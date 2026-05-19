@@ -3831,7 +3831,6 @@ function YoutubeWidget({ compact = false }) {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState(false);
-  const [selected, setSelected] = useState(null);
   const YOUTUBE_API_KEY = GCAL_API_KEY;
 
   useEffect(() => {
@@ -3863,14 +3862,15 @@ function YoutubeWidget({ compact = false }) {
 
   const CHANNEL_URL = `https://www.youtube.com/channel/${YOUTUBE_CHANNEL_ID}`;
 
+  const [currentIdx, setCurrentIdx] = useState(0);
+
   const header = (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-      <span style={{ fontSize: compact ? 16 : 20 }}>▶️</span>
+      <span style={{ fontSize: 16 }}>▶️</span>
       <div style={{ flex: 1 }}>
-        <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: compact ? 13 : 14, fontWeight: 600, color: C.dark }}>
+        <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 13, fontWeight: 600, color: C.dark }}>
           Canal YouTube
         </div>
-        {!compact && <div style={{ fontSize: 11, color: C.gray }}>Últimos videos publicados</div>}
       </div>
       <a href={CHANNEL_URL} target="_blank" rel="noopener noreferrer"
         style={{ fontSize: 11, color: C.primary, fontWeight: 600, textDecoration: "none" }}>
@@ -3909,90 +3909,47 @@ function YoutubeWidget({ compact = false }) {
     );
   }
 
+  const current = videos[currentIdx];
+  const vid = current?.id?.videoId;
+  const title = current?.snippet?.title || "";
+  const date = current?.snippet?.publishedAt
+    ? new Date(current.snippet.publishedAt).toLocaleDateString("es-CL", { day: "numeric", month: "long" })
+    : "";
+
   return (
     <div>
       {header}
 
-      {/* Modal reproductor */}
-      {selected && (
-        <div onClick={() => setSelected(null)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div onClick={(e) => e.stopPropagation()}
-            style={{ width: "100%", maxWidth: 720, background: "#000", borderRadius: 12, overflow: "hidden", position: "relative" }}>
-            <button onClick={() => setSelected(null)}
-              style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.6)", border: "none", color: "white", fontSize: 22, cursor: "pointer", borderRadius: 6, zIndex: 10, lineHeight: 1, padding: "2px 8px" }}>×</button>
-            <div style={{ position: "relative", paddingTop: "56.25%" }}>
-              <iframe src={`https://www.youtube.com/embed/${selected}?autoplay=1`}
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Player embed inline */}
+      <div style={{ borderRadius: 10, overflow: "hidden", background: "#000", position: "relative", paddingTop: "56.25%" }}>
+        <iframe
+          key={vid}
+          src={`https://www.youtube.com/embed/${vid}?autoplay=0`}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
 
-      {compact ? (
-        /* Modo columna: lista vertical con miniatura pequeña */
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {videos.slice(0, 4).map((v) => {
-            const vid = v.id?.videoId;
-            const thumb = v.snippet?.thumbnails?.default?.url;
-            const title = v.snippet?.title || "";
-            const date = v.snippet?.publishedAt
-              ? new Date(v.snippet.publishedAt).toLocaleDateString("es-CL", { day: "numeric", month: "short" })
-              : "";
-            return (
-              <div key={vid} onClick={() => setSelected(vid)}
-                style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer", borderRadius: 8, padding: "4px 0" }}>
-                <div style={{ position: "relative", width: 72, height: 40, borderRadius: 6, overflow: "hidden", flexShrink: 0, background: C.dark }}>
-                  {thumb && <img src={thumb} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
-                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ width: 22, height: 22, background: "rgba(0,0,0,0.65)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <span style={{ fontSize: 9, marginLeft: 1, color: "white" }}>▶</span>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: C.dark, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                    {title}
-                  </div>
-                  <div style={{ fontSize: 10, color: C.gray, marginTop: 2 }}>{date}</div>
-                </div>
-              </div>
-            );
-          })}
+      {/* Título + controles prev/next */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+        <button
+          onClick={() => setCurrentIdx(i => Math.max(0, i - 1))}
+          disabled={currentIdx === 0}
+          style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, width: 28, height: 28, cursor: currentIdx === 0 ? "not-allowed" : "pointer", opacity: currentIdx === 0 ? 0.3 : 1, fontSize: 12, flexShrink: 0 }}
+        >‹</button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: C.dark, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+            {title}
+          </div>
+          <div style={{ fontSize: 10, color: C.gray, marginTop: 2 }}>{date} · {currentIdx + 1}/{videos.length}</div>
         </div>
-      ) : (
-        /* Modo grilla completo */
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12 }}>
-          {videos.map((v) => {
-            const vid = v.id?.videoId;
-            const thumb = v.snippet?.thumbnails?.medium?.url || v.snippet?.thumbnails?.default?.url;
-            const title = v.snippet?.title || "";
-            const date = v.snippet?.publishedAt
-              ? new Date(v.snippet.publishedAt).toLocaleDateString("es-CL", { day: "numeric", month: "short" })
-              : "";
-            return (
-              <Card key={vid} hover onClick={() => setSelected(vid)} style={{ padding: 0, overflow: "hidden", cursor: "pointer" }}>
-                <div style={{ position: "relative", paddingTop: "56.25%", background: C.dark }}>
-                  {thumb && <img src={thumb} alt={title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
-                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ width: 40, height: 40, background: "rgba(0,0,0,0.65)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <span style={{ fontSize: 18, marginLeft: 3 }}>▶</span>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ padding: "10px 12px" }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                    {title}
-                  </div>
-                  <div style={{ fontSize: 10, color: C.gray, marginTop: 4 }}>{date}</div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+        <button
+          onClick={() => setCurrentIdx(i => Math.min(videos.length - 1, i + 1))}
+          disabled={currentIdx === videos.length - 1}
+          style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, width: 28, height: 28, cursor: currentIdx === videos.length - 1 ? "not-allowed" : "pointer", opacity: currentIdx === videos.length - 1 ? 0.3 : 1, fontSize: 12, flexShrink: 0 }}
+        >›</button>
+      </div>
     </div>
   );
 }
