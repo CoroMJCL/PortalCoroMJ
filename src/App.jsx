@@ -5716,7 +5716,7 @@ function Integrantes({ members }) {
 //  SECCIONES ESTÁTICAS
 // ══════════════════════════════════════════
 function Biblioteca({ biblioteca, onReload, user }) {
-  const librosDefault = [
+  const LIBROS_DEFAULT = [
     {
       id: "d1",
       titulo: "Catecismo de la Iglesia Católica",
@@ -5750,6 +5750,11 @@ function Biblioteca({ biblioteca, onReload, user }) {
       url: "https://www.vatican.va/content/john-paul-ii/es/apostolic_letters/2003/documents/hf_jp-ii_apl_20031204_spiritus-et-sponsa.html",
     },
   ];
+  const ocultos = (() => {
+    try { return JSON.parse(localStorage.getItem("biblioteca_ocultos") || "[]"); }
+    catch { return []; }
+  })();
+  const librosDefault = LIBROS_DEFAULT.filter((l) => !ocultos.includes(l.id));
   const todos = [...librosDefault, ...(biblioteca || [])];
   const emojis = ["📕", "📗", "📘", "📙", "📓", "📔", "📒", "📃"];
   return (
@@ -8517,6 +8522,13 @@ function AdminLinks({ links, onReload }) {
   );
 }
 
+const LIBROS_DEFAULT_ADMIN = [
+  { id: "d1", titulo: "Catecismo de la Iglesia Católica", autor: "Vaticano · 1992", emoji: "📕" },
+  { id: "d2", titulo: "Sacrosanctum Concilium", autor: "Concilio Vaticano II · 1963", emoji: "📗" },
+  { id: "d3", titulo: "Musicam Sacram", autor: "Santa Sede · 1967", emoji: "📘" },
+  { id: "d4", titulo: "Spiritus et Sponsa", autor: "Juan Pablo II · 2003", emoji: "📙" },
+];
+
 function AdminBiblioteca({ biblioteca, onReload }) {
   const [form, setForm] = useState({
     titulo: "",
@@ -8527,6 +8539,10 @@ function AdminBiblioteca({ biblioteca, onReload }) {
   });
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [ocultos, setOcultos] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("biblioteca_ocultos") || "[]"); }
+    catch { return []; }
+  });
   const inputS = {
     padding: "8px 12px",
     borderRadius: 7,
@@ -8537,6 +8553,14 @@ function AdminBiblioteca({ biblioteca, onReload }) {
     boxSizing: "border-box",
   };
   const emojis = ["📕", "📗", "📘", "📙", "📓", "📔", "📒", "📃", "📜"];
+
+  function toggleOculto(id) {
+    const nuevos = ocultos.includes(id)
+      ? ocultos.filter((x) => x !== id)
+      : [...ocultos, id];
+    setOcultos(nuevos);
+    localStorage.setItem("biblioteca_ocultos", JSON.stringify(nuevos));
+  }
 
   async function submit() {
     if (!form.titulo || !form.url) return;
@@ -8563,19 +8587,62 @@ function AdminBiblioteca({ biblioteca, onReload }) {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 14,
-        }}
-      >
-        <span style={{ fontSize: 13, color: C.gray }}>
-          {biblioteca.length} documentos propios
-        </span>
-        <Btn onClick={() => setShowForm((p) => !p)}>+ Agregar documento</Btn>
+      {/* Libros por defecto */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: C.gray, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>
+          Libros del Magisterio (predeterminados)
+        </div>
+        {LIBROS_DEFAULT_ADMIN.map((l) => {
+          const visible = !ocultos.includes(l.id);
+          return (
+            <Card
+              key={l.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 8,
+                opacity: visible ? 1 : 0.45,
+              }}
+            >
+              <span style={{ fontSize: 24, flexShrink: 0 }}>{l.emoji}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>{l.titulo}</div>
+                <div style={{ fontSize: 11, color: C.gray, marginTop: 1 }}>{l.autor}</div>
+              </div>
+              <button
+                onClick={() => toggleOculto(l.id)}
+                style={{
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "5px 12px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: visible ? "#dcfce7" : "#fee2e2",
+                  color: visible ? "#16a34a" : "#dc2626",
+                  flexShrink: 0,
+                }}
+              >
+                {visible ? "✓ Visible" : "✗ Oculto"}
+              </button>
+            </Card>
+          );
+        })}
+        <div style={{ fontSize: 11, color: C.gray, marginTop: 6 }}>
+          Los libros ocultos no aparecen para los integrantes del coro.
+        </div>
       </div>
+
+      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16, marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <span style={{ fontSize: 13, color: C.gray }}>
+            {biblioteca.length} documentos propios
+          </span>
+          <Btn onClick={() => setShowForm((p) => !p)}>+ Agregar documento</Btn>
+        </div>
+      </div>
+
       {showForm && (
         <Card
           style={{
@@ -8691,8 +8758,7 @@ function AdminBiblioteca({ biblioteca, onReload }) {
             padding: "20px 0",
           }}
         >
-          Sin documentos propios aún. Los libros del Magisterio siempre se
-          muestran.
+          Sin documentos propios aún.
         </p>
       )}
     </div>
