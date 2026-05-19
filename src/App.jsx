@@ -983,6 +983,8 @@ export default function App() {
             "Al atardecer de aquel día, el primero de la semana, estando cerradas las puertas del lugar donde se encontraban los discípulos por miedo a los judíos, llegó Jesús, se puso en medio y les dijo: «La paz sea con vosotros.» Dicho esto, les mostró las manos y el costado. Los discípulos se llenaron de alegría al ver al Señor. De nuevo les dijo: «La paz sea con vosotros. Como el Padre me envió, también yo os envío.» Después de decir esto, sopló sobre ellos y les dijo: «Recibid el Espíritu Santo; a quienes les perdonéis los pecados, les quedan perdonados.»",
           reflexion:
             "El Espíritu Santo nos anima a cantar con gozo y a ser instrumentos de paz en la liturgia.",
+          oracion:
+            "Ven, Espíritu Santo, llena nuestras voces de tu fuego y que nuestro canto sea ofrenda digna de tu gloria.",
           domingo: "Pentecostés",
           fuente: "Calendario litúrgico 2026",
         },
@@ -992,6 +994,8 @@ export default function App() {
             "Jesús se dirigió a una ciudad llamada Naín, e iban con él sus discípulos y mucha gente. Cuando se acercaba a la puerta de la ciudad, resultó que sacaban a enterrar a un muerto, hijo único de su madre, que era viuda. La ciudad acompañaba a la madre. Al verla el Señor, le dio lástima y le dijo: «No llores.» Se acercó y tocó el féretro; los que lo llevaban se detuvieron. Y dijo: «Joven, yo te lo mando: levántate.» El muerto se incorporó y empezó a hablar. Y Jesús se lo entregó a su madre.",
           reflexion:
             "Nuestra música proclama la vida que Cristo devuelve y el consuelo que el Señor ofrece a los afligidos.",
+          oracion:
+            "Señor, que nuestras voces eleven a los caídos y tu misericordia se haga presente hoy en este ensayo.",
           domingo: "X Domingo del Tiempo Ordinario",
           fuente: "Calendario litúrgico 2026",
         },
@@ -1003,6 +1007,8 @@ export default function App() {
             "Como el Padre me amó, yo también os he amado. Permaneced en mi amor. Si guardáis mis mandamientos, permaneceréis en mi amor, lo mismo que yo he guardado los mandamientos de mi Padre y permanezco en su amor. Os he dicho esto para que mi alegría esté en vosotros y vuestra alegría llegue a plenitud.",
           reflexion:
             "Que nuestra música sea expresión del amor que permanece y de la alegría del Evangelio.",
+          oracion:
+            "Señor, que nuestro canto brote del amor que tú nos tienes y que tu alegría se haga presente en cada nota.",
           domingo: "Domingo del Tiempo Ordinario",
           fuente: "Evangelio según San Juan",
         }
@@ -1082,6 +1088,8 @@ export default function App() {
           "Al atardecer de aquel día, el primero de la semana, llegó Jesús, se puso en medio y les dijo: «La paz sea con vosotros.» Dicho esto, les mostró las manos y el costado. Los discípulos se llenaron de alegría al ver al Señor.",
         reflexion:
           "El Espíritu Santo nos anima a cantar con gozo y a ser instrumentos de paz en la liturgia.",
+        oracion:
+          "Ven, Espíritu Santo, llena nuestras voces de tu fuego y que nuestro canto sea ofrenda digna de tu gloria.",
         domingo: "Pentecostés",
         fuente: "Calendario litúrgico 2026",
       });
