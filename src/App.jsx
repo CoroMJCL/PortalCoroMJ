@@ -10549,8 +10549,6 @@ function AdminPautasMisa({ onReload }) {
 //  ASISTENCIA (vista pública)
 // ══════════════════════════════════════════
 function Asistencia({ asistencia, members, eventos, user, onReload }) {
-  // eventos = gcalEventos (Google Calendar). Enriquecer con título del evento GCal al mostrar.
-  // Eventos que tienen al menos un registro de asistencia
   const eventosConAsistencia = eventos.filter(e =>
     asistencia.some(a => a.evento_id === e.id)
   ).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
@@ -10563,130 +10561,230 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
   };
 
   const colorPct = (pct) => pct === null ? C.gray : pct >= 75 ? C.primary : pct >= 50 ? "#f59e0b" : "#ef4444";
-
   const fmtFecha = (f) => new Date(f + "T00:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" });
-
   const [eventoSeleccionado, setEventoSeleccionado] = useState(null);
+
+  const isAdmin = user?.cuerda === "Admin";
+  const cc = CUERDAS[user?.cuerda] || C.primary;
+
+  // Datos personales del usuario logueado
+  const misReg = asistencia.filter(a => a.member_id === user?.id);
+  const misPresentes = misReg.filter(a => a.estado === "presente").length;
+  const misAusentes = misReg.filter(a => a.estado === "ausente").length;
+  const misJustificados = misReg.filter(a => a.estado === "justificado").length;
+  const evaluados = misReg.filter(a => a.estado !== "justificado").length;
+  const pct = calcPct(user?.id);
+  const colPct = colorPct(pct);
+  const circum = 2 * Math.PI * 38; // radio 38
+
+  const msgPct = pct === null ? null : pct >= 75 ? "¡Vas muy bien! Sigue así 💪" : pct >= 50 ? "Puedes mejorar tu asistencia 🎵" : "Tu asistencia necesita atención ⚠️";
+  const bgPct = pct === null ? C.bg : pct >= 75 ? C.primary + "12" : pct >= 50 ? "#fef3c7" : "#fee2e2";
+  const borderPct = pct === null ? C.border : pct >= 75 ? C.primary + "40" : pct >= 50 ? "#f59e0b40" : "#ef444440";
 
   return (
     <div style={{ maxWidth: 1000 }}>
       <SectionTitle title="Asistencia del Coro" subtitle="Registro de asistencia a eventos y ensayos" />
 
-      {/* Tabla resumen de integrantes */}
-      <Card style={{ marginBottom: 20, padding: 0, overflow: "hidden" }}>
-        <div style={{ padding: "14px 18px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 18 }}>📊</span>
-          <span style={{ fontWeight: 700, fontSize: 15, color: C.dark }}>Resumen por integrante</span>
+      {/* ── WIDGET PERSONAL ── */}
+      <div style={{ background: bgPct, border: `2px solid ${borderPct}`, borderRadius: 18, padding: 20, marginBottom: 20, display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+
+        {/* Anillo SVG */}
+        <div style={{ position: "relative", width: 96, height: 96, flexShrink: 0 }}>
+          <svg width="96" height="96" style={{ transform: "rotate(-90deg)" }}>
+            <circle cx="48" cy="48" r="38" fill="none" stroke="#e5e7eb" strokeWidth="7" />
+            {pct !== null && (
+              <circle cx="48" cy="48" r="38" fill="none"
+                stroke={colPct} strokeWidth="7"
+                strokeDasharray={`${(pct / 100) * circum} ${circum}`}
+                strokeLinecap="round"
+                style={{ transition: "stroke-dasharray 0.6s ease" }}
+              />
+            )}
+          </svg>
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+            {pct !== null ? (
+              <>
+                <span style={{ fontSize: 20, fontWeight: 800, color: colPct, lineHeight: 1 }}>{pct}%</span>
+                <span style={{ fontSize: 9, color: C.gray, fontWeight: 600, marginTop: 1 }}>asistencia</span>
+              </>
+            ) : (
+              <span style={{ fontSize: 10, color: C.gray, textAlign: "center", lineHeight: 1.3, padding: "0 8px" }}>sin datos</span>
+            )}
+          </div>
         </div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: C.bg }}>
-                <th style={{ padding: "10px 16px", textAlign: "left", color: C.gray, fontWeight: 600 }}>Integrante</th>
-                <th style={{ padding: "10px 16px", textAlign: "center", color: C.gray, fontWeight: 600 }}>Presentes</th>
-                <th style={{ padding: "10px 16px", textAlign: "center", color: C.gray, fontWeight: 600 }}>Ausentes</th>
-                <th style={{ padding: "10px 16px", textAlign: "center", color: C.gray, fontWeight: 600 }}>Justificados</th>
-                <th style={{ padding: "10px 16px", textAlign: "center", color: C.gray, fontWeight: 600 }}>Asistencia</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m, i) => {
-                const misReg = asistencia.filter(a => a.member_id === m.id);
-                const presentes = misReg.filter(a => a.estado === "presente").length;
-                const ausentes = misReg.filter(a => a.estado === "ausente").length;
-                const justificados = misReg.filter(a => a.estado === "justificado").length;
-                const pct = calcPct(m.id);
-                const cc = CUERDAS[m.cuerda] || C.primary;
+
+        {/* Info personal */}
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            <div style={{ width: 40, height: 40, borderRadius: "50%", background: cc, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 14, fontWeight: 700, flexShrink: 0 }}>
+              {user?.foto_url ? <img src={user.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(user?.nombre || "U")}
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: C.dark }}>{user?.nombre?.split(" ")[0]}</div>
+              <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>{rolLabel(user?.cuerda)}</div>
+            </div>
+          </div>
+          {msgPct && <div style={{ fontSize: 12, color: colPct, fontWeight: 600, marginBottom: 10 }}>{msgPct}</div>}
+
+          {/* Contadores */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {[
+              { label: "Presentes", val: misPresentes, color: C.primary, bg: C.primaryLight, emoji: "✅" },
+              { label: "Ausentes", val: misAusentes, color: "#ef4444", bg: "#fee2e2", emoji: "❌" },
+              { label: "Justificados", val: misJustificados, color: "#f59e0b", bg: "#fef3c7", emoji: "🟡" },
+            ].map(s => (
+              <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.color}30`, borderRadius: 10, padding: "6px 12px", textAlign: "center", minWidth: 70 }}>
+                <div style={{ fontSize: 11, color: s.color, marginBottom: 1 }}>{s.emoji} {s.label}</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.val}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Historial personal por evento */}
+        {misReg.length > 0 && (
+          <div style={{ width: "100%", marginTop: 4 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.gray, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Mis últimos eventos</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {eventosConAsistencia.slice(0, 8).map(e => {
+                const reg = misReg.find(a => a.evento_id === e.id);
+                const estado = reg?.estado;
+                if (!estado) return null;
+                const color = estado === "presente" ? C.primary : estado === "justificado" ? "#f59e0b" : "#ef4444";
+                const icono = estado === "presente" ? "✅" : estado === "justificado" ? "🟡" : "❌";
+                const tipoEmoji = e.tipo === "ensayo" ? "🎵" : e.tipo === "misa" ? "⛪" : "📅";
                 return (
-                  <tr key={m.id} style={{ borderTop: `1px solid ${C.border}`, background: m.id === user?.id ? C.primaryLight + "40" : i % 2 === 0 ? "#fff" : C.bg }}>
-                    <td style={{ padding: "10px 16px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: "50%", background: cc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 12, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
-                          {m.foto_url ? <img src={m.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(m.nombre || "?")}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 600, color: C.dark }}>{m.nombre} {m.id === user?.id && <span style={{ fontSize: 10, color: C.primary }}>(tú)</span>}</div>
-                          <div style={{ fontSize: 11, color: cc }}>{rolLabel(m.cuerda)}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{ padding: "10px 16px", textAlign: "center", color: C.primary, fontWeight: 600 }}>{presentes}</td>
-                    <td style={{ padding: "10px 16px", textAlign: "center", color: "#ef4444", fontWeight: 600 }}>{ausentes}</td>
-                    <td style={{ padding: "10px 16px", textAlign: "center", color: "#f59e0b", fontWeight: 600 }}>{justificados}</td>
-                    <td style={{ padding: "10px 16px", textAlign: "center" }}>
-                      {pct !== null ? (
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          <div style={{ width: 60, height: 6, borderRadius: 3, background: "#e5e7eb", overflow: "hidden" }}>
-                            <div style={{ width: `${pct}%`, height: "100%", background: colorPct(pct), borderRadius: 3, transition: "width 0.3s" }} />
-                          </div>
-                          <span style={{ fontWeight: 700, color: colorPct(pct), fontSize: 13 }}>{pct}%</span>
-                        </div>
-                      ) : (
-                        <span style={{ color: C.gray, fontSize: 12 }}>Sin registros</span>
-                      )}
-                    </td>
-                  </tr>
+                  <div key={e.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: color + "15", border: `1px solid ${color}30`, borderRadius: 10, padding: "6px 10px", fontSize: 11 }}>
+                    <span style={{ fontSize: 16 }}>{icono}</span>
+                    <span style={{ color: C.dark, fontWeight: 600, textAlign: "center", maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tipoEmoji} {e.titulo.split(" ").slice(0, 2).join(" ")}</span>
+                    <span style={{ color: C.gray, fontSize: 10 }}>{fmtFecha(e.fecha)}</span>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {/* Detalle por evento */}
-      <Card style={{ padding: 0, overflow: "hidden" }}>
-        <div style={{ padding: "14px 18px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 18 }}>📅</span>
-          <span style={{ fontWeight: 700, fontSize: 15, color: C.dark }}>Detalle por evento</span>
-        </div>
-        {eventosConAsistencia.length === 0 ? (
-          <div style={{ padding: 32, textAlign: "center", color: C.gray }}>No hay registros de asistencia aún.</div>
-        ) : (
-          <div>
-            {eventosConAsistencia.map(e => {
-              const regEvento = asistencia.filter(a => a.evento_id === e.id);
-              const presentes = regEvento.filter(a => a.estado === "presente").length;
-              const total = regEvento.filter(a => a.estado !== "justificado").length;
-              const pct = total > 0 ? Math.round((presentes / total) * 100) : 0;
-              const isOpen = eventoSeleccionado === e.id;
-              return (
-                <div key={e.id} style={{ borderTop: `1px solid ${C.border}` }}>
-                  <div onClick={() => setEventoSeleccionado(isOpen ? null : e.id)} style={{ padding: "12px 18px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12, background: isOpen ? C.primaryLight + "30" : "transparent" }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: C.primary + "15", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 800, color: C.primary, lineHeight: 1 }}>{new Date(e.fecha + "T00:00:00").getDate()}</div>
-                      <div style={{ fontSize: 8, color: C.primary, textTransform: "uppercase" }}>{new Date(e.fecha + "T00:00:00").toLocaleDateString("es-CL", { month: "short" })}</div>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, color: C.dark, fontSize: 13 }}>{e.titulo}</div>
-                      <div style={{ fontSize: 11, color: C.gray }}>{presentes} presentes · {regEvento.filter(a => a.estado === "ausente").length} ausentes · {regEvento.filter(a => a.estado === "justificado").length} justificados</div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontWeight: 700, color: colorPct(pct), fontSize: 14 }}>{pct}%</span>
-                      <span style={{ color: C.gray, fontSize: 12 }}>{isOpen ? "▲" : "▼"}</span>
-                    </div>
-                  </div>
-                  {isOpen && (
-                    <div style={{ padding: "8px 18px 16px", display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {members.map(m => {
-                        const reg = regEvento.find(a => a.member_id === m.id);
-                        const estado = reg?.estado || "sin registro";
-                        const color = estado === "presente" ? C.primary : estado === "justificado" ? "#f59e0b" : estado === "ausente" ? "#ef4444" : C.gray;
-                        const icono = estado === "presente" ? "✅" : estado === "justificado" ? "🟡" : estado === "ausente" ? "❌" : "⬜";
-                        return (
-                          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 6, background: color + "15", border: `1px solid ${color}30`, borderRadius: 20, padding: "4px 10px", fontSize: 12 }}>
-                            <span>{icono}</span>
-                            <span style={{ color: C.dark, fontWeight: 500 }}>{m.nombre.split(" ")[0]}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            </div>
           </div>
         )}
-      </Card>
+      </div>
+
+      {/* ── TABLA GENERAL (solo Admin) ── */}
+      {isAdmin && (
+        <>
+          <Card style={{ marginBottom: 20, padding: 0, overflow: "hidden" }}>
+            <div style={{ padding: "14px 18px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 18 }}>📊</span>
+              <span style={{ fontWeight: 700, fontSize: 15, color: C.dark }}>Resumen por integrante</span>
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: C.bg }}>
+                    <th style={{ padding: "10px 16px", textAlign: "left", color: C.gray, fontWeight: 600 }}>Integrante</th>
+                    <th style={{ padding: "10px 16px", textAlign: "center", color: C.gray, fontWeight: 600 }}>Presentes</th>
+                    <th style={{ padding: "10px 16px", textAlign: "center", color: C.gray, fontWeight: 600 }}>Ausentes</th>
+                    <th style={{ padding: "10px 16px", textAlign: "center", color: C.gray, fontWeight: 600 }}>Justificados</th>
+                    <th style={{ padding: "10px 16px", textAlign: "center", color: C.gray, fontWeight: 600 }}>Asistencia</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {members.map((m, i) => {
+                    const mReg = asistencia.filter(a => a.member_id === m.id);
+                    const presentes = mReg.filter(a => a.estado === "presente").length;
+                    const ausentes = mReg.filter(a => a.estado === "ausente").length;
+                    const justificados = mReg.filter(a => a.estado === "justificado").length;
+                    const p = calcPct(m.id);
+                    const mcc = CUERDAS[m.cuerda] || C.primary;
+                    return (
+                      <tr key={m.id} style={{ borderTop: `1px solid ${C.border}`, background: m.id === user?.id ? C.primaryLight + "40" : i % 2 === 0 ? "#fff" : C.bg }}>
+                        <td style={{ padding: "10px 16px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 32, height: 32, borderRadius: "50%", background: mcc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 12, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                              {m.foto_url ? <img src={m.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(m.nombre || "?")}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, color: C.dark }}>{m.nombre} {m.id === user?.id && <span style={{ fontSize: 10, color: C.primary }}>(tú)</span>}</div>
+                              <div style={{ fontSize: 11, color: mcc }}>{rolLabel(m.cuerda)}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: "10px 16px", textAlign: "center", color: C.primary, fontWeight: 600 }}>{presentes}</td>
+                        <td style={{ padding: "10px 16px", textAlign: "center", color: "#ef4444", fontWeight: 600 }}>{ausentes}</td>
+                        <td style={{ padding: "10px 16px", textAlign: "center", color: "#f59e0b", fontWeight: 600 }}>{justificados}</td>
+                        <td style={{ padding: "10px 16px", textAlign: "center" }}>
+                          {p !== null ? (
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                              <div style={{ width: 60, height: 6, borderRadius: 3, background: "#e5e7eb", overflow: "hidden" }}>
+                                <div style={{ width: `${p}%`, height: "100%", background: colorPct(p), borderRadius: 3, transition: "width 0.3s" }} />
+                              </div>
+                              <span style={{ fontWeight: 700, color: colorPct(p), fontSize: 13 }}>{p}%</span>
+                            </div>
+                          ) : (
+                            <span style={{ color: C.gray, fontSize: 12 }}>Sin registros</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          {/* Detalle por evento */}
+          <Card style={{ padding: 0, overflow: "hidden" }}>
+            <div style={{ padding: "14px 18px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 18 }}>📅</span>
+              <span style={{ fontWeight: 700, fontSize: 15, color: C.dark }}>Detalle por evento</span>
+            </div>
+            {eventosConAsistencia.length === 0 ? (
+              <div style={{ padding: 32, textAlign: "center", color: C.gray }}>No hay registros de asistencia aún.</div>
+            ) : (
+              <div>
+                {eventosConAsistencia.map(e => {
+                  const regEvento = asistencia.filter(a => a.evento_id === e.id);
+                  const presentes = regEvento.filter(a => a.estado === "presente").length;
+                  const total = regEvento.filter(a => a.estado !== "justificado").length;
+                  const p = total > 0 ? Math.round((presentes / total) * 100) : 0;
+                  const isOpen = eventoSeleccionado === e.id;
+                  return (
+                    <div key={e.id} style={{ borderTop: `1px solid ${C.border}` }}>
+                      <div onClick={() => setEventoSeleccionado(isOpen ? null : e.id)} style={{ padding: "12px 18px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12, background: isOpen ? C.primaryLight + "30" : "transparent" }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, background: C.primary + "15", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: C.primary, lineHeight: 1 }}>{new Date(e.fecha + "T00:00:00").getDate()}</div>
+                          <div style={{ fontSize: 8, color: C.primary, textTransform: "uppercase" }}>{new Date(e.fecha + "T00:00:00").toLocaleDateString("es-CL", { month: "short" })}</div>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, color: C.dark, fontSize: 13 }}>{e.titulo}</div>
+                          <div style={{ fontSize: 11, color: C.gray }}>{presentes} presentes · {regEvento.filter(a => a.estado === "ausente").length} ausentes · {regEvento.filter(a => a.estado === "justificado").length} justificados</div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontWeight: 700, color: colorPct(p), fontSize: 14 }}>{p}%</span>
+                          <span style={{ color: C.gray, fontSize: 12 }}>{isOpen ? "▲" : "▼"}</span>
+                        </div>
+                      </div>
+                      {isOpen && (
+                        <div style={{ padding: "8px 18px 16px", display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {members.map(m => {
+                            const reg = regEvento.find(a => a.member_id === m.id);
+                            const estado = reg?.estado || "sin registro";
+                            const color = estado === "presente" ? C.primary : estado === "justificado" ? "#f59e0b" : estado === "ausente" ? "#ef4444" : C.gray;
+                            const icono = estado === "presente" ? "✅" : estado === "justificado" ? "🟡" : estado === "ausente" ? "❌" : "⬜";
+                            return (
+                              <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 6, background: color + "15", border: `1px solid ${color}30`, borderRadius: 20, padding: "4px 10px", fontSize: 12 }}>
+                                <span>{icono}</span>
+                                <span style={{ color: C.dark, fontWeight: 500 }}>{m.nombre.split(" ")[0]}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </>
+      )}
     </div>
   );
 }
@@ -10763,6 +10861,7 @@ function AdminAsistencia({ members, eventos, asistencia, onReload }) {
   const guardar = async () => {
     if (!eventoId) return;
     setSaving(true);
+    const token = _authToken || SUPABASE_KEY;
     try {
       for (const m of members) {
         const estado = registros[m.id] || "ausente";
@@ -10770,19 +10869,22 @@ function AdminAsistencia({ members, eventos, asistencia, onReload }) {
         if (existe) {
           await fetch(`${SUPABASE_URL}/rest/v1/asistencia?id=eq.${existe.id}`, {
             method: "PATCH",
-            headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
+            headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
             body: JSON.stringify({ estado }),
           });
         } else {
           await fetch(`${SUPABASE_URL}/rest/v1/asistencia`, {
             method: "POST",
-            headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+            headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "return=minimal" },
             body: JSON.stringify({ evento_id: eventoId, member_id: m.id, estado }),
           });
         }
       }
       setSaved(true);
       onReload();
+    } catch(err) {
+      console.error("Error guardando asistencia:", err);
+      alert("Error al guardar: " + err.message);
     } finally {
       setSaving(false);
     }
