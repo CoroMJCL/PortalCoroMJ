@@ -2660,6 +2660,200 @@ function Dashboard({
         </div>
       ))}
 
+      {/* ── Stats con foto de usuario ── */}
+      <div
+        className="grid-stats"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4,1fr)",
+          gap: 12,
+          marginBottom: 16,
+        }}
+      >
+        {/* Foto + saludo usuario */}
+        <Card
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: 14,
+            background: `linear-gradient(135deg,${C.primaryLight},#fff)`,
+          }}
+        >
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              flexShrink: 0,
+              background: cc,
+              border: `3px solid ${cc}40`,
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "white",
+              fontSize: 16,
+              fontWeight: 700,
+            }}
+          >
+            {user?.foto_url ? (
+              <img
+                src={user.foto_url}
+                alt=""
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  display: "block",
+                }}
+              />
+            ) : (
+              ini(user?.nombre || "U")
+            )}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 12, color: C.gray, marginBottom: 1 }}>
+              Bienvenido/a
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: C.dark,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {user?.nombre?.split(" ")[0]}
+            </div>
+            <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>
+              {rolLabel(user?.cuerda)}
+            </div>
+          </div>
+        </Card>
+        {/* Próximo evento con fecha */}
+        <Card
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: 14,
+            gridColumn: "span 2",
+          }}
+        >
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 12,
+              background: C.primary + "15",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 9,
+              fontWeight: 700,
+              color: C.primary,
+              flexShrink: 0,
+              border: `1px solid ${C.primary}20`,
+            }}
+          >
+            {eventoDestacado ? (
+              <>
+                <div
+                  style={{
+                    fontSize: 20,
+                    fontWeight: 800,
+                    lineHeight: 1,
+                    color: C.primary,
+                  }}
+                >
+                  {new Date(eventoDestacado.fecha + "T00:00:00").getDate()}
+                </div>
+                <div
+                  style={{
+                    fontSize: 8,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  {new Date(
+                    eventoDestacado.fecha + "T00:00:00"
+                  ).toLocaleDateString("es-CL", { month: "short" })}
+                </div>
+              </>
+            ) : (
+              <span style={{ fontSize: 20 }}>🎼</span>
+            )}
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 11, color: C.gray, marginBottom: 2 }}>
+              Próximo evento
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: C.dark,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {eventoDestacado?.titulo || "Sin eventos próximos"}
+            </div>
+            {eventoDestacado && (
+              <div
+                style={{
+                  fontSize: 11,
+                  color: C.primary,
+                  marginTop: 2,
+                  textTransform: "capitalize",
+                }}
+              >
+                {fmtEventoFecha(eventoDestacado.fecha)}
+                {eventoDestacado.hora ? " · " + eventoDestacado.hora : ""}
+              </div>
+            )}
+          </div>
+        </Card>
+        {/* Documentos */}
+        <Card
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: 14,
+          }}
+        >
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 10,
+              background: C.gold + "15",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 18,
+              flexShrink: 0,
+            }}
+          >
+            📄
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: C.gray, marginBottom: 2 }}>
+              Documentos
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>
+              {docs.length} archivos
+            </div>
+          </div>
+        </Card>
+      </div>
+
       {/* ── Avisos del Coro ── */}
       {avisos && avisos.length > 0 && (
         <div style={{ marginBottom: 14 }}>
@@ -2908,200 +3102,6 @@ function Dashboard({
             ))}
         </div>
       )}
-
-      {/* ── Stats con foto de usuario ── */}
-      <div
-        className="grid-stats"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4,1fr)",
-          gap: 12,
-          marginBottom: 16,
-        }}
-      >
-        {/* Foto + saludo usuario */}
-        <Card
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: 14,
-            background: `linear-gradient(135deg,${C.primaryLight},#fff)`,
-          }}
-        >
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: "50%",
-              flexShrink: 0,
-              background: cc,
-              border: `3px solid ${cc}40`,
-              overflow: "hidden",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "white",
-              fontSize: 16,
-              fontWeight: 700,
-            }}
-          >
-            {user?.foto_url ? (
-              <img
-                src={user.foto_url}
-                alt=""
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  display: "block",
-                }}
-              />
-            ) : (
-              ini(user?.nombre || "U")
-            )}
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 12, color: C.gray, marginBottom: 1 }}>
-              Bienvenido/a
-            </div>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: C.dark,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {user?.nombre?.split(" ")[0]}
-            </div>
-            <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>
-              {rolLabel(user?.cuerda)}
-            </div>
-          </div>
-        </Card>
-        {/* Próximo evento con fecha */}
-        <Card
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: 14,
-            gridColumn: "span 2",
-          }}
-        >
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 12,
-              background: C.primary + "15",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 9,
-              fontWeight: 700,
-              color: C.primary,
-              flexShrink: 0,
-              border: `1px solid ${C.primary}20`,
-            }}
-          >
-            {eventoDestacado ? (
-              <>
-                <div
-                  style={{
-                    fontSize: 20,
-                    fontWeight: 800,
-                    lineHeight: 1,
-                    color: C.primary,
-                  }}
-                >
-                  {new Date(eventoDestacado.fecha + "T00:00:00").getDate()}
-                </div>
-                <div
-                  style={{
-                    fontSize: 8,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  {new Date(
-                    eventoDestacado.fecha + "T00:00:00"
-                  ).toLocaleDateString("es-CL", { month: "short" })}
-                </div>
-              </>
-            ) : (
-              <span style={{ fontSize: 20 }}>🎼</span>
-            )}
-          </div>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 11, color: C.gray, marginBottom: 2 }}>
-              Próximo evento
-            </div>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: C.dark,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {eventoDestacado?.titulo || "Sin eventos próximos"}
-            </div>
-            {eventoDestacado && (
-              <div
-                style={{
-                  fontSize: 11,
-                  color: C.primary,
-                  marginTop: 2,
-                  textTransform: "capitalize",
-                }}
-              >
-                {fmtEventoFecha(eventoDestacado.fecha)}
-                {eventoDestacado.hora ? " · " + eventoDestacado.hora : ""}
-              </div>
-            )}
-          </div>
-        </Card>
-        {/* Documentos */}
-        <Card
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: 14,
-          }}
-        >
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 10,
-              background: C.gold + "15",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 18,
-              flexShrink: 0,
-            }}
-          >
-            📄
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: C.gray, marginBottom: 2 }}>
-              Documentos
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>
-              {docs.length} archivos
-            </div>
-          </div>
-        </Card>
-      </div>
 
       <div
         className="grid-dash-main"
