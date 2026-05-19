@@ -470,7 +470,7 @@ function SectionTitle({ title, subtitle, action }) {
   );
 }
 
-function MobileMenu({ section, setSection, onClose }) {
+function MobileMenu({ section, setSection, onClose, user }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex" }}>
       <div
@@ -1219,6 +1219,7 @@ export default function App() {
           section={section}
           setSection={setSection}
           onClose={() => setMobileMenu(false)}
+          user={user}
         />
       )}
 
@@ -1753,7 +1754,6 @@ export default function App() {
         <nav
           className="bottom-nav"
           style={{
-            display: "none",
             position: "fixed",
             bottom: 0,
             left: 0,
