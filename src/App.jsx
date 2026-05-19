@@ -1650,7 +1650,7 @@ export default function App() {
                   pautas={pautas}
                   avisos={avisos}
                   asistencia={asistencia}
-                  allEventos={eventos}
+                  allEventos={gcalEventos}
                 />
               )}
               {section === "perfil" && (
@@ -1710,7 +1710,7 @@ export default function App() {
                 <Asistencia
                   asistencia={asistencia}
                   members={members}
-                  eventos={eventos}
+                  eventos={gcalEventos}
                   user={user}
                   onReload={loadData}
                 />
@@ -1718,7 +1718,7 @@ export default function App() {
               {section === "admin" && user?.cuerda === "Admin" && (
                 <Admin
                   members={members}
-                  eventos={eventos}
+                  eventos={gcalEventos}
                   docs={docs}
                   oraciones={oraciones}
                   noticias={avisos}
@@ -2705,36 +2705,57 @@ function Dashboard({
             background: `linear-gradient(135deg,${C.primaryLight},#fff)`,
           }}
         >
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: "50%",
-              flexShrink: 0,
-              background: cc,
-              border: `3px solid ${cc}40`,
-              overflow: "hidden",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "white",
-              fontSize: 16,
-              fontWeight: 700,
-            }}
-          >
-            {user?.foto_url ? (
-              <img
-                src={user.foto_url}
-                alt=""
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  display: "block",
-                }}
-              />
-            ) : (
-              ini(user?.nombre || "U")
+          {/* Foto con anillo de asistencia */}
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <svg width="56" height="56" style={{ position: "absolute", top: -4, left: -4, transform: "rotate(-90deg)" }}>
+              <circle cx="28" cy="28" r="24" fill="none" stroke="#e5e7eb" strokeWidth="3" />
+              {pctAsistencia !== null && (
+                <circle cx="28" cy="28" r="24" fill="none"
+                  stroke={pctAsistencia >= 75 ? C.primary : pctAsistencia >= 50 ? "#f59e0b" : "#ef4444"}
+                  strokeWidth="3"
+                  strokeDasharray={`${(pctAsistencia / 100) * 150.8} 150.8`}
+                  strokeLinecap="round"
+                />
+              )}
+            </svg>
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: "50%",
+                background: cc,
+                border: `3px solid ${cc}40`,
+                overflow: "hidden",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "white",
+                fontSize: 16,
+                fontWeight: 700,
+              }}
+            >
+              {user?.foto_url ? (
+                <img
+                  src={user.foto_url}
+                  alt=""
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                />
+              ) : (
+                ini(user?.nombre || "U")
+              )}
+            </div>
+            {pctAsistencia !== null && (
+              <div style={{
+                position: "absolute", bottom: -4, right: -4,
+                background: pctAsistencia >= 75 ? C.primary : pctAsistencia >= 50 ? "#f59e0b" : "#ef4444",
+                color: "white", borderRadius: 8, fontSize: 9, fontWeight: 800,
+                padding: "2px 4px", lineHeight: 1, border: "1.5px solid white",
+              }}>{pctAsistencia}%</div>
             )}
           </div>
           <div style={{ minWidth: 0 }}>
@@ -2756,10 +2777,12 @@ function Dashboard({
             <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>
               {rolLabel(user?.cuerda)}
             </div>
-            {pctAsistencia !== null && (
+            {pctAsistencia !== null ? (
               <div style={{ fontSize: 11, color: pctAsistencia >= 75 ? C.primary : pctAsistencia >= 50 ? "#f59e0b" : "#ef4444", fontWeight: 600, marginTop: 2 }}>
                 ✅ Asistencia: {pctAsistencia}%
               </div>
+            ) : (
+              <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>Sin registros aún</div>
             )}
           </div>
         </Card>
@@ -10525,7 +10548,9 @@ function AdminPautasMisa({ onReload }) {
 // ══════════════════════════════════════════
 //  ASISTENCIA (vista pública)
 // ══════════════════════════════════════════
-function Asistencia({ asistencia, members, eventos, user }) {
+function Asistencia({ asistencia, members, eventos, user, onReload }) {
+  // eventos = gcalEventos (Google Calendar). Enriquecer con título del evento GCal al mostrar.
+  // Eventos que tienen al menos un registro de asistencia
   const eventosConAsistencia = eventos.filter(e =>
     asistencia.some(a => a.evento_id === e.id)
   ).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
@@ -10670,12 +10695,53 @@ function Asistencia({ asistencia, members, eventos, user }) {
 //  ADMIN ASISTENCIA
 // ══════════════════════════════════════════
 function AdminAsistencia({ members, eventos, asistencia, onReload }) {
+  // eventos = gcalEventos (Google Calendar)
   const [eventoId, setEventoId] = useState("");
   const [registros, setRegistros] = useState({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [gcalLoading, setGcalLoading] = useState(false);
+  const [gcalEventos, setGcalEventos] = useState(eventos || []);
 
-  const eventosOrdenados = [...eventos].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  // Si no hay eventos pasados, intentar cargar desde GCal directamente
+  useEffect(() => {
+    if (eventos && eventos.length > 0) {
+      setGcalEventos(eventos);
+    } else {
+      setGcalLoading(true);
+      fetchGoogleCalendarEvents().then(ev => {
+        setGcalEventos(ev || []);
+        setGcalLoading(false);
+      });
+    }
+  }, [eventos]);
+
+  // Incluir también eventos pasados: cargar con timeMin más atrás
+  useEffect(() => {
+    setGcalLoading(true);
+    const calId = encodeURIComponent(GCAL_CALENDAR_ID);
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${calId}/events?key=${GCAL_API_KEY}&timeMin=${threeMonthsAgo.toISOString()}&maxResults=50&singleEvents=true&orderBy=startTime`;
+    fetch(url).then(r => r.json()).then(data => {
+      const items = (data.items || []).map((item) => {
+        const start = item.start?.dateTime || item.start?.date || "";
+        const isDateTime = !!item.start?.dateTime;
+        const fecha = start.split("T")[0];
+        const hora = isDateTime
+          ? new Date(item.start.dateTime).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hour12: false })
+          : "";
+        const titulo = item.summary || "Sin título";
+        const tl = titulo.toLowerCase();
+        const tipo = tl.includes("ensayo") ? "ensayo" : tl.includes("misa") || tl.includes("vigilia") || tl.includes("corpus") || tl.includes("pentecost") || tl.includes("pascua") ? "misa" : "evento";
+        return { id: item.id, titulo, fecha, hora, tipo, lugar: item.location || "", descripcion: item.description || "" };
+      });
+      setGcalEventos(items);
+      setGcalLoading(false);
+    }).catch(() => setGcalLoading(false));
+  }, []);
+
+  const eventosOrdenados = [...gcalEventos].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
   useEffect(() => {
     if (!eventoId) return;
@@ -10728,16 +10794,24 @@ function AdminAsistencia({ members, eventos, asistencia, onReload }) {
 
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.dark, marginBottom: 6 }}>Selecciona un evento</label>
+    <div style={{ marginBottom: 16 }}>
+        <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.dark, marginBottom: 6 }}>Selecciona un evento del calendario</label>
+        {gcalLoading ? (
+          <div style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, color: C.gray, background: C.bg }}>⏳ Cargando eventos de Google Calendar...</div>
+        ) : (
         <select value={eventoId} onChange={e => setEventoId(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 14, color: C.dark, background: "white" }}>
           <option value="">— Selecciona un evento —</option>
-          {eventosOrdenados.map(e => (
-            <option key={e.id} value={e.id}>
-              {new Date(e.fecha + "T00:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" })} · {e.titulo}
-            </option>
-          ))}
+          {eventosOrdenados.map(e => {
+            const tipoEmoji = e.tipo === "ensayo" ? "🎵" : e.tipo === "misa" ? "⛪" : "📅";
+            const horaStr = e.hora ? ` ${e.hora}` : "";
+            return (
+              <option key={e.id} value={e.id}>
+                {tipoEmoji} {new Date(e.fecha + "T00:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" })}{horaStr} · {e.titulo}
+              </option>
+            );
+          })}
         </select>
+        )}
       </div>
 
       {eventoId && (
@@ -11005,6 +11079,18 @@ function Admin({
           create table if not exists podcasts (id uuid default gen_random_uuid()
           primary key, titulo text, descripcion text, url text, autor text,
           created_at timestamptz default now());
+          <br />
+          -- Tabla asistencia con evento_id de tipo TEXT (ID de Google Calendar):
+          <br />
+          create table if not exists asistencia (id uuid default gen_random_uuid()
+          primary key, evento_id text not null, member_id uuid references integrantes(id),
+          estado text check (estado in ('presente','ausente','justificado')),
+          created_at timestamptz default now(),
+          unique(evento_id, member_id));
+          <br />
+          -- Si ya existe asistencia con evento_id uuid, migrar a text:
+          <br />
+          alter table asistencia alter column evento_id type text using evento_id::text;
           <br />
           -- Habilitar RLS y políticas para cada tabla (select/insert/delete to
           authenticated)
