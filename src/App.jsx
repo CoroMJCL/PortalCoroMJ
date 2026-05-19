@@ -676,6 +676,15 @@ export default function App() {
     }
   }, [view]);
 
+  // Auto-refresh data each 3 minutes (without forcing re-login)
+  useEffect(() => {
+    if (view !== "app") return;
+    const interval = setInterval(() => {
+      loadData();
+    }, 3 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [view]);
+
   // ── Clima (Open-Meteo, sin API key) ──────────────────────
   async function fetchClima() {
     try {
@@ -1911,10 +1920,11 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
       style={{
         minHeight: "100dvh",
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         justifyContent: "center",
         background: "#ffffff",
-        padding: 16,
+        padding: "24px 16px 40px",
+        overflowY: "auto",
       }}
     >
       <style>{G}</style>
@@ -3802,6 +3812,138 @@ function Dashboard({
           </div>
         );
       })()}
+
+      {/* ── Canal YouTube del Coro ── */}
+      <YoutubeWidget />
+
+    </div>
+  );
+}
+
+
+
+// ══════════════════════════════════════════
+//  YOUTUBE WIDGET
+// ══════════════════════════════════════════
+const YOUTUBE_CHANNEL_ID = "UCmyLPDfcxu4VMTMztDnzdWA";
+
+function YoutubeWidget() {
+  const [videos, setVideos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
+  const YOUTUBE_API_KEY = GCAL_API_KEY; // reutiliza la misma API key si tiene permisos YouTube, si no agrega una nueva
+
+  useEffect(() => {
+    async function fetchVideos() {
+      try {
+        const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${YOUTUBE_CHANNEL_ID}&part=snippet&order=date&maxResults=6&type=video`;
+        const res = await fetch(url, {
+          signal: (() => { const c = new AbortController(); setTimeout(() => c.abort(), 8000); return c.signal; })()
+        });
+        if (!res.ok) throw new Error("YouTube API error");
+        const data = await res.json();
+        setVideos(data.items || []);
+      } catch (e) {
+        console.warn("YouTube fetch error:", e.message);
+        setVideos([]);
+      }
+      setLoading(false);
+    }
+    fetchVideos();
+  }, []);
+
+  if (!loading && videos.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 20, marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <span style={{ fontSize: 20 }}>▶️</span>
+        <div>
+          <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 14, fontWeight: 700, color: C.dark }}>
+            Canal del Coro MJ
+          </div>
+          <div style={{ fontSize: 11, color: C.gray }}>Últimos videos publicados</div>
+        </div>
+        <a
+          href={`https://www.youtube.com/channel/${YOUTUBE_CHANNEL_ID}`}
+          target="_blank"
+          rel="noopener"
+          style={{ marginLeft: "auto", fontSize: 11, color: C.primary, fontWeight: 600, textDecoration: "none" }}
+        >
+          Ver canal →
+        </a>
+      </div>
+
+      {/* Modal reproductor */}
+      {selected && (
+        <div
+          onClick={() => setSelected(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "100%", maxWidth: 720, background: "#000", borderRadius: 12, overflow: "hidden", position: "relative" }}
+          >
+            <button
+              onClick={() => setSelected(null)}
+              style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.6)", border: "none", color: "white", fontSize: 22, cursor: "pointer", borderRadius: 6, zIndex: 10, lineHeight: 1, padding: "2px 8px" }}
+            >×</button>
+            <div style={{ position: "relative", paddingTop: "56.25%" }}>
+              <iframe
+                src={`https://www.youtube.com/embed/${selected}?autoplay=1`}
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <Spinner />
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12 }}>
+          {videos.map((v) => {
+            const vid = v.id?.videoId;
+            const thumb = v.snippet?.thumbnails?.medium?.url || v.snippet?.thumbnails?.default?.url;
+            const title = v.snippet?.title || "";
+            const date = v.snippet?.publishedAt
+              ? new Date(v.snippet.publishedAt).toLocaleDateString("es-CL", { day: "numeric", month: "short" })
+              : "";
+            return (
+              <Card
+                key={vid}
+                hover
+                onClick={() => setSelected(vid)}
+                style={{ padding: 0, overflow: "hidden", cursor: "pointer" }}
+              >
+                <div style={{ position: "relative", paddingTop: "56.25%", background: C.dark }}>
+                  {thumb && (
+                    <img
+                      src={thumb}
+                      alt={title}
+                      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                  )}
+                  {/* Play overlay */}
+                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: 40, height: 40, background: "rgba(0,0,0,0.65)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <span style={{ fontSize: 18, marginLeft: 3 }}>▶</span>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ padding: "10px 12px" }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                    {title}
+                  </div>
+                  <div style={{ fontSize: 10, color: C.gray, marginTop: 4 }}>{date}</div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -4842,7 +4984,8 @@ function Oraciones({ oraciones, user, onReload }) {
 //  NOTICIAS
 // ══════════════════════════════════════════
 function Noticias({ noticias, onReload }) {
-  const [expandId, setExpandId] = useState(null);
+  const [expandedIds, setExpandedIds] = useState(new Set());
+  const toggleExpand = (id) => setExpandedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
   if (noticias.length === 0)
     return (
@@ -4977,7 +5120,7 @@ function Noticias({ noticias, onReload }) {
                         fontSize: 12,
                         color: "#374151",
                         lineHeight: 1.6,
-                        ...(expandId !== n.id
+                        ...(!expandedIds.has(n.id)
                           ? {
                               overflow: "hidden",
                               display: "-webkit-box",
@@ -5010,9 +5153,7 @@ function Noticias({ noticias, onReload }) {
                     >
                       {n.descripcion && (
                         <button
-                          onClick={() =>
-                            setExpandId(expandId === n.id ? null : n.id)
-                          }
+                          onClick={() => toggleExpand(n.id)}
                           style={{
                             fontSize: 11,
                             background: "none",
@@ -5023,7 +5164,7 @@ function Noticias({ noticias, onReload }) {
                             textDecoration: "underline",
                           }}
                         >
-                          {expandId === n.id ? "Ver menos" : "Ver más"}
+                          {expandedIds.has(n.id) ? "Ver menos" : "Ver más"}
                         </button>
                       )}
                       {n.url && (
@@ -5113,7 +5254,7 @@ function Noticias({ noticias, onReload }) {
                       color: "#374151",
                       lineHeight: 1.6,
                       marginBottom: 6,
-                      ...(expandId !== n.id
+                      ...(!expandedIds.has(n.id)
                         ? {
                             overflow: "hidden",
                             display: "-webkit-box",
@@ -5146,9 +5287,7 @@ function Noticias({ noticias, onReload }) {
                   </span>
                   {n.descripcion && (
                     <button
-                      onClick={() =>
-                        setExpandId(expandId === n.id ? null : n.id)
-                      }
+                      onClick={() => toggleExpand(n.id)}
                       style={{
                         fontSize: 11,
                         background: "none",
@@ -5159,7 +5298,7 @@ function Noticias({ noticias, onReload }) {
                         textDecoration: "underline",
                       }}
                     >
-                      {expandId === n.id ? "Ver menos" : "Ver más"}
+                      {expandedIds.has(n.id) ? "Ver menos" : "Ver más"}
                     </button>
                   )}
                   {n.url && (
@@ -6909,7 +7048,8 @@ function AdminOraciones({ oraciones, onReload }) {
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
-  const [expandId, setExpandId] = useState(null);
+  const [expandedIds, setExpandedIds] = useState(new Set());
+  const toggleExpand = (id) => setExpandedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
   const inputS = {
     padding: "9px 12px",
