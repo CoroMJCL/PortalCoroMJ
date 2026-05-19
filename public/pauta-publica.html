@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Pauta de Misa — Coro Misioneros de Jesús</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet"/>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: #f3f4f6; min-height: 100vh; color: #111827; }
+  .header { background: linear-gradient(135deg, #157a5a, #1D9E75); padding: 18px 24px; display: flex; align-items: center; gap: 12px; }
+  .header-text h1 { font-size: 15px; font-weight: 700; color: white; font-family: 'Poppins', sans-serif; }
+  .header-text p { font-size: 11px; color: rgba(255,255,255,0.75); margin-top: 2px; }
+  .container { max-width: 860px; margin: 0 auto; padding: 20px 16px 48px; }
+  .card { background: white; border-radius: 14px; border: 1px solid #e5e7eb; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; margin-bottom: 16px; }
+  .pauta-header { padding: 24px; border-bottom: 1px solid #e5e7eb; display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+  .pauta-info { flex: 1; min-width: 200px; }
+  .badge { display: inline-block; background: #dcfce7; color: #15803d; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; margin-bottom: 10px; }
+  .pauta-titulo { font-size: 22px; font-weight: 700; color: #111827; margin-bottom: 4px; font-family: 'Poppins', sans-serif; }
+  .pauta-coro { font-size: 13px; color: #1D9E75; font-weight: 600; margin-bottom: 12px; }
+  .pauta-meta { display: flex; flex-direction: column; gap: 5px; }
+  .meta-item { font-size: 13px; color: #374151; display: flex; align-items: center; gap: 7px; }
+  .meta-item span.icon { width: 18px; text-align: center; }
+  .qr-side { text-align: center; flex-shrink: 0; }
+  .qr-side img { border-radius: 10px; border: 2px solid #1a3a2a; display: block; }
+  .qr-label { font-size: 10px; color: #6b7280; margin-top: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 480px; }
+  thead tr { background: #1a3a2a; }
+  thead th { padding: 11px 14px; text-align: left; font-weight: 600; font-size: 12px; color: white; letter-spacing: 0.04em; }
+  tbody tr { border-bottom: 1px solid #f3f4f6; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #f9fafb; }
+  td { padding: 11px 14px; vertical-align: middle; }
+  .td-num { font-weight: 700; color: #1D9E75; width: 38px; text-align: center; }
+  .td-icono { width: 36px; text-align: center; color: #6b7280; font-size: 15px; }
+  .td-orden { color: #374151; font-weight: 500; }
+  .td-cancion { font-weight: 600; color: #111827; }
+  .td-autor { color: #6b7280; }
+  .td-salmista { color: #6b7280; }
+  .empty { text-align: center; padding: 48px 24px; color: #9ca3af; }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .footer { text-align: center; font-size: 11px; color: #9ca3af; margin-top: 24px; }
+  .spinner { text-align: center; padding: 60px; color: #6b7280; font-size: 14px; }
+  .notas-box { margin: 0 24px 20px; padding: 12px 16px; background: #f0fdf4; border-left: 3px solid #1D9E75; border-radius: 0 8px 8px 0; font-size: 13px; color: #374151; font-style: italic; }
+  @media (max-width: 600px) {
+    .pauta-titulo { font-size: 18px; }
+    .pauta-header { padding: 16px; gap: 16px; }
+    .qr-side img { width: 100px; height: 100px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-text">
+    <h1>Coro Misioneros de Jesús</h1>
+    <p>Pauta de Misa — Portal del Coro</p>
+  </div>
+</div>
+
+<div class="container">
+  <div id="app"><div class="spinner">⏳ Cargando pauta...</div></div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://ttbipbhfswcwwgcwaist.supabase.co";
+const SUPABASE_KEY = "sb_publishable_mz6TyeuTP3TA6XQPOunXFQ_ad0Cp9fg";
+
+function getParam(name) {
+  return new URLSearchParams(window.location.search).get(name);
+}
+
+async function loadPauta(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pautas_misa?id=eq.${id}&select=*`, {
+    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
+  });
+  if (!res.ok) throw new Error("Error al cargar");
+  const rows = await res.json();
+  return rows[0] || null;
+}
+
+function iconoOrden(orden) {
+  const o = (orden||"").toLowerCase();
+  if (o.includes("entrada")) return "🎵";
+  if (o.includes("salmo")) return "📖";
+  if (o.includes("gloria")) return "✨";
+  if (o.includes("ofertorio")) return "🕯️";
+  if (o.includes("santo")) return "🙏";
+  if (o.includes("cordero")) return "🐑";
+  if (o.includes("comunión") || o.includes("comunion")) return "🍞";
+  if (o.includes("aclamación") || o.includes("aclamacion")) return "📣";
+  if (o.includes("evangelio")) return "📜";
+  if (o.includes("salida")) return "🚪";
+  return "🎶";
+}
+
+function render(pauta) {
+  const canciones = typeof pauta.canciones === "string"
+    ? JSON.parse(pauta.canciones || "[]")
+    : (pauta.canciones || []);
+
+  const fecha = new Date(pauta.fecha + "T00:00:00").toLocaleDateString("es-CL", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric"
+  });
+  const fechaCap = fecha.charAt(0).toUpperCase() + fecha.slice(1);
+
+  const appUrl = `https://343mhn.csb.app/?pauta=${pauta.id}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(appUrl)}&color=1a3a2a&bgcolor=ffffff&margin=8`;
+
+  const filas = canciones.map(c => `
+    <tr>
+      <td class="td-num">${c.n || ""}</td>
+      <td class="td-icono">${iconoOrden(c.orden)}</td>
+      <td class="td-orden">${c.orden || "—"}</td>
+      <td class="td-cancion">${c.cancion || "—"}</td>
+      <td class="td-autor">${c.autor || "—"}</td>
+      <td class="td-salmista">${c.salmista || "—"}</td>
+    </tr>
+  `).join("");
+
+  document.getElementById("app").innerHTML = `
+    <div class="card">
+      <div class="pauta-header">
+        <div class="pauta-info">
+          <div class="badge">✅ PUBLICADA</div>
+          <div class="pauta-titulo">${pauta.titulo}</div>
+          <div class="pauta-coro">Coro Misioneros de Jesús</div>
+          <div class="pauta-meta">
+            <div class="meta-item"><span class="icon">📅</span>${fechaCap}</div>
+            <div class="meta-item"><span class="icon">🕐</span>Horario Coro: ${pauta.hora} Hrs</div>
+            ${pauta.lugar ? `<div class="meta-item"><span class="icon">📍</span>${pauta.lugar}</div>` : ""}
+            ${pauta.tipo_celebracion ? `<div class="meta-item"><span class="icon">🎼</span>${pauta.tipo_celebracion}</div>` : ""}
+          </div>
+        </div>
+        <div class="qr-side">
+          <img src="${qrUrl}" width="130" height="130" alt="QR Pauta"/>
+          <div class="qr-label">Código QR</div>
+        </div>
+      </div>
+      ${pauta.notas ? `<div class="notas-box">💬 ${pauta.notas}</div>` : ""}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:38px;text-align:center">N°</th>
+              <th style="width:36px"></th>
+              <th>Orden Litúrgico</th>
+              <th>Canción</th>
+              <th>Autor</th>
+              <th>Salmista</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filas || `<tr><td colspan="6" style="text-align:center;padding:24px;color:#9ca3af">Sin canciones cargadas</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="footer">Coro Misioneros de Jesús · Sistema TEMPVS7®</div>
+  `;
+  document.title = `${pauta.titulo} — Coro MJ`;
+}
+
+async function init() {
+  const id = getParam("pauta");
+  if (!id) {
+    document.getElementById("app").innerHTML = `
+      <div class="card empty">
+        <div class="empty-icon">🎼</div>
+        <div style="font-size:15px;font-weight:600;color:#374151;margin-bottom:8px">Pauta no encontrada</div>
+        <div style="font-size:13px">El enlace no contiene un ID de pauta válido.</div>
+      </div>`;
+    return;
+  }
+  try {
+    const pauta = await loadPauta(id);
+    if (!pauta) throw new Error("No encontrada");
+    render(pauta);
+  } catch(e) {
+    document.getElementById("app").innerHTML = `
+      <div class="card empty">
+        <div class="empty-icon">⚠️</div>
+        <div style="font-size:15px;font-weight:600;color:#374151;margin-bottom:8px">No se pudo cargar la pauta</div>
+        <div style="font-size:13px;color:#6b7280">${e.message}</div>
+      </div>`;
+  }
+}
+
+init();
+</script>
+</body>
+</html>
