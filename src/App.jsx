@@ -1669,6 +1669,7 @@ export default function App() {
                   avisos={avisos}
                   asistencia={asistencia}
                   allEventos={gcalEventos}
+                  podcasts={podcasts}
                 />
               )}
               {section === "perfil" && (
@@ -2363,6 +2364,68 @@ function TwitterTimeline() {
   return <div ref={ref} style={{ background: "#ffffff", minHeight: 280 }} />;
 }
 
+function PodcastWidget({ podcasts, setSection }) {
+  const [idx, setIdx] = useState(0);
+  const lista = podcasts && podcasts.length > 0 ? podcasts : null;
+  if (!lista) return null;
+  const p = lista[Math.min(idx, lista.length - 1)];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 13 }}>🎙️</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>Podcast</span>
+        <button
+          onClick={() => setSection("podcast")}
+          style={{ marginLeft: "auto", fontSize: 11, color: C.primary, background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}
+        >
+          Ver todos →
+        </button>
+      </div>
+
+      {/* Episodio */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, background: C.primaryLight, borderRadius: 10, padding: "10px 12px" }}>
+        <div style={{
+          width: 42, height: 42, borderRadius: 10, flexShrink: 0,
+          background: `linear-gradient(135deg,${C.primary},${C.primaryDark})`,
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+        }}>🎙️</div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {p.titulo}
+          </div>
+          {p.autor && (
+            <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>👤 {p.autor}</div>
+          )}
+        </div>
+
+        {/* Botón play / nav */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          {lista.length > 1 && (
+            <>
+              <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
+                style={{ border: "none", background: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? C.border : C.primary, fontSize: 18, padding: 0, lineHeight: 1 }}>‹</button>
+              <button onClick={() => setIdx((i) => Math.min(lista.length - 1, i + 1))} disabled={idx === lista.length - 1}
+                style={{ border: "none", background: "none", cursor: idx === lista.length - 1 ? "default" : "pointer", color: idx === lista.length - 1 ? C.border : C.primary, fontSize: 18, padding: 0, lineHeight: 1 }}>›</button>
+            </>
+          )}
+          {p.url && (
+            <a href={p.url} target="_blank" rel="noopener">
+              <div style={{
+                width: 36, height: 36, borderRadius: "50%",
+                background: C.primary, display: "flex", alignItems: "center",
+                justifyContent: "center", color: "white", fontSize: 14, marginLeft: 4,
+              }}>▶</div>
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({
   cumple,
   evangelio,
@@ -2381,6 +2444,7 @@ function Dashboard({
   avisos,
   asistencia,
   allEventos,
+  podcasts,
 }) {
   const futuros = [...eventos]
     .filter((e) => new Date(e.fecha + "T00:00:00") >= new Date())
@@ -3184,6 +3248,7 @@ function Dashboard({
           alignItems: "start",
         }}
       >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <Card>
           <div
             style={{
@@ -3299,6 +3364,12 @@ function Dashboard({
             </>
           ) : null}
         </Card>
+        {podcasts && podcasts.length > 0 && (
+          <Card style={{ overflow: "hidden", padding: "14px 16px" }}>
+            <PodcastWidget podcasts={podcasts} setSection={setSection} />
+          </Card>
+        )}
+        </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <Card style={{ flex: 1 }}>
             <div
