@@ -3372,6 +3372,9 @@ function Dashboard({
               </div>
             </a>
           </Card>
+          <Card style={{ flex: 1 }}>
+            <YoutubeWidget compact />
+          </Card>
         </div>
       </div>
 
@@ -3813,9 +3816,6 @@ function Dashboard({
         );
       })()}
 
-      {/* ── Canal YouTube del Coro ── */}
-      <YoutubeWidget />
-
     </div>
   );
 }
@@ -3827,11 +3827,12 @@ function Dashboard({
 // ══════════════════════════════════════════
 const YOUTUBE_CHANNEL_ID = "UCmyLPDfcxu4VMTMztDnzdWA";
 
-function YoutubeWidget() {
+function YoutubeWidget({ compact = false }) {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState(false);
   const [selected, setSelected] = useState(null);
-  const YOUTUBE_API_KEY = GCAL_API_KEY; // reutiliza la misma API key si tiene permisos YouTube, si no agrega una nueva
+  const YOUTUBE_API_KEY = GCAL_API_KEY;
 
   useEffect(() => {
     async function fetchVideos() {
@@ -3840,69 +3841,129 @@ function YoutubeWidget() {
         const res = await fetch(url, {
           signal: (() => { const c = new AbortController(); setTimeout(() => c.abort(), 8000); return c.signal; })()
         });
-        if (!res.ok) throw new Error("YouTube API error");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.warn("YouTube API error:", errData?.error?.message || res.status);
+          setApiError(true);
+          setLoading(false);
+          return;
+        }
         const data = await res.json();
-        setVideos(data.items || []);
+        const items = data.items || [];
+        setVideos(items);
+        if (items.length === 0) setApiError(true);
       } catch (e) {
         console.warn("YouTube fetch error:", e.message);
-        setVideos([]);
+        setApiError(true);
       }
       setLoading(false);
     }
     fetchVideos();
   }, []);
 
-  if (!loading && videos.length === 0) return null;
+  const CHANNEL_URL = `https://www.youtube.com/channel/${YOUTUBE_CHANNEL_ID}`;
+
+  const header = (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+      <span style={{ fontSize: compact ? 16 : 20 }}>▶️</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: compact ? 13 : 14, fontWeight: 600, color: C.dark }}>
+          Canal YouTube
+        </div>
+        {!compact && <div style={{ fontSize: 11, color: C.gray }}>Últimos videos publicados</div>}
+      </div>
+      <a href={CHANNEL_URL} target="_blank" rel="noopener noreferrer"
+        style={{ fontSize: 11, color: C.primary, fontWeight: 600, textDecoration: "none" }}>
+        Ver →
+      </a>
+    </div>
+  );
+
+  if (loading) return <div>{header}<Spinner /></div>;
+
+  if (apiError || videos.length === 0) {
+    return (
+      <div>
+        {header}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          background: "#fff1f2", border: "1px solid #fecdd3",
+          borderRadius: 10, padding: "10px 12px",
+        }}>
+          <div style={{
+            width: 36, height: 36, background: "#ff0000", borderRadius: 8,
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <span style={{ fontSize: 16, color: "white" }}>▶</span>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: C.dark, marginBottom: 2 }}>API no habilitada aún</div>
+            <div style={{ fontSize: 10, color: C.gray }}>Habilita YouTube Data API v3 en Google Cloud</div>
+          </div>
+          <a href={CHANNEL_URL} target="_blank" rel="noopener noreferrer"
+            style={{ flexShrink: 0, background: "#ff0000", color: "white", borderRadius: 6, padding: "5px 10px", fontSize: 11, fontWeight: 600, textDecoration: "none" }}>
+            Canal
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ marginTop: 20, marginBottom: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-        <span style={{ fontSize: 20 }}>▶️</span>
-        <div>
-          <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 14, fontWeight: 700, color: C.dark }}>
-            Canal del Coro MJ
-          </div>
-          <div style={{ fontSize: 11, color: C.gray }}>Últimos videos publicados</div>
-        </div>
-        <a
-          href={`https://www.youtube.com/channel/${YOUTUBE_CHANNEL_ID}`}
-          target="_blank"
-          rel="noopener"
-          style={{ marginLeft: "auto", fontSize: 11, color: C.primary, fontWeight: 600, textDecoration: "none" }}
-        >
-          Ver canal →
-        </a>
-      </div>
+    <div>
+      {header}
 
       {/* Modal reproductor */}
       {selected && (
-        <div
-          onClick={() => setSelected(null)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ width: "100%", maxWidth: 720, background: "#000", borderRadius: 12, overflow: "hidden", position: "relative" }}
-          >
-            <button
-              onClick={() => setSelected(null)}
-              style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.6)", border: "none", color: "white", fontSize: 22, cursor: "pointer", borderRadius: 6, zIndex: 10, lineHeight: 1, padding: "2px 8px" }}
-            >×</button>
+        <div onClick={() => setSelected(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ width: "100%", maxWidth: 720, background: "#000", borderRadius: 12, overflow: "hidden", position: "relative" }}>
+            <button onClick={() => setSelected(null)}
+              style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.6)", border: "none", color: "white", fontSize: 22, cursor: "pointer", borderRadius: 6, zIndex: 10, lineHeight: 1, padding: "2px 8px" }}>×</button>
             <div style={{ position: "relative", paddingTop: "56.25%" }}>
-              <iframe
-                src={`https://www.youtube.com/embed/${selected}?autoplay=1`}
+              <iframe src={`https://www.youtube.com/embed/${selected}?autoplay=1`}
                 style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
+                allowFullScreen />
             </div>
           </div>
         </div>
       )}
 
-      {loading ? (
-        <Spinner />
+      {compact ? (
+        /* Modo columna: lista vertical con miniatura pequeña */
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {videos.slice(0, 4).map((v) => {
+            const vid = v.id?.videoId;
+            const thumb = v.snippet?.thumbnails?.default?.url;
+            const title = v.snippet?.title || "";
+            const date = v.snippet?.publishedAt
+              ? new Date(v.snippet.publishedAt).toLocaleDateString("es-CL", { day: "numeric", month: "short" })
+              : "";
+            return (
+              <div key={vid} onClick={() => setSelected(vid)}
+                style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer", borderRadius: 8, padding: "4px 0" }}>
+                <div style={{ position: "relative", width: 72, height: 40, borderRadius: 6, overflow: "hidden", flexShrink: 0, background: C.dark }}>
+                  {thumb && <img src={thumb} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
+                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: 22, height: 22, background: "rgba(0,0,0,0.65)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <span style={{ fontSize: 9, marginLeft: 1, color: "white" }}>▶</span>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: C.dark, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                    {title}
+                  </div>
+                  <div style={{ fontSize: 10, color: C.gray, marginTop: 2 }}>{date}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       ) : (
+        /* Modo grilla completo */
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12 }}>
           {videos.map((v) => {
             const vid = v.id?.videoId;
@@ -3912,21 +3973,9 @@ function YoutubeWidget() {
               ? new Date(v.snippet.publishedAt).toLocaleDateString("es-CL", { day: "numeric", month: "short" })
               : "";
             return (
-              <Card
-                key={vid}
-                hover
-                onClick={() => setSelected(vid)}
-                style={{ padding: 0, overflow: "hidden", cursor: "pointer" }}
-              >
+              <Card key={vid} hover onClick={() => setSelected(vid)} style={{ padding: 0, overflow: "hidden", cursor: "pointer" }}>
                 <div style={{ position: "relative", paddingTop: "56.25%", background: C.dark }}>
-                  {thumb && (
-                    <img
-                      src={thumb}
-                      alt={title}
-                      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    />
-                  )}
-                  {/* Play overlay */}
+                  {thumb && <img src={thumb} alt={title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
                   <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <div style={{ width: 40, height: 40, background: "rgba(0,0,0,0.65)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <span style={{ fontSize: 18, marginLeft: 3 }}>▶</span>
