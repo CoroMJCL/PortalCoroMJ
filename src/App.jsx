@@ -947,12 +947,12 @@ export default function App() {
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
+          max_tokens: 2000,
           tools: [{ type: "web_search_20250305", name: "web_search" }],
           messages: [
             {
               role: "user",
-              content: `Busca en internet el evangelio oficial de la misa dominical del ${domingoStr} (${domingoISO}) según el calendario litúrgico romano. Busca en evangelio.es, vaticano.va o catholic.net. Responde SOLO con JSON puro sin markdown:\n{"referencia":"Ej: Jn 15,9-17","texto":"texto del evangelio máximo 150 palabras","reflexion":"reflexión breve de 2 líneas para un coro de música sacra","domingo":"nombre de la celebración litúrgica","fuente":"nombre del sitio web"}`,
+              content: `Busca en internet el evangelio oficial de la misa dominical del ${domingoStr} (${domingoISO}) según el calendario litúrgico romano. Busca en evangelio.es, vaticano.va o catholic.net. Responde SOLO con JSON puro sin markdown:\n{"referencia":"Ej: Jn 15,9-17","texto":"texto completo del evangelio sin recortar","reflexion":"reflexión de 3 a 4 líneas para un coro de música sacra con aplicación al canto litúrgico","oracion":"oración breve de 2 líneas para rezar antes de ensayar","domingo":"nombre de la celebración litúrgica","fuente":"nombre del sitio web"}`,
             },
           ],
         }),
@@ -3173,6 +3173,7 @@ function Dashboard({
           gridTemplateColumns: "1.5fr 1fr",
           gap: 14,
           marginBottom: 14,
+          alignItems: "start",
         }}
       >
         <Card>
@@ -3242,6 +3243,7 @@ function Dashboard({
                   borderRadius: 8,
                   padding: "10px 14px",
                   borderLeft: `3px solid ${C.primary}`,
+                  marginBottom: 10,
                 }}
               >
                 <p
@@ -3256,6 +3258,24 @@ function Dashboard({
                   {evangelio.reflexion}
                 </p>
               </div>
+              {evangelio.oracion && (
+                <div
+                  style={{
+                    background: C.goldLight,
+                    borderRadius: 8,
+                    padding: "10px 14px",
+                    borderLeft: `3px solid ${C.gold}`,
+                    marginBottom: 10,
+                  }}
+                >
+                  <div style={{ fontSize: 10, fontWeight: 700, color: C.gold, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>
+                    🙏 Oración antes del ensayo
+                  </div>
+                  <p style={{ margin: 0, fontSize: 12, color: "#374151", lineHeight: 1.6, fontStyle: "italic" }}>
+                    {evangelio.oracion}
+                  </p>
+                </div>
+              )}
               {evangelio.fuente && (
                 <div
                   style={{
