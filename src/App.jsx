@@ -787,11 +787,16 @@ export default function App() {
     }
   }, [view]);
 
-  // Auto-refresh data each 3 minutes (without forcing re-login)
+  // Auto-refresh: solo integrantes cada 3 minutos, sin interrumpir formularios
   useEffect(() => {
     if (view !== "app") return;
-    const interval = setInterval(() => {
-      loadData();
+    const interval = setInterval(async () => {
+      try {
+        const m = await supabase("integrantes", { order: "&order=nombre.asc" });
+        if (m) setMembers(m);
+      } catch (e) {
+        console.error("Error en refresh de integrantes:", e);
+      }
     }, 3 * 60 * 1000);
     return () => clearInterval(interval);
   }, [view]);
@@ -8729,6 +8734,9 @@ function AdminBiblioteca({ biblioteca, onReload }) {
   });
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
   const [ocultos, setOcultos] = useState(() => {
     try { return JSON.parse(localStorage.getItem("biblioteca_ocultos") || "[]"); }
     catch { return []; }
@@ -8773,6 +8781,24 @@ function AdminBiblioteca({ biblioteca, onReload }) {
     } catch (e) {
       alert("Error: " + e.message);
     }
+  }
+
+  function startEdit(b) {
+    setEditId(b.id);
+    setEditForm({ titulo: b.titulo || "", autor: b.autor || "", anio: b.anio || "", url: b.url || "", emoji: b.emoji || "📘" });
+  }
+
+  async function saveEdit() {
+    if (!editForm.titulo || !editForm.url) return;
+    setEditSaving(true);
+    try {
+      await supabase(`biblioteca?id=eq.${editId}`, { method: "PATCH", body: editForm });
+      setEditId(null);
+      onReload();
+    } catch (e) {
+      alert("Error: " + e.message);
+    }
+    setEditSaving(false);
   }
 
   return (
@@ -8911,32 +8937,57 @@ function AdminBiblioteca({ biblioteca, onReload }) {
         </Card>
       )}
       {biblioteca.map((b) => (
-        <Card
-          key={b.id}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            marginBottom: 10,
-            flexWrap: "wrap",
-          }}
-        >
-          <span style={{ fontSize: 28, flexShrink: 0 }}>{b.emoji || "📘"}</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>
-              {b.titulo}
+        <Card key={b.id} style={{ marginBottom: 10 }}>
+          {editId === b.id ? (
+            /* ── MODO EDICIÓN ── */
+            <div>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8, marginBottom: 8 }}>
+                <input placeholder="Título *" value={editForm.titulo}
+                  onChange={(e) => setEditForm((f) => ({ ...f, titulo: e.target.value }))}
+                  style={inputS} />
+                <select value={editForm.emoji}
+                  onChange={(e) => setEditForm((f) => ({ ...f, emoji: e.target.value }))}
+                  style={inputS}>
+                  {emojis.map((em) => <option key={em} value={em}>{em}</option>)}
+                </select>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                <input placeholder="Autor / Institución" value={editForm.autor}
+                  onChange={(e) => setEditForm((f) => ({ ...f, autor: e.target.value }))}
+                  style={inputS} />
+                <input placeholder="Año" value={editForm.anio}
+                  onChange={(e) => setEditForm((f) => ({ ...f, anio: e.target.value }))}
+                  style={inputS} />
+              </div>
+              <input placeholder="URL *" value={editForm.url}
+                onChange={(e) => setEditForm((f) => ({ ...f, url: e.target.value }))}
+                style={{ ...inputS, marginBottom: 10 }} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <Btn onClick={saveEdit} disabled={editSaving}>{editSaving ? "Guardando..." : "Guardar cambios"}</Btn>
+                <Btn variant="ghost" onClick={() => setEditId(null)}>Cancelar</Btn>
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>
-              {b.autor}
-              {b.anio ? ` · ${b.anio}` : ""}
+          ) : (
+            /* ── MODO VISTA ── */
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 28, flexShrink: 0 }}>{b.emoji || "📘"}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>{b.titulo}</div>
+                <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>
+                  {b.autor}{b.anio ? ` · ${b.anio}` : ""}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <Btn variant="ghost" style={{ fontSize: 11, padding: "5px 10px" }} onClick={() => startEdit(b)}>✏️ Editar</Btn>
+                {b.url && (
+                  <a href={b.url} target="_blank" rel="noopener">
+                    <Btn variant="ghost" style={{ fontSize: 11, padding: "5px 10px" }}>🔗 Ver</Btn>
+                  </a>
+                )}
+                <ConfirmBtn onConfirm={() => del(b.id)} />
+              </div>
             </div>
-          </div>
-          <a href={b.url} target="_blank" rel="noopener">
-            <Btn variant="ghost" style={{ fontSize: 11, padding: "5px 10px" }}>
-              🔗 Ver
-            </Btn>
-          </a>
-          <ConfirmBtn onConfirm={() => del(b.id)} />
+          )}
         </Card>
       ))}
       {biblioteca.length === 0 && (
