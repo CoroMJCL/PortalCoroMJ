@@ -1706,95 +1706,65 @@ export default function App() {
 
           <RadioMariaWidget />
 
-          <div
-            className="topbar-greeting"
-            style={{
-              marginLeft: 8,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
+          {/* Clima + Fecha + Saludo — solo desktop */}
+          <style>{`.topbar-extras { display: flex; } @media(max-width:640px){ .topbar-extras { display: none !important; } }`}</style>
+          <div className="topbar-extras" style={{ marginLeft: 8, alignItems: "center", gap: 8 }}>
+            {/* Clima */}
             {clima && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  background: C.primaryLight,
-                  borderRadius: 10,
-                  padding: "5px 12px",
-                  border: `1px solid ${C.primary}25`,
-                }}
-              >
-                <span style={{ fontSize: 20, lineHeight: 1 }}>
-                  {clima.desc.split(" ")[0]}
-                </span>
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6,
+                background: C.primaryLight, borderRadius: 10, padding: "5px 12px",
+                border: `1px solid ${C.primary}25`,
+              }}>
+                <span style={{ fontSize: 20, lineHeight: 1 }}>{clima.desc.split(" ")[0]}</span>
                 <div>
-                  <div
-                    style={{
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: C.primaryDark,
-                      lineHeight: 1,
-                    }}
-                  >
-                    {clima.temp}°C
-                  </div>
-                  <div style={{ fontSize: 10, color: C.gray, lineHeight: 1 }}>
-                    {clima.ciudad}, {clima.pais}
+                  <div style={{ fontSize: 16, fontWeight: 700, color: C.primaryDark, lineHeight: 1 }}>{clima.temp}°C</div>
+                  <div style={{ fontSize: 10, color: C.gray, lineHeight: 1 }}>{clima.ciudad}, {clima.pais}</div>
+                </div>
+              </div>
+            )}
+            {/* Fecha */}
+            <div style={{
+              display: "flex", alignItems: "center", borderRadius: 12, overflow: "hidden",
+              border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", background: C.white,
+            }}>
+              <div style={{
+                background: `linear-gradient(160deg,${C.primary},${C.primaryDark})`,
+                padding: "8px 10px", display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center", minWidth: 44,
+              }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "white", lineHeight: 1, fontFamily: "'Poppins',sans-serif" }}>
+                  {new Date().getDate()}
+                </div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.85)", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 1 }}>
+                  {new Date().toLocaleDateString("es-CL", { month: "short" })}
+                </div>
+              </div>
+              <div style={{ padding: "0 10px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.dark, textTransform: "capitalize", fontFamily: "'Poppins',sans-serif" }}>
+                  {new Date().toLocaleDateString("es-CL", { weekday: "long" })}
+                </div>
+                <div style={{ fontSize: 10, color: C.gray }}>
+                  {new Date().toLocaleDateString("es-CL", { month: "long", year: "numeric" })}
+                </div>
+              </div>
+            </div>
+            {/* Saludo */}
+            {user?.nombre && (
+              <div style={{
+                display: "flex", alignItems: "center",
+                background: C.white, border: `1px solid ${C.border}`,
+                borderRadius: 12, padding: "6px 12px",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+              }}>
+                <div>
+                  <div style={{ fontSize: 9, color: C.gray, lineHeight: 1.2 }}>Hola,</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.dark, lineHeight: 1.2, fontFamily: "'Poppins',sans-serif" }}>
+                    {user.nombre.split(" ")[0]}
                   </div>
                 </div>
               </div>
             )}
-            {/* ── Saludo + Widget fecha compacto móvil ── */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-              {/* Saludo */}
-              {user?.nombre && (
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  background: C.white, border: `1px solid ${C.border}`,
-                  borderRadius: 12, padding: "6px 12px",
-                  boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-                }}>
-                  <div>
-                    <div style={{ fontSize: 9, color: C.gray, lineHeight: 1.2 }}>Hola,</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: C.dark, lineHeight: 1.2, fontFamily: "'Poppins',sans-serif" }}>
-                      {user.nombre.split(" ")[0]}
-                    </div>
-                  </div>
-                </div>
-              )}
-              {/* Fecha */}
-              <div style={{
-                display: "flex", alignItems: "center",
-                borderRadius: 12, overflow: "hidden",
-                border: `1px solid ${C.border}`,
-                boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-                background: C.white,
-              }}>
-                <div style={{
-                  background: `linear-gradient(160deg,${C.primary},${C.primaryDark})`,
-                  padding: "8px 10px", display: "flex", flexDirection: "column",
-                  alignItems: "center", justifyContent: "center", minWidth: 44,
-                }}>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: "white", lineHeight: 1, fontFamily: "'Poppins',sans-serif" }}>
-                    {new Date().getDate()}
-                  </div>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.85)", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 1 }}>
-                    {new Date().toLocaleDateString("es-CL", { month: "short" })}
-                  </div>
-                </div>
-                <div style={{ padding: "0 10px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: C.dark, textTransform: "capitalize", fontFamily: "'Poppins',sans-serif" }}>
-                    {new Date().toLocaleDateString("es-CL", { weekday: "long" })}
-                  </div>
-                  <div style={{ fontSize: 10, color: C.gray }}>
-                    {new Date().toLocaleDateString("es-CL", { month: "long", year: "numeric" })}
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
           <button
             onClick={handleSignOut}
@@ -2105,16 +2075,16 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
     <div
       style={{
         minHeight: "100dvh",
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "center",
+        display: "block",
         background: "#ffffff",
-        padding: "24px 16px 40px",
-        overflowY: "auto",
+        padding: "24px 16px 80px",
       }}
     >
-      <style>{G}</style>
-      <div style={{ width: "100%", maxWidth: 420 }}>
+      <style>{G}{`
+        body { overflow-y: auto !important; height: auto !important; }
+        html { overflow-y: auto !important; height: auto !important; }
+      `}</style>
+      <div style={{ width: "100%", maxWidth: 420, margin: "0 auto" }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <img
