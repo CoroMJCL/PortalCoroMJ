@@ -708,54 +708,20 @@ function RadioMariaWidget() {
             </div>
 
             <div style={{ padding: "16px", textAlign: "center" }}>
-              {error ? (
-                // Fallback: iframe embebido de TuneIn (siempre funciona)
-                <div>
-                  <div style={{ fontSize: 11, color: C.gray, marginBottom: 10 }}>
-                    ⚠️ Stream directo bloqueado por CORS.<br />Usa el reproductor embebido:
-                  </div>
-                  <iframe
-                    src="https://tunein.com/embed/player/s50214/"
-                    style={{ width: "100%", height: 100, border: "none", borderRadius: 10 }}
-                    scrolling="no"
-                    frameBorder="no"
-                    title="Radio María Chile - TuneIn"
-                  />
-                  <div style={{ marginTop: 10 }}>
-                    <a href="https://www.radiomaria.cl/radio-en-vivo/" target="_blank" rel="noopener noreferrer"
-                      style={{ fontSize: 11, color: "#1d4ed8", textDecoration: "none" }}>
-                      🔗 Abrir en radiomaria.cl
-                    </a>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <button
-                    onClick={togglePlay}
-                    style={{
-                      width: 64, height: 64, borderRadius: "50%",
-                      background: playing ? "#dc2626" : "#1d4ed8",
-                      border: "none", cursor: "pointer",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      margin: "0 auto 12px",
-                      fontSize: 26, color: "white",
-                      boxShadow: playing ? "0 0 0 4px rgba(220,38,38,0.2)" : "0 4px 12px rgba(29,78,216,0.3)",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    {playing ? "⏹" : "▶"}
-                  </button>
-                  <div style={{ fontSize: 12, color: playing ? "#1d4ed8" : C.gray, fontWeight: playing ? 600 : 400, animation: playing ? "rm-pulse 1.5s infinite" : "none" }}>
-                    {playing ? "● Reproduciendo en vivo..." : "Pulsa ▶ para escuchar"}
-                  </div>
-                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #f3f4f6" }}>
-                    <a href="https://www.radiomaria.cl/radio-en-vivo/" target="_blank" rel="noopener noreferrer"
-                      style={{ fontSize: 11, color: "#1d4ed8", textDecoration: "none" }}>
-                      🔗 Abrir en radiomaria.cl
-                    </a>
-                  </div>
-                </>
-              )}
+              {/* Reproductor TuneIn embebido directo — sin mensajes de error */}
+              <iframe
+                src="https://tunein.com/embed/player/s50214/"
+                style={{ width: "100%", height: 100, border: "none", borderRadius: 10, display: "block" }}
+                scrolling="no"
+                frameBorder="no"
+                title="Radio María Chile"
+              />
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #f3f4f6" }}>
+                <a href="https://www.radiomaria.cl/radio-en-vivo/" target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 11, color: "#1d4ed8", textDecoration: "none" }}>
+                  🔗 Abrir en radiomaria.cl
+                </a>
+              </div>
             </div>
           </div>
         )}
@@ -1781,41 +1747,51 @@ export default function App() {
                 </div>
               </div>
             )}
-            {/* ── Widget fecha compacto móvil ── */}
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              borderRadius: 12,
-              overflow: "hidden",
-              border: `1px solid ${C.border}`,
-              boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-              flexShrink: 0,
-              background: C.white,
-            }}>
-              {/* Día número */}
+            {/* ── Saludo + Widget fecha compacto móvil ── */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              {/* Saludo */}
+              {user?.nombre && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: C.white, border: `1px solid ${C.border}`,
+                  borderRadius: 12, padding: "6px 12px",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+                }}>
+                  <div>
+                    <div style={{ fontSize: 9, color: C.gray, lineHeight: 1.2 }}>Hola,</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.dark, lineHeight: 1.2, fontFamily: "'Poppins',sans-serif" }}>
+                      {user.nombre.split(" ")[0]}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Fecha */}
               <div style={{
-                background: `linear-gradient(160deg,${C.primary},${C.primaryDark})`,
-                padding: "8px 10px",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                minWidth: 44,
+                display: "flex", alignItems: "center",
+                borderRadius: 12, overflow: "hidden",
+                border: `1px solid ${C.border}`,
+                boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+                background: C.white,
               }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: "white", lineHeight: 1, fontFamily: "'Poppins',sans-serif" }}>
-                  {new Date().getDate()}
+                <div style={{
+                  background: `linear-gradient(160deg,${C.primary},${C.primaryDark})`,
+                  padding: "8px 10px", display: "flex", flexDirection: "column",
+                  alignItems: "center", justifyContent: "center", minWidth: 44,
+                }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "white", lineHeight: 1, fontFamily: "'Poppins',sans-serif" }}>
+                    {new Date().getDate()}
+                  </div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.85)", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 1 }}>
+                    {new Date().toLocaleDateString("es-CL", { month: "short" })}
+                  </div>
                 </div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.85)", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 1 }}>
-                  {new Date().toLocaleDateString("es-CL", { month: "short" })}
-                </div>
-              </div>
-              {/* Día semana */}
-              <div style={{ padding: "0 10px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: C.dark, textTransform: "capitalize", fontFamily: "'Poppins',sans-serif" }}>
-                  {new Date().toLocaleDateString("es-CL", { weekday: "long" })}
-                </div>
-                <div style={{ fontSize: 10, color: C.gray }}>
-                  {new Date().toLocaleDateString("es-CL", { month: "long", year: "numeric" })}
+                <div style={{ padding: "0 10px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.dark, textTransform: "capitalize", fontFamily: "'Poppins',sans-serif" }}>
+                    {new Date().toLocaleDateString("es-CL", { weekday: "long" })}
+                  </div>
+                  <div style={{ fontSize: 10, color: C.gray }}>
+                    {new Date().toLocaleDateString("es-CL", { month: "long", year: "numeric" })}
+                  </div>
                 </div>
               </div>
             </div>
