@@ -592,27 +592,26 @@ function MobileMenu({ section, setSection, onClose, user }) {
 // ══════════════════════════════════════════
 function RadioMariaWidget() {
   const [open, setOpen] = useState(false);
-  const iframeRef = useRef(null);
 
   return (
     <>
       <style>{`
-        .rm-btn:hover { background: rgba(255,255,255,0.15) !important; }
-        .rm-popup { animation: rm-fadedown 0.15s ease; }
-        @keyframes rm-fadedown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+        .rm-chip:hover { background: #e8f5e9 !important; border-color: #1d4ed8 !important; }
+        .rm-popup-in { animation: rm-fd 0.15s ease; }
+        @keyframes rm-fd { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
       `}</style>
 
-      {/* Botón compacto en el header */}
       <div style={{ position: "relative", flexShrink: 0 }}>
+        {/* Chip compacto */}
         <button
-          className="rm-btn"
+          className="rm-chip"
           onClick={() => setOpen(p => !p)}
-          title="Radio María Chile · En vivo"
+          title="Radio María Chile en vivo"
           style={{
             display: "flex", alignItems: "center", gap: 7,
-            background: open ? "rgba(29,78,216,0.12)" : C.light,
+            background: open ? C.primaryLight : C.light,
             border: `1px solid ${open ? "#1d4ed8" : C.border}`,
-            borderRadius: 9, padding: "6px 11px",
+            borderRadius: 9, padding: "5px 11px",
             cursor: "pointer", transition: "all 0.18s",
           }}
         >
@@ -624,20 +623,20 @@ function RadioMariaWidget() {
           <span style={{ fontSize: 9, color: C.gray, marginLeft: 2 }}>{open ? "▲" : "▼"}</span>
         </button>
 
-        {/* Popup con el iframe oficial */}
+        {/* Popup con reproductor oficial embebido */}
         {open && (
           <div
-            className="rm-popup"
+            className="rm-popup-in"
             style={{
               position: "absolute", top: "calc(100% + 8px)", right: 0,
-              width: 320, zIndex: 500,
+              width: 300, zIndex: 500,
               background: "white", borderRadius: 14,
               boxShadow: "0 8px 32px rgba(0,0,0,0.16)",
               border: "1px solid #e5e7eb",
               overflow: "hidden",
             }}
           >
-            {/* Cabecera del popup */}
+            {/* Cabecera */}
             <div style={{
               background: "linear-gradient(90deg,#1e3a5f,#1d4ed8)",
               padding: "10px 14px",
@@ -646,23 +645,23 @@ function RadioMariaWidget() {
               <span style={{ fontSize: 18 }}>📻</span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "white" }}>Radio María Chile</div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)" }}>Transmisión en vivo</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)" }}>Transmisión en vivo · FM 89.3</div>
               </div>
               <button
                 onClick={() => setOpen(false)}
-                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.7)", fontSize: 16, cursor: "pointer", padding: "2px 6px", borderRadius: 4 }}
+                style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", fontSize: 13, cursor: "pointer", padding: "3px 7px", borderRadius: 5 }}
               >✕</button>
             </div>
-            {/* Iframe oficial */}
+            {/* Reproductor oficial de Janus (el que usa radiomaria.cl) */}
             <iframe
-              ref={iframeRef}
-              src="https://www.radiomaria.cl/radio_envivo"
+              src="https://rmaria2.janus.cl/front/audio_player_radio.html"
               width="100%"
-              height="180"
+              height="120"
               frameBorder="0"
-              allowFullScreen
+              scrolling="no"
               title="Radio María Chile en vivo"
               style={{ display: "block" }}
+              allow="autoplay"
             />
           </div>
         )}
