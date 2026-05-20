@@ -7102,14 +7102,13 @@ function AdminEventos({ eventos, onReload }) {
 }
 
 function AdminDocumentos({ docs, onReload }) {
-  const [form, setForm] = useState({
-    nombre: "",
-    url: "",
-    categoria: "Repertorio",
-    size: "",
-  });
+  const [form, setForm] = useState({ nombre: "", url: "", categoria: "Repertorio", size: "" });
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+
   const inputS = {
     padding: "7px 10px",
     borderRadius: 7,
@@ -7118,6 +7117,7 @@ function AdminDocumentos({ docs, onReload }) {
     outline: "none",
     boxSizing: "border-box",
   };
+  const CATS = ["Repertorio", "Partituras", "Organización", "Comunicados", "Otro"];
 
   async function submit() {
     if (!form.nombre || !form.url) return;
@@ -7127,148 +7127,104 @@ function AdminDocumentos({ docs, onReload }) {
       setForm({ nombre: "", url: "", categoria: "Repertorio", size: "" });
       setShowForm(false);
       onReload();
-    } catch (e) {
-      alert("Error: " + e.message);
-    }
+    } catch (e) { alert("Error: " + e.message); }
     setSaving(false);
   }
 
   async function del(id) {
+    try { await deleteRecord("documentos", id); onReload(); }
+    catch (e) { alert("Error: " + e.message); }
+  }
+
+  function startEdit(d) {
+    setEditId(d.id);
+    setEditForm({ nombre: d.nombre || "", url: d.url || "", categoria: d.categoria || "Repertorio", size: d.size || "" });
+  }
+
+  async function saveEdit() {
+    if (!editForm.nombre || !editForm.url) return;
+    setEditSaving(true);
     try {
-      await deleteRecord("documentos", id);
+      await updateRecord("documentos", editId, editForm);
+      setEditId(null);
       onReload();
-    } catch (e) {
-      alert("Error: " + e.message);
-    }
+    } catch (e) { alert("Error: " + e.message); }
+    setEditSaving(false);
   }
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 14,
-        }}
-      >
-        <span style={{ fontSize: 13, color: C.gray }}>
-          {docs.length} documentos
-        </span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <span style={{ fontSize: 13, color: C.gray }}>{docs.length} documentos</span>
         <Btn onClick={() => setShowForm((p) => !p)}>+ Nuevo documento</Btn>
       </div>
       {showForm && (
-        <Card
-          style={{
-            marginBottom: 16,
-            border: `1px solid ${C.primary}40`,
-            background: C.primaryLight,
-          }}
-        >
-          <input
-            placeholder="Nombre del archivo *"
-            value={form.nombre}
+        <Card style={{ marginBottom: 16, border: `1px solid ${C.primary}40`, background: C.primaryLight }}>
+          <input placeholder="Nombre del archivo *" value={form.nombre}
             onChange={(e) => setForm((p) => ({ ...p, nombre: e.target.value }))}
-            style={{ ...inputS, width: "100%", marginBottom: 10 }}
-          />
-          <input
-            placeholder="URL del archivo *"
-            value={form.url}
+            style={{ ...inputS, width: "100%", marginBottom: 10 }} />
+          <input placeholder="URL del archivo *" value={form.url}
             onChange={(e) => setForm((p) => ({ ...p, url: e.target.value }))}
-            style={{ ...inputS, width: "100%", marginBottom: 10 }}
-          />
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 10,
-              marginBottom: 12,
-            }}
-          >
-            <select
-              value={form.categoria}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, categoria: e.target.value }))
-              }
-              style={inputS}
-            >
-              {[
-                "Repertorio",
-                "Partituras",
-                "Organización",
-                "Comunicados",
-                "Otro",
-              ].map((c) => (
-                <option key={c}>{c}</option>
-              ))}
+            style={{ ...inputS, width: "100%", marginBottom: 10 }} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+            <select value={form.categoria} onChange={(e) => setForm((p) => ({ ...p, categoria: e.target.value }))} style={inputS}>
+              {CATS.map((c) => <option key={c}>{c}</option>)}
             </select>
-            <input
-              placeholder="Tamaño (ej: 2.3 MB)"
-              value={form.size}
-              onChange={(e) => setForm((p) => ({ ...p, size: e.target.value }))}
-              style={inputS}
-            />
+            <input placeholder="Tamaño (ej: 2.3 MB)" value={form.size}
+              onChange={(e) => setForm((p) => ({ ...p, size: e.target.value }))} style={inputS} />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <Btn onClick={submit} disabled={saving}>
-              {saving ? "Guardando..." : "Guardar"}
-            </Btn>
-            <Btn variant="ghost" onClick={() => setShowForm(false)}>
-              Cancelar
-            </Btn>
+            <Btn onClick={submit} disabled={saving}>{saving ? "Guardando..." : "Guardar"}</Btn>
+            <Btn variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Btn>
           </div>
         </Card>
       )}
       {docs.map((d) => (
-        <Card
-          key={d.id}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            marginBottom: 10,
-            flexWrap: "wrap",
-          }}
-        >
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              background: "#fee2e2",
-              borderRadius: 9,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 18,
-              flexShrink: 0,
-            }}
-          >
-            📄
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 500,
-                color: C.dark,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {d.nombre}
+        <Card key={d.id} style={{ marginBottom: 10 }}>
+          {editId === d.id ? (
+            /* ── MODO EDICIÓN ── */
+            <div>
+              <input placeholder="Nombre *" value={editForm.nombre}
+                onChange={(e) => setEditForm((f) => ({ ...f, nombre: e.target.value }))}
+                style={{ ...inputS, width: "100%", marginBottom: 8 }} />
+              <input placeholder="URL *" value={editForm.url}
+                onChange={(e) => setEditForm((f) => ({ ...f, url: e.target.value }))}
+                style={{ ...inputS, width: "100%", marginBottom: 8 }} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                <select value={editForm.categoria} onChange={(e) => setEditForm((f) => ({ ...f, categoria: e.target.value }))} style={inputS}>
+                  {CATS.map((c) => <option key={c}>{c}</option>)}
+                </select>
+                <input placeholder="Tamaño (ej: 2.3 MB)" value={editForm.size}
+                  onChange={(e) => setEditForm((f) => ({ ...f, size: e.target.value }))} style={inputS} />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Btn onClick={saveEdit} disabled={editSaving}>{editSaving ? "Guardando..." : "Guardar cambios"}</Btn>
+                <Btn variant="ghost" onClick={() => setEditId(null)}>Cancelar</Btn>
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: C.gray }}>
-              <Badge>{d.categoria}</Badge>
-              {d.size ? " · " + d.size : ""}
+          ) : (
+            /* ── MODO VISTA ── */
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ width: 40, height: 40, background: "#fee2e2", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
+                📄
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: C.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {d.nombre}
+                </div>
+                <div style={{ fontSize: 11, color: C.gray }}>
+                  <Badge>{d.categoria}</Badge>{d.size ? " · " + d.size : ""}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <Btn variant="ghost" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => startEdit(d)}>✏️ Editar</Btn>
+                <a href={d.url} target="_blank" rel="noopener">
+                  <Btn variant="ghost" style={{ fontSize: 11, padding: "4px 10px" }}>🔗 Abrir</Btn>
+                </a>
+                <ConfirmBtn onConfirm={() => del(d.id)} />
+              </div>
             </div>
-          </div>
-          <a href={d.url} target="_blank" rel="noopener">
-            <Btn variant="ghost" style={{ fontSize: 11, padding: "4px 10px" }}>
-              🔗 Abrir
-            </Btn>
-          </a>
-          <ConfirmBtn onConfirm={() => del(d.id)} />
+          )}
         </Card>
       ))}
     </div>
