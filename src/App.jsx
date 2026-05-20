@@ -590,24 +590,30 @@ function MobileMenu({ section, setSection, onClose, user }) {
 // ══════════════════════════════════════════
 //  APP PRINCIPAL
 // ══════════════════════════════════════════
-// Streams de fallback conocidos para Radio María Chile
+// Streams de fallback HTTPS para Radio María Chile
 const RM_FALLBACK_STREAMS = [
   "https://dreamer.janus.cl/8038/stream",
   "https://dreamer2.janus.cl/8038/stream",
 ];
 
-// Obtener stream URL desde radio-browser.info (ejecutado en el browser del usuario)
+// Obtener stream URL via radio-browser.info (solo HTTPS)
 async function fetchRadioMariaStream() {
   try {
+    // Usar servidor HTTPS de radio-browser
     const res = await fetch(
-      "https://de1.api.radio-browser.info/json/stations/search?name=radio+maria+chile&countrycode=CL&limit=5",
+      "https://de1.api.radio-browser.info/json/stations/search?name=radio+maria+chile&countrycode=CL&limit=10",
       { headers: { "User-Agent": "CoroMJ/1.0" } }
     );
     if (!res.ok) throw new Error("no ok");
     const stations = await res.json();
-    // Tomar el primer resultado con stream url válido
-    const station = stations.find(s => s.url_resolved && s.url_resolved.startsWith("http"));
-    return station?.url_resolved || null;
+    // Solo streams HTTPS para evitar Mixed Content
+    const station = stations.find(s =>
+      s.url_resolved && s.url_resolved.startsWith("https")
+    );
+    if (station) return station.url_resolved;
+    // Si solo hay HTTP, intentar con url sin resolver también
+    const anyStation = stations.find(s => s.url_resolved);
+    return anyStation?.url_resolved || null;
   } catch {
     return null;
   }
@@ -624,30 +630,23 @@ function RadioMariaWidget() {
   async function tryPlay(url) {
     const audio = audioRef.current;
     if (!audio) return;
-    audio.src = url;
-    audio.load();
-    try {
-      await audio.play();
-      setPlaying(true);
-      setLoading(false);
-      setError(false);
-    } catch {
-      // Intentar fallbacks
-      for (const fb of RM_FALLBACK_STREAMS) {
-        if (fb === url) continue;
-        audio.src = fb;
+    // Lista de candidatos: URL dada + fallbacks HTTPS
+    const candidates = [url, ...RM_FALLBACK_STREAMS].filter(Boolean).filter(
+      (v, i, a) => a.indexOf(v) === i
+    );
+    for (const candidate of candidates) {
+      try {
+        audio.src = candidate;
         audio.load();
-        try {
-          await audio.play();
-          setPlaying(true);
-          setLoading(false);
-          setError(false);
-          return;
-        } catch {}
-      }
-      setLoading(false);
-      setError(true);
+        await audio.play();
+        setPlaying(true);
+        setLoading(false);
+        setError(false);
+        return;
+      } catch {}
     }
+    setLoading(false);
+    setError(true);
   }
 
   async function togglePlay() {
@@ -1797,106 +1796,33 @@ export default function App() {
                 </div>
               </div>
             )}
-            {/* ── Widget saludo sofisticado ── */}
+            {/* ── Widget fecha minimalista ── */}
             <div
               style={{
                 display: "flex",
-                alignItems: "center",
-                gap: 0,
+                alignItems: "stretch",
                 borderRadius: 12,
                 overflow: "hidden",
                 border: `1px solid ${C.border}`,
-                boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+                boxShadow: "0 1px 6px rgba(0,0,0,0.06)",
                 flexShrink: 0,
+                background: C.white,
               }}
             >
-              {/* Franja izquierda: avatar con color de cuerda */}
-              <div
-                style={{
-                  background: `linear-gradient(160deg, ${CUERDAS[user?.cuerda] || C.primary}, ${CUERDAS[user?.cuerda] || C.primary}cc)`,
-                  width: 44,
-                  alignSelf: "stretch",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <div
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: "50%",
-                    background: "rgba(255,255,255,0.25)",
-                    border: "2px solid rgba(255,255,255,0.6)",
-                    overflow: "hidden",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "white",
-                    fontSize: 10,
-                    fontWeight: 800,
-                  }}
-                >
-                  {user?.foto_url
-                    ? <img src={user.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    : ini(user?.nombre || "U")}
-                </div>
-              </div>
-              {/* Centro: nombre + fecha */}
-              <div
-                style={{
-                  background: C.white,
-                  padding: "6px 12px",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "center",
-                  gap: 1,
-                  minWidth: 0,
-                }}
-              >
+              {/* Día número grande */}
+              <div style={{
+                background: `linear-gradient(160deg,${C.primary},${C.primaryDark})`,
+                padding: "7px 11px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 0,
+              }}>
                 <div style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: C.dark,
-                  whiteSpace: "nowrap",
-                  fontFamily: "'Poppins',sans-serif",
-                }}>
-                  Hola, {user?.nombre?.split(" ")[0]} 👋
-                </div>
-                <div style={{
-                  fontSize: 10,
-                  color: C.gray,
-                  whiteSpace: "nowrap",
-                  textTransform: "capitalize",
-                  letterSpacing: "0.01em",
-                }}>
-                  {new Date().toLocaleDateString("es-CL", {
-                    weekday: "short",
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </div>
-              </div>
-              {/* Franja derecha: día del mes destacado */}
-              <div
-                style={{
-                  background: `linear-gradient(160deg, ${C.primary}18, ${C.primary}08)`,
-                  borderLeft: `1px solid ${C.primary}20`,
-                  padding: "6px 10px",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  alignSelf: "stretch",
-                }}
-              >
-                <div style={{
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: 800,
-                  color: C.primary,
+                  color: "white",
                   lineHeight: 1,
                   fontFamily: "'Poppins',sans-serif",
                 }}>
@@ -1905,12 +1831,38 @@ export default function App() {
                 <div style={{
                   fontSize: 8,
                   fontWeight: 700,
-                  color: C.primary,
+                  color: "rgba(255,255,255,0.75)",
                   textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  opacity: 0.75,
+                  letterSpacing: "0.07em",
                 }}>
                   {new Date().toLocaleDateString("es-CL", { month: "short" })}
+                </div>
+              </div>
+              {/* Día semana + año */}
+              <div style={{
+                padding: "7px 12px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                gap: 1,
+              }}>
+                <div style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: C.dark,
+                  textTransform: "capitalize",
+                  whiteSpace: "nowrap",
+                  fontFamily: "'Poppins',sans-serif",
+                }}>
+                  {new Date().toLocaleDateString("es-CL", { weekday: "long" })}
+                </div>
+                <div style={{
+                  fontSize: 10,
+                  color: C.gray,
+                  whiteSpace: "nowrap",
+                  letterSpacing: "0.02em",
+                }}>
+                  {new Date().toLocaleDateString("es-CL", { month: "long", year: "numeric" })}
                 </div>
               </div>
             </div>
