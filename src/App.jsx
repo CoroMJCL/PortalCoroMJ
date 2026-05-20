@@ -590,93 +590,8 @@ function MobileMenu({ section, setSection, onClose, user }) {
 // ══════════════════════════════════════════
 //  APP PRINCIPAL
 // ══════════════════════════════════════════
-// Streams de fallback HTTPS para Radio María Chile
-const RM_FALLBACK_STREAMS = [
-  "https://dreamer.janus.cl/8038/stream",
-  "https://dreamer2.janus.cl/8038/stream",
-];
-
-// Obtener stream URL via radio-browser.info (solo HTTPS)
-async function fetchRadioMariaStream() {
-  try {
-    // Usar servidor HTTPS de radio-browser
-    const res = await fetch(
-      "https://de1.api.radio-browser.info/json/stations/search?name=radio+maria+chile&countrycode=CL&limit=10",
-      { headers: { "User-Agent": "CoroMJ/1.0" } }
-    );
-    if (!res.ok) throw new Error("no ok");
-    const stations = await res.json();
-    // Solo streams HTTPS para evitar Mixed Content
-    const station = stations.find(s =>
-      s.url_resolved && s.url_resolved.startsWith("https")
-    );
-    if (station) return station.url_resolved;
-    // Si solo hay HTTP, intentar con url sin resolver también
-    const anyStation = stations.find(s => s.url_resolved);
-    return anyStation?.url_resolved || null;
-  } catch {
-    return null;
-  }
-}
-
 function RadioMariaWidget() {
   const [open, setOpen] = useState(false);
-  const [playing, setPlaying] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [streamUrl, setStreamUrl] = useState(null);
-  const [error, setError] = useState(false);
-  const audioRef = useRef(null);
-
-  async function tryPlay(url) {
-    const audio = audioRef.current;
-    if (!audio) return;
-    // Lista de candidatos: URL dada + fallbacks HTTPS
-    const candidates = [url, ...RM_FALLBACK_STREAMS].filter(Boolean).filter(
-      (v, i, a) => a.indexOf(v) === i
-    );
-    for (const candidate of candidates) {
-      try {
-        audio.src = candidate;
-        audio.load();
-        await audio.play();
-        setPlaying(true);
-        setLoading(false);
-        setError(false);
-        return;
-      } catch {}
-    }
-    setLoading(false);
-    setError(true);
-  }
-
-  async function togglePlay() {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (playing) {
-      audio.pause();
-      audio.src = "";
-      setPlaying(false);
-      return;
-    }
-    setLoading(true);
-    setError(false);
-    // Obtener stream dinámicamente si aún no lo tenemos
-    let url = streamUrl;
-    if (!url) {
-      url = await fetchRadioMariaStream();
-      if (url) setStreamUrl(url);
-      else url = RM_FALLBACK_STREAMS[0];
-    }
-    await tryPlay(url);
-  }
-
-  // Pausar al cerrar popup
-  function handleClose() {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; }
-    setPlaying(false);
-    setError(false);
-    setOpen(false);
-  }
 
   return (
     <>
@@ -684,13 +599,9 @@ function RadioMariaWidget() {
         .rm-chip:hover { background: #e8f5e9 !important; border-color: #1d4ed8 !important; }
         .rm-popup-in { animation: rm-fd 0.15s ease; }
         @keyframes rm-fd { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes rm-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
       `}</style>
 
-      <audio ref={audioRef} preload="none" style={{ display: "none" }} />
-
       <div style={{ position: "relative", flexShrink: 0 }}>
-        {/* Chip compacto */}
         <button
           className="rm-chip"
           onClick={() => setOpen(p => !p)}
@@ -706,27 +617,23 @@ function RadioMariaWidget() {
           <span style={{ fontSize: 15, lineHeight: 1 }}>📻</span>
           <div style={{ textAlign: "left" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: C.dark, lineHeight: 1.1 }}>Radio María</div>
-            <div style={{ fontSize: 9, color: playing ? "#16a34a" : C.gray, lineHeight: 1.2, fontWeight: playing ? 700 : 400 }}>
-              {playing ? "▶ En vivo" : "En vivo"}
-            </div>
+            <div style={{ fontSize: 9, color: C.gray, lineHeight: 1.2 }}>En vivo</div>
           </div>
           <span style={{ fontSize: 9, color: C.gray, marginLeft: 2 }}>{open ? "▲" : "▼"}</span>
         </button>
 
-        {/* Popup */}
         {open && (
           <div
             className="rm-popup-in"
             style={{
               position: "absolute", top: "calc(100% + 8px)", right: 0,
-              width: 280, zIndex: 500,
+              width: 320, zIndex: 500,
               background: "white", borderRadius: 14,
               boxShadow: "0 8px 32px rgba(0,0,0,0.16)",
               border: "1px solid #e5e7eb",
               overflow: "hidden",
             }}
           >
-            {/* Cabecera */}
             <div style={{
               background: "linear-gradient(90deg,#1e3a5f,#1d4ed8)",
               padding: "10px 14px",
@@ -738,39 +645,29 @@ function RadioMariaWidget() {
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)" }}>Transmisión en vivo · FM 89.3</div>
               </div>
               <button
-                onClick={handleClose}
+                onClick={() => setOpen(false)}
                 style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", fontSize: 13, cursor: "pointer", padding: "3px 7px", borderRadius: 5 }}
               >✕</button>
             </div>
-            {/* Controles de audio */}
-            <div style={{ padding: "16px 14px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-              <button
-                onClick={togglePlay}
-                disabled={loading}
-                style={{
-                  width: 56, height: 56, borderRadius: "50%",
-                  background: playing ? "#dc2626" : "#1d4ed8",
-                  border: "none", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 22, color: "white",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-                  transition: "all 0.18s",
-                  opacity: loading ? 0.7 : 1,
-                }}
-              >
-                {loading ? "⏳" : playing ? "⏸" : "▶"}
-              </button>
-              <div style={{ textAlign: "center" }}>
-                <div style={{
-                  fontSize: 12, fontWeight: 700,
-                  color: error ? "#dc2626" : playing ? "#16a34a" : C.dark,
-                  animation: playing ? "rm-pulse 2s infinite" : "none",
-                }}>
-                  {loading ? "Conectando..." : error ? "⚠️ Sin señal disponible" : playing ? "🔴 En vivo" : "Presiona ▶ para escuchar"}
-                </div>
-                <div style={{ fontSize: 10, color: C.gray, marginTop: 2 }}>
-                  {error ? "Intenta de nuevo más tarde" : "Streaming de audio directo"}
-                </div>
+            <div style={{ padding: "14px" }}>
+              <iframe
+                src="https://www.radiomaria.cl/radio-en-vivo/"
+                title="Radio María Chile"
+                width="100%"
+                height="160"
+                frameBorder="0"
+                allow="autoplay"
+                style={{ borderRadius: 10, border: "1px solid #e5e7eb", display: "block" }}
+              />
+              <div style={{ textAlign: "center", marginTop: 10 }}>
+                <a
+                  href="https://www.radiomaria.cl/radio-en-vivo/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: 11, color: "#1d4ed8", textDecoration: "none" }}
+                >
+                  🔗 Abrir en radiomaria.cl
+                </a>
               </div>
             </div>
           </div>
@@ -779,6 +676,7 @@ function RadioMariaWidget() {
     </>
   );
 }
+
 
 
 export default function App() {
@@ -1801,18 +1699,19 @@ export default function App() {
               style={{
                 display: "flex",
                 alignItems: "stretch",
-                borderRadius: 12,
+                borderRadius: 14,
                 overflow: "hidden",
                 border: `1px solid ${C.border}`,
-                boxShadow: "0 1px 6px rgba(0,0,0,0.06)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
                 flexShrink: 0,
                 background: C.white,
+                minWidth: 120,
               }}
             >
               {/* Día número grande */}
               <div style={{
                 background: `linear-gradient(160deg,${C.primary},${C.primaryDark})`,
-                padding: "7px 11px",
+                padding: "10px 14px",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
@@ -1820,7 +1719,7 @@ export default function App() {
                 gap: 0,
               }}>
                 <div style={{
-                  fontSize: 20,
+                  fontSize: 28,
                   fontWeight: 800,
                   color: "white",
                   lineHeight: 1,
@@ -1829,25 +1728,26 @@ export default function App() {
                   {new Date().getDate()}
                 </div>
                 <div style={{
-                  fontSize: 8,
+                  fontSize: 11,
                   fontWeight: 700,
-                  color: "rgba(255,255,255,0.75)",
+                  color: "rgba(255,255,255,0.85)",
                   textTransform: "uppercase",
                   letterSpacing: "0.07em",
+                  marginTop: 2,
                 }}>
                   {new Date().toLocaleDateString("es-CL", { month: "short" })}
                 </div>
               </div>
               {/* Día semana + año */}
               <div style={{
-                padding: "7px 12px",
+                padding: "10px 14px",
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "center",
-                gap: 1,
+                gap: 2,
               }}>
                 <div style={{
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: 700,
                   color: C.dark,
                   textTransform: "capitalize",
@@ -1857,7 +1757,7 @@ export default function App() {
                   {new Date().toLocaleDateString("es-CL", { weekday: "long" })}
                 </div>
                 <div style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   color: C.gray,
                   whiteSpace: "nowrap",
                   letterSpacing: "0.02em",
@@ -2612,11 +2512,29 @@ function TwitterTimeline() {
   return <div ref={ref} style={{ background: "#ffffff", minHeight: 280 }} />;
 }
 
+function getSpotifyEmbedUrl(url) {
+  if (!url) return null;
+  if (!url.includes("spotify.com")) return null;
+  // Limpiar parámetros y convertir a embed
+  const clean = url.split("?")[0];
+  return clean
+    .replace("https://open.spotify.com/episode/", "https://open.spotify.com/embed/episode/")
+    .replace("https://open.spotify.com/show/", "https://open.spotify.com/embed/show/")
+    .replace("https://open.spotify.com/track/", "https://open.spotify.com/embed/track/");
+}
+
 function PodcastWidget({ podcasts, setSection }) {
   const [idx, setIdx] = useState(0);
+  const [playerOpen, setPlayerOpen] = useState(false);
   const lista = podcasts && podcasts.length > 0 ? podcasts : null;
   if (!lista) return null;
   const p = lista[Math.min(idx, lista.length - 1)];
+  const embedUrl = getSpotifyEmbedUrl(p.url);
+
+  function handleNav(newIdx) {
+    setIdx(newIdx);
+    setPlayerOpen(false);
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -2633,42 +2551,80 @@ function PodcastWidget({ podcasts, setSection }) {
       </div>
 
       {/* Episodio */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, background: C.primaryLight, borderRadius: 10, padding: "10px 12px" }}>
-        <div style={{
-          width: 42, height: 42, borderRadius: 10, flexShrink: 0,
-          background: `linear-gradient(135deg,${C.primary},${C.primaryDark})`,
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-        }}>🎙️</div>
+      <div style={{ background: C.primaryLight, borderRadius: 12, overflow: "hidden" }}>
+        {/* Fila del episodio */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px" }}>
+          <div style={{
+            width: 42, height: 42, borderRadius: 10, flexShrink: 0,
+            background: `linear-gradient(135deg,${C.primary},${C.primaryDark})`,
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+          }}>🎙️</div>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {p.titulo}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {p.titulo}
+            </div>
+            {p.autor && (
+              <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>👤 {p.autor}</div>
+            )}
           </div>
-          {p.autor && (
-            <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>👤 {p.autor}</div>
-          )}
+
+          {/* Controles */}
+          <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+            {lista.length > 1 && (
+              <>
+                <button onClick={() => handleNav(Math.max(0, idx - 1))} disabled={idx === 0}
+                  style={{ border: "none", background: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? C.border : C.primary, fontSize: 18, padding: 0, lineHeight: 1 }}>‹</button>
+                <button onClick={() => handleNav(Math.min(lista.length - 1, idx + 1))} disabled={idx === lista.length - 1}
+                  style={{ border: "none", background: "none", cursor: idx === lista.length - 1 ? "default" : "pointer", color: idx === lista.length - 1 ? C.border : C.primary, fontSize: 18, padding: 0, lineHeight: 1 }}>›</button>
+              </>
+            )}
+            {p.url && (
+              embedUrl ? (
+                // Spotify: toggle player inline
+                <button
+                  onClick={() => setPlayerOpen(o => !o)}
+                  title={playerOpen ? "Cerrar player" : "Reproducir en esta página"}
+                  style={{
+                    width: 36, height: 36, borderRadius: "50%",
+                    background: playerOpen ? "#1DB954" : C.primary,
+                    border: "none", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "white", fontSize: 14, marginLeft: 4,
+                    transition: "background 0.2s",
+                  }}
+                >
+                  {playerOpen ? "⏹" : "▶"}
+                </button>
+              ) : (
+                // Otro servicio: abrir en nueva pestaña
+                <a href={p.url} target="_blank" rel="noopener">
+                  <div style={{
+                    width: 36, height: 36, borderRadius: "50%",
+                    background: C.primary, display: "flex", alignItems: "center",
+                    justifyContent: "center", color: "white", fontSize: 14, marginLeft: 4,
+                  }}>▶</div>
+                </a>
+              )
+            )}
+          </div>
         </div>
 
-        {/* Botón play / nav */}
-        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-          {lista.length > 1 && (
-            <>
-              <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
-                style={{ border: "none", background: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? C.border : C.primary, fontSize: 18, padding: 0, lineHeight: 1 }}>‹</button>
-              <button onClick={() => setIdx((i) => Math.min(lista.length - 1, i + 1))} disabled={idx === lista.length - 1}
-                style={{ border: "none", background: "none", cursor: idx === lista.length - 1 ? "default" : "pointer", color: idx === lista.length - 1 ? C.border : C.primary, fontSize: 18, padding: 0, lineHeight: 1 }}>›</button>
-            </>
-          )}
-          {p.url && (
-            <a href={p.url} target="_blank" rel="noopener">
-              <div style={{
-                width: 36, height: 36, borderRadius: "50%",
-                background: C.primary, display: "flex", alignItems: "center",
-                justifyContent: "center", color: "white", fontSize: 14, marginLeft: 4,
-              }}>▶</div>
-            </a>
-          )}
-        </div>
+        {/* Spotify embed — se despliega al pulsar ▶ */}
+        {playerOpen && embedUrl && (
+          <div style={{ padding: "0 10px 10px" }}>
+            <iframe
+              src={`${embedUrl}?utm_source=generator&theme=0`}
+              width="100%"
+              height="152"
+              frameBorder="0"
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              loading="lazy"
+              style={{ borderRadius: 10, display: "block" }}
+              title={p.titulo}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
