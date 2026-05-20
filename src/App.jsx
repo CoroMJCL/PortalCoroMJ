@@ -593,7 +593,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
 function RadioMariaWidget() {
   const [open, setOpen] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const audioRef = React.useRef(null);
+  const audioRef = useRef(null);
   const STREAM_URL = "https://stream.zeno.fm/q2fmwqmhh5zuv";
 
   function toggle() {
