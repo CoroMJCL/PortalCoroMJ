@@ -592,6 +592,34 @@ function MobileMenu({ section, setSection, onClose, user }) {
 // ══════════════════════════════════════════
 function RadioMariaWidget() {
   const [open, setOpen] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef(null);
+
+  // Stream de audio directo de Radio María Chile
+  const STREAM_URL = "https://streaming.radiomaria.cl/radiomaria";
+
+  function togglePlay() {
+    if (!audioRef.current) return;
+    if (playing) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      setPlaying(false);
+    } else {
+      audioRef.current.src = STREAM_URL;
+      audioRef.current.load();
+      audioRef.current.play().catch(() => {});
+      setPlaying(true);
+    }
+  }
+
+  function handleClose() {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+    }
+    setPlaying(false);
+    setOpen(false);
+  }
 
   return (
     <>
@@ -599,7 +627,10 @@ function RadioMariaWidget() {
         .rm-chip:hover { background: #e8f5e9 !important; border-color: #1d4ed8 !important; }
         .rm-popup-in { animation: rm-fd 0.15s ease; }
         @keyframes rm-fd { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes rm-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
       `}</style>
+
+      <audio ref={audioRef} preload="none" />
 
       <div style={{ position: "relative", flexShrink: 0 }}>
         <button
@@ -608,8 +639,8 @@ function RadioMariaWidget() {
           title="Radio María Chile en vivo"
           style={{
             display: "flex", alignItems: "center", gap: 7,
-            background: open ? C.primaryLight : C.light,
-            border: `1px solid ${open ? "#1d4ed8" : C.border}`,
+            background: playing ? "#dbeafe" : open ? C.primaryLight : C.light,
+            border: `1px solid ${playing ? "#1d4ed8" : open ? "#1d4ed8" : C.border}`,
             borderRadius: 9, padding: "5px 11px",
             cursor: "pointer", transition: "all 0.18s",
           }}
@@ -617,7 +648,9 @@ function RadioMariaWidget() {
           <span style={{ fontSize: 15, lineHeight: 1 }}>📻</span>
           <div style={{ textAlign: "left" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: C.dark, lineHeight: 1.1 }}>Radio María</div>
-            <div style={{ fontSize: 9, color: C.gray, lineHeight: 1.2 }}>En vivo</div>
+            <div style={{ fontSize: 9, color: playing ? "#1d4ed8" : C.gray, lineHeight: 1.2, animation: playing ? "rm-pulse 1.5s infinite" : "none" }}>
+              {playing ? "● En vivo" : "En vivo"}
+            </div>
           </div>
           <span style={{ fontSize: 9, color: C.gray, marginLeft: 2 }}>{open ? "▲" : "▼"}</span>
         </button>
@@ -627,7 +660,7 @@ function RadioMariaWidget() {
             className="rm-popup-in"
             style={{
               position: "absolute", top: "calc(100% + 8px)", right: 0,
-              width: 320, zIndex: 500,
+              width: 290, zIndex: 500,
               background: "white", borderRadius: 14,
               boxShadow: "0 8px 32px rgba(0,0,0,0.16)",
               border: "1px solid #e5e7eb",
@@ -642,24 +675,33 @@ function RadioMariaWidget() {
               <span style={{ fontSize: 18 }}>📻</span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "white" }}>Radio María Chile</div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)" }}>Transmisión en vivo · FM 89.3</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)" }}>FM 89.3 · Transmisión en vivo</div>
               </div>
               <button
-                onClick={() => setOpen(false)}
+                onClick={handleClose}
                 style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", fontSize: 13, cursor: "pointer", padding: "3px 7px", borderRadius: 5 }}
               >✕</button>
             </div>
-            <div style={{ padding: "14px" }}>
-              <iframe
-                src="https://www.radiomaria.cl/radio-en-vivo/"
-                title="Radio María Chile"
-                width="100%"
-                height="160"
-                frameBorder="0"
-                allow="autoplay"
-                style={{ borderRadius: 10, border: "1px solid #e5e7eb", display: "block" }}
-              />
-              <div style={{ textAlign: "center", marginTop: 10 }}>
+            <div style={{ padding: "16px", textAlign: "center" }}>
+              <button
+                onClick={togglePlay}
+                style={{
+                  width: 64, height: 64, borderRadius: "50%",
+                  background: playing ? "#dc2626" : "#1d4ed8",
+                  border: "none", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  margin: "0 auto 12px",
+                  fontSize: 26, color: "white",
+                  boxShadow: playing ? "0 0 0 4px rgba(220,38,38,0.2)" : "0 4px 12px rgba(29,78,216,0.3)",
+                  transition: "all 0.2s",
+                }}
+              >
+                {playing ? "⏹" : "▶"}
+              </button>
+              <div style={{ fontSize: 12, color: playing ? "#1d4ed8" : C.gray, fontWeight: playing ? 600 : 400, animation: playing ? "rm-pulse 1.5s infinite" : "none" }}>
+                {playing ? "● Reproduciendo en vivo..." : "Pulsa ▶ para escuchar"}
+              </div>
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #f3f4f6" }}>
                 <a
                   href="https://www.radiomaria.cl/radio-en-vivo/"
                   target="_blank"
@@ -1694,74 +1736,40 @@ export default function App() {
                 </div>
               </div>
             )}
-            {/* ── Widget fecha minimalista ── */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "stretch",
-                borderRadius: 14,
-                overflow: "hidden",
-                border: `1px solid ${C.border}`,
-                boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-                flexShrink: 0,
-                background: C.white,
-                minWidth: 120,
-              }}
-            >
-              {/* Día número grande */}
+            {/* ── Widget fecha compacto móvil ── */}
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              borderRadius: 12,
+              overflow: "hidden",
+              border: `1px solid ${C.border}`,
+              boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+              flexShrink: 0,
+              background: C.white,
+            }}>
+              {/* Día número */}
               <div style={{
                 background: `linear-gradient(160deg,${C.primary},${C.primaryDark})`,
-                padding: "10px 14px",
+                padding: "8px 10px",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 0,
+                minWidth: 44,
               }}>
-                <div style={{
-                  fontSize: 28,
-                  fontWeight: 800,
-                  color: "white",
-                  lineHeight: 1,
-                  fontFamily: "'Poppins',sans-serif",
-                }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "white", lineHeight: 1, fontFamily: "'Poppins',sans-serif" }}>
                   {new Date().getDate()}
                 </div>
-                <div style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "rgba(255,255,255,0.85)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.07em",
-                  marginTop: 2,
-                }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.85)", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 1 }}>
                   {new Date().toLocaleDateString("es-CL", { month: "short" })}
                 </div>
               </div>
-              {/* Día semana + año */}
-              <div style={{
-                padding: "10px 14px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "center",
-                gap: 2,
-              }}>
-                <div style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: C.dark,
-                  textTransform: "capitalize",
-                  whiteSpace: "nowrap",
-                  fontFamily: "'Poppins',sans-serif",
-                }}>
+              {/* Día semana */}
+              <div style={{ padding: "0 10px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.dark, textTransform: "capitalize", fontFamily: "'Poppins',sans-serif" }}>
                   {new Date().toLocaleDateString("es-CL", { weekday: "long" })}
                 </div>
-                <div style={{
-                  fontSize: 11,
-                  color: C.gray,
-                  whiteSpace: "nowrap",
-                  letterSpacing: "0.02em",
-                }}>
+                <div style={{ fontSize: 10, color: C.gray }}>
                   {new Date().toLocaleDateString("es-CL", { month: "long", year: "numeric" })}
                 </div>
               </div>
@@ -2524,9 +2532,17 @@ function getSpotifyEmbedUrl(url) {
 }
 
 function PodcastWidget({ podcasts, setSection }) {
+  // Ordenar por campo "orden" asc — el admin controla cuál aparece primero en el widget
+  const lista = podcasts && podcasts.length > 0
+    ? [...podcasts].sort((a, b) => {
+        const oa = a.orden ?? 999;
+        const ob = b.orden ?? 999;
+        if (oa !== ob) return oa - ob;
+        return new Date(a.created_at) - new Date(b.created_at);
+      })
+    : null;
   const [idx, setIdx] = useState(0);
   const [playerOpen, setPlayerOpen] = useState(false);
-  const lista = podcasts && podcasts.length > 0 ? podcasts : null;
   if (!lista) return null;
   const p = lista[Math.min(idx, lista.length - 1)];
   const embedUrl = getSpotifyEmbedUrl(p.url);
@@ -6378,7 +6394,7 @@ function Podcast({ podcasts, onReload, user }) {
         </Card>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {podcasts.map((p) => (
+          {[...podcasts].sort((a,b) => { const oa=a.orden??999,ob=b.orden??999; return oa!==ob?oa-ob:new Date(a.created_at)-new Date(b.created_at); }).map((p) => (
             <Card
               key={p.id}
               hover
@@ -9230,14 +9246,15 @@ function AdminBiblioteca({ biblioteca, onReload }) {
 }
 
 function AdminPodcasts({ podcasts, onReload }) {
-  const [form, setForm] = useState({
-    titulo: "",
-    descripcion: "",
-    url: "",
-    autor: "",
-  });
+  const emptyForm = { titulo: "", descripcion: "", url: "", autor: "", orden: 0 };
+  const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Editing state
+  const [editId, setEditId] = useState(null);
+  const [editData, setEditData] = useState(emptyForm);
+  const [editSaving, setEditSaving] = useState(false);
+
   const inputS = {
     padding: "8px 12px",
     borderRadius: 7,
@@ -9248,18 +9265,50 @@ function AdminPodcasts({ podcasts, onReload }) {
     boxSizing: "border-box",
   };
 
+  // Sort by orden asc, then created_at asc
+  const sorted = [...podcasts].sort((a, b) => {
+    const oa = a.orden ?? 999;
+    const ob = b.orden ?? 999;
+    if (oa !== ob) return oa - ob;
+    return new Date(a.created_at) - new Date(b.created_at);
+  });
+
   async function submit() {
     if (!form.titulo) return;
     setSaving(true);
     try {
-      await supabase("podcasts", { method: "POST", body: form });
-      setForm({ titulo: "", descripcion: "", url: "", autor: "" });
+      await supabase("podcasts", { method: "POST", body: { ...form, orden: Number(form.orden) || 0 } });
+      setForm(emptyForm);
       setShowForm(false);
       onReload();
     } catch (e) {
       alert("Error: " + e.message);
     }
     setSaving(false);
+  }
+
+  async function saveEdit(id) {
+    setEditSaving(true);
+    try {
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/podcasts?id=eq.${id}`,
+        {
+          method: "PATCH",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "return=representation",
+          },
+          body: JSON.stringify({ ...editData, orden: Number(editData.orden) || 0 }),
+        }
+      );
+      setEditId(null);
+      onReload();
+    } catch (e) {
+      alert("Error: " + e.message);
+    }
+    setEditSaving(false);
   }
 
   async function del(id) {
@@ -9273,27 +9322,23 @@ function AdminPodcasts({ podcasts, onReload }) {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 14,
-        }}
-      >
-        <span style={{ fontSize: 13, color: C.gray }}>
-          {podcasts.length} episodios
-        </span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <div>
+          <span style={{ fontSize: 13, color: C.gray }}>{podcasts.length} episodios</span>
+          <span style={{ fontSize: 11, color: C.gray, marginLeft: 8 }}>· El de menor nº de orden aparece primero en el widget</span>
+        </div>
         <Btn onClick={() => setShowForm((p) => !p)}>+ Nuevo episodio</Btn>
       </div>
+
+      {/* SQL hint for orden column */}
+      <div style={{ background: C.goldLight, border: `1px solid ${C.gold}40`, borderRadius: 8, padding: "8px 12px", fontSize: 11, color: C.gray, marginBottom: 14 }}>
+        ⚠️ Si el campo <strong>orden</strong> no existe aún, ejecuta en Supabase:<br />
+        <code style={{ fontFamily: "monospace" }}>alter table podcasts add column if not exists orden int default 0;</code>
+      </div>
+
       {showForm && (
-        <Card
-          style={{
-            marginBottom: 16,
-            border: `1px solid ${C.primary}40`,
-            background: C.primaryLight,
-          }}
-        >
+        <Card style={{ marginBottom: 16, border: `1px solid ${C.primary}40`, background: C.primaryLight }}>
+          <div style={{ fontWeight: 600, fontSize: 13, color: C.dark, marginBottom: 10 }}>Nuevo episodio</div>
           <input
             placeholder="Título del episodio *"
             value={form.titulo}
@@ -9303,107 +9348,128 @@ function AdminPodcasts({ podcasts, onReload }) {
           <textarea
             placeholder="Descripción breve"
             value={form.descripcion}
-            onChange={(e) =>
-              setForm((p) => ({ ...p, descripcion: e.target.value }))
-            }
+            onChange={(e) => setForm((p) => ({ ...p, descripcion: e.target.value }))}
             rows={2}
-            style={{
-              ...inputS,
-              resize: "vertical",
-              fontFamily: "Inter,sans-serif",
-              marginBottom: 10,
-            }}
+            style={{ ...inputS, resize: "vertical", fontFamily: "Inter,sans-serif", marginBottom: 10 }}
           />
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 10,
-              marginBottom: 12,
-            }}
-          >
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: 10, marginBottom: 12 }}>
             <input
               placeholder="Autor / Narrador"
               value={form.autor}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, autor: e.target.value }))
-              }
+              onChange={(e) => setForm((p) => ({ ...p, autor: e.target.value }))}
               style={inputS}
             />
             <input
-              placeholder="URL (Spotify, SoundCloud, Drive...)"
+              placeholder="URL (Spotify, SoundCloud...)"
               value={form.url}
               onChange={(e) => setForm((p) => ({ ...p, url: e.target.value }))}
               style={inputS}
             />
+            <input
+              type="number"
+              placeholder="Orden"
+              value={form.orden}
+              onChange={(e) => setForm((p) => ({ ...p, orden: e.target.value }))}
+              style={inputS}
+              title="Orden (menor = primero en el widget)"
+            />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <Btn onClick={submit} disabled={saving}>
-              {saving ? "Guardando..." : "Guardar"}
-            </Btn>
-            <Btn variant="ghost" onClick={() => setShowForm(false)}>
-              Cancelar
-            </Btn>
+            <Btn onClick={submit} disabled={saving}>{saving ? "Guardando..." : "Guardar"}</Btn>
+            <Btn variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Btn>
           </div>
         </Card>
       )}
-      {podcasts.map((p) => (
-        <Card
-          key={p.id}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            marginBottom: 10,
-            flexWrap: "wrap",
-          }}
-        >
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              background: `linear-gradient(135deg,${C.primary},${C.primaryDark})`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 20,
-              flexShrink: 0,
-            }}
-          >
-            🎙️
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>
-              {p.titulo}
+
+      {sorted.map((p) => (
+        <Card key={p.id} style={{ marginBottom: 10 }}>
+          {editId === p.id ? (
+            // ── Modo edición ──────────────────────────
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 12, color: C.primary, marginBottom: 10 }}>✏️ Editando episodio</div>
+              <input
+                placeholder="Título *"
+                value={editData.titulo}
+                onChange={(e) => setEditData((d) => ({ ...d, titulo: e.target.value }))}
+                style={{ ...inputS, marginBottom: 8 }}
+              />
+              <textarea
+                placeholder="Descripción"
+                value={editData.descripcion}
+                onChange={(e) => setEditData((d) => ({ ...d, descripcion: e.target.value }))}
+                rows={2}
+                style={{ ...inputS, resize: "vertical", fontFamily: "Inter,sans-serif", marginBottom: 8 }}
+              />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: 8, marginBottom: 10 }}>
+                <input
+                  placeholder="Autor"
+                  value={editData.autor}
+                  onChange={(e) => setEditData((d) => ({ ...d, autor: e.target.value }))}
+                  style={inputS}
+                />
+                <input
+                  placeholder="URL"
+                  value={editData.url}
+                  onChange={(e) => setEditData((d) => ({ ...d, url: e.target.value }))}
+                  style={inputS}
+                />
+                <input
+                  type="number"
+                  placeholder="Orden"
+                  value={editData.orden}
+                  onChange={(e) => setEditData((d) => ({ ...d, orden: e.target.value }))}
+                  style={inputS}
+                  title="Orden (menor = primero en el widget)"
+                />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Btn onClick={() => saveEdit(p.id)} disabled={editSaving}>{editSaving ? "Guardando..." : "💾 Guardar cambios"}</Btn>
+                <Btn variant="ghost" onClick={() => setEditId(null)}>Cancelar</Btn>
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>
-              {p.autor && `${p.autor} · `}
-              {new Date(p.created_at).toLocaleDateString("es-CL")}
-            </div>
-          </div>
-          {p.url && (
-            <a href={p.url} target="_blank" rel="noopener">
+          ) : (
+            // ── Modo vista ────────────────────────────
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                background: `linear-gradient(135deg,${C.primary},${C.primaryDark})`,
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+              }}>🎙️</div>
+              {/* Orden badge */}
+              <div style={{
+                minWidth: 28, height: 28, borderRadius: 8,
+                background: C.goldLight, border: `1px solid ${C.gold}50`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 11, fontWeight: 700, color: C.gray, flexShrink: 0,
+              }} title="Número de orden">#{p.orden ?? 0}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>{p.titulo}</div>
+                <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>
+                  {p.autor && `${p.autor} · `}
+                  {new Date(p.created_at).toLocaleDateString("es-CL")}
+                </div>
+              </div>
+              {p.url && (
+                <a href={p.url} target="_blank" rel="noopener">
+                  <Btn variant="ghost" style={{ fontSize: 11, padding: "5px 10px" }}>▶ Ver</Btn>
+                </a>
+              )}
               <Btn
                 variant="ghost"
-                style={{ fontSize: 11, padding: "5px 10px" }}
-              >
-                ▶ Ver
-              </Btn>
-            </a>
+                style={{ fontSize: 11, padding: "5px 10px", color: C.primary }}
+                onClick={() => {
+                  setEditId(p.id);
+                  setEditData({ titulo: p.titulo || "", descripcion: p.descripcion || "", url: p.url || "", autor: p.autor || "", orden: p.orden ?? 0 });
+                }}
+              >✏️ Editar</Btn>
+              <ConfirmBtn onConfirm={() => del(p.id)} />
+            </div>
           )}
-          <ConfirmBtn onConfirm={() => del(p.id)} />
         </Card>
       ))}
+
       {podcasts.length === 0 && (
-        <p
-          style={{
-            color: C.gray,
-            fontSize: 13,
-            textAlign: "center",
-            padding: "20px 0",
-          }}
-        >
+        <p style={{ color: C.gray, fontSize: 13, textAlign: "center", padding: "20px 0" }}>
           Sin episodios aún.
         </p>
       )}
