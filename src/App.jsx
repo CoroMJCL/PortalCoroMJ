@@ -590,8 +590,52 @@ function MobileMenu({ section, setSection, onClose, user }) {
 // ══════════════════════════════════════════
 //  APP PRINCIPAL
 // ══════════════════════════════════════════
+// Streams directos de Radio María Chile (fallback en cadena)
+const RM_STREAMS = [
+  "https://dreamer.janus.cl/8038/stream",
+  "https://dreamer2.janus.cl/8038/stream",
+  "https://c3.radioboss.fm:18038/stream",
+];
+
 function RadioMariaWidget() {
   const [open, setOpen] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [streamIdx, setStreamIdx] = useState(0);
+  const audioRef = useRef(null);
+
+  function togglePlay() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) {
+      audio.pause();
+      audio.src = "";
+      setPlaying(false);
+    } else {
+      setLoading(true);
+      audio.src = RM_STREAMS[streamIdx];
+      audio.load();
+      audio.play().then(() => {
+        setPlaying(true);
+        setLoading(false);
+      }).catch(() => {
+        // intentar siguiente stream
+        const next = (streamIdx + 1) % RM_STREAMS.length;
+        setStreamIdx(next);
+        audio.src = RM_STREAMS[next];
+        audio.load();
+        audio.play().then(() => { setPlaying(true); setLoading(false); })
+          .catch(() => { setLoading(false); });
+      });
+    }
+  }
+
+  // Pausar al cerrar popup
+  function handleClose() {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; }
+    setPlaying(false);
+    setOpen(false);
+  }
 
   return (
     <>
@@ -599,7 +643,10 @@ function RadioMariaWidget() {
         .rm-chip:hover { background: #e8f5e9 !important; border-color: #1d4ed8 !important; }
         .rm-popup-in { animation: rm-fd 0.15s ease; }
         @keyframes rm-fd { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes rm-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
       `}</style>
+
+      <audio ref={audioRef} preload="none" style={{ display: "none" }} />
 
       <div style={{ position: "relative", flexShrink: 0 }}>
         {/* Chip compacto */}
@@ -618,18 +665,20 @@ function RadioMariaWidget() {
           <span style={{ fontSize: 15, lineHeight: 1 }}>📻</span>
           <div style={{ textAlign: "left" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: C.dark, lineHeight: 1.1 }}>Radio María</div>
-            <div style={{ fontSize: 9, color: C.gray, lineHeight: 1.2 }}>En vivo</div>
+            <div style={{ fontSize: 9, color: playing ? "#16a34a" : C.gray, lineHeight: 1.2, fontWeight: playing ? 700 : 400 }}>
+              {playing ? "▶ En vivo" : "En vivo"}
+            </div>
           </div>
           <span style={{ fontSize: 9, color: C.gray, marginLeft: 2 }}>{open ? "▲" : "▼"}</span>
         </button>
 
-        {/* Popup con reproductor oficial embebido */}
+        {/* Popup */}
         {open && (
           <div
             className="rm-popup-in"
             style={{
               position: "absolute", top: "calc(100% + 8px)", right: 0,
-              width: 300, zIndex: 500,
+              width: 280, zIndex: 500,
               background: "white", borderRadius: 14,
               boxShadow: "0 8px 32px rgba(0,0,0,0.16)",
               border: "1px solid #e5e7eb",
@@ -648,21 +697,41 @@ function RadioMariaWidget() {
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)" }}>Transmisión en vivo · FM 89.3</div>
               </div>
               <button
-                onClick={() => setOpen(false)}
+                onClick={handleClose}
                 style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", fontSize: 13, cursor: "pointer", padding: "3px 7px", borderRadius: 5 }}
               >✕</button>
             </div>
-            {/* Reproductor oficial de Janus (el que usa radiomaria.cl) */}
-            <iframe
-              src="https://rmaria2.janus.cl/front/audio_player_radio.html"
-              width="100%"
-              height="120"
-              frameBorder="0"
-              scrolling="no"
-              title="Radio María Chile en vivo"
-              style={{ display: "block" }}
-              allow="autoplay"
-            />
+            {/* Controles de audio */}
+            <div style={{ padding: "16px 14px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+              <button
+                onClick={togglePlay}
+                disabled={loading}
+                style={{
+                  width: 56, height: 56, borderRadius: "50%",
+                  background: playing ? "#dc2626" : "#1d4ed8",
+                  border: "none", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 22, color: "white",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+                  transition: "all 0.18s",
+                  opacity: loading ? 0.7 : 1,
+                }}
+              >
+                {loading ? "⏳" : playing ? "⏸" : "▶"}
+              </button>
+              <div style={{ textAlign: "center" }}>
+                <div style={{
+                  fontSize: 12, fontWeight: 700,
+                  color: playing ? "#16a34a" : C.dark,
+                  animation: playing ? "rm-pulse 2s infinite" : "none",
+                }}>
+                  {loading ? "Conectando..." : playing ? "🔴 En vivo" : "Presiona ▶ para escuchar"}
+                </div>
+                <div style={{ fontSize: 10, color: C.gray, marginTop: 2 }}>
+                  Streaming de audio directo
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -1686,23 +1755,35 @@ export default function App() {
                 </div>
               </div>
             )}
+            {/* Chip saludo */}
             <div
               style={{
-                textAlign: "right",
                 background: C.goldLight,
                 borderRadius: 10,
                 padding: "5px 12px",
                 border: `1px solid ${C.gold}30`,
+                whiteSpace: "nowrap",
               }}
             >
               <div style={{ fontSize: 14, fontWeight: 700, color: C.dark }}>
                 ¡Hola, {user?.nombre?.split(" ")[0]}! 👋
               </div>
+            </div>
+            {/* Chip fecha */}
+            <div
+              style={{
+                background: C.primaryLight,
+                borderRadius: 10,
+                padding: "5px 12px",
+                border: `1px solid ${C.primary}25`,
+                whiteSpace: "nowrap",
+              }}
+            >
               <div
                 style={{
                   fontSize: 11,
                   fontWeight: 600,
-                  color: C.gold,
+                  color: C.primary,
                   textTransform: "capitalize",
                 }}
               >
@@ -2538,21 +2619,56 @@ function extractYTId(input) {
   return null;
 }
 
+// ── Helpers para tabla config en Supabase ────────────────────────────
+async function getConfig(key) {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/config?select=value&key=eq.${encodeURIComponent(key)}&limit=1`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.[0]?.value ?? null;
+  } catch { return null; }
+}
+
+async function setConfig(key, value) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/config`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify({ key, value }),
+    });
+  } catch {}
+}
+
 function VideoDestacadoWidget({ isAdmin }) {
-  const [savedUrl, setSavedUrl] = useState(() => {
-    try { return localStorage.getItem(VD_STORAGE_KEY) || ""; } catch { return ""; }
-  });
+  const [savedUrl, setSavedUrl] = useState("");
+  const [loadedFromDB, setLoadedFromDB] = useState(false);
   const [editing, setEditing] = useState(false);
   const [inputVal, setInputVal] = useState("");
+
+  // Cargar desde Supabase al montar (funciona en todos los dispositivos)
+  useEffect(() => {
+    getConfig(VD_STORAGE_KEY).then((val) => {
+      if (val !== null) setSavedUrl(val);
+      setLoadedFromDB(true);
+    });
+  }, []);
 
   const videoId = extractYTId(savedUrl);
 
   function openEdit() { setInputVal(savedUrl); setEditing(true); }
   function cancelEdit() { setInputVal(""); setEditing(false); }
-  function saveUrl() {
+  async function saveUrl() {
     const v = inputVal.trim();
     setSavedUrl(v);
-    try { localStorage.setItem(VD_STORAGE_KEY, v); } catch {}
+    await setConfig(VD_STORAGE_KEY, v);
     setEditing(false);
   }
 
@@ -2624,7 +2740,7 @@ function VideoDestacadoWidget({ isAdmin }) {
               <Btn
                 variant="ghost"
                 style={{ fontSize: 12, padding: "6px 14px", color: "#dc2626", border: "1px solid #fca5a5" }}
-                onClick={() => { setSavedUrl(""); try { localStorage.removeItem(VD_STORAGE_KEY); } catch {} setEditing(false); }}
+                onClick={async () => { setSavedUrl(""); await setConfig(VD_STORAGE_KEY, ""); setEditing(false); }}
               >
                 🗑 Quitar video
               </Btn>
