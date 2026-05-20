@@ -592,11 +592,40 @@ function MobileMenu({ section, setSection, onClose, user }) {
 // ══════════════════════════════════════════
 function RadioMariaWidget() {
   const [open, setOpen] = useState(false);
-  const [playing, setPlaying] = useState(false);
   const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [error, setError] = useState(false);
 
-  // Stream de audio directo de Radio María Chile
-  const STREAM_URL = "https://streaming.radiomaria.cl/radiomaria";
+  // URLs de stream a intentar en orden
+  const STREAMS = [
+    "https://streaming.radiomaria.cl/radiomaria",
+    "http://streaming.radiomaria.cl:8000/radiomaria",
+    "https://streema.com/radios/play/Radio_Maria_Chile",
+  ];
+  const [streamIdx, setStreamIdx] = useState(0);
+
+  function tryPlay() {
+    if (!audioRef.current) return;
+    setError(false);
+    audioRef.current.src = STREAMS[streamIdx];
+    audioRef.current.load();
+    const p = audioRef.current.play();
+    if (p) p.catch(() => handleError());
+  }
+
+  function handleError() {
+    if (streamIdx + 1 < STREAMS.length) {
+      setStreamIdx(i => i + 1);
+    } else {
+      setError(true);
+      setPlaying(false);
+    }
+  }
+
+  // Re-intentar con siguiente URL cuando cambia streamIdx
+  useEffect(() => {
+    if (playing && !error) tryPlay();
+  }, [streamIdx]);
 
   function togglePlay() {
     if (!audioRef.current) return;
@@ -604,21 +633,17 @@ function RadioMariaWidget() {
       audioRef.current.pause();
       audioRef.current.src = "";
       setPlaying(false);
+      setStreamIdx(0);
+      setError(false);
     } else {
-      audioRef.current.src = STREAM_URL;
-      audioRef.current.load();
-      audioRef.current.play().catch(() => {});
       setPlaying(true);
+      tryPlay();
     }
   }
 
   function handleClose() {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = "";
-    }
-    setPlaying(false);
-    setOpen(false);
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; }
+    setPlaying(false); setStreamIdx(0); setError(false); setOpen(false);
   }
 
   return (
@@ -630,7 +655,13 @@ function RadioMariaWidget() {
         @keyframes rm-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
       `}</style>
 
-      <audio ref={audioRef} preload="none" />
+      <audio
+        ref={audioRef}
+        preload="none"
+        onError={handleError}
+        onPlaying={() => { setPlaying(true); setError(false); }}
+        crossOrigin="anonymous"
+      />
 
       <div style={{ position: "relative", flexShrink: 0 }}>
         <button
@@ -667,50 +698,64 @@ function RadioMariaWidget() {
               overflow: "hidden",
             }}
           >
-            <div style={{
-              background: "linear-gradient(90deg,#1e3a5f,#1d4ed8)",
-              padding: "10px 14px",
-              display: "flex", alignItems: "center", gap: 10,
-            }}>
+            <div style={{ background: "linear-gradient(90deg,#1e3a5f,#1d4ed8)", padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 18 }}>📻</span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "white" }}>Radio María Chile</div>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)" }}>FM 89.3 · Transmisión en vivo</div>
               </div>
-              <button
-                onClick={handleClose}
-                style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", fontSize: 13, cursor: "pointer", padding: "3px 7px", borderRadius: 5 }}
-              >✕</button>
+              <button onClick={handleClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", fontSize: 13, cursor: "pointer", padding: "3px 7px", borderRadius: 5 }}>✕</button>
             </div>
+
             <div style={{ padding: "16px", textAlign: "center" }}>
-              <button
-                onClick={togglePlay}
-                style={{
-                  width: 64, height: 64, borderRadius: "50%",
-                  background: playing ? "#dc2626" : "#1d4ed8",
-                  border: "none", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  margin: "0 auto 12px",
-                  fontSize: 26, color: "white",
-                  boxShadow: playing ? "0 0 0 4px rgba(220,38,38,0.2)" : "0 4px 12px rgba(29,78,216,0.3)",
-                  transition: "all 0.2s",
-                }}
-              >
-                {playing ? "⏹" : "▶"}
-              </button>
-              <div style={{ fontSize: 12, color: playing ? "#1d4ed8" : C.gray, fontWeight: playing ? 600 : 400, animation: playing ? "rm-pulse 1.5s infinite" : "none" }}>
-                {playing ? "● Reproduciendo en vivo..." : "Pulsa ▶ para escuchar"}
-              </div>
-              <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #f3f4f6" }}>
-                <a
-                  href="https://www.radiomaria.cl/radio-en-vivo/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: 11, color: "#1d4ed8", textDecoration: "none" }}
-                >
-                  🔗 Abrir en radiomaria.cl
-                </a>
-              </div>
+              {error ? (
+                // Fallback: iframe embebido de TuneIn (siempre funciona)
+                <div>
+                  <div style={{ fontSize: 11, color: C.gray, marginBottom: 10 }}>
+                    ⚠️ Stream directo bloqueado por CORS.<br />Usa el reproductor embebido:
+                  </div>
+                  <iframe
+                    src="https://tunein.com/embed/player/s50214/"
+                    style={{ width: "100%", height: 100, border: "none", borderRadius: 10 }}
+                    scrolling="no"
+                    frameBorder="no"
+                    title="Radio María Chile - TuneIn"
+                  />
+                  <div style={{ marginTop: 10 }}>
+                    <a href="https://www.radiomaria.cl/radio-en-vivo/" target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: 11, color: "#1d4ed8", textDecoration: "none" }}>
+                      🔗 Abrir en radiomaria.cl
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={togglePlay}
+                    style={{
+                      width: 64, height: 64, borderRadius: "50%",
+                      background: playing ? "#dc2626" : "#1d4ed8",
+                      border: "none", cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      margin: "0 auto 12px",
+                      fontSize: 26, color: "white",
+                      boxShadow: playing ? "0 0 0 4px rgba(220,38,38,0.2)" : "0 4px 12px rgba(29,78,216,0.3)",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    {playing ? "⏹" : "▶"}
+                  </button>
+                  <div style={{ fontSize: 12, color: playing ? "#1d4ed8" : C.gray, fontWeight: playing ? 600 : 400, animation: playing ? "rm-pulse 1.5s infinite" : "none" }}>
+                    {playing ? "● Reproduciendo en vivo..." : "Pulsa ▶ para escuchar"}
+                  </div>
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #f3f4f6" }}>
+                    <a href="https://www.radiomaria.cl/radio-en-vivo/" target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: 11, color: "#1d4ed8", textDecoration: "none" }}>
+                      🔗 Abrir en radiomaria.cl
+                    </a>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -2586,13 +2631,30 @@ function PodcastWidget({ podcasts, setSection }) {
           </div>
 
           {/* Controles */}
-          <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             {lista.length > 1 && (
               <>
                 <button onClick={() => handleNav(Math.max(0, idx - 1))} disabled={idx === 0}
-                  style={{ border: "none", background: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? C.border : C.primary, fontSize: 18, padding: 0, lineHeight: 1 }}>‹</button>
+                  style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    border: `1px solid ${idx === 0 ? C.border : C.primary}`,
+                    background: idx === 0 ? C.light : C.primaryLight,
+                    cursor: idx === 0 ? "default" : "pointer",
+                    color: idx === 0 ? C.border : C.primary,
+                    fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0, transition: "all 0.15s",
+                  }}>‹</button>
+                <span style={{ fontSize: 10, color: C.gray, minWidth: 28, textAlign: "center" }}>{idx + 1}/{lista.length}</span>
                 <button onClick={() => handleNav(Math.min(lista.length - 1, idx + 1))} disabled={idx === lista.length - 1}
-                  style={{ border: "none", background: "none", cursor: idx === lista.length - 1 ? "default" : "pointer", color: idx === lista.length - 1 ? C.border : C.primary, fontSize: 18, padding: 0, lineHeight: 1 }}>›</button>
+                  style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    border: `1px solid ${idx === lista.length - 1 ? C.border : C.primary}`,
+                    background: idx === lista.length - 1 ? C.light : C.primaryLight,
+                    cursor: idx === lista.length - 1 ? "default" : "pointer",
+                    color: idx === lista.length - 1 ? C.border : C.primary,
+                    fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0, transition: "all 0.15s",
+                  }}>›</button>
               </>
             )}
             {p.url && (
