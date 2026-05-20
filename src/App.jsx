@@ -591,8 +591,8 @@ function MobileMenu({ section, setSection, onClose, user }) {
 //  APP PRINCIPAL
 // ══════════════════════════════════════════
 function RadioMariaWidget() {
-  const [open, setOpen] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
   const audioRef = useRef(null);
   const STREAM_URL = "https://stream.zeno.fm/q2fmwqmhh5zuv";
 
@@ -601,101 +601,129 @@ function RadioMariaWidget() {
     if (playing) {
       audioRef.current.pause();
       setPlaying(false);
+      setLoading(false);
     } else {
-      audioRef.current.play().catch(() => {});
-      setPlaying(true);
+      setLoading(true);
+      audioRef.current.load();
+      audioRef.current.play().catch(() => setLoading(false));
     }
   }
 
   return (
     <>
-      <audio ref={audioRef} src={STREAM_URL} preload="none" />
-      {/* Widget flotante */}
+      <audio
+        ref={audioRef}
+        src={STREAM_URL}
+        preload="none"
+        onPlaying={() => { setPlaying(true); setLoading(false); }}
+        onPause={() => { setPlaying(false); setLoading(false); }}
+        onError={() => { setPlaying(false); setLoading(false); }}
+      />
+      <style>{`
+        @keyframes rm-wave1{0%,100%{height:4px}50%{height:15px}}
+        @keyframes rm-wave2{0%,100%{height:13px}50%{height:4px}}
+        @keyframes rm-wave3{0%,100%{height:7px}50%{height:18px}}
+        @keyframes rm-wave4{0%,100%{height:15px}50%{height:5px}}
+        @keyframes rm-wave5{0%,100%{height:5px}50%{height:13px}}
+        @keyframes rm-spin{to{transform:rotate(360deg)}}
+        .rm-bar-link:hover{color:white!important}
+      `}</style>
+
+      {/* ── Barra horizontal Radio María ── */}
       <div style={{
-        position: "fixed", bottom: 80, right: 16, zIndex: 1000,
-        display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8,
+        background: "linear-gradient(90deg,#1e3a5f 0%,#1d4ed8 55%,#1e3a5f 100%)",
+        borderBottom: "1px solid #1e40af",
+        padding: "0 20px",
+        height: 42,
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        flexShrink: 0,
+        userSelect: "none",
       }}>
-        {open && (
+        {/* Icono + nombre */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <div style={{
-            background: "white", borderRadius: 14, padding: "14px 16px",
-            boxShadow: "0 8px 30px rgba(0,0,0,0.15)", width: 230,
-            border: "1px solid #e5e7eb",
-          }}>
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <div style={{
-                width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-                background: "linear-gradient(135deg,#3b82f6,#1d4ed8)",
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-              }}>📻</div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>Radio María</div>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>Chile · En vivo</div>
-              </div>
-            </div>
-            {/* Onda animada */}
-            <div style={{
-              background: "#eff6ff", borderRadius: 10, padding: "8px 12px",
-              display: "flex", alignItems: "center", gap: 10, marginBottom: 12,
-            }}>
-              <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 20 }}>
-                {[1,2,3,4].map((b) => (
-                  <div key={b} style={{
-                    width: 4, borderRadius: 2,
-                    background: playing ? "#3b82f6" : "#d1d5db",
-                    height: playing ? `${[12,18,10,16][b-1]}px` : "4px",
-                    transition: "height 0.3s ease",
-                    animation: playing ? `wave${b} 0.8s ease-in-out infinite alternate` : "none",
-                  }} />
-                ))}
-              </div>
-              <span style={{ fontSize: 12, color: playing ? "#3b82f6" : "#6b7280", fontWeight: 500 }}>
-                {playing ? "En transmisión" : "Pausado"}
-              </span>
-            </div>
-            {/* Controles */}
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={toggle} style={{
-                flex: 1, padding: "9px 0", border: "none", borderRadius: 9, cursor: "pointer",
-                background: playing ? "#fee2e2" : "#3b82f6",
-                color: playing ? "#dc2626" : "white",
-                fontSize: 13, fontWeight: 600,
-              }}>
-                {playing ? "⏸ Pausar" : "▶ Reproducir"}
-              </button>
-              <a href="https://www.radiomaria.cl" target="_blank" rel="noopener" style={{
-                padding: "9px 10px", border: "1px solid #e5e7eb", borderRadius: 9,
-                fontSize: 12, color: "#6b7280", textDecoration: "none", display: "flex", alignItems: "center",
-              }}>🔗</a>
-            </div>
-            <style>{`
-              @keyframes wave1{from{height:8px}to{height:18px}}
-              @keyframes wave2{from{height:14px}to{height:6px}}
-              @keyframes wave3{from{height:10px}to{height:20px}}
-              @keyframes wave4{from{height:16px}to{height:8px}}
-            `}</style>
+            width: 26, height: 26, borderRadius: 6,
+            background: "rgba(255,255,255,0.15)",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0,
+          }}>📻</div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "white", lineHeight: 1.1 }}>Radio María</div>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.55)", lineHeight: 1.1 }}>Chile · En vivo</div>
           </div>
-        )}
-        {/* Botón flotante */}
+        </div>
+        {/* Divisor */}
+        <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.2)", flexShrink: 0 }} />
+        {/* Botón play/pause */}
         <button
-          onClick={() => setOpen((p) => !p)}
-          title="Radio María Chile"
+          onClick={toggle}
+          title={playing ? "Pausar" : "Reproducir Radio María"}
           style={{
-            width: 48, height: 48, borderRadius: "50%", border: "none", cursor: "pointer",
-            background: playing ? "linear-gradient(135deg,#3b82f6,#1d4ed8)" : "linear-gradient(135deg,#6b7280,#374151)",
-            color: "white", fontSize: 20, boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
+            width: 30, height: 30, borderRadius: "50%", border: "none", cursor: "pointer",
+            background: playing ? "rgba(239,68,68,0.8)" : "rgba(255,255,255,0.2)",
+            color: "white", fontSize: 11, fontWeight: 700, flexShrink: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
-            position: "relative",
+            transition: "background 0.2s, transform 0.1s",
+          }}
+          onMouseDown={e => e.currentTarget.style.transform = "scale(0.92)"}
+          onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
+        >
+          {loading
+            ? <div style={{ width: 12, height: 12, border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "white", borderRadius: "50%", animation: "rm-spin 0.7s linear infinite" }} />
+            : playing ? "⏸" : "▶"
+          }
+        </button>
+        {/* Barras de onda animadas */}
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 20, flexShrink: 0 }}>
+          {[
+            { a: "rm-wave1", d: "0.65s" },
+            { a: "rm-wave2", d: "0.50s" },
+            { a: "rm-wave3", d: "0.85s" },
+            { a: "rm-wave4", d: "0.60s" },
+            { a: "rm-wave5", d: "0.75s" },
+          ].map((b, i) => (
+            <div key={i} style={{
+              width: 3, borderRadius: 2,
+              background: playing ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.22)",
+              height: playing ? undefined : "3px",
+              animation: playing ? `${b.a} ${b.d} ease-in-out infinite` : "none",
+              transition: "background 0.3s",
+            }} />
+          ))}
+        </div>
+        {/* Punto de estado + texto */}
+        <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+          <div style={{
+            width: 7, height: 7, borderRadius: "50%",
+            background: loading ? "#fbbf24" : playing ? "#22c55e" : "rgba(255,255,255,0.25)",
+            boxShadow: playing ? "0 0 7px #22c55e" : loading ? "0 0 7px #fbbf24" : "none",
+            transition: "all 0.3s",
+          }} />
+          <span style={{
+            fontSize: 11, fontWeight: 500,
+            color: loading ? "#fde68a" : playing ? "#86efac" : "rgba(255,255,255,0.45)",
+          }}>
+            {loading ? "Conectando…" : playing ? "En vivo" : "Detenido"}
+          </span>
+        </div>
+        <div style={{ flex: 1 }} />
+        {/* Enlace al sitio */}
+        <a
+          href="https://www.radiomaria.cl/radio_envivo"
+          target="_blank"
+          rel="noopener"
+          className="rm-bar-link"
+          style={{
+            fontSize: 10, color: "rgba(255,255,255,0.45)", textDecoration: "none",
+            display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+            padding: "3px 8px", borderRadius: 5,
+            border: "1px solid rgba(255,255,255,0.14)",
+            transition: "color 0.2s",
           }}
         >
-          📻
-          {playing && (
-            <span style={{
-              position: "absolute", top: 0, right: 0, width: 12, height: 12,
-              borderRadius: "50%", background: "#22c55e", border: "2px solid white",
-            }} />
-          )}
-        </button>
+          🔗 <span>radiomaria.cl</span>
+        </a>
       </div>
     </>
   );
@@ -2550,6 +2578,156 @@ function PodcastWidget({ podcasts, setSection }) {
   );
 }
 
+// ══════════════════════════════════════════
+//  VIDEO DESTACADO WIDGET
+// ══════════════════════════════════════════
+const VD_STORAGE_KEY = "coro_video_destacado_url";
+
+function extractYTId(input) {
+  if (!input) return null;
+  const short = input.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (short) return short[1];
+  const watch = input.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (watch) return watch[1];
+  const embed = input.match(/embed\/([a-zA-Z0-9_-]{11})/);
+  if (embed) return embed[1];
+  if (/^[a-zA-Z0-9_-]{11}$/.test(input.trim())) return input.trim();
+  return null;
+}
+
+function VideoDestacadoWidget({ isAdmin }) {
+  const [savedUrl, setSavedUrl] = useState(() => {
+    try { return localStorage.getItem(VD_STORAGE_KEY) || ""; } catch { return ""; }
+  });
+  const [editing, setEditing] = useState(false);
+  const [inputVal, setInputVal] = useState("");
+
+  const videoId = extractYTId(savedUrl);
+
+  function openEdit() { setInputVal(savedUrl); setEditing(true); }
+  function cancelEdit() { setInputVal(""); setEditing(false); }
+  function saveUrl() {
+    const v = inputVal.trim();
+    setSavedUrl(v);
+    try { localStorage.setItem(VD_STORAGE_KEY, v); } catch {}
+    setEditing(false);
+  }
+
+  // Si no hay video y no es admin, no mostrar nada
+  if (!videoId && !isAdmin) return null;
+
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      {/* Cabecera */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <div style={{
+          width: 32, height: 32, background: "#ff0000", borderRadius: 8,
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 14, color: "white" }}>▶</span>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 14, fontWeight: 700, color: C.dark }}>
+            Video Destacado
+          </div>
+          <div style={{ fontSize: 11, color: C.gray }}>
+            {videoId ? "Reproducir directamente aquí" : "Sin video asignado aún"}
+          </div>
+        </div>
+        {isAdmin && (
+          <button
+            onClick={editing ? cancelEdit : openEdit}
+            style={{
+              background: editing ? "#f3f4f6" : C.primaryLight,
+              border: `1px solid ${editing ? C.border : C.primary + "50"}`,
+              borderRadius: 8, padding: "5px 12px",
+              fontSize: 11, fontWeight: 600,
+              color: editing ? C.gray : C.primary,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+            }}
+          >
+            {editing ? "✕ Cancelar" : "✏️ " + (videoId ? "Cambiar video" : "Asignar video")}
+          </button>
+        )}
+      </div>
+
+      {/* Formulario de edición (solo Admin) */}
+      {editing && (
+        <div style={{
+          background: C.primaryLight, border: `1px solid ${C.primary}40`,
+          borderRadius: 10, padding: "12px 14px", marginBottom: 12,
+        }}>
+          <div style={{ fontSize: 11, color: C.primaryDark, fontWeight: 600, marginBottom: 6 }}>
+            📎 Pega el link o ID del video de YouTube
+          </div>
+          <input
+            value={inputVal}
+            onChange={(e) => setInputVal(e.target.value)}
+            placeholder="https://www.youtube.com/watch?v=...  ó  https://youtu.be/..."
+            onKeyDown={(e) => { if (e.key === "Enter") saveUrl(); if (e.key === "Escape") cancelEdit(); }}
+            autoFocus
+            style={{
+              width: "100%", boxSizing: "border-box",
+              padding: "8px 12px", borderRadius: 8,
+              border: `1px solid ${C.border}`, fontSize: 12,
+              outline: "none", marginBottom: 8, fontFamily: "Inter,sans-serif",
+            }}
+          />
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <Btn onClick={saveUrl} style={{ fontSize: 12, padding: "6px 14px" }}>
+              💾 Guardar
+            </Btn>
+            {videoId && (
+              <Btn
+                variant="ghost"
+                style={{ fontSize: 12, padding: "6px 14px", color: "#dc2626", border: "1px solid #fca5a5" }}
+                onClick={() => { setSavedUrl(""); try { localStorage.removeItem(VD_STORAGE_KEY); } catch {} setEditing(false); }}
+              >
+                🗑 Quitar video
+              </Btn>
+            )}
+            <span style={{ fontSize: 10, color: C.gray, marginLeft: "auto" }}>
+              Funciona con links de YouTube, youtu.be e IDs directos
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Player */}
+      {videoId ? (
+        <div style={{
+          borderRadius: 12, overflow: "hidden", background: "#000",
+          position: "relative", paddingTop: "56.25%",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+        }}>
+          <iframe
+            key={videoId}
+            src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            title="Video destacado"
+          />
+        </div>
+      ) : (
+        /* Placeholder vacío (solo visible para admin) */
+        <div style={{
+          borderRadius: 12, background: "#f9fafb",
+          border: `2px dashed ${C.border}`,
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          gap: 8, padding: "36px 20px", minHeight: 140,
+        }}>
+          <div style={{ fontSize: 36, opacity: 0.25 }}>▶️</div>
+          <div style={{ fontSize: 12, color: C.gray, textAlign: "center" }}>
+            Haz clic en <strong>"Asignar video"</strong> para proyectar un video de YouTube aquí
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function Dashboard({
   cumple,
   evangelio,
@@ -3361,6 +3539,8 @@ function Dashboard({
             ))}
         </div>
       )}
+
+      <VideoDestacadoWidget isAdmin={isAdmin} />
 
       <div
         className="grid-dash-main"
