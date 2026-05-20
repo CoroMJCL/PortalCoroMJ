@@ -276,7 +276,7 @@ const NAV = [
   { id: "perfil", icon: "◎", label: "Mi Perfil" },
   { id: "agenda", icon: "◫", label: "Agenda" },
   { id: "pauta_misa", icon: "🎼", label: "Pauta de Misa" },
-  { id: "documentos", icon: "⬇", label: "Documentos" },
+  { id: "documentos", icon: "⬇", label: "Descargas Misas" },
   { id: "oraciones", icon: "✦", label: "Oraciones" },
   { id: "noticias", icon: "◈", label: "Avisos" },
   { id: "qanda", icon: "?", label: "Preguntas" },
@@ -590,6 +590,117 @@ function MobileMenu({ section, setSection, onClose, user }) {
 // ══════════════════════════════════════════
 //  APP PRINCIPAL
 // ══════════════════════════════════════════
+function RadioMariaWidget() {
+  const [open, setOpen] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const audioRef = React.useRef(null);
+  const STREAM_URL = "https://stream.zeno.fm/q2fmwqmhh5zuv";
+
+  function toggle() {
+    if (!audioRef.current) return;
+    if (playing) {
+      audioRef.current.pause();
+      setPlaying(false);
+    } else {
+      audioRef.current.play().catch(() => {});
+      setPlaying(true);
+    }
+  }
+
+  return (
+    <>
+      <audio ref={audioRef} src={STREAM_URL} preload="none" />
+      {/* Widget flotante */}
+      <div style={{
+        position: "fixed", bottom: 80, right: 16, zIndex: 1000,
+        display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8,
+      }}>
+        {open && (
+          <div style={{
+            background: "white", borderRadius: 14, padding: "14px 16px",
+            boxShadow: "0 8px 30px rgba(0,0,0,0.15)", width: 230,
+            border: "1px solid #e5e7eb",
+          }}>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                background: "linear-gradient(135deg,#3b82f6,#1d4ed8)",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+              }}>📻</div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>Radio María</div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>Chile · En vivo</div>
+              </div>
+            </div>
+            {/* Onda animada */}
+            <div style={{
+              background: "#eff6ff", borderRadius: 10, padding: "8px 12px",
+              display: "flex", alignItems: "center", gap: 10, marginBottom: 12,
+            }}>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 20 }}>
+                {[1,2,3,4].map((b) => (
+                  <div key={b} style={{
+                    width: 4, borderRadius: 2,
+                    background: playing ? "#3b82f6" : "#d1d5db",
+                    height: playing ? `${[12,18,10,16][b-1]}px` : "4px",
+                    transition: "height 0.3s ease",
+                    animation: playing ? `wave${b} 0.8s ease-in-out infinite alternate` : "none",
+                  }} />
+                ))}
+              </div>
+              <span style={{ fontSize: 12, color: playing ? "#3b82f6" : "#6b7280", fontWeight: 500 }}>
+                {playing ? "En transmisión" : "Pausado"}
+              </span>
+            </div>
+            {/* Controles */}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={toggle} style={{
+                flex: 1, padding: "9px 0", border: "none", borderRadius: 9, cursor: "pointer",
+                background: playing ? "#fee2e2" : "#3b82f6",
+                color: playing ? "#dc2626" : "white",
+                fontSize: 13, fontWeight: 600,
+              }}>
+                {playing ? "⏸ Pausar" : "▶ Reproducir"}
+              </button>
+              <a href="https://www.radiomaria.cl" target="_blank" rel="noopener" style={{
+                padding: "9px 10px", border: "1px solid #e5e7eb", borderRadius: 9,
+                fontSize: 12, color: "#6b7280", textDecoration: "none", display: "flex", alignItems: "center",
+              }}>🔗</a>
+            </div>
+            <style>{`
+              @keyframes wave1{from{height:8px}to{height:18px}}
+              @keyframes wave2{from{height:14px}to{height:6px}}
+              @keyframes wave3{from{height:10px}to{height:20px}}
+              @keyframes wave4{from{height:16px}to{height:8px}}
+            `}</style>
+          </div>
+        )}
+        {/* Botón flotante */}
+        <button
+          onClick={() => setOpen((p) => !p)}
+          title="Radio María Chile"
+          style={{
+            width: 48, height: 48, borderRadius: "50%", border: "none", cursor: "pointer",
+            background: playing ? "linear-gradient(135deg,#3b82f6,#1d4ed8)" : "linear-gradient(135deg,#6b7280,#374151)",
+            color: "white", fontSize: 20, boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            position: "relative",
+          }}
+        >
+          📻
+          {playing && (
+            <span style={{
+              position: "absolute", top: 0, right: 0, width: 12, height: 12,
+              borderRadius: "50%", background: "#22c55e", border: "2px solid white",
+            }} />
+          )}
+        </button>
+      </div>
+    </>
+  );
+}
+
 export default function App() {
   const [view, setView] = useState("login"); // "login" | "register" | "recover" | "app"
   const [user, setUser] = useState(null);
@@ -1179,16 +1290,18 @@ export default function App() {
               label: m.nombre,
               sub: m.cuerda,
               color: CUERDAS[m.cuerda],
+              section: "integrantes",
             })),
           ...docs
             .filter((d) =>
               d.nombre.toLowerCase().includes(searchQ.toLowerCase())
             )
             .map((d) => ({
-              type: "Documento",
+              type: "Descarga",
               label: d.nombre,
               sub: d.categoria,
               color: C.danger,
+              section: "documentos",
             })),
           ...oraciones
             .filter((o) =>
@@ -1199,6 +1312,7 @@ export default function App() {
               label: o.titulo,
               sub: o.autor,
               color: C.gold,
+              section: "oraciones",
             })),
         ]
       : [];
@@ -1231,6 +1345,7 @@ export default function App() {
       }}
     >
       <style>{G}</style>
+      <RadioMariaWidget />
       {mobileMenu && (
         <MobileMenu
           section={section}
@@ -1492,7 +1607,7 @@ export default function App() {
                 }}
                 onFocus={() => setShowSearch(true)}
                 onBlur={() => setTimeout(() => setShowSearch(false), 150)}
-                placeholder="Buscar integrantes, documentos..."
+                placeholder="Buscar integrantes, descargas..."
                 style={{
                   background: "none",
                   border: "none",
@@ -1521,7 +1636,11 @@ export default function App() {
                 {searchRes.map((r, i) => (
                   <div
                     key={i}
-                    onClick={() => setSearchQ("")}
+                    onClick={() => {
+                      setSearchQ("");
+                      setShowSearch(false);
+                      if (r.section) setSection(r.section);
+                    }}
                     style={{
                       padding: "10px 14px",
                       borderBottom: `1px solid ${C.border}`,
@@ -2980,7 +3099,7 @@ function Dashboard({
           </div>
           <div>
             <div style={{ fontSize: 11, color: C.gray, marginBottom: 2 }}>
-              Documentos
+              Descargas Misas
             </div>
             <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>
               {docs.length} archivos
@@ -4816,7 +4935,7 @@ function Documentos({ docs, onReload }) {
   return (
     <div style={{ maxWidth: 800 }}>
       <SectionTitle
-        title="Documentos"
+        title="Descargas Misas"
         subtitle="Archivos del coro"
         action={<Btn onClick={() => setShowForm(true)}>+ Agregar</Btn>}
       />
@@ -6165,7 +6284,7 @@ function Cancionero() {
 const ADMIN_TABS = [
   { id: "integrantes", label: "👥 Integrantes" },
   { id: "asistencia", label: "✅ Asistencia" },
-  { id: "documentos", label: "📄 Documentos" },
+  { id: "documentos", label: "📄 Descargas Misas" },
   { id: "oraciones", label: "✦ Oraciones" },
   { id: "noticias", label: "📢 Avisos" },
   { id: "preguntas", label: "❓ Preguntas" },
