@@ -8792,7 +8792,7 @@ function AdminBiblioteca({ biblioteca, onReload }) {
     if (!editForm.titulo || !editForm.url) return;
     setEditSaving(true);
     try {
-      await supabase(`biblioteca?id=eq.${editId}`, { method: "PATCH", body: editForm });
+      await updateRecord("biblioteca", editId, editForm);
       setEditId(null);
       onReload();
     } catch (e) {
