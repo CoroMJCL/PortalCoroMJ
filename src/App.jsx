@@ -590,50 +590,92 @@ function MobileMenu({ section, setSection, onClose, user }) {
 // ══════════════════════════════════════════
 //  APP PRINCIPAL
 // ══════════════════════════════════════════
-// Streams directos de Radio María Chile (fallback en cadena)
-const RM_STREAMS = [
+// Streams de fallback conocidos para Radio María Chile
+const RM_FALLBACK_STREAMS = [
   "https://dreamer.janus.cl/8038/stream",
   "https://dreamer2.janus.cl/8038/stream",
-  "https://c3.radioboss.fm:18038/stream",
 ];
+
+// Obtener stream URL desde radio-browser.info (ejecutado en el browser del usuario)
+async function fetchRadioMariaStream() {
+  try {
+    const res = await fetch(
+      "https://de1.api.radio-browser.info/json/stations/search?name=radio+maria+chile&countrycode=CL&limit=5",
+      { headers: { "User-Agent": "CoroMJ/1.0" } }
+    );
+    if (!res.ok) throw new Error("no ok");
+    const stations = await res.json();
+    // Tomar el primer resultado con stream url válido
+    const station = stations.find(s => s.url_resolved && s.url_resolved.startsWith("http"));
+    return station?.url_resolved || null;
+  } catch {
+    return null;
+  }
+}
 
 function RadioMariaWidget() {
   const [open, setOpen] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [streamIdx, setStreamIdx] = useState(0);
+  const [streamUrl, setStreamUrl] = useState(null);
+  const [error, setError] = useState(false);
   const audioRef = useRef(null);
 
-  function togglePlay() {
+  async function tryPlay(url) {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.src = url;
+    audio.load();
+    try {
+      await audio.play();
+      setPlaying(true);
+      setLoading(false);
+      setError(false);
+    } catch {
+      // Intentar fallbacks
+      for (const fb of RM_FALLBACK_STREAMS) {
+        if (fb === url) continue;
+        audio.src = fb;
+        audio.load();
+        try {
+          await audio.play();
+          setPlaying(true);
+          setLoading(false);
+          setError(false);
+          return;
+        } catch {}
+      }
+      setLoading(false);
+      setError(true);
+    }
+  }
+
+  async function togglePlay() {
     const audio = audioRef.current;
     if (!audio) return;
     if (playing) {
       audio.pause();
       audio.src = "";
       setPlaying(false);
-    } else {
-      setLoading(true);
-      audio.src = RM_STREAMS[streamIdx];
-      audio.load();
-      audio.play().then(() => {
-        setPlaying(true);
-        setLoading(false);
-      }).catch(() => {
-        // intentar siguiente stream
-        const next = (streamIdx + 1) % RM_STREAMS.length;
-        setStreamIdx(next);
-        audio.src = RM_STREAMS[next];
-        audio.load();
-        audio.play().then(() => { setPlaying(true); setLoading(false); })
-          .catch(() => { setLoading(false); });
-      });
+      return;
     }
+    setLoading(true);
+    setError(false);
+    // Obtener stream dinámicamente si aún no lo tenemos
+    let url = streamUrl;
+    if (!url) {
+      url = await fetchRadioMariaStream();
+      if (url) setStreamUrl(url);
+      else url = RM_FALLBACK_STREAMS[0];
+    }
+    await tryPlay(url);
   }
 
   // Pausar al cerrar popup
   function handleClose() {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; }
     setPlaying(false);
+    setError(false);
     setOpen(false);
   }
 
@@ -722,13 +764,13 @@ function RadioMariaWidget() {
               <div style={{ textAlign: "center" }}>
                 <div style={{
                   fontSize: 12, fontWeight: 700,
-                  color: playing ? "#16a34a" : C.dark,
+                  color: error ? "#dc2626" : playing ? "#16a34a" : C.dark,
                   animation: playing ? "rm-pulse 2s infinite" : "none",
                 }}>
-                  {loading ? "Conectando..." : playing ? "🔴 En vivo" : "Presiona ▶ para escuchar"}
+                  {loading ? "Conectando..." : error ? "⚠️ Sin señal disponible" : playing ? "🔴 En vivo" : "Presiona ▶ para escuchar"}
                 </div>
                 <div style={{ fontSize: 10, color: C.gray, marginTop: 2 }}>
-                  Streaming de audio directo
+                  {error ? "Intenta de nuevo más tarde" : "Streaming de audio directo"}
                 </div>
               </div>
             </div>
@@ -1717,10 +1759,10 @@ export default function App() {
           <div
             className="topbar-greeting"
             style={{
-              marginLeft: "auto",
+              marginLeft: 8,
               display: "flex",
               alignItems: "center",
-              gap: 14,
+              gap: 8,
             }}
           >
             {clima && (
@@ -1755,43 +1797,121 @@ export default function App() {
                 </div>
               </div>
             )}
-            {/* Chip saludo */}
+            {/* ── Widget saludo sofisticado ── */}
             <div
               style={{
-                background: C.goldLight,
-                borderRadius: 10,
-                padding: "5px 12px",
-                border: `1px solid ${C.gold}30`,
-                whiteSpace: "nowrap",
+                display: "flex",
+                alignItems: "center",
+                gap: 0,
+                borderRadius: 12,
+                overflow: "hidden",
+                border: `1px solid ${C.border}`,
+                boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+                flexShrink: 0,
               }}
             >
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.dark }}>
-                ¡Hola, {user?.nombre?.split(" ")[0]}! 👋
-              </div>
-            </div>
-            {/* Chip fecha */}
-            <div
-              style={{
-                background: C.primaryLight,
-                borderRadius: 10,
-                padding: "5px 12px",
-                border: `1px solid ${C.primary}25`,
-                whiteSpace: "nowrap",
-              }}
-            >
+              {/* Franja izquierda: avatar con color de cuerda */}
               <div
                 style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: C.primary,
-                  textTransform: "capitalize",
+                  background: `linear-gradient(160deg, ${CUERDAS[user?.cuerda] || C.primary}, ${CUERDAS[user?.cuerda] || C.primary}cc)`,
+                  width: 44,
+                  alignSelf: "stretch",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
                 }}
               >
-                {new Date().toLocaleDateString("es-CL", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                })}
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    background: "rgba(255,255,255,0.25)",
+                    border: "2px solid rgba(255,255,255,0.6)",
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    fontSize: 10,
+                    fontWeight: 800,
+                  }}
+                >
+                  {user?.foto_url
+                    ? <img src={user.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : ini(user?.nombre || "U")}
+                </div>
+              </div>
+              {/* Centro: nombre + fecha */}
+              <div
+                style={{
+                  background: C.white,
+                  padding: "6px 12px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  gap: 1,
+                  minWidth: 0,
+                }}
+              >
+                <div style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: C.dark,
+                  whiteSpace: "nowrap",
+                  fontFamily: "'Poppins',sans-serif",
+                }}>
+                  Hola, {user?.nombre?.split(" ")[0]} 👋
+                </div>
+                <div style={{
+                  fontSize: 10,
+                  color: C.gray,
+                  whiteSpace: "nowrap",
+                  textTransform: "capitalize",
+                  letterSpacing: "0.01em",
+                }}>
+                  {new Date().toLocaleDateString("es-CL", {
+                    weekday: "short",
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </div>
+              </div>
+              {/* Franja derecha: día del mes destacado */}
+              <div
+                style={{
+                  background: `linear-gradient(160deg, ${C.primary}18, ${C.primary}08)`,
+                  borderLeft: `1px solid ${C.primary}20`,
+                  padding: "6px 10px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  alignSelf: "stretch",
+                }}
+              >
+                <div style={{
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: C.primary,
+                  lineHeight: 1,
+                  fontFamily: "'Poppins',sans-serif",
+                }}>
+                  {new Date().getDate()}
+                </div>
+                <div style={{
+                  fontSize: 8,
+                  fontWeight: 700,
+                  color: C.primary,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  opacity: 0.75,
+                }}>
+                  {new Date().toLocaleDateString("es-CL", { month: "short" })}
+                </div>
               </div>
             </div>
           </div>
@@ -11658,6 +11778,59 @@ function AdminAsistencia({ members, eventos, asistencia, onReload }) {
   );
 }
 
+function SqlSetupBlock() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: 16 }}>
+      <button
+        onClick={() => setOpen(p => !p)}
+        style={{
+          display: "flex", alignItems: "center", gap: 6,
+          background: "none", border: "none", cursor: "pointer",
+          color: C.gray, fontSize: 11, padding: "4px 0",
+        }}
+      >
+        <span style={{ fontSize: 13, opacity: 0.5 }}>{open ? "▾" : "▸"}</span>
+        <span style={{ opacity: 0.5 }}>SQL de configuración inicial</span>
+      </button>
+      {open && (
+        <div style={{
+          marginTop: 6, padding: "12px 16px",
+          background: C.goldLight, borderRadius: 10,
+          border: `1px solid ${C.gold}30`, fontSize: 12,
+          color: C.gray, lineHeight: 1.6,
+        }}>
+          ⚠️ <strong>Nuevas tablas requeridas en Supabase:</strong>
+          <br />
+          <code style={{
+            display: "block", marginTop: 6, fontFamily: "monospace",
+            fontSize: 11, background: "#f3f4f6", padding: "8px 10px",
+            borderRadius: 6, color: C.dark,
+          }}>
+            -- Columna teléfono (si aún no existe):<br />
+            alter table integrantes add column if not exists telefono text;<br />
+            -- Tablas nuevas (si aún no existen):<br />
+            create table if not exists links (id uuid default gen_random_uuid() primary key, label text, url text, orden int default 0, created_at timestamptz default now());<br />
+            create table if not exists biblioteca (id uuid default gen_random_uuid() primary key, titulo text, autor text, anio text, url text, emoji text, created_at timestamptz default now());<br />
+            create table if not exists podcasts (id uuid default gen_random_uuid() primary key, titulo text, descripcion text, url text, autor text, created_at timestamptz default now());<br />
+            -- Tabla asistencia con evento_id de tipo TEXT:<br />
+            create table if not exists asistencia (id uuid default gen_random_uuid() primary key, evento_id text not null, member_id uuid references integrantes(id), estado text check (estado in ('presente','ausente','justificado')), created_at timestamptz default now(), unique(evento_id, member_id));<br />
+            -- Migrar evento_id uuid → text si ya existe:<br />
+            alter table asistencia alter column evento_id type text using evento_id::text;<br />
+            -- Tabla config para video destacado y ajustes globales:<br />
+            create table if not exists config (key text primary key, value text, updated_at timestamptz default now());<br />
+            alter table config enable row level security;<br />
+            create policy "config_read" on config for select using (true);<br />
+            create policy "config_write" on config for insert with check (true);<br />
+            create policy "config_update" on config for update using (true);<br />
+            -- Habilitar RLS y políticas para cada tabla (select/insert/delete to authenticated)
+          </code>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Admin({
   members,
   eventos,
@@ -11814,66 +11987,7 @@ function Admin({
         {tab === "asistencia" && <AdminAsistencia members={members} eventos={eventos} asistencia={asistencia} onReload={onReload} />}
       </Card>
 
-      <div
-        style={{
-          marginTop: 16,
-          padding: "12px 16px",
-          background: C.goldLight,
-          borderRadius: 10,
-          border: `1px solid ${C.gold}30`,
-          fontSize: 12,
-          color: C.gray,
-          lineHeight: 1.6,
-        }}
-      >
-        ⚠️ <strong>Nuevas tablas requeridas en Supabase:</strong>
-        <br />
-        <code
-          style={{
-            display: "block",
-            marginTop: 6,
-            fontFamily: "monospace",
-            fontSize: 11,
-            background: "#f3f4f6",
-            padding: "8px 10px",
-            borderRadius: 6,
-            color: C.dark,
-          }}
-        >
-          -- Columna teléfono (si aún no existe):
-          <br />
-          alter table integrantes add column if not exists telefono text;
-          <br />
-          -- Tablas nuevas (si aún no existen):
-          <br />
-          create table if not exists links (id uuid default gen_random_uuid()
-          primary key, label text, url text, orden int default 0, created_at
-          timestamptz default now());
-          <br />
-          create table if not exists biblioteca (id uuid default
-          gen_random_uuid() primary key, titulo text, autor text, anio text, url
-          text, emoji text, created_at timestamptz default now());
-          <br />
-          create table if not exists podcasts (id uuid default gen_random_uuid()
-          primary key, titulo text, descripcion text, url text, autor text,
-          created_at timestamptz default now());
-          <br />
-          -- Tabla asistencia con evento_id de tipo TEXT (ID de Google Calendar):
-          <br />
-          create table if not exists asistencia (id uuid default gen_random_uuid()
-          primary key, evento_id text not null, member_id uuid references integrantes(id),
-          estado text check (estado in ('presente','ausente','justificado')),
-          created_at timestamptz default now(),
-          unique(evento_id, member_id));
-          <br />
-          -- Si ya existe asistencia con evento_id uuid, migrar a text:
-          <br />
-          alter table asistencia alter column evento_id type text using evento_id::text;
-          <br />
-          -- Habilitar RLS y políticas para cada tabla (select/insert/delete to
-          authenticated)
-        </code>
-      </div>
+      <SqlSetupBlock />
     </div>
   );
 }
