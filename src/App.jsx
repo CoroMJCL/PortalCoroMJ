@@ -591,143 +591,86 @@ function MobileMenu({ section, setSection, onClose, user }) {
 //  APP PRINCIPAL
 // ══════════════════════════════════════════
 function RadioMariaWidget() {
-  const [playing, setPlaying] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const audioRef = useRef(null);
-  const STREAM_URL = "https://stream.zeno.fm/q2fmwqmhh5zuv";
-
-  function toggle() {
-    if (!audioRef.current) return;
-    if (playing) {
-      audioRef.current.pause();
-      setPlaying(false);
-      setLoading(false);
-    } else {
-      setLoading(true);
-      audioRef.current.load();
-      audioRef.current.play().catch(() => setLoading(false));
-    }
-  }
+  const [open, setOpen] = useState(false);
+  const iframeRef = useRef(null);
 
   return (
     <>
-      <audio
-        ref={audioRef}
-        src={STREAM_URL}
-        preload="none"
-        onPlaying={() => { setPlaying(true); setLoading(false); }}
-        onPause={() => { setPlaying(false); setLoading(false); }}
-        onError={() => { setPlaying(false); setLoading(false); }}
-      />
       <style>{`
-        @keyframes rm-wave1{0%,100%{height:4px}50%{height:15px}}
-        @keyframes rm-wave2{0%,100%{height:13px}50%{height:4px}}
-        @keyframes rm-wave3{0%,100%{height:7px}50%{height:18px}}
-        @keyframes rm-wave4{0%,100%{height:15px}50%{height:5px}}
-        @keyframes rm-wave5{0%,100%{height:5px}50%{height:13px}}
-        @keyframes rm-spin{to{transform:rotate(360deg)}}
-        .rm-bar-link:hover{color:white!important}
+        .rm-btn:hover { background: rgba(255,255,255,0.15) !important; }
+        .rm-popup { animation: rm-fadedown 0.15s ease; }
+        @keyframes rm-fadedown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
       `}</style>
 
-      {/* ── Barra horizontal Radio María ── */}
-      <div style={{
-        background: "linear-gradient(90deg,#1e3a5f 0%,#1d4ed8 55%,#1e3a5f 100%)",
-        borderBottom: "1px solid #1e40af",
-        padding: "0 20px",
-        height: 42,
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-        flexShrink: 0,
-        userSelect: "none",
-      }}>
-        {/* Icono + nombre */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <div style={{
-            width: 26, height: 26, borderRadius: 6,
-            background: "rgba(255,255,255,0.15)",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0,
-          }}>📻</div>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "white", lineHeight: 1.1 }}>Radio María</div>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.55)", lineHeight: 1.1 }}>Chile · En vivo</div>
-          </div>
-        </div>
-        {/* Divisor */}
-        <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.2)", flexShrink: 0 }} />
-        {/* Botón play/pause */}
+      {/* Botón compacto en el header */}
+      <div style={{ position: "relative", flexShrink: 0 }}>
         <button
-          onClick={toggle}
-          title={playing ? "Pausar" : "Reproducir Radio María"}
+          className="rm-btn"
+          onClick={() => setOpen(p => !p)}
+          title="Radio María Chile · En vivo"
           style={{
-            width: 30, height: 30, borderRadius: "50%", border: "none", cursor: "pointer",
-            background: playing ? "rgba(239,68,68,0.8)" : "rgba(255,255,255,0.2)",
-            color: "white", fontSize: 11, fontWeight: 700, flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "background 0.2s, transform 0.1s",
+            display: "flex", alignItems: "center", gap: 7,
+            background: open ? "rgba(29,78,216,0.12)" : C.light,
+            border: `1px solid ${open ? "#1d4ed8" : C.border}`,
+            borderRadius: 9, padding: "6px 11px",
+            cursor: "pointer", transition: "all 0.18s",
           }}
-          onMouseDown={e => e.currentTarget.style.transform = "scale(0.92)"}
-          onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
         >
-          {loading
-            ? <div style={{ width: 12, height: 12, border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "white", borderRadius: "50%", animation: "rm-spin 0.7s linear infinite" }} />
-            : playing ? "⏸" : "▶"
-          }
+          <span style={{ fontSize: 15, lineHeight: 1 }}>📻</span>
+          <div style={{ textAlign: "left" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.dark, lineHeight: 1.1 }}>Radio María</div>
+            <div style={{ fontSize: 9, color: C.gray, lineHeight: 1.2 }}>En vivo</div>
+          </div>
+          <span style={{ fontSize: 9, color: C.gray, marginLeft: 2 }}>{open ? "▲" : "▼"}</span>
         </button>
-        {/* Barras de onda animadas */}
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 20, flexShrink: 0 }}>
-          {[
-            { a: "rm-wave1", d: "0.65s" },
-            { a: "rm-wave2", d: "0.50s" },
-            { a: "rm-wave3", d: "0.85s" },
-            { a: "rm-wave4", d: "0.60s" },
-            { a: "rm-wave5", d: "0.75s" },
-          ].map((b, i) => (
-            <div key={i} style={{
-              width: 3, borderRadius: 2,
-              background: playing ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.22)",
-              height: playing ? undefined : "3px",
-              animation: playing ? `${b.a} ${b.d} ease-in-out infinite` : "none",
-              transition: "background 0.3s",
-            }} />
-          ))}
-        </div>
-        {/* Punto de estado + texto */}
-        <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
-          <div style={{
-            width: 7, height: 7, borderRadius: "50%",
-            background: loading ? "#fbbf24" : playing ? "#22c55e" : "rgba(255,255,255,0.25)",
-            boxShadow: playing ? "0 0 7px #22c55e" : loading ? "0 0 7px #fbbf24" : "none",
-            transition: "all 0.3s",
-          }} />
-          <span style={{
-            fontSize: 11, fontWeight: 500,
-            color: loading ? "#fde68a" : playing ? "#86efac" : "rgba(255,255,255,0.45)",
-          }}>
-            {loading ? "Conectando…" : playing ? "En vivo" : "Detenido"}
-          </span>
-        </div>
-        <div style={{ flex: 1 }} />
-        {/* Enlace al sitio */}
-        <a
-          href="https://www.radiomaria.cl/radio_envivo"
-          target="_blank"
-          rel="noopener"
-          className="rm-bar-link"
-          style={{
-            fontSize: 10, color: "rgba(255,255,255,0.45)", textDecoration: "none",
-            display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
-            padding: "3px 8px", borderRadius: 5,
-            border: "1px solid rgba(255,255,255,0.14)",
-            transition: "color 0.2s",
-          }}
-        >
-          🔗 <span>radiomaria.cl</span>
-        </a>
+
+        {/* Popup con el iframe oficial */}
+        {open && (
+          <div
+            className="rm-popup"
+            style={{
+              position: "absolute", top: "calc(100% + 8px)", right: 0,
+              width: 320, zIndex: 500,
+              background: "white", borderRadius: 14,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.16)",
+              border: "1px solid #e5e7eb",
+              overflow: "hidden",
+            }}
+          >
+            {/* Cabecera del popup */}
+            <div style={{
+              background: "linear-gradient(90deg,#1e3a5f,#1d4ed8)",
+              padding: "10px 14px",
+              display: "flex", alignItems: "center", gap: 10,
+            }}>
+              <span style={{ fontSize: 18 }}>📻</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "white" }}>Radio María Chile</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)" }}>Transmisión en vivo</div>
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.7)", fontSize: 16, cursor: "pointer", padding: "2px 6px", borderRadius: 4 }}
+              >✕</button>
+            </div>
+            {/* Iframe oficial */}
+            <iframe
+              ref={iframeRef}
+              src="https://www.radiomaria.cl/radio_envivo"
+              width="100%"
+              height="180"
+              frameBorder="0"
+              allowFullScreen
+              title="Radio María Chile en vivo"
+              style={{ display: "block" }}
+            />
+          </div>
+        )}
       </div>
     </>
   );
 }
+
 
 export default function App() {
   const [view, setView] = useState("login"); // "login" | "register" | "recover" | "app"
@@ -1378,7 +1321,6 @@ export default function App() {
       }}
     >
       <style>{G}</style>
-      <RadioMariaWidget />
       {mobileMenu && (
         <MobileMenu
           section={section}
@@ -1701,6 +1643,8 @@ export default function App() {
               </div>
             )}
           </div>
+
+          <RadioMariaWidget />
 
           <div
             className="topbar-greeting"
