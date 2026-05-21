@@ -1831,6 +1831,7 @@ export default function App() {
                   allEventos={gcalEventos}
                   podcasts={podcasts}
                   fotos={fotos}
+                  comunidades={comunidades}
                 />
               )}
               {section === "perfil" && (
