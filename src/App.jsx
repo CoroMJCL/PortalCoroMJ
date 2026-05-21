@@ -3587,11 +3587,10 @@ function Dashboard({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 18,
               flexShrink: 0,
             }}
           >
-            📄
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#ef4444" fillOpacity="0.15" stroke="#ef4444" strokeWidth="1.5" strokeLinejoin="round"/><path d="M14 2v6h6" stroke="#ef4444" strokeWidth="1.5" strokeLinejoin="round"/><text x="4.5" y="19" fontFamily="Arial" fontSize="5.5" fontWeight="bold" fill="#ef4444">PDF</text></svg>
           </div>
           <div>
             <div style={{ fontSize: 11, color: C.gray, marginBottom: 2 }}>
@@ -5558,11 +5557,10 @@ function Documentos({ docs, onReload }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 20,
               flexShrink: 0,
             }}
           >
-            📄
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#ef4444" fillOpacity="0.15" stroke="#ef4444" strokeWidth="1.5" strokeLinejoin="round"/><path d="M14 2v6h6" stroke="#ef4444" strokeWidth="1.5" strokeLinejoin="round"/><text x="4.5" y="19" fontFamily="Arial" fontSize="5.5" fontWeight="bold" fill="#ef4444">PDF</text></svg>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
@@ -7639,14 +7637,15 @@ function AdminDocumentos({ docs, onReload }) {
     setEditForm({ nombre: d.nombre || "", url: d.url || "", categoria: d.categoria || "Repertorio", size: d.size || "" });
   }
 
-  async function saveEdit() {
-    if (!editForm.nombre || !editForm.url) return;
+  async function saveEdit(idToSave) {
+    const targetId = idToSave ?? editId;
+    if (!editForm.nombre || !editForm.url || !targetId) return;
     setEditSaving(true);
     try {
-      await updateRecord("documentos", editId, editForm);
+      await updateRecord("documentos", targetId, editForm);
       setEditId(null);
       onReload();
-    } catch (e) { alert("Error: " + e.message); }
+    } catch (e) { alert("Error al guardar: " + e.message); }
     setEditSaving(false);
   }
 
@@ -7696,15 +7695,15 @@ function AdminDocumentos({ docs, onReload }) {
                   onChange={(e) => setEditForm((f) => ({ ...f, size: e.target.value }))} style={inputS} />
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <Btn onClick={saveEdit} disabled={editSaving}>{editSaving ? "Guardando..." : "Guardar cambios"}</Btn>
+                <Btn onClick={() => saveEdit(editId)} disabled={editSaving}>{editSaving ? "Guardando..." : "Guardar cambios"}</Btn>
                 <Btn variant="ghost" onClick={() => setEditId(null)}>Cancelar</Btn>
               </div>
             </div>
           ) : (
             /* ── MODO VISTA ── */
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ width: 40, height: 40, background: "#fee2e2", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
-                📄
+              <div style={{ width: 40, height: 40, background: "#fee2e2", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#ef4444" fillOpacity="0.15" stroke="#ef4444" strokeWidth="1.5" strokeLinejoin="round"/><path d="M14 2v6h6" stroke="#ef4444" strokeWidth="1.5" strokeLinejoin="round"/><text x="4.5" y="19" fontFamily="Arial" fontSize="5.5" fontWeight="bold" fill="#ef4444">PDF</text></svg>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: C.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -12012,7 +12011,22 @@ function SqlSetupBlock() {
             create policy "config_read" on config for select using (true);<br />
             create policy "config_write" on config for insert with check (true);<br />
             create policy "config_update" on config for update using (true);<br />
-            -- Habilitar RLS y políticas para cada tabla (select/insert/delete to authenticated)
+            -- Habilitar RLS y políticas UPDATE para todas las tablas:<br />
+            alter table documentos enable row level security;<br />
+            drop policy if exists "docs_all" on documentos;<br />
+            create policy "docs_all" on documentos for all using (true) with check (true);<br />
+            alter table links enable row level security;<br />
+            drop policy if exists "links_all" on links;<br />
+            create policy "links_all" on links for all using (true) with check (true);<br />
+            alter table biblioteca enable row level security;<br />
+            drop policy if exists "bib_all" on biblioteca;<br />
+            create policy "bib_all" on biblioteca for all using (true) with check (true);<br />
+            alter table podcasts enable row level security;<br />
+            drop policy if exists "pods_all" on podcasts;<br />
+            create policy "pods_all" on podcasts for all using (true) with check (true);<br />
+            alter table asistencia enable row level security;<br />
+            drop policy if exists "asis_all" on asistencia;<br />
+            create policy "asis_all" on asistencia for all using (true) with check (true);
           </code>
         </div>
       )}
