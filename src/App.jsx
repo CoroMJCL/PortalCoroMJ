@@ -753,6 +753,7 @@ export default function App() {
   const [links, setLinks] = useState([]);
   const [biblioteca, setBiblioteca] = useState([]);
   const [podcasts, setPodcasts] = useState([]);
+  const [fotos, setFotos] = useState([]);
   const [pautas, setPautas] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
 
@@ -774,7 +775,7 @@ export default function App() {
   async function loadData() {
     setDbLoading(true);
     try {
-      const [m, ev, d, or, n, p, lk, bib, pod, pau, asis] = await Promise.all([
+      const [m, ev, d, or, n, p, lk, bib, pod, pau, asis, gal] = await Promise.all([
         supabase("integrantes", { order: "&order=nombre.asc" }),
         supabase("eventos", { order: "&order=fecha.asc" }),
         supabase("documentos", { order: "&order=created_at.desc" }),
@@ -786,6 +787,7 @@ export default function App() {
         supabase("podcasts", { order: "&order=created_at.desc" }).catch(() => []),
         supabase("pautas_misa", { order: "&order=fecha.desc" }).catch(() => []),
         supabase("asistencia", { order: "&order=created_at.desc" }).catch(() => []),
+        supabase("galeria", { order: "&order=orden.asc,created_at.asc" }).catch(() => []),
       ]);
       setMembers(m || []);
       setEventos(ev || []);
@@ -798,6 +800,7 @@ export default function App() {
       setPodcasts(pod || []);
       setPautas(pau || []);
       setAsistencia(asis || []);
+      setFotos(gal || []);
       // Cargar eventos desde Google Calendar para el Dashboard
       fetchGoogleCalendarEvents().then((gcal) => setGcalEventos(gcal));
     } catch (e) {
@@ -1752,14 +1755,21 @@ export default function App() {
             {/* Saludo */}
             {user?.nombre && (
               <div style={{
-                display: "flex", alignItems: "center",
-                background: C.white, border: `1px solid ${C.border}`,
-                borderRadius: 12, padding: "6px 12px",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+                display: "flex", alignItems: "center", gap: 8,
+                background: `linear-gradient(135deg, ${C.primaryLight}, #f0fdf4)`,
+                border: `1px solid ${C.primary}30`,
+                borderRadius: 12, padding: "6px 14px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
               }}>
+                {user.foto_url
+                  ? <img src={user.foto_url} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", border: `2px solid ${C.primary}40`, flexShrink: 0 }} />
+                  : <div style={{ width: 28, height: 28, borderRadius: "50%", background: `linear-gradient(135deg,${C.primary},${C.primaryDark})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "white", flexShrink: 0 }}>
+                      {user.nombre.charAt(0).toUpperCase()}
+                    </div>
+                }
                 <div>
-                  <div style={{ fontSize: 9, color: C.gray, lineHeight: 1.2 }}>Hola,</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: C.dark, lineHeight: 1.2, fontFamily: "'Poppins',sans-serif" }}>
+                  <div style={{ fontSize: 9, color: C.primary, lineHeight: 1.1, fontWeight: 500 }}>Hola,</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.dark, lineHeight: 1.2, fontFamily: "'Poppins',sans-serif" }}>
                     {user.nombre.split(" ")[0]}
                   </div>
                 </div>
@@ -1817,6 +1827,7 @@ export default function App() {
                   asistencia={asistencia}
                   allEventos={gcalEventos}
                   podcasts={podcasts}
+                  fotos={fotos}
                 />
               )}
               {section === "perfil" && (
@@ -1893,6 +1904,7 @@ export default function App() {
                   biblioteca={biblioteca}
                   podcasts={podcasts}
                   asistencia={asistencia}
+                  fotos={fotos}
                   onReload={loadData}
                   user={user}
                 />
@@ -2839,6 +2851,177 @@ function VideoDestacadoWidget({ isAdmin }) {
   );
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+//  WIDGET VOCALIZACIÓN (igual a VideoDestacado)
+// ═══════════════════════════════════════════════════════════════
+const VOC_STORAGE_KEY = "coro_vocalizacion_url";
+
+function VocalizacionWidget({ isAdmin }) {
+  const [savedUrl, setSavedUrl] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [inputVal, setInputVal] = useState("");
+
+  useEffect(() => {
+    getConfig(VOC_STORAGE_KEY).then((val) => { if (val !== null) setSavedUrl(val); });
+  }, []);
+
+  const videoId = extractYTId(savedUrl);
+  function openEdit() { setInputVal(savedUrl); setEditing(true); }
+  function cancelEdit() { setEditing(false); }
+  async function saveUrl() {
+    const v = inputVal.trim();
+    setSavedUrl(v);
+    await setConfig(VOC_STORAGE_KEY, v);
+    setEditing(false);
+  }
+  if (!videoId && !isAdmin) return null;
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <div style={{ width: 32, height: 32, background: "linear-gradient(135deg,#7c3aed,#a855f7)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <span style={{ fontSize: 14, color: "white" }}>🎤</span>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 14, fontWeight: 700, color: C.dark }}>Vocalización</div>
+          <div style={{ fontSize: 11, color: C.gray }}>{videoId ? "Reproducir directamente aquí" : "Sin video asignado aún"}</div>
+        </div>
+        {isAdmin && (
+          <button onClick={editing ? cancelEdit : openEdit} style={{ background: editing ? "#f3f4f6" : "#f5f3ff", border: `1px solid ${editing ? C.border : "#a855f760"}`, borderRadius: 8, padding: "5px 12px", fontSize: 11, fontWeight: 600, color: editing ? C.gray : "#7c3aed", cursor: "pointer" }}>
+            {editing ? "✕ Cancelar" : "✏️ " + (videoId ? "Cambiar video" : "Asignar video")}
+          </button>
+        )}
+      </div>
+      {editing && (
+        <div style={{ background: "#f5f3ff", border: "1px solid #a855f740", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 600, marginBottom: 6 }}>📎 Pega el link o ID del video de YouTube</div>
+          <input value={inputVal} onChange={(e) => setInputVal(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." onKeyDown={(e) => { if (e.key === "Enter") saveUrl(); if (e.key === "Escape") cancelEdit(); }} autoFocus style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, outline: "none", marginBottom: 8 }} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn onClick={saveUrl} style={{ fontSize: 12, padding: "6px 14px", background: "#7c3aed", color: "white", border: "none" }}>💾 Guardar</Btn>
+            {videoId && <Btn variant="ghost" style={{ fontSize: 12, padding: "6px 14px", color: "#dc2626", border: "1px solid #fca5a5" }} onClick={async () => { setSavedUrl(""); await setConfig(VOC_STORAGE_KEY, ""); setEditing(false); }}>🗑 Quitar</Btn>}
+          </div>
+        </div>
+      )}
+      {videoId ? (
+        <div style={{ borderRadius: 12, overflow: "hidden", background: "#000", position: "relative", paddingTop: "56.25%", boxShadow: "0 4px 20px rgba(0,0,0,0.18)" }}>
+          <iframe key={videoId} src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="Vocalización" />
+        </div>
+      ) : (
+        <div style={{ borderRadius: 12, background: "#faf5ff", border: "2px dashed #a855f750", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "36px 20px", minHeight: 140 }}>
+          <div style={{ fontSize: 36, opacity: 0.25 }}>🎤</div>
+          <div style={{ fontSize: 12, color: C.gray, textAlign: "center" }}>Haz clic en <strong>"Asignar video"</strong> para agregar un video de vocalización</div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  WIDGET GALERÍA DE FOTOS
+// ═══════════════════════════════════════════════════════════════
+function GaleriaWidget({ fotos, setSection, isAdmin }) {
+  const [idx, setIdx] = useState(0);
+  const [lightbox, setLightbox] = useState(false);
+
+  if (!fotos || fotos.length === 0) {
+    if (!isAdmin) return null;
+    return (
+      <Card style={{ marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+          <div style={{ width: 32, height: 32, background: "linear-gradient(135deg,#f59e0b,#ef4444)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontSize: 14 }}>🖼️</span>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 14, fontWeight: 700, color: C.dark }}>Galería</div>
+            <div style={{ fontSize: 11, color: C.gray }}>Sin fotos aún</div>
+          </div>
+          <button onClick={() => setSection("admin-galeria")} style={{ background: C.primaryLight, border: `1px solid ${C.primary}50`, borderRadius: 8, padding: "5px 12px", fontSize: 11, fontWeight: 600, color: C.primary, cursor: "pointer" }}>+ Agregar fotos</button>
+        </div>
+        <div style={{ borderRadius: 12, background: "#fefce8", border: "2px dashed #f59e0b50", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "36px 20px", gap: 8, minHeight: 140 }}>
+          <div style={{ fontSize: 36, opacity: 0.25 }}>🖼️</div>
+          <div style={{ fontSize: 12, color: C.gray, textAlign: "center" }}>Sube fotos desde el panel <strong>Administrador → Galería</strong></div>
+        </div>
+      </Card>
+    );
+  }
+
+  const foto = fotos[idx];
+  const prev = () => setIdx(i => Math.max(0, i - 1));
+  const next = () => setIdx(i => Math.min(fotos.length - 1, i + 1));
+
+  return (
+    <>
+      <style>{`
+        .gal-nav:hover { opacity: 1 !important; }
+        .gal-thumb { cursor: pointer; opacity: 0.6; transition: all 0.2s; border: 2px solid transparent; border-radius: 6px; overflow: hidden; }
+        .gal-thumb.active, .gal-thumb:hover { opacity: 1; border-color: ${C.primary}; }
+        .gal-lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        @keyframes gal-in { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} }
+        .gal-lightbox-img { animation: gal-in 0.2s ease; max-width: 95vw; max-height: 90vh; border-radius: 12px; object-fit: contain; }
+      `}</style>
+      <Card style={{ marginBottom: 14 }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <div style={{ width: 32, height: 32, background: "linear-gradient(135deg,#f59e0b,#ef4444)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontSize: 14 }}>🖼️</span>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 14, fontWeight: 700, color: C.dark }}>Galería</div>
+            <div style={{ fontSize: 11, color: C.gray }}>{idx + 1} / {fotos.length} fotos</div>
+          </div>
+          {isAdmin && (
+            <button onClick={() => setSection("admin-galeria")} style={{ background: C.primaryLight, border: `1px solid ${C.primary}50`, borderRadius: 8, padding: "5px 12px", fontSize: 11, fontWeight: 600, color: C.primary, cursor: "pointer" }}>✏️ Gestionar</button>
+          )}
+        </div>
+
+        {/* Imagen principal */}
+        <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", background: "#000", aspectRatio: "16/9", cursor: "pointer" }} onClick={() => setLightbox(true)}>
+          <img src={foto.url} alt={foto.titulo || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.3s" }} />
+          {foto.titulo && (
+            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent,rgba(0,0,0,0.7))", padding: "24px 14px 12px", color: "white" }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{foto.titulo}</div>
+              {foto.descripcion && <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>{foto.descripcion}</div>}
+            </div>
+          )}
+          {/* Expand icon */}
+          <div style={{ position: "absolute", top: 10, right: 10, background: "rgba(0,0,0,0.4)", borderRadius: 7, padding: "4px 8px", fontSize: 11, color: "white" }}>⛶ Ver</div>
+        </div>
+
+        {/* Navegación */}
+        {fotos.length > 1 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+            <button onClick={prev} disabled={idx === 0} className="gal-nav" style={{ width: 36, height: 36, borderRadius: 10, border: `1px solid ${idx===0?C.border:C.primary}`, background: idx===0?C.light:C.primaryLight, color: idx===0?C.border:C.primary, fontSize: 16, cursor: idx===0?"default":"pointer", display:"flex",alignItems:"center",justifyContent:"center", opacity: idx===0?0.4:0.9, transition:"all 0.15s", flexShrink:0 }}>‹</button>
+            {/* Miniaturas scrollables */}
+            <div style={{ flex: 1, display: "flex", gap: 6, overflowX: "auto", padding: "2px 0", scrollbarWidth: "none" }}>
+              {fotos.map((f, i) => (
+                <div key={f.id} className={`gal-thumb${i===idx?" active":""}`} onClick={() => setIdx(i)} style={{ width: 44, height: 44, flexShrink: 0 }}>
+                  <img src={f.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                </div>
+              ))}
+            </div>
+            <button onClick={next} disabled={idx===fotos.length-1} className="gal-nav" style={{ width: 36, height: 36, borderRadius: 10, border: `1px solid ${idx===fotos.length-1?C.border:C.primary}`, background: idx===fotos.length-1?C.light:C.primaryLight, color: idx===fotos.length-1?C.border:C.primary, fontSize: 16, cursor: idx===fotos.length-1?"default":"pointer", display:"flex",alignItems:"center",justifyContent:"center", opacity: idx===fotos.length-1?0.4:0.9, transition:"all 0.15s", flexShrink:0 }}>›</button>
+          </div>
+        )}
+      </Card>
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div className="gal-lightbox" onClick={() => setLightbox(false)}>
+          <div style={{ position: "absolute", top: 16, right: 16, color: "white", fontSize: 28, cursor: "pointer", lineHeight: 1 }}>✕</div>
+          <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}>
+            {idx > 0 && <button onClick={(e)=>{e.stopPropagation();prev();}} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"white", fontSize:28, cursor:"pointer", borderRadius:10, padding:"8px 14px" }}>‹</button>}
+          </div>
+          <img src={foto.url} alt={foto.titulo||""} className="gal-lightbox-img" onClick={e=>e.stopPropagation()} />
+          <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)" }}>
+            {idx < fotos.length-1 && <button onClick={(e)=>{e.stopPropagation();next();}} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"white", fontSize:28, cursor:"pointer", borderRadius:10, padding:"8px 14px" }}>›</button>}
+          </div>
+          {foto.titulo && <div style={{ position:"absolute", bottom:24, left:0, right:0, textAlign:"center", color:"white", fontSize:14, fontWeight:600 }}>{foto.titulo}</div>}
+        </div>
+      )}
+    </>
+  );
+}
+
 function Dashboard({
   cumple,
   evangelio,
@@ -2858,6 +3041,7 @@ function Dashboard({
   asistencia,
   allEventos,
   podcasts,
+  fotos,
 }) {
   const futuros = [...eventos]
     .filter((e) => new Date(e.fecha + "T00:00:00") >= new Date())
@@ -3784,6 +3968,8 @@ function Dashboard({
             <PodcastWidget podcasts={podcasts} setSection={setSection} />
           </Card>
         )}
+        <VocalizacionWidget isAdmin={isAdmin} />
+        <GaleriaWidget fotos={fotos} setSection={setSection} isAdmin={isAdmin} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <Card style={{ flex: 1 }}>
@@ -6588,6 +6774,7 @@ const ADMIN_TABS = [
   { id: "biblioteca", label: "📚 Biblioteca" },
   { id: "podcasts", label: "🎙️ Podcast" },
   { id: "pautas", label: "🎼 Pautas Misa" },
+  { id: "galeria", label: "🖼️ Galería" },
 ];
 
 function AdminTab({ label, active, onClick }) {
@@ -11813,6 +12000,122 @@ function SqlSetupBlock() {
   );
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+//  ADMIN GALERÍA
+// ═══════════════════════════════════════════════════════════════
+function AdminGaleria({ fotos, onReload }) {
+  const [form, setForm] = useState({ url: "", titulo: "", descripcion: "", orden: 0 });
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [editData, setEditData] = useState({});
+  const inputS = { padding: "8px 12px", borderRadius: 7, border: `1px solid ${C.border}`, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
+
+  const sorted = [...fotos].sort((a, b) => {
+    const oa = a.orden ?? 999, ob = b.orden ?? 999;
+    return oa !== ob ? oa - ob : new Date(a.created_at) - new Date(b.created_at);
+  });
+
+  async function submit() {
+    if (!form.url) return;
+    setSaving(true);
+    try {
+      await supabase("galeria", { method: "POST", body: { ...form, orden: Number(form.orden) || 0 } });
+      setForm({ url: "", titulo: "", descripcion: "", orden: 0 });
+      setShowForm(false);
+      onReload();
+    } catch(e) { alert("Error: " + e.message); }
+    setSaving(false);
+  }
+
+  async function saveEdit(id) {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/galeria?id=eq.${id}`, {
+        method: "PATCH",
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" },
+        body: JSON.stringify({ ...editData, orden: Number(editData.orden) || 0 }),
+      });
+      setEditId(null);
+      onReload();
+    } catch(e) { alert("Error: " + e.message); }
+  }
+
+  async function del(id) {
+    try { await deleteRecord("galeria", id); onReload(); } catch(e) { alert("Error: " + e.message); }
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <div>
+          <span style={{ fontSize: 13, color: C.gray }}>{fotos.length} fotografías</span>
+          <span style={{ fontSize: 11, color: C.gray, marginLeft: 8 }}>· Orden menor = aparece primero</span>
+        </div>
+        <Btn onClick={() => setShowForm(p => !p)}>+ Nueva foto</Btn>
+      </div>
+
+      <div style={{ background: C.goldLight, border: `1px solid ${C.gold}40`, borderRadius: 8, padding: "8px 12px", fontSize: 11, color: C.gray, marginBottom: 14 }}>
+        ⚠️ SQL requerido en Supabase (una vez):<br />
+        <code style={{ fontFamily: "monospace" }}>create table if not exists galeria (id uuid default gen_random_uuid() primary key, url text not null, titulo text, descripcion text, orden int default 0, created_at timestamptz default now());</code>
+      </div>
+
+      {showForm && (
+        <Card style={{ marginBottom: 16, border: `1px solid ${C.primary}40`, background: C.primaryLight }}>
+          <div style={{ fontWeight: 600, fontSize: 13, color: C.dark, marginBottom: 10 }}>Nueva fotografía</div>
+          <input placeholder="URL de la imagen *" value={form.url} onChange={e => setForm(p => ({...p, url: e.target.value}))} style={{ ...inputS, marginBottom: 8 }} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: 8, marginBottom: 8 }}>
+            <input placeholder="Título (opcional)" value={form.titulo} onChange={e => setForm(p => ({...p, titulo: e.target.value}))} style={inputS} />
+            <input placeholder="Descripción (opcional)" value={form.descripcion} onChange={e => setForm(p => ({...p, descripcion: e.target.value}))} style={inputS} />
+            <input type="number" placeholder="Orden" value={form.orden} onChange={e => setForm(p => ({...p, orden: e.target.value}))} style={inputS} title="Orden (menor = primero)" />
+          </div>
+          {form.url && <img src={form.url} alt="preview" onError={e => e.target.style.display="none"} style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 8, marginBottom: 8 }} />}
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn onClick={submit} disabled={saving}>{saving ? "Guardando..." : "Guardar"}</Btn>
+            <Btn variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Btn>
+          </div>
+        </Card>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+        {sorted.map(f => (
+          <Card key={f.id} style={{ padding: 10 }}>
+            {editId === f.id ? (
+              <div>
+                <input placeholder="URL *" value={editData.url} onChange={e => setEditData(d => ({...d, url: e.target.value}))} style={{ ...inputS, marginBottom: 6 }} />
+                <input placeholder="Título" value={editData.titulo} onChange={e => setEditData(d => ({...d, titulo: e.target.value}))} style={{ ...inputS, marginBottom: 6 }} />
+                <input placeholder="Descripción" value={editData.descripcion} onChange={e => setEditData(d => ({...d, descripcion: e.target.value}))} style={{ ...inputS, marginBottom: 6 }} />
+                <input type="number" placeholder="Orden" value={editData.orden} onChange={e => setEditData(d => ({...d, orden: e.target.value}))} style={{ ...inputS, marginBottom: 8 }} />
+                <div style={{ display: "flex", gap: 6 }}>
+                  <Btn style={{ fontSize: 11, padding: "5px 10px" }} onClick={() => saveEdit(f.id)}>💾 Guardar</Btn>
+                  <Btn variant="ghost" style={{ fontSize: 11, padding: "5px 10px" }} onClick={() => setEditId(null)}>Cancelar</Btn>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ position: "relative", aspectRatio: "4/3", borderRadius: 8, overflow: "hidden", background: "#f3f4f6", marginBottom: 8 }}>
+                  <img src={f.url} alt={f.titulo || ""} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <div style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.5)", color: "white", borderRadius: 6, fontSize: 10, padding: "2px 6px", fontWeight: 700 }}>#{f.orden ?? 0}</div>
+                </div>
+                {f.titulo && <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, marginBottom: 2 }}>{f.titulo}</div>}
+                {f.descripcion && <div style={{ fontSize: 11, color: C.gray, marginBottom: 6 }}>{f.descripcion}</div>}
+                <div style={{ display: "flex", gap: 6 }}>
+                  <Btn variant="ghost" style={{ fontSize: 11, padding: "4px 8px", flex: 1, color: C.primary }} onClick={() => { setEditId(f.id); setEditData({ url: f.url||"", titulo: f.titulo||"", descripcion: f.descripcion||"", orden: f.orden??0 }); }}>✏️ Editar</Btn>
+                  <ConfirmBtn onConfirm={() => del(f.id)} />
+                </div>
+              </>
+            )}
+          </Card>
+        ))}
+      </div>
+
+      {fotos.length === 0 && (
+        <p style={{ color: C.gray, fontSize: 13, textAlign: "center", padding: "20px 0" }}>Sin fotografías aún.</p>
+      )}
+    </div>
+  );
+}
+
 function Admin({
   members,
   eventos,
@@ -11824,6 +12127,7 @@ function Admin({
   biblioteca,
   podcasts,
   asistencia,
+  fotos,
   onReload,
   user,
 }) {
@@ -11967,6 +12271,7 @@ function Admin({
         )}
         {tab === "pautas" && <AdminPautasMisa onReload={onReload} />}
         {tab === "asistencia" && <AdminAsistencia members={members} eventos={eventos} asistencia={asistencia} onReload={onReload} />}
+        {tab === "galeria" && <AdminGaleria fotos={fotos} onReload={onReload} />}
       </Card>
 
       <SqlSetupBlock />
