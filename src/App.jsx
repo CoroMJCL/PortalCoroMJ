@@ -12233,8 +12233,13 @@ function AdminComunidades({ comunidades, onReload }) {
       </div>
 
       <div style={{ background:C.goldLight, border:`1px solid ${C.gold}40`, borderRadius:8, padding:"8px 12px", fontSize:11, color:C.gray, marginBottom:14 }}>
-        ⚠️ SQL requerido (una vez):<br/>
-        <code style={{ fontFamily:"monospace", fontSize:10 }}>create table if not exists comunidades (id uuid default gen_random_uuid() primary key, nombre text not null, direccion text, telefono text, email text, descripcion text, foto_url text, orden int default 0, created_at timestamptz default now());</code>
+        ⚠️ SQL requerido (una vez) — pegar en Supabase → SQL Editor:<br/>
+        <code style={{ fontFamily:"monospace", fontSize:10, display:"block", whiteSpace:"pre-wrap", marginTop:4 }}>{`create table if not exists comunidades (id uuid default gen_random_uuid() primary key, nombre text not null, direccion text, telefono text, email text, descripcion text, foto_url text, orden int default 0, created_at timestamptz default now());
+alter table comunidades enable row level security;
+drop policy if exists "comunidades_read" on comunidades;
+drop policy if exists "comunidades_write" on comunidades;
+create policy "comunidades_read" on comunidades for select using (true);
+create policy "comunidades_write" on comunidades for all using (true) with check (true);`}</code>
       </div>
 
       {showForm && (
