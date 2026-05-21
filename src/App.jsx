@@ -12029,6 +12029,31 @@ function AdminGaleria({ fotos, onReload }) {
     return oa !== ob ? oa - ob : new Date(a.created_at) - new Date(b.created_at);
   });
 
+  const fileInputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function uploadFile(file) {
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `galeria/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/fotos/${path}`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+          "Content-Type": file.type,
+          "x-upsert": "true",
+        },
+        body: file,
+      });
+      if (!res.ok) throw new Error("Error subiendo archivo");
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/fotos/${path}`;
+      setForm(p => ({ ...p, url: publicUrl }));
+    } catch(e) { alert("Error subiendo: " + e.message); }
+    setUploading(false);
+  }
+
   async function submit() {
     if (!form.url) return;
     setSaving(true);
@@ -12075,13 +12100,21 @@ function AdminGaleria({ fotos, onReload }) {
       {showForm && (
         <Card style={{ marginBottom: 16, border: `1px solid ${C.primary}40`, background: C.primaryLight }}>
           <div style={{ fontWeight: 600, fontSize: 13, color: C.dark, marginBottom: 10 }}>Nueva fotografía</div>
-          <input placeholder="URL de la imagen *" value={form.url} onChange={e => setForm(p => ({...p, url: e.target.value}))} style={{ ...inputS, marginBottom: 8 }} />
+          {/* Subir archivo */}
+          <input ref={fileInputRef} type="file" accept="image/*" style={{ display:"none" }} onChange={e => { if(e.target.files[0]) uploadFile(e.target.files[0]); }} />
+          <div style={{ display:"flex", gap:8, marginBottom:8 }}>
+            <input placeholder="URL de la imagen *" value={form.url} onChange={e => setForm(p => ({...p, url: e.target.value}))} style={{ ...inputS, flex:1 }} />
+            <button onClick={() => fileInputRef.current?.click()} disabled={uploading} style={{ flexShrink:0, padding:"8px 14px", borderRadius:7, border:`1px solid ${C.border}`, background: uploading?"#f3f4f6":C.primaryLight, color:C.primary, fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>
+              {uploading ? "⏳ Subiendo..." : "📁 Subir foto"}
+            </button>
+          </div>
+          {form.url && <img src={normalizarUrlFoto(form.url)} alt="preview" onError={e => e.target.style.display="none"} style={{ width:"100%", maxHeight:160, objectFit:"cover", borderRadius:8, marginBottom:8 }} />}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: 8, marginBottom: 8 }}>
             <input placeholder="Título (opcional)" value={form.titulo} onChange={e => setForm(p => ({...p, titulo: e.target.value}))} style={inputS} />
             <input placeholder="Descripción (opcional)" value={form.descripcion} onChange={e => setForm(p => ({...p, descripcion: e.target.value}))} style={inputS} />
             <input type="number" placeholder="Orden" value={form.orden} onChange={e => setForm(p => ({...p, orden: e.target.value}))} style={inputS} title="Orden (menor = primero)" />
           </div>
-          {form.url && <img src={normalizarUrlFoto(form.url)} alt="preview" onError={e => e.target.style.display="none"} style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 8, marginBottom: 8 }} />}
+          
           <div style={{ display: "flex", gap: 8 }}>
             <Btn onClick={submit} disabled={saving}>{saving ? "Guardando..." : "Guardar"}</Btn>
             <Btn variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Btn>
