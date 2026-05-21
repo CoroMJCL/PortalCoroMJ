@@ -754,6 +754,7 @@ export default function App() {
   const [biblioteca, setBiblioteca] = useState([]);
   const [podcasts, setPodcasts] = useState([]);
   const [fotos, setFotos] = useState([]);
+  const [comunidades, setComunidades] = useState([]);
   const [pautas, setPautas] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
 
@@ -775,7 +776,7 @@ export default function App() {
   async function loadData() {
     setDbLoading(true);
     try {
-      const [m, ev, d, or, n, p, lk, bib, pod, pau, asis, gal] = await Promise.all([
+      const [m, ev, d, or, n, p, lk, bib, pod, pau, asis, gal, com] = await Promise.all([
         supabase("integrantes", { order: "&order=nombre.asc" }),
         supabase("eventos", { order: "&order=fecha.asc" }),
         supabase("documentos", { order: "&order=created_at.desc" }),
@@ -788,6 +789,7 @@ export default function App() {
         supabase("pautas_misa", { order: "&order=fecha.desc" }).catch(() => []),
         supabase("asistencia", { order: "&order=created_at.desc" }).catch(() => []),
         supabase("galeria", { order: "&order=orden.asc,created_at.asc" }).catch(() => []),
+        supabase("comunidades", { order: "&order=orden.asc,created_at.asc" }).catch(() => []),
       ]);
       setMembers(m || []);
       setEventos(ev || []);
@@ -801,6 +803,7 @@ export default function App() {
       setPautas(pau || []);
       setAsistencia(asis || []);
       setFotos(gal || []);
+      setComunidades(com || []);
       // Cargar eventos desde Google Calendar para el Dashboard
       fetchGoogleCalendarEvents().then((gcal) => setGcalEventos(gcal));
     } catch (e) {
@@ -1905,6 +1908,7 @@ export default function App() {
                   podcasts={podcasts}
                   asistencia={asistencia}
                   fotos={fotos}
+                  comunidades={comunidades}
                   onReload={loadData}
                   user={user}
                 />
@@ -3054,6 +3058,7 @@ function Dashboard({
   allEventos,
   podcasts,
   fotos,
+  comunidades,
 }) {
   const futuros = [...eventos]
     .filter((e) => new Date(e.fecha + "T00:00:00") >= new Date())
@@ -4089,6 +4094,8 @@ function Dashboard({
           </Card>
         </div>
       </div>
+
+      <ComunidadesWidget comunidades={comunidades} isAdmin={isAdmin} setSection={setSection} />
 
       <div
         className="grid-dash-sub"
@@ -6787,6 +6794,7 @@ const ADMIN_TABS = [
   { id: "podcasts", label: "🎙️ Podcast" },
   { id: "pautas", label: "🎼 Pautas Misa" },
   { id: "galeria", label: "🖼️ Galería" },
+  { id: "comunidades", label: "⛪ Comunidades" },
 ];
 
 function AdminTab({ label, active, onClick }) {
@@ -12013,6 +12021,284 @@ function SqlSetupBlock() {
 }
 
 
+
+// ═══════════════════════════════════════════════════════════════
+//  WIDGET COMUNIDADES
+// ═══════════════════════════════════════════════════════════════
+function ComunidadesWidget({ comunidades, isAdmin, setSection }) {
+  const [idx, setIdx] = useState(0);
+  const [lightbox, setLightbox] = useState(false);
+
+  if (!comunidades || comunidades.length === 0) {
+    if (!isAdmin) return null;
+    return (
+      <Card style={{ marginBottom: 14 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+          <div style={{ width:32, height:32, background:"linear-gradient(135deg,#0ea5e9,#2563eb)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <span style={{ fontSize:14 }}>⛪</span>
+          </div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:14, fontWeight:700, color:C.dark }}>Comunidades</div>
+            <div style={{ fontSize:11, color:C.gray }}>Sin comunidades aún</div>
+          </div>
+          <button onClick={() => setSection("admin")} style={{ background:C.primaryLight, border:`1px solid ${C.primary}50`, borderRadius:8, padding:"5px 12px", fontSize:11, fontWeight:600, color:C.primary, cursor:"pointer" }}>+ Agregar</button>
+        </div>
+        <div style={{ borderRadius:12, background:"#f0f9ff", border:"2px dashed #0ea5e950", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"36px 20px", minHeight:140 }}>
+          <div style={{ fontSize:36, opacity:0.25 }}>⛪</div>
+          <div style={{ fontSize:12, color:C.gray, textAlign:"center" }}>Agrega comunidades desde el panel <strong>Administrador → Comunidades</strong></div>
+        </div>
+      </Card>
+    );
+  }
+
+  const com = comunidades[idx];
+  const prev = () => setIdx(i => Math.max(0, i - 1));
+  const next = () => setIdx(i => Math.min(comunidades.length - 1, i + 1));
+
+  return (
+    <>
+      <style>{`
+        @keyframes com-slide { from{opacity:0;transform:translateX(12px)} to{opacity:1;transform:translateX(0)} }
+        .com-card-inner { animation: com-slide 0.22s ease; }
+      `}</style>
+
+      <Card style={{ marginBottom:14, padding:0, overflow:"hidden" }}>
+        {/* Header fuera de la foto */}
+        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"14px 16px 10px" }}>
+          <div style={{ width:32, height:32, background:"linear-gradient(135deg,#0ea5e9,#2563eb)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+            <span style={{ fontSize:14 }}>⛪</span>
+          </div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:14, fontWeight:700, color:C.dark }}>Comunidades</div>
+            <div style={{ fontSize:11, color:C.gray }}>{idx+1} de {comunidades.length}</div>
+          </div>
+          {isAdmin && (
+            <button onClick={() => setSection("admin")} style={{ background:C.primaryLight, border:`1px solid ${C.primary}50`, borderRadius:8, padding:"5px 12px", fontSize:11, fontWeight:600, color:C.primary, cursor:"pointer" }}>✏️ Gestionar</button>
+          )}
+        </div>
+
+        {/* Tarjeta animada */}
+        <div key={idx} className="com-card-inner">
+          {/* Foto */}
+          <div
+            style={{ position:"relative", width:"100%", aspectRatio:"16/9", background:"#1e293b", cursor:"pointer", overflow:"hidden" }}
+            onClick={() => setLightbox(true)}
+          >
+            {com.foto_url
+              ? <img src={normalizarUrlFoto(com.foto_url)} alt={com.nombre} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
+              : <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:48, opacity:0.18 }}>⛪</div>
+            }
+            {/* Gradiente inferior */}
+            <div style={{ position:"absolute", inset:0, background:"linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.72) 100%)" }} />
+            {/* Nombre superpuesto */}
+            <div style={{ position:"absolute", bottom:0, left:0, right:0, padding:"18px 16px 14px" }}>
+              <div style={{ fontSize:20, fontWeight:800, color:"white", fontFamily:"'Poppins',sans-serif", lineHeight:1.1, textShadow:"0 2px 8px rgba(0,0,0,0.4)" }}>{com.nombre}</div>
+            </div>
+            {/* Expand */}
+            <div style={{ position:"absolute", top:10, right:10, background:"rgba(0,0,0,0.35)", borderRadius:7, padding:"3px 8px", fontSize:10, color:"white" }}>⛶ Ver</div>
+          </div>
+
+          {/* Info */}
+          <div style={{ padding:"14px 16px" }}>
+            {com.direccion && (
+              <div style={{ display:"flex", alignItems:"flex-start", gap:8, marginBottom:6 }}>
+                <span style={{ fontSize:14, flexShrink:0, marginTop:1 }}>📍</span>
+                <span style={{ fontSize:13, color:C.dark }}>{com.direccion}</span>
+              </div>
+            )}
+            {com.telefono && (
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                <span style={{ fontSize:14, flexShrink:0 }}>📞</span>
+                <a href={`tel:${com.telefono}`} style={{ fontSize:13, color:C.dark, textDecoration:"none" }}>{com.telefono}</a>
+              </div>
+            )}
+            {com.email && (
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                <span style={{ fontSize:14, flexShrink:0 }}>✉️</span>
+                <a href={`mailto:${com.email}`} style={{ fontSize:13, color:"#0ea5e9", textDecoration:"none", wordBreak:"break-all" }}>{com.email}</a>
+              </div>
+            )}
+            {com.descripcion && (
+              <div style={{ fontSize:12, color:C.gray, marginTop:8, lineHeight:1.5, borderTop:`1px solid ${C.border}`, paddingTop:10 }}>{com.descripcion}</div>
+            )}
+
+            {/* Navegación */}
+            {comunidades.length > 1 && (
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:14, paddingTop:12, borderTop:`1px solid ${C.border}` }}>
+                <button onClick={prev} disabled={idx===0} style={{ width:40, height:40, borderRadius:10, border:`1px solid ${idx===0?C.border:"#0ea5e9"}`, background:idx===0?C.light:"#f0f9ff", color:idx===0?C.border:"#0ea5e9", fontSize:20, cursor:idx===0?"default":"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.15s", opacity:idx===0?0.4:1, flexShrink:0 }}>‹</button>
+                <div style={{ flex:1, display:"flex", gap:6, justifyContent:"center" }}>
+                  {comunidades.map((_,i) => (
+                    <div key={i} onClick={() => setIdx(i)} style={{ width:i===idx?20:8, height:8, borderRadius:4, background:i===idx?"#0ea5e9":C.border, cursor:"pointer", transition:"all 0.25s" }} />
+                  ))}
+                </div>
+                <button onClick={next} disabled={idx===comunidades.length-1} style={{ width:40, height:40, borderRadius:10, border:`1px solid ${idx===comunidades.length-1?C.border:"#0ea5e9"}`, background:idx===comunidades.length-1?C.light:"#f0f9ff", color:idx===comunidades.length-1?C.border:"#0ea5e9", fontSize:20, cursor:idx===comunidades.length-1?"default":"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.15s", opacity:idx===comunidades.length-1?0.4:1, flexShrink:0 }}>›</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      {/* Lightbox */}
+      {lightbox && com.foto_url && (
+        <div onClick={() => setLightbox(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.92)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <div style={{ position:"absolute", top:16, right:16, color:"white", fontSize:28, cursor:"pointer" }}>✕</div>
+          <img src={normalizarUrlFoto(com.foto_url)} alt={com.nombre} onClick={e=>e.stopPropagation()} style={{ maxWidth:"95vw", maxHeight:"90vh", borderRadius:12, objectFit:"contain" }} />
+          <div style={{ position:"absolute", bottom:24, left:0, right:0, textAlign:"center", color:"white", fontSize:15, fontWeight:700 }}>{com.nombre}</div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── Admin Comunidades ──────────────────────────────────────────
+function AdminComunidades({ comunidades, onReload }) {
+  const empty = { nombre:"", direccion:"", telefono:"", email:"", descripcion:"", foto_url:"", orden:0 };
+  const [form, setForm] = useState(empty);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [editData, setEditData] = useState(empty);
+  const [uploading, setUploading] = useState(false);
+  const [uploadingEdit, setUploadingEdit] = useState(false);
+  const fileRef = useRef(null);
+  const fileEditRef = useRef(null);
+
+  const inputS = { padding:"8px 12px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:13, outline:"none", width:"100%", boxSizing:"border-box" };
+
+  const sorted = [...comunidades].sort((a,b) => (a.orden??999)-(b.orden??999));
+
+  async function uploadFoto(file, isEdit=false) {
+    const setter = isEdit ? setUploadingEdit : setUploading;
+    setter(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `comunidades/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/fotos/${path}`, {
+        method:"POST", headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${_authToken||SUPABASE_KEY}`, "Content-Type":file.type, "x-upsert":"true" }, body:file
+      });
+      if (!res.ok) throw new Error("Error subiendo");
+      const url = `${SUPABASE_URL}/storage/v1/object/public/fotos/${path}`;
+      if (isEdit) setEditData(d => ({...d, foto_url:url}));
+      else setForm(p => ({...p, foto_url:url}));
+    } catch(e) { alert(e.message); }
+    setter(false);
+  }
+
+  async function submit() {
+    if (!form.nombre) return;
+    setSaving(true);
+    try {
+      await supabase("comunidades", { method:"POST", body:{...form, orden:Number(form.orden)||0} });
+      setForm(empty); setShowForm(false); onReload();
+    } catch(e) { alert(e.message); }
+    setSaving(false);
+  }
+
+  async function saveEdit(id) {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/comunidades?id=eq.${id}`, {
+        method:"PATCH", headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${_authToken||SUPABASE_KEY}`, "Content-Type":"application/json", Prefer:"return=representation" },
+        body:JSON.stringify({...editData, orden:Number(editData.orden)||0})
+      });
+      setEditId(null); onReload();
+    } catch(e) { alert(e.message); }
+  }
+
+  async function del(id) {
+    try { await deleteRecord("comunidades", id); onReload(); } catch(e) { alert(e.message); }
+  }
+
+  function FotoUploader({ value, onChange, uploading, fileRef }) {
+    return (
+      <div style={{ marginBottom:8 }}>
+        <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }} onChange={e => { if(e.target.files[0]) uploadFoto(e.target.files[0], fileRef===fileEditRef); }} />
+        <div style={{ display:"flex", gap:8 }}>
+          <input placeholder="URL de foto" value={value} onChange={e => onChange(e.target.value)} style={{ ...inputS, flex:1 }} />
+          <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ flexShrink:0, padding:"8px 12px", borderRadius:7, border:`1px solid ${C.border}`, background:C.primaryLight, color:C.primary, fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>
+            {uploading?"⏳ Subiendo...":"📁 Subir foto"}
+          </button>
+        </div>
+        {value && <img src={normalizarUrlFoto(value)} alt="preview" onError={e=>e.target.style.display="none"} style={{ width:"100%", maxHeight:140, objectFit:"cover", borderRadius:8, marginTop:8 }} />}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+        <div>
+          <span style={{ fontSize:13, color:C.gray }}>{comunidades.length} comunidades</span>
+          <span style={{ fontSize:11, color:C.gray, marginLeft:8 }}>· Orden menor = aparece primero</span>
+        </div>
+        <Btn onClick={() => setShowForm(p=>!p)}>+ Nueva comunidad</Btn>
+      </div>
+
+      <div style={{ background:C.goldLight, border:`1px solid ${C.gold}40`, borderRadius:8, padding:"8px 12px", fontSize:11, color:C.gray, marginBottom:14 }}>
+        ⚠️ SQL requerido (una vez):<br/>
+        <code style={{ fontFamily:"monospace", fontSize:10 }}>create table if not exists comunidades (id uuid default gen_random_uuid() primary key, nombre text not null, direccion text, telefono text, email text, descripcion text, foto_url text, orden int default 0, created_at timestamptz default now());</code>
+      </div>
+
+      {showForm && (
+        <Card style={{ marginBottom:16, border:`1px solid ${C.primary}40`, background:C.primaryLight }}>
+          <div style={{ fontWeight:600, fontSize:13, color:C.dark, marginBottom:10 }}>Nueva comunidad</div>
+          <input placeholder="Nombre de la comunidad *" value={form.nombre} onChange={e=>setForm(p=>({...p,nombre:e.target.value}))} style={{...inputS,marginBottom:8}} />
+          <FotoUploader value={form.foto_url} onChange={v=>setForm(p=>({...p,foto_url:v}))} uploading={uploading} fileRef={fileRef} />
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8 }}>
+            <input placeholder="Dirección" value={form.direccion} onChange={e=>setForm(p=>({...p,direccion:e.target.value}))} style={inputS} />
+            <input placeholder="Teléfono" value={form.telefono} onChange={e=>setForm(p=>({...p,telefono:e.target.value}))} style={inputS} />
+            <input placeholder="Email" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} style={inputS} />
+            <input type="number" placeholder="Orden" value={form.orden} onChange={e=>setForm(p=>({...p,orden:e.target.value}))} style={inputS} />
+          </div>
+          <textarea placeholder="Descripción" value={form.descripcion} onChange={e=>setForm(p=>({...p,descripcion:e.target.value}))} rows={2} style={{...inputS,resize:"vertical",fontFamily:"Inter,sans-serif",marginBottom:10}} />
+          <div style={{ display:"flex", gap:8 }}>
+            <Btn onClick={submit} disabled={saving}>{saving?"Guardando...":"Guardar"}</Btn>
+            <Btn variant="ghost" onClick={()=>setShowForm(false)}>Cancelar</Btn>
+          </div>
+        </Card>
+      )}
+
+      {sorted.map(c => (
+        <Card key={c.id} style={{ marginBottom:10 }}>
+          {editId===c.id ? (
+            <div>
+              <div style={{ fontWeight:600, fontSize:12, color:C.primary, marginBottom:10 }}>✏️ Editando: {c.nombre}</div>
+              <input placeholder="Nombre *" value={editData.nombre} onChange={e=>setEditData(d=>({...d,nombre:e.target.value}))} style={{...inputS,marginBottom:8}} />
+              <FotoUploader value={editData.foto_url} onChange={v=>setEditData(d=>({...d,foto_url:v}))} uploading={uploadingEdit} fileRef={fileEditRef} />
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8 }}>
+                <input placeholder="Dirección" value={editData.direccion} onChange={e=>setEditData(d=>({...d,direccion:e.target.value}))} style={inputS} />
+                <input placeholder="Teléfono" value={editData.telefono} onChange={e=>setEditData(d=>({...d,telefono:e.target.value}))} style={inputS} />
+                <input placeholder="Email" value={editData.email} onChange={e=>setEditData(d=>({...d,email:e.target.value}))} style={inputS} />
+                <input type="number" placeholder="Orden" value={editData.orden} onChange={e=>setEditData(d=>({...d,orden:e.target.value}))} style={inputS} />
+              </div>
+              <textarea placeholder="Descripción" value={editData.descripcion} onChange={e=>setEditData(d=>({...d,descripcion:e.target.value}))} rows={2} style={{...inputS,resize:"vertical",fontFamily:"Inter,sans-serif",marginBottom:10}} />
+              <div style={{ display:"flex", gap:8 }}>
+                <Btn onClick={()=>saveEdit(c.id)}>💾 Guardar</Btn>
+                <Btn variant="ghost" onClick={()=>setEditId(null)}>Cancelar</Btn>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+              {c.foto_url
+                ? <img src={normalizarUrlFoto(c.foto_url)} alt={c.nombre} style={{ width:56, height:56, objectFit:"cover", borderRadius:10, flexShrink:0 }} />
+                : <div style={{ width:56, height:56, background:"linear-gradient(135deg,#0ea5e9,#2563eb)", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, flexShrink:0 }}>⛪</div>
+              }
+              <div style={{ width:24, height:24, background:"#f0f9ff", border:"1px solid #0ea5e940", borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, color:"#0ea5e9", flexShrink:0 }}>#{c.orden??0}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:600, color:C.dark }}>{c.nombre}</div>
+                {c.direccion && <div style={{ fontSize:11, color:C.gray, marginTop:2 }}>📍 {c.direccion}</div>}
+                {c.email && <div style={{ fontSize:11, color:"#0ea5e9", marginTop:1 }}>✉️ {c.email}</div>}
+              </div>
+              <Btn variant="ghost" style={{ fontSize:11, padding:"5px 10px", color:C.primary }} onClick={()=>{ setEditId(c.id); setEditData({nombre:c.nombre||"",direccion:c.direccion||"",telefono:c.telefono||"",email:c.email||"",descripcion:c.descripcion||"",foto_url:c.foto_url||"",orden:c.orden??0}); }}>✏️ Editar</Btn>
+              <ConfirmBtn onConfirm={()=>del(c.id)} />
+            </div>
+          )}
+        </Card>
+      ))}
+      {comunidades.length===0 && <p style={{ color:C.gray, fontSize:13, textAlign:"center", padding:"20px 0" }}>Sin comunidades aún.</p>}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  ADMIN GALERÍA
 // ═══════════════════════════════════════════════════════════════
@@ -12173,6 +12459,7 @@ function Admin({
   podcasts,
   asistencia,
   fotos,
+  comunidades,
   onReload,
   user,
 }) {
@@ -12317,6 +12604,7 @@ function Admin({
         {tab === "pautas" && <AdminPautasMisa onReload={onReload} />}
         {tab === "asistencia" && <AdminAsistencia members={members} eventos={eventos} asistencia={asistencia} onReload={onReload} />}
         {tab === "galeria" && <AdminGaleria fotos={fotos} onReload={onReload} />}
+        {tab === "comunidades" && <AdminComunidades comunidades={comunidades} onReload={onReload} />}
       </Card>
 
       <SqlSetupBlock />
