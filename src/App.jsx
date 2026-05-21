@@ -2683,6 +2683,18 @@ function extractYTId(input) {
   return null;
 }
 
+
+function normalizarUrlFoto(url) {
+  if (!url) return url;
+  // Google Drive: /file/d/ID/view → uc?export=view&id=ID
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (driveMatch) return `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
+  // Google Drive: open?id=ID
+  const openMatch = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+  if (openMatch) return `https://drive.google.com/uc?export=view&id=${openMatch[1]}`;
+  return url;
+}
+
 // ── Helpers para tabla config en Supabase ────────────────────────────
 async function getConfig(key) {
   try {
@@ -2976,7 +2988,7 @@ function GaleriaWidget({ fotos, setSection, isAdmin }) {
 
         {/* Imagen principal */}
         <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", background: "#000", aspectRatio: "16/9", cursor: "pointer" }} onClick={() => setLightbox(true)}>
-          <img src={foto.url} alt={foto.titulo || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.3s" }} />
+          <img src={normalizarUrlFoto(foto.url)} alt={foto.titulo || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.3s" }} />
           {foto.titulo && (
             <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent,rgba(0,0,0,0.7))", padding: "24px 14px 12px", color: "white" }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{foto.titulo}</div>
@@ -2995,7 +3007,7 @@ function GaleriaWidget({ fotos, setSection, isAdmin }) {
             <div style={{ flex: 1, display: "flex", gap: 6, overflowX: "auto", padding: "2px 0", scrollbarWidth: "none" }}>
               {fotos.map((f, i) => (
                 <div key={f.id} className={`gal-thumb${i===idx?" active":""}`} onClick={() => setIdx(i)} style={{ width: 44, height: 44, flexShrink: 0 }}>
-                  <img src={f.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <img src={normalizarUrlFoto(f.url)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 </div>
               ))}
             </div>
@@ -3011,7 +3023,7 @@ function GaleriaWidget({ fotos, setSection, isAdmin }) {
           <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}>
             {idx > 0 && <button onClick={(e)=>{e.stopPropagation();prev();}} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"white", fontSize:28, cursor:"pointer", borderRadius:10, padding:"8px 14px" }}>‹</button>}
           </div>
-          <img src={foto.url} alt={foto.titulo||""} className="gal-lightbox-img" onClick={e=>e.stopPropagation()} />
+          <img src={normalizarUrlFoto(foto.url)} alt={foto.titulo||""} className="gal-lightbox-img" onClick={e=>e.stopPropagation()} />
           <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)" }}>
             {idx < fotos.length-1 && <button onClick={(e)=>{e.stopPropagation();next();}} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"white", fontSize:28, cursor:"pointer", borderRadius:10, padding:"8px 14px" }}>›</button>}
           </div>
@@ -12069,7 +12081,7 @@ function AdminGaleria({ fotos, onReload }) {
             <input placeholder="Descripción (opcional)" value={form.descripcion} onChange={e => setForm(p => ({...p, descripcion: e.target.value}))} style={inputS} />
             <input type="number" placeholder="Orden" value={form.orden} onChange={e => setForm(p => ({...p, orden: e.target.value}))} style={inputS} title="Orden (menor = primero)" />
           </div>
-          {form.url && <img src={form.url} alt="preview" onError={e => e.target.style.display="none"} style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 8, marginBottom: 8 }} />}
+          {form.url && <img src={normalizarUrlFoto(form.url)} alt="preview" onError={e => e.target.style.display="none"} style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 8, marginBottom: 8 }} />}
           <div style={{ display: "flex", gap: 8 }}>
             <Btn onClick={submit} disabled={saving}>{saving ? "Guardando..." : "Guardar"}</Btn>
             <Btn variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Btn>
@@ -12094,7 +12106,7 @@ function AdminGaleria({ fotos, onReload }) {
             ) : (
               <>
                 <div style={{ position: "relative", aspectRatio: "4/3", borderRadius: 8, overflow: "hidden", background: "#f3f4f6", marginBottom: 8 }}>
-                  <img src={f.url} alt={f.titulo || ""} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <img src={normalizarUrlFoto(f.url)} alt={f.titulo || ""} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   <div style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.5)", color: "white", borderRadius: 6, fontSize: 10, padding: "2px 6px", fontWeight: 700 }}>#{f.orden ?? 0}</div>
                 </div>
                 {f.titulo && <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, marginBottom: 2 }}>{f.titulo}</div>}
