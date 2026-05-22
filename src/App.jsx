@@ -1886,7 +1886,7 @@ export default function App() {
                 <Podcast podcasts={podcasts} onReload={loadData} user={user} />
               )}
               {section === "videos" && <Videos />}
-              {section === "cancionero" && <Cancionero />}
+              {section === "cancionero" && <Cancionero user={user} />}
               {section === "asistencia" && (
                 <Asistencia
                   asistencia={asistencia}
@@ -6700,79 +6700,982 @@ function Videos() {
   );
 }
 
-function Cancionero() {
+// ══════════════════════════════════════════════════════════════════
+//  CANCIONERO DIGITAL — constantes y helpers
+// ══════════════════════════════════════════════════════════════════
+
+const MOMENTOS_LITURGICOS = [
+  { id: "entrada",       label: "Canto de Entrada",         color: "#1D9E75", icon: "🚪" },
+  { id: "acto_penit",   label: "Acto Penitencial / Kyrie",  color: "#8b5cf6", icon: "🙏" },
+  { id: "gloria",       label: "Gloria",                    color: "#B8922A", icon: "✨" },
+  { id: "salmo",        label: "Salmo Responsorial",        color: "#3b82f6", icon: "📖" },
+  { id: "aleluya",      label: "Aleluya / Aclamación",      color: "#f59e0b", icon: "🎶" },
+  { id: "ofertorio",    label: "Ofertorio",                 color: "#ef4444", icon: "🍞" },
+  { id: "santo",        label: "Santo",                     color: "#ec4899", icon: "⭐" },
+  { id: "paz",          label: "Rito de la Paz",            color: "#06b6d4", icon: "🕊️" },
+  { id: "comunion",     label: "Comunión",                  color: "#1D9E75", icon: "💫" },
+  { id: "accion",       label: "Acción de Gracias",         color: "#8b5cf6", icon: "🙌" },
+  { id: "salida",       label: "Canto de Salida",           color: "#6b7280", icon: "🚶" },
+];
+
+const NOTAS_CROMATICAS = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+
+function transponerAcorde(acorde, semis) {
+  if (!acorde || semis === 0) return acorde;
+  const flatMap = { Db:"C#", Eb:"D#", Fb:"E", Gb:"F#", Ab:"G#", Bb:"A#", Cb:"B" };
+  const regex = /^([A-G][#b]?)(.*)/;
+  const m = acorde.match(regex);
+  if (!m) return acorde;
+  const rawNote = m[1];
+  const suffix  = m[2];
+  const normalizado = flatMap[rawNote] || rawNote;
+  const idx = NOTAS_CROMATICAS.indexOf(normalizado);
+  if (idx === -1) return acorde;
+  const newIdx = ((idx + semis) % 12 + 12) % 12;
+  return NOTAS_CROMATICAS[newIdx] + suffix;
+}
+
+function transponerLinea(linea, semis) {
+  // Detecta si la línea es de acordes: >= 50% de tokens son acordes
+  if (semis === 0) return linea;
+  const tokens = linea.trim().split(/\s+/);
+  if (tokens.length === 0) return linea;
+  const acordeRe = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add)?\d*(\/[A-G][#b]?)?$/;
+  const contAcordes = tokens.filter(t => acordeRe.test(t)).length;
+  if (contAcordes / tokens.length < 0.5) return linea;
+  return tokens.map(t => acordeRe.test(t) ? transponerAcorde(t, semis) : t).join(" ");
+}
+
+function transponerTextoCompleto(texto, semis) {
+  if (!texto || semis === 0) return texto;
+  return texto.split("\n").map(l => transponerLinea(l, semis)).join("\n");
+}
+
+function drivePreviewUrl(url) {
+  if (!url) return "";
+  // Convertir cualquier variante de URL de Drive a preview embebible
+  return url
+    .replace(/\/view(\?.*)?$/, "/preview")
+    .replace(/\/edit(\?.*)?$/, "/preview");
+}
+
+// ── Componente QR pequeño usando api.qrserver.com (gratis, sin clave) ──
+function QRImg({ data, size = 120, borderColor = "#1a3a2a" }) {
+  if (!data) return null;
+  const src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}&color=1a3a2a&bgcolor=ffffff&margin=8`;
   return (
-    <div style={{ maxWidth: 700 }}>
-      <SectionTitle
-        title="Cancionero"
-        subtitle="Acceso al repertorio completo"
-      />
-      <div
-        className="grid-2"
-        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
-      >
-        {[
-          {
-            titulo: "Cancionero Digital",
-            desc: "Letras, acordes e interactivo en línea",
-            emoji: "🌐",
-            color: C.primary,
-            label: "Abrir ahora",
-            href: "#",
-          },
-          {
-            titulo: "Cancionero PDF",
-            desc: "Versión completa para imprimir",
-            emoji: "📄",
-            color: C.danger,
-            label: "Ver PDF",
-            href: "https://drive.google.com/file/d/1reZwCTC6mMJM2Rb1gEnUtYFkmNxijO0e/view?usp=drive_link",
-          },
-        ].map((c, i) => (
-          <Card key={i} style={{ textAlign: "center", padding: 24 }}>
-            <div style={{ fontSize: 44, marginBottom: 12 }}>{c.emoji}</div>
-            <div
-              style={{
-                fontFamily: "'Poppins',sans-serif",
-                fontSize: 15,
-                fontWeight: 600,
-                color: C.dark,
-                marginBottom: 8,
-              }}
-            >
-              {c.titulo}
+    <div style={{
+      background: "white", borderRadius: 10, padding: 6,
+      border: `2px solid ${borderColor}`,
+      boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+      display: "inline-block",
+    }}>
+      <img src={src} alt="QR" width={size} height={size} style={{ display: "block", borderRadius: 4 }} />
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  CANCIONERO — Componente principal
+// ══════════════════════════════════════════════════════════════════
+function Cancionero({ user }) {
+  const isAdmin = user?.cuerda === "Admin";
+
+  // Vista activa: "biblioteca" | "visor" | "nueva_cancion" | "pautas" | "nueva_pauta" | "ver_pauta"
+  const [vista, setVista] = useState("biblioteca");
+
+  // Datos
+  const [canciones, setCanciones]   = useState([]);
+  const [pautas, setPautas]         = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState("");
+
+  // Ítem activo
+  const [cancionActiva, setCancionActiva] = useState(null);
+  const [pautaActiva, setPautaActiva]     = useState(null);
+
+  useEffect(() => { cargar(); }, []);
+
+  async function cargar() {
+    setLoading(true);
+    setError("");
+    try {
+      const [c, p] = await Promise.all([
+        supabase("cancionero_canciones", { order: "&order=nombre.asc" }).catch(() => []),
+        supabase("cancionero_pautas",    { order: "&order=fecha.desc" }).catch(() => []),
+      ]);
+      setCanciones(Array.isArray(c) ? c : []);
+      setPautas(Array.isArray(p) ? p : []);
+    } catch (e) {
+      setError("Error al cargar el cancionero: " + e.message);
+    }
+    setLoading(false);
+  }
+
+  function abrirVisor(cancion) { setCancionActiva(cancion); setVista("visor"); }
+  function abrirPauta(pauta)   { setPautaActiva(pauta);     setVista("ver_pauta"); }
+
+  const TAB_ITEMS = [
+    { id: "biblioteca", icon: "🎵", label: "Biblioteca" },
+    { id: "pautas",     icon: "📋", label: "Pautas de Misa" },
+    ...(isAdmin ? [{ id: "nueva_cancion", icon: "➕", label: "Agregar Canción" }] : []),
+  ];
+
+  const enSubvista = ["visor","nueva_cancion","nueva_pauta","ver_pauta"].includes(vista);
+
+  return (
+    <div style={{ maxWidth: 1100 }}>
+      {/* ── Encabezado ── */}
+      <div style={{
+        background: `linear-gradient(135deg,${C.primaryDark},${C.primary})`,
+        borderRadius: 16, padding: "20px 24px", marginBottom: 20,
+        display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap",
+      }}>
+        <div style={{
+          width: 52, height: 52, background: "rgba(255,255,255,0.2)", borderRadius: 14,
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, flexShrink: 0,
+        }}>🎼</div>
+        <div>
+          <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 20, fontWeight: 700, color: "white" }}>
+            Cancionero Digital
+          </div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)" }}>
+            Letras · Acordes · Pautas de Misa · QR
+          </div>
+        </div>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          {[{ n: canciones.length, l: "Canciones" }, { n: pautas.length, l: "Pautas" }].map((s, i) => (
+            <div key={i} style={{ background: "rgba(255,255,255,0.2)", borderRadius: 10, padding: "8px 14px", textAlign: "center" }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "white", lineHeight: 1 }}>{s.n}</div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.85)", marginTop: 2 }}>{s.l}</div>
             </div>
-            <p
-              style={{
-                fontSize: 12,
-                color: C.gray,
-                marginBottom: 18,
-                lineHeight: 1.6,
-              }}
-            >
-              {c.desc}
-            </p>
-            <a
-              href={c.href}
-              target="_blank"
-              rel="noopener"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "10px 20px",
-                background: c.color,
-                borderRadius: 8,
-                color: "white",
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              {c.label}
-            </a>
-          </Card>
-        ))}
+          ))}
+        </div>
       </div>
+
+      {/* ── Tabs (solo en vistas principales) ── */}
+      {!enSubvista && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 20, overflowX: "auto", paddingBottom: 4 }}>
+          {TAB_ITEMS.map(t => (
+            <button key={t.id} onClick={() => setVista(t.id)} style={{
+              padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: vista === t.id ? 600 : 400, whiteSpace: "nowrap",
+              background: vista === t.id ? C.primary : "transparent",
+              color: vista === t.id ? "white" : C.gray, transition: "all 0.15s",
+            }}>{t.icon} {t.label}</button>
+          ))}
+          {isAdmin && vista === "pautas" && (
+            <button onClick={() => setVista("nueva_pauta")} style={{
+              marginLeft: "auto", padding: "8px 18px", borderRadius: 8, border: `1px solid ${C.primary}`,
+              background: C.primaryLight, color: C.primaryDark, fontSize: 13, fontWeight: 600, cursor: "pointer",
+            }}>📋 Nueva Pauta</button>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <div style={{ background: "#fee2e2", color: "#b91c1c", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13 }}>
+          ⚠️ {error}
+        </div>
+      )}
+
+      {loading ? <Spinner /> : (
+        <>
+          {vista === "biblioteca"    && <CancioneroBiblioteca canciones={canciones} isAdmin={isAdmin} onAbrir={abrirVisor} onReload={cargar} />}
+          {vista === "visor"         && <CancioneroVisor cancion={cancionActiva} isAdmin={isAdmin} onVolver={() => setVista("biblioteca")} onReload={cargar} />}
+          {vista === "nueva_cancion" && <CancioneroFormCancion onGuardado={() => { cargar(); setVista("biblioteca"); }} onCancelar={() => setVista("biblioteca")} />}
+          {vista === "pautas"        && <CancioneroPautas pautas={pautas} canciones={canciones} isAdmin={isAdmin} onAbrir={abrirPauta} onNueva={() => setVista("nueva_pauta")} onReload={cargar} />}
+          {vista === "nueva_pauta"   && <CancioneroFormPauta canciones={canciones} onGuardado={() => { cargar(); setVista("pautas"); }} onCancelar={() => setVista("pautas")} />}
+          {vista === "ver_pauta"     && <CancioneroDetallePauta pauta={pautaActiva} canciones={canciones} isAdmin={isAdmin} onVolver={() => setVista("pautas")} onReload={cargar} />}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+//  BIBLIOTECA
+// ══════════════════════════════════════════
+function CancioneroBiblioteca({ canciones, isAdmin, onAbrir, onReload }) {
+  const [busqueda, setBusqueda]   = useState("");
+  const [filtroMom, setFiltroMom] = useState("");
+  const [deleting, setDeleting]   = useState(null);
+
+  const filtradas = canciones.filter(c => {
+    const ok1 = !busqueda || c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+                (c.artista || "").toLowerCase().includes(busqueda.toLowerCase());
+    const ok2 = !filtroMom || (c.momentos || []).includes(filtroMom);
+    return ok1 && ok2;
+  });
+
+  async function eliminar(id) {
+    if (!confirm("¿Eliminar esta canción del cancionero?")) return;
+    setDeleting(id);
+    try {
+      await deleteRecord("cancionero_canciones", id);
+      onReload();
+    } catch (e) { alert("Error: " + e.message); }
+    setDeleting(null);
+  }
+
+  if (canciones.length === 0) return (
+    <Card style={{ textAlign: "center", padding: 48 }}>
+      <div style={{ fontSize: 52, marginBottom: 16 }}>🎵</div>
+      <div style={{ fontSize: 16, fontWeight: 600, color: C.dark, marginBottom: 8 }}>El cancionero está vacío</div>
+      <p style={{ fontSize: 13, color: C.gray, lineHeight: 1.7 }}>
+        {isAdmin ? "Usa la pestaña ➕ Agregar Canción para subir letras desde Google Drive." : "El administrador aún no ha cargado canciones."}
+      </p>
+    </Card>
+  );
+
+  return (
+    <div>
+      {/* Barra de búsqueda + filtro */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 200,
+          background: C.white, borderRadius: 8, padding: "8px 12px", border: `1px solid ${C.border}`,
+        }}>
+          <span style={{ color: C.gray, fontSize: 14 }}>🔍</span>
+          <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
+            placeholder="Buscar canción o artista…"
+            style={{ border: "none", outline: "none", fontSize: 13, width: "100%", color: C.dark, background: "none" }} />
+        </div>
+        <select value={filtroMom} onChange={e => setFiltroMom(e.target.value)} style={{
+          padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`,
+          fontSize: 13, color: C.dark, background: C.white, cursor: "pointer",
+        }}>
+          <option value="">Todos los momentos</option>
+          {MOMENTOS_LITURGICOS.map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
+        </select>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
+        {filtradas.map(c => {
+          const momentos = c.momentos || [];
+          return (
+            <Card key={c.id} hover style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+              {/* Cabecera */}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                  background: C.primaryLight, display: "flex", alignItems: "center",
+                  justifyContent: "center", fontSize: 22,
+                }}>🎵</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, lineHeight: 1.3,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {c.nombre}
+                  </div>
+                  {c.artista && <div style={{ fontSize: 12, color: C.gray, marginTop: 2 }}>{c.artista}</div>}
+                  {c.tono_base && <div style={{ fontSize: 11, color: C.primary, fontWeight: 600, marginTop: 2 }}>Tono: {c.tono_base}</div>}
+                </div>
+              </div>
+
+              {/* Etiquetas litúrgicas */}
+              {momentos.length > 0 && (
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {momentos.slice(0,3).map(mid => {
+                    const mom = MOMENTOS_LITURGICOS.find(m => m.id === mid);
+                    return mom ? (
+                      <span key={mid} style={{
+                        fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 12,
+                        background: mom.color + "18", color: mom.color, border: `1px solid ${mom.color}30`,
+                      }}>{mom.icon} {mom.label.split(" ")[0]}</span>
+                    ) : null;
+                  })}
+                  {momentos.length > 3 && <span style={{ fontSize: 10, color: C.gray }}>+{momentos.length - 3}</span>}
+                </div>
+              )}
+
+              {/* Acciones */}
+              <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
+                <button onClick={() => onAbrir(c)} style={{
+                  flex: 1, padding: "7px 0", borderRadius: 7, border: "none",
+                  background: C.primary, color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                }}>📄 Ver letra</button>
+                {c.drive_url && (
+                  <a href={c.drive_url} target="_blank" rel="noopener" style={{
+                    padding: "7px 10px", borderRadius: 7, border: `1px solid ${C.border}`,
+                    background: C.light, color: C.gray, fontSize: 12, cursor: "pointer", textDecoration: "none",
+                  }}>☁️</a>
+                )}
+                {isAdmin && (
+                  <button onClick={() => eliminar(c.id)} disabled={deleting === c.id} style={{
+                    padding: "7px 10px", borderRadius: 7, border: "none",
+                    background: "#fee2e2", color: C.danger, fontSize: 12, cursor: "pointer",
+                  }}>{deleting === c.id ? "…" : "🗑"}</button>
+                )}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      {filtradas.length === 0 && (
+        <div style={{ textAlign: "center", padding: "30px 0", color: C.gray, fontSize: 13 }}>
+          No se encontraron canciones con ese filtro.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+//  VISOR DE CANCIÓN + TRANSPOSITOR
+// ══════════════════════════════════════════
+function CancioneroVisor({ cancion, isAdmin, onVolver, onReload }) {
+  const [semis, setSemis]           = useState(0);
+  const [modoPDF, setModoPDF]       = useState(true);
+  const [textoLetra, setTextoLetra] = useState(cancion?.letra_texto || "");
+  const [asignando, setAsignando]   = useState(false);
+  const [momsSel, setMomsSel]       = useState(cancion?.momentos || []);
+  const [guardando, setGuardando]   = useState(false);
+  const [msg, setMsg]               = useState("");
+
+  const tonoBase  = cancion?.tono_base || "C";
+  const idxBase   = NOTAS_CROMATICAS.indexOf(tonoBase);
+  const tonoActual = idxBase === -1 ? tonoBase : NOTAS_CROMATICAS[((idxBase + semis) % 12 + 12) % 12];
+
+  const previewUrl = drivePreviewUrl(cancion?.drive_url || "");
+  const letraTranspuesta = transponerTextoCompleto(textoLetra, semis);
+
+  async function guardarMomentos() {
+    setGuardando(true);
+    setMsg("");
+    try {
+      await updateRecord("cancionero_canciones", cancion.id, { momentos: momsSel });
+      setMsg("✅ Momentos guardados.");
+      await onReload();
+    } catch (e) { setMsg("Error: " + e.message); }
+    setGuardando(false);
+  }
+
+  async function guardarLetra() {
+    try {
+      await updateRecord("cancionero_canciones", cancion.id, { letra_texto: textoLetra });
+      setMsg("✅ Letra guardada.");
+      await onReload();
+    } catch (e) { setMsg("Error: " + e.message); }
+  }
+
+  const inpStyle = { border: "none", outline: "none", background: "none", fontSize: 13, cursor: "pointer" };
+
+  return (
+    <div>
+      {/* ── Barra superior del visor ── */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
+        padding: "12px 16px", background: C.white, borderRadius: 12,
+        border: `1px solid ${C.border}`, flexWrap: "wrap",
+      }}>
+        <button onClick={onVolver} style={{
+          background: C.light, border: `1px solid ${C.border}`, borderRadius: 8,
+          padding: "7px 12px", cursor: "pointer", fontSize: 13, color: C.gray,
+          display: "flex", alignItems: "center", gap: 5,
+        }}>← Volver</button>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 15, fontWeight: 700, color: C.dark,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cancion?.nombre}</div>
+          {cancion?.artista && <div style={{ fontSize: 12, color: C.gray }}>{cancion.artista}</div>}
+        </div>
+
+        {/* Transpositor */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 6,
+          background: C.primaryLight, borderRadius: 10, padding: "6px 12px",
+          border: `1px solid ${C.primary}30`,
+        }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: C.primaryDark }}>Tono:</span>
+          <button onClick={() => setSemis(s => s - 1)} style={{
+            width: 26, height: 26, borderRadius: 6, border: `1px solid ${C.primary}50`,
+            background: C.white, cursor: "pointer", color: C.primary, fontSize: 15, fontWeight: 700,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>−</button>
+          <span style={{ fontSize: 15, fontWeight: 800, color: C.primary, minWidth: 34, textAlign: "center" }}>
+            {tonoActual}
+            {semis !== 0 && <span style={{ fontSize: 10, color: C.gray, fontWeight: 400 }}> ({semis > 0 ? "+" : ""}{semis})</span>}
+          </span>
+          <button onClick={() => setSemis(s => s + 1)} style={{
+            width: 26, height: 26, borderRadius: 6, border: `1px solid ${C.primary}50`,
+            background: C.white, cursor: "pointer", color: C.primary, fontSize: 15, fontWeight: 700,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>+</button>
+          {semis !== 0 && (
+            <button onClick={() => setSemis(0)} style={{
+              fontSize: 10, padding: "2px 7px", borderRadius: 5, border: "none",
+              background: C.primary + "20", color: C.primary, cursor: "pointer",
+            }}>Reset</button>
+          )}
+        </div>
+
+        {/* Toggle PDF / Texto */}
+        <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}` }}>
+          {[["PDF","📄"],["Texto","📝"]].map(([lbl, ico]) => (
+            <button key={lbl} onClick={() => setModoPDF(lbl === "PDF")} style={{
+              padding: "7px 13px", border: "none", cursor: "pointer", fontSize: 12,
+              background: (lbl === "PDF") === modoPDF ? C.primary : C.white,
+              color: (lbl === "PDF") === modoPDF ? "white" : C.gray, fontWeight: 500,
+            }}>{ico} {lbl}</button>
+          ))}
+        </div>
+
+        {isAdmin && (
+          <button onClick={() => setAsignando(!asignando)} style={{
+            padding: "7px 13px", borderRadius: 8, border: `1px solid ${C.primary}`,
+            background: asignando ? C.primary : C.white,
+            color: asignando ? "white" : C.primary, fontSize: 12, cursor: "pointer", fontWeight: 600,
+          }}>⛪ {asignando ? "Cerrar" : "Asignar momentos"}</button>
+        )}
+      </div>
+
+      {msg && (
+        <div style={{
+          background: msg.startsWith("✅") ? "#d1fae5" : "#fee2e2",
+          color: msg.startsWith("✅") ? "#065f46" : "#b91c1c",
+          borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 12,
+        }}>{msg}</div>
+      )}
+
+      {/* ── Panel asignación litúrgica ── */}
+      {asignando && isAdmin && (
+        <Card style={{ marginBottom: 14, padding: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.dark, marginBottom: 12 }}>
+            ⛪ Selecciona en qué momentos litúrgicos se usa esta canción:
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(210px,1fr))", gap: 8, marginBottom: 14 }}>
+            {MOMENTOS_LITURGICOS.map(m => (
+              <label key={m.id} style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "8px 12px",
+                borderRadius: 8, border: `1px solid ${momsSel.includes(m.id) ? m.color : C.border}`,
+                background: momsSel.includes(m.id) ? m.color + "12" : C.white,
+                cursor: "pointer", transition: "all 0.15s",
+              }}>
+                <input type="checkbox" checked={momsSel.includes(m.id)}
+                  onChange={() => setMomsSel(p => p.includes(m.id) ? p.filter(x => x !== m.id) : [...p, m.id])}
+                  style={{ accentColor: m.color }} />
+                <span style={{ fontSize: 14 }}>{m.icon}</span>
+                <span style={{ fontSize: 12, color: C.dark, fontWeight: momsSel.includes(m.id) ? 600 : 400 }}>{m.label}</span>
+              </label>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn onClick={guardarMomentos} disabled={guardando}>{guardando ? "Guardando…" : "💾 Guardar asignación"}</Btn>
+            <Btn variant="ghost" onClick={() => setAsignando(false)}>Cancelar</Btn>
+          </div>
+        </Card>
+      )}
+
+      {/* ── Visor PDF ── */}
+      {modoPDF && (
+        <Card style={{ padding: 0, overflow: "hidden", minHeight: 620 }}>
+          {previewUrl ? (
+            <iframe src={previewUrl} style={{ width: "100%", height: 680, border: "none", display: "block" }}
+              title={cancion?.nombre} allow="autoplay" />
+          ) : (
+            <div style={{ padding: 48, textAlign: "center", color: C.gray }}>
+              <div style={{ fontSize: 44, marginBottom: 12 }}>📄</div>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Sin URL de Google Drive</div>
+              <p style={{ fontSize: 13 }}>Esta canción no tiene un PDF asociado. Cambia a la pestaña Texto para editar la letra.</p>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* ── Visor Texto / Acordes ── */}
+      {!modoPDF && (
+        <Card style={{ padding: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.gray }}>
+              📝 Letra con acordes
+              {semis !== 0 && <span style={{ color: C.primary }}> · Transpuesta {semis > 0 ? "+" : ""}{semis} semitonos → Tono {tonoActual}</span>}
+            </div>
+            {isAdmin && <Btn onClick={guardarLetra} style={{ fontSize: 12, padding: "5px 12px" }}>💾 Guardar letra</Btn>}
+          </div>
+
+          {isAdmin ? (
+            <textarea value={textoLetra} onChange={e => setTextoLetra(e.target.value)}
+              placeholder={"Pega aquí la letra con acordes encima de cada sílaba.\nEjemplo:\n\n Am        G\n Señor ten piedad\n      F          Em\n Cristo ten piedad\n\nLas líneas que son mayormente acordes se transpondrán automáticamente."}
+              style={{
+                width: "100%", minHeight: 400, padding: "14px 16px",
+                border: `1px solid ${C.border}`, borderRadius: 10,
+                fontSize: 13, fontFamily: "monospace", lineHeight: 1.8,
+                color: C.dark, background: C.light, resize: "vertical", outline: "none",
+              }} />
+          ) : (
+            <pre style={{
+              background: C.light, borderRadius: 10, padding: "14px 16px",
+              fontSize: 13, fontFamily: "monospace", lineHeight: 1.9, color: C.dark,
+              whiteSpace: "pre-wrap", border: `1px solid ${C.border}`, minHeight: 200,
+            }}>
+              {letraTranspuesta || <span style={{ color: C.gray, fontStyle: "italic" }}>Sin letra cargada aún.</span>}
+            </pre>
+          )}
+
+          {/* Preview transpuesto cuando el admin edita */}
+          {isAdmin && textoLetra && semis !== 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: C.primary, marginBottom: 8 }}>
+                🎵 Vista previa transpuesta (tono {tonoActual}):
+              </div>
+              <pre style={{
+                background: C.primaryLight, borderRadius: 10, padding: "14px 16px",
+                fontSize: 13, fontFamily: "monospace", lineHeight: 1.9, color: C.dark,
+                whiteSpace: "pre-wrap", border: `1px solid ${C.primary}30`,
+              }}>{letraTranspuesta}</pre>
+            </div>
+          )}
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+//  FORMULARIO: AGREGAR CANCIÓN
+// ══════════════════════════════════════════
+function CancioneroFormCancion({ onGuardado, onCancelar }) {
+  const [form, setForm] = useState({ nombre: "", artista: "", drive_url: "", tono_base: "C", momentos: [], letra_texto: "" });
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  const inp = {
+    width: "100%", padding: "9px 12px", borderRadius: 8,
+    border: `1px solid ${C.border}`, fontSize: 13, color: C.dark,
+    background: C.white, outline: "none", marginBottom: 10,
+  };
+
+  async function guardar() {
+    if (!form.nombre.trim())     return setError("El nombre es obligatorio.");
+    if (!form.drive_url.trim())  return setError("La URL de Google Drive es obligatoria.");
+    setError(""); setGuardando(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/cancionero_canciones`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+          "Content-Type": "application/json", Prefer: "return=representation",
+        },
+        body: JSON.stringify({
+          nombre: form.nombre.trim(), artista: form.artista.trim(),
+          drive_url: form.drive_url.trim(), tono_base: form.tono_base,
+          momentos: form.momentos, letra_texto: form.letra_texto,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      onGuardado();
+    } catch (e) { setError("Error al guardar: " + e.message); }
+    setGuardando(false);
+  }
+
+  return (
+    <Card style={{ maxWidth: 620 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: C.dark, marginBottom: 18 }}>🎵 Agregar canción</div>
+      <input placeholder="Nombre de la canción *" value={form.nombre}
+        onChange={e => setForm(p => ({...p, nombre: e.target.value}))} style={inp} />
+      <input placeholder="Artista / compositor" value={form.artista}
+        onChange={e => setForm(p => ({...p, artista: e.target.value}))} style={inp} />
+      <input placeholder="URL de Google Drive (PDF) *" value={form.drive_url}
+        onChange={e => setForm(p => ({...p, drive_url: e.target.value}))} style={inp} />
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
+        <label style={{ fontSize: 13, color: C.gray, flexShrink: 0 }}>Tono base:</label>
+        <select value={form.tono_base} onChange={e => setForm(p => ({...p, tono_base: e.target.value}))}
+          style={{ ...inp, width: "auto", marginBottom: 0 }}>
+          {NOTAS_CROMATICAS.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, marginBottom: 8 }}>Momentos litúrgicos (opcional):</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          {MOMENTOS_LITURGICOS.map(m => (
+            <label key={m.id} style={{
+              display: "flex", alignItems: "center", gap: 7, padding: "7px 10px",
+              borderRadius: 7, border: `1px solid ${form.momentos.includes(m.id) ? m.color : C.border}`,
+              background: form.momentos.includes(m.id) ? m.color + "12" : C.white,
+              cursor: "pointer", fontSize: 11,
+            }}>
+              <input type="checkbox" checked={form.momentos.includes(m.id)}
+                onChange={() => setForm(p => ({...p, momentos: p.momentos.includes(m.id) ? p.momentos.filter(x => x !== m.id) : [...p.momentos, m.id]}))}
+                style={{ accentColor: m.color }} />
+              {m.icon} {m.label}
+            </label>
+          ))}
+        </div>
+      </div>
+      <textarea placeholder={"Letra con acordes (opcional)\n\n Am       G\n Señor ten piedad…"}
+        value={form.letra_texto} onChange={e => setForm(p => ({...p, letra_texto: e.target.value}))}
+        style={{ ...inp, minHeight: 140, fontFamily: "monospace", lineHeight: 1.7, resize: "vertical", marginBottom: 14 }} />
+      {error && <div style={{ color: C.danger, fontSize: 12, marginBottom: 10 }}>⚠️ {error}</div>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <Btn onClick={guardar} disabled={guardando}>{guardando ? "Guardando…" : "💾 Guardar canción"}</Btn>
+        <Btn variant="ghost" onClick={onCancelar}>Cancelar</Btn>
+      </div>
+      <div style={{ marginTop: 14, padding: "12px 14px", background: C.primaryLight, borderRadius: 8, fontSize: 12, color: C.primaryDark }}>
+        💡 <strong>Tip URL de Google Drive:</strong> Abre el PDF en Drive → clic derecho → "Obtener enlace" → Copiar. Acepta cualquier variante de URL (/view, /edit, /preview).
+      </div>
+    </Card>
+  );
+}
+
+// ══════════════════════════════════════════
+//  LISTA DE PAUTAS
+// ══════════════════════════════════════════
+function CancioneroPautas({ pautas, canciones, isAdmin, onAbrir, onNueva, onReload }) {
+  return (
+    <div>
+      {pautas.length === 0 ? (
+        <Card style={{ textAlign: "center", padding: 48 }}>
+          <div style={{ fontSize: 52, marginBottom: 16 }}>📋</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: C.dark, marginBottom: 8 }}>Sin pautas de misa</div>
+          <p style={{ fontSize: 13, color: C.gray }}>
+            {isAdmin ? "Usa el botón «Nueva Pauta» para crear la primera." : "El administrador aún no ha creado pautas."}
+          </p>
+        </Card>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 14 }}>
+          {pautas.map(p => <CancioneroPautaCard key={p.id} pauta={p} canciones={canciones} isAdmin={isAdmin} onAbrir={onAbrir} onReload={onReload} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CancioneroPautaCard({ pauta, canciones, isAdmin, onAbrir, onReload }) {
+  const asigs = (() => { try { return typeof pauta.asignaciones === "string" ? JSON.parse(pauta.asignaciones) : (pauta.asignaciones || []); } catch { return []; } })();
+  const fecha = pauta.fecha ? new Date(pauta.fecha + "T00:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "";
+
+  async function eliminar() {
+    if (!confirm(`¿Eliminar la pauta "${pauta.titulo}"?`)) return;
+    try { await deleteRecord("cancionero_pautas", pauta.id); onReload(); }
+    catch (e) { alert("Error: " + e.message); }
+  }
+
+  return (
+    <Card hover style={{ padding: 16 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 10, background: C.primaryLight,
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🎼</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.dark, lineHeight: 1.3 }}>{pauta.titulo}</div>
+          {fecha && <div style={{ fontSize: 11, color: C.gray, marginTop: 2, textTransform: "capitalize" }}>{fecha}</div>}
+          {pauta.comunidad && <div style={{ fontSize: 11, color: C.primary, fontWeight: 500, marginTop: 2 }}>⛪ {pauta.comunidad}</div>}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 12 }}>
+        {asigs.slice(0,5).map((a, i) => {
+          const mom = MOMENTOS_LITURGICOS.find(m => m.id === a.momento);
+          return mom ? <span key={i} style={{ fontSize: 10, padding: "2px 7px", borderRadius: 10, background: mom.color + "18", color: mom.color, fontWeight: 600 }}>{mom.icon}</span> : null;
+        })}
+        {asigs.length > 5 && <span style={{ fontSize: 10, color: C.gray }}>+{asigs.length - 5}</span>}
+      </div>
+      <div style={{ display: "flex", gap: 6 }}>
+        <button onClick={() => onAbrir(pauta)} style={{
+          flex: 1, padding: "7px 0", borderRadius: 7, border: "none",
+          background: C.primary, color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
+        }}>📋 Ver pauta</button>
+        {isAdmin && <button onClick={eliminar} style={{ padding: "7px 10px", borderRadius: 7, border: "none", background: "#fee2e2", color: C.danger, fontSize: 12, cursor: "pointer" }}>🗑</button>}
+      </div>
+    </Card>
+  );
+}
+
+// ══════════════════════════════════════════
+//  DETALLE DE PAUTA + QR
+// ══════════════════════════════════════════
+function CancioneroDetallePauta({ pauta, canciones, isAdmin, onVolver, onReload }) {
+  const asigs = (() => { try { return typeof pauta?.asignaciones === "string" ? JSON.parse(pauta.asignaciones) : (pauta?.asignaciones || []); } catch { return []; } })();
+  const fecha = pauta?.fecha ? new Date(pauta.fecha + "T00:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "";
+  const qrLink = `${window.location.origin}${window.location.pathname}?cancionero_pauta=${pauta?.id}`;
+
+  function getNombreCancion(id) {
+    const c = canciones.find(x => x.id === id);
+    return c ? c.nombre : "(sin canción)";
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <button onClick={onVolver} style={{
+          background: C.light, border: `1px solid ${C.border}`, borderRadius: 8,
+          padding: "7px 12px", cursor: "pointer", fontSize: 13, color: C.gray,
+        }}>← Volver</button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 17, fontWeight: 700, color: C.dark }}>{pauta?.titulo}</div>
+          {fecha && <div style={{ fontSize: 12, color: C.gray, textTransform: "capitalize" }}>{fecha}</div>}
+        </div>
+        <button onClick={() => window.print()} style={{
+          padding: "7px 14px", borderRadius: 8, border: `1px solid ${C.border}`,
+          background: C.white, color: C.dark, fontSize: 12, cursor: "pointer", fontWeight: 500,
+        }}>🖨️ Imprimir</button>
+      </div>
+
+      {/* Layout principal: tabla + QR */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: 16 }}>
+
+        {/* ── Tabla de canciones ── */}
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          {/* Encabezado estilo pauta de misa */}
+          <div style={{ background: "linear-gradient(135deg,#1a3a2a,#2d6a4f)", padding: "18px 22px" }}>
+            <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 18, fontWeight: 700, color: "white" }}>🎼 Pauta de Misa</div>
+            {pauta?.comunidad && <div style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 2 }}>⛪ {pauta.comunidad}</div>}
+            {fecha && <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 2, textTransform: "capitalize" }}>📅 {fecha}</div>}
+            {pauta?.hora && <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 2 }}>🕐 {pauta.hora} hrs</div>}
+          </div>
+
+          {asigs.length === 0 ? (
+            <div style={{ padding: 32, textAlign: "center", color: C.gray, fontSize: 13 }}>Esta pauta no tiene canciones asignadas.</div>
+          ) : (
+            <div>
+              {asigs.map((a, i) => {
+                const mom = MOMENTOS_LITURGICOS.find(m => m.id === a.momento);
+                const nombre = getNombreCancion(a.cancion_id);
+                return (
+                  <div key={i} style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: "12px 22px",
+                    borderBottom: i < asigs.length - 1 ? `1px solid ${C.border}` : "none",
+                    background: i % 2 === 0 ? C.white : "#f8fffe",
+                  }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+                      background: mom?.color + "20" || C.primaryLight,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 12, fontWeight: 700, color: mom?.color || C.primary,
+                    }}>{i + 1}</div>
+                    <div style={{ width: 170, flexShrink: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: mom?.color || C.primary }}>
+                        {mom?.icon} {mom?.label || a.momento}
+                      </div>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.dark,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nombre}</div>
+                      {a.tono && <div style={{ fontSize: 11, color: C.primary, marginTop: 1 }}>Tono: {a.tono}</div>}
+                      {a.notas && <div style={{ fontSize: 11, color: C.gray, marginTop: 1, fontStyle: "italic" }}>{a.notas}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {pauta?.notas_generales && (
+            <div style={{ padding: "12px 22px", borderTop: `1px solid ${C.border}`, background: "#f0fdf4" }}>
+              <div style={{ fontSize: 12, color: C.primaryDark, fontStyle: "italic" }}>📝 {pauta.notas_generales}</div>
+            </div>
+          )}
+        </Card>
+
+        {/* ── Panel QR ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <Card style={{ padding: 20, textAlign: "center" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.dark, marginBottom: 4 }}>📱 Código QR</div>
+            <div style={{ fontSize: 11, color: C.gray, marginBottom: 14, lineHeight: 1.5 }}>
+              Escanea para ver la pauta en el celular
+            </div>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+              <QRImg data={qrLink} size={150} />
+            </div>
+            <div style={{ fontSize: 9, color: C.gray, wordBreak: "break-all", background: C.light, borderRadius: 6, padding: "6px 10px", lineHeight: 1.5 }}>
+              {qrLink}
+            </div>
+            <button onClick={() => navigator.clipboard?.writeText(qrLink).then(() => alert("✅ Link copiado"))} style={{
+              marginTop: 10, width: "100%", padding: 8, borderRadius: 8, border: `1px solid ${C.border}`,
+              background: C.white, fontSize: 12, cursor: "pointer", color: C.gray,
+            }}>📋 Copiar link</button>
+          </Card>
+
+          {/* Resumen de momentos */}
+          <Card style={{ padding: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.dark, marginBottom: 10 }}>Resumen</div>
+            {MOMENTOS_LITURGICOS.map(mom => {
+              const a = asigs.find(x => x.momento === mom.id);
+              const nombre = a ? getNombreCancion(a.cancion_id) : null;
+              return (
+                <div key={mom.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, opacity: a ? 1 : 0.35 }}>
+                  <span style={{ fontSize: 12, flexShrink: 0 }}>{mom.icon}</span>
+                  <span style={{ fontSize: 10, flex: 1, color: a ? C.dark : C.gray, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {nombre || mom.label}
+                  </span>
+                  {a && <span style={{ fontSize: 10, color: C.primary, fontWeight: 700, flexShrink: 0 }}>✓</span>}
+                </div>
+              );
+              function getNombreCancion(id) { const c = canciones.find(x => x.id === id); return c ? c.nombre : "—"; }
+            })}
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+//  FORMULARIO: NUEVA PAUTA DE MISA
+// ══════════════════════════════════════════
+function CancioneroFormPauta({ canciones, onGuardado, onCancelar }) {
+  const [titulo, setTitulo]         = useState("");
+  const [fecha, setFecha]           = useState(new Date().toISOString().split("T")[0]);
+  const [hora, setHora]             = useState("");
+  const [comunidad, setComunidad]   = useState("");
+  const [notasGen, setNotasGen]     = useState("");
+  const [guardando, setGuardando]   = useState(false);
+  const [error, setError]           = useState("");
+
+  // Una asignación por momento litúrgico
+  const [asigs, setAsigs] = useState(
+    MOMENTOS_LITURGICOS.map(m => ({ momento: m.id, cancion_id: "", tono: "", notas: "" }))
+  );
+
+  function setAsig(momentoId, campo, val) {
+    setAsigs(prev => prev.map(a => a.momento === momentoId ? { ...a, [campo]: val } : a));
+  }
+
+  async function guardar() {
+    if (!titulo.trim()) return setError("El título es obligatorio.");
+    if (!fecha)         return setError("La fecha es obligatoria.");
+    const rellenas = asigs.filter(a => a.cancion_id);
+    if (rellenas.length === 0) return setError("Asigna al menos una canción.");
+    setError(""); setGuardando(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/cancionero_pautas`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+          "Content-Type": "application/json", Prefer: "return=representation",
+        },
+        body: JSON.stringify({
+          titulo: titulo.trim(), fecha, hora: hora.trim(),
+          comunidad: comunidad.trim(), notas_generales: notasGen.trim(),
+          asignaciones: JSON.stringify(rellenas),
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      onGuardado();
+    } catch (e) { setError("Error: " + e.message); }
+    setGuardando(false);
+  }
+
+  const inpS = { padding: "9px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, color: C.dark, background: C.white, outline: "none" };
+
+  return (
+    <div style={{ maxWidth: 860 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <button onClick={onCancelar} style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 12px", cursor: "pointer", fontSize: 13, color: C.gray }}>← Volver</button>
+        <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 16, fontWeight: 700, color: C.dark }}>📋 Nueva Pauta de Misa</div>
+      </div>
+
+      {/* Datos generales */}
+      <Card style={{ marginBottom: 14, padding: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 120px 1fr", gap: 10, flexWrap: "wrap" }}>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: C.gray, display: "block", marginBottom: 4 }}>Título *</label>
+            <input value={titulo} onChange={e => setTitulo(e.target.value)} placeholder="Ej: Misa dominical" style={{ ...inpS, width: "100%" }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: C.gray, display: "block", marginBottom: 4 }}>Fecha *</label>
+            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} style={{ ...inpS, width: "100%" }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: C.gray, display: "block", marginBottom: 4 }}>Hora</label>
+            <input type="time" value={hora} onChange={e => setHora(e.target.value)} style={{ ...inpS, width: "100%" }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: C.gray, display: "block", marginBottom: 4 }}>Comunidad / Parroquia</label>
+            <input value={comunidad} onChange={e => setComunidad(e.target.value)} placeholder="Ej: Parroquia San José" style={{ ...inpS, width: "100%" }} />
+          </div>
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <label style={{ fontSize: 11, fontWeight: 600, color: C.gray, display: "block", marginBottom: 4 }}>Notas generales</label>
+          <input value={notasGen} onChange={e => setNotasGen(e.target.value)} placeholder="Ej: Traer cancionero impreso" style={{ ...inpS, width: "100%" }} />
+        </div>
+      </Card>
+
+      {/* Asignación por momento */}
+      <Card style={{ padding: 0, overflow: "hidden", marginBottom: 14 }}>
+        <div style={{ padding: "12px 20px", borderBottom: `1px solid ${C.border}`, background: C.light }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.dark }}>⛪ Asignación por momento litúrgico</div>
+          <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>
+            Selecciona la canción para cada momento. Las canciones marcadas con ★ ya están asignadas a ese momento.
+          </div>
+        </div>
+        {MOMENTOS_LITURGICOS.map((mom, i) => {
+          const a = asigs.find(x => x.momento === mom.id);
+          const cancionesSugeridas = canciones.filter(c => (c.momentos || []).includes(mom.id));
+          const otrasCanc = canciones.filter(c => !(c.momentos || []).includes(mom.id));
+          return (
+            <div key={mom.id} style={{
+              display: "grid", gridTemplateColumns: "190px 1fr 90px",
+              gap: 10, padding: "10px 20px", alignItems: "center",
+              borderBottom: i < MOMENTOS_LITURGICOS.length - 1 ? `1px solid ${C.border}` : "none",
+              background: a?.cancion_id ? mom.color + "06" : "transparent",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 30, height: 30, borderRadius: "50%", flexShrink: 0, background: mom.color + "20",
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{mom.icon}</div>
+                <span style={{ fontSize: 12, fontWeight: 600, color: C.dark }}>{mom.label}</span>
+              </div>
+              <select value={a?.cancion_id || ""} onChange={e => setAsig(mom.id, "cancion_id", e.target.value)}
+                style={{ ...inpS, width: "100%", background: a?.cancion_id ? mom.color + "08" : C.white }}>
+                <option value="">— Sin canción —</option>
+                {cancionesSugeridas.length > 0 && (
+                  <optgroup label="★ Sugeridas para este momento">
+                    {cancionesSugeridas.map(c => <option key={c.id} value={c.id}>{c.nombre}{c.artista ? ` — ${c.artista}` : ""}</option>)}
+                  </optgroup>
+                )}
+                {otrasCanc.length > 0 && (
+                  <optgroup label="Otras canciones">
+                    {otrasCanc.map(c => <option key={c.id} value={c.id}>{c.nombre}{c.artista ? ` — ${c.artista}` : ""}</option>)}
+                  </optgroup>
+                )}
+              </select>
+              <select value={a?.tono || ""} onChange={e => setAsig(mom.id, "tono", e.target.value)}
+                disabled={!a?.cancion_id} style={{ ...inpS, width: "100%", opacity: a?.cancion_id ? 1 : 0.4 }}>
+                <option value="">Tono</option>
+                {NOTAS_CROMATICAS.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+          );
+        })}
+      </Card>
+
+      {error && <div style={{ color: C.danger, fontSize: 12, marginBottom: 10 }}>⚠️ {error}</div>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <Btn onClick={guardar} disabled={guardando}>{guardando ? "Guardando…" : "💾 Guardar Pauta"}</Btn>
+        <Btn variant="ghost" onClick={onCancelar}>Cancelar</Btn>
+      </div>
+
+      {/* Instrucción SQL */}
+      <details style={{ marginTop: 20 }}>
+        <summary style={{ fontSize: 12, color: C.gray, cursor: "pointer" }}>📦 SQL necesario en Supabase (clic para ver)</summary>
+        <pre style={{ marginTop: 8, background: "#1e293b", color: "#e2e8f0", borderRadius: 10, padding: "14px 16px", fontSize: 11, overflowX: "auto", lineHeight: 1.7 }}>{`-- Tabla de canciones del cancionero
+create table if not exists cancionero_canciones (
+  id          uuid primary key default gen_random_uuid(),
+  nombre      text not null,
+  artista     text default '',
+  drive_url   text default '',
+  tono_base   text default 'C',
+  momentos    text[] default '{}',
+  letra_texto text default '',
+  created_at  timestamptz default now()
+);
+alter table cancionero_canciones enable row level security;
+create policy "cancionero_canciones_all" on cancionero_canciones for all using (true);
+
+-- Tabla de pautas del cancionero
+create table if not exists cancionero_pautas (
+  id               uuid primary key default gen_random_uuid(),
+  titulo           text not null,
+  fecha            date not null,
+  hora             text default '',
+  comunidad        text default '',
+  notas_generales  text default '',
+  asignaciones     jsonb default '[]',
+  created_at       timestamptz default now()
+);
+alter table cancionero_pautas enable row level security;
+create policy "cancionero_pautas_all" on cancionero_pautas for all using (true);`}</pre>
+      </details>
     </div>
   );
 }
