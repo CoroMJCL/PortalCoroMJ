@@ -6738,51 +6738,23 @@ const NOTA_LATINA = {
 function notaLatina(nota) { return NOTA_LATINA[nota] || nota; }
 
 // Google Drive Picker (OAuth client-only, sin secreto)
-const GDRIVE_CLIENT_ID = "549816260958-jvbtlvfrt4sdnuodji7o90oamb1nfq9o.apps.googleusercontent.com";
-const GDRIVE_API_KEY   = GCAL_API_KEY; // reutilizamos la misma clave de API pública
+// ID de la carpeta pública de Google Drive con los PDFs del cancionero
+const GDRIVE_FOLDER_ID = "18AqJFgonJlvXh-CxZuKRQC2oXLVK2BjF";
+const GDRIVE_API_KEY   = GCAL_API_KEY;
 
-async function abrirGoogleDrivePicker(callback) {
-  // Cargar gapi si no está disponible
-  await new Promise((resolve, reject) => {
-    if (window.gapi) return resolve();
-    const s = document.createElement("script");
-    s.src = "https://apis.google.com/js/api.js";
-    s.onload = resolve; s.onerror = reject;
-    document.head.appendChild(s);
-  });
-  await new Promise((resolve) => window.gapi.load("picker", resolve));
-
-  // Cargar la librería de Identity Services para obtener token OAuth
-  await new Promise((resolve, reject) => {
-    if (window.google?.accounts) return resolve();
-    const s = document.createElement("script");
-    s.src = "https://accounts.google.com/gsi/client";
-    s.onload = resolve; s.onerror = reject;
-    document.head.appendChild(s);
-  });
-
-  window.google.accounts.oauth2.initTokenClient({
-    client_id: GDRIVE_CLIENT_ID,
-    scope: "https://www.googleapis.com/auth/drive.readonly",
-    callback: (tokenResponse) => {
-      if (tokenResponse.error) return;
-      const picker = new window.google.picker.PickerBuilder()
-        .addView(new window.google.picker.DocsView()
-          .setMimeTypes("application/pdf")
-          .setMode(window.google.picker.DocsViewMode.LIST))
-        .setOAuthToken(tokenResponse.access_token)
-        .setDeveloperKey(GDRIVE_API_KEY)
-        .setCallback((data) => {
-          if (data.action === window.google.picker.Action.PICKED) {
-            const doc = data.docs[0];
-            const url = `https://drive.google.com/file/d/${doc.id}/view`;
-            callback(url, doc.name);
-          }
-        })
-        .build();
-      picker.setVisible(true);
-    },
-  }).requestAccessToken({ prompt: "consent" });
+// Lista todos los PDFs de la carpeta pública sin OAuth
+async function listarPDFsDrive(busqueda = "") {
+  let q = `'${GDRIVE_FOLDER_ID}' in parents and mimeType='application/pdf' and trashed=false`;
+  if (busqueda.trim()) q += ` and name contains '${busqueda.trim().replace(/'/g, "\\'")}'`;
+  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&key=${GDRIVE_API_KEY}&fields=files(id,name)&orderBy=name&pageSize=200`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("No se pudo acceder a la carpeta de Drive");
+  const data = await res.json();
+  return (data.files || []).map(f => ({
+    id: f.id,
+    nombre: f.name.replace(/\.pdf$/i, ""),
+    url: `https://drive.google.com/file/d/${f.id}/view`,
+  }));
 }
 
 function transponerAcorde(acorde, semis) {
@@ -7303,8 +7275,12 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload }) {
 function CancioneroFormCancion({ onGuardado, onCancelar }) {
   const [form, setForm] = useState({ nombre: "", artista: "", drive_url: "", tono_base: "C", momentos: [], letra_texto: "" });
   const [guardando, setGuardando] = useState(false);
-  const [pickerLoading, setPickerLoading] = useState(false);
   const [error, setError] = useState("");
+  const [busqueda, setBusqueda] = useState("");
+  const [pdfs, setPdfs] = useState([]);
+  const [cargandoPdfs, setCargandoPdfs] = useState(false);
+  const [pdfsBuscados, setPdfsBuscados] = useState(false);
+  const busquedaTimer = useRef(null);
 
   const inp = {
     width: "100%", padding: "9px 12px", borderRadius: 8,
@@ -7312,25 +7288,36 @@ function CancioneroFormCancion({ onGuardado, onCancelar }) {
     background: C.white, outline: "none", marginBottom: 10,
   };
 
-  async function abrirPicker() {
-    setPickerLoading(true);
+  async function buscarPdfs(q) {
+    setCargandoPdfs(true);
+    setPdfsBuscados(true);
     try {
-      await abrirGoogleDrivePicker((url, nombre) => {
-        setForm(p => ({
-          ...p,
-          drive_url: url,
-          nombre: p.nombre || nombre.replace(/\.pdf$/i, ""),
-        }));
-      });
+      const lista = await listarPDFsDrive(q);
+      setPdfs(lista);
     } catch (e) {
-      setError("No se pudo abrir Google Drive: " + e.message);
+      setError("No se pudo acceder a la carpeta de Drive: " + e.message);
+      setPdfs([]);
     }
-    setPickerLoading(false);
+    setCargandoPdfs(false);
+  }
+
+  function onChangeBusqueda(e) {
+    const val = e.target.value;
+    setBusqueda(val);
+    setForm(p => ({ ...p, drive_url: "" }));
+    clearTimeout(busquedaTimer.current);
+    busquedaTimer.current = setTimeout(() => buscarPdfs(val), 400);
+  }
+
+  function seleccionarPdf(pdf) {
+    setForm(p => ({ ...p, drive_url: pdf.url, nombre: p.nombre || pdf.nombre }));
+    setPdfs([]);
+    setBusqueda(pdf.nombre);
   }
 
   async function guardar() {
-    if (!form.nombre.trim())     return setError("El nombre es obligatorio.");
-    if (!form.drive_url.trim())  return setError("Debes seleccionar un PDF desde Google Drive.");
+    if (!form.nombre.trim())    return setError("El nombre es obligatorio.");
+    if (!form.drive_url.trim()) return setError("Debes seleccionar un PDF de la lista.");
     setError(""); setGuardando(true);
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/cancionero_canciones`, {
@@ -7359,25 +7346,47 @@ function CancioneroFormCancion({ onGuardado, onCancelar }) {
       <input placeholder="Artista / compositor" value={form.artista}
         onChange={e => setForm(p => ({...p, artista: e.target.value}))} style={inp} />
 
-      {/* ── Selector de PDF desde Google Drive ── */}
-      <div style={{ marginBottom: 10 }}>
-        <button onClick={abrirPicker} disabled={pickerLoading} style={{
-          width: "100%", padding: "10px 14px", borderRadius: 8,
-          border: `2px dashed ${form.drive_url ? C.primary : C.border}`,
-          background: form.drive_url ? C.primaryLight : C.light,
-          color: form.drive_url ? C.primaryDark : C.gray,
-          fontSize: 13, fontWeight: 600, cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-        }}>
-          {pickerLoading
-            ? "⏳ Abriendo Google Drive…"
-            : form.drive_url
-              ? "✅ PDF seleccionado — clic para cambiar"
-              : "📂 Seleccionar PDF desde Google Drive"}
-        </button>
+      {/* ── Buscador de PDFs desde carpeta Drive pública ── */}
+      <div style={{ marginBottom: 14, position: "relative" }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, marginBottom: 6 }}>📂 Buscar PDF en Google Drive</div>
+        <div style={{ position: "relative" }}>
+          <input
+            placeholder="Escribe para buscar entre los 136 PDFs…"
+            value={busqueda}
+            onChange={onChangeBusqueda}
+            onFocus={() => { if (!pdfsBuscados) buscarPdfs(""); }}
+            style={{ ...inp, marginBottom: 0, paddingRight: cargandoPdfs ? 36 : 12 }}
+          />
+          {cargandoPdfs && (
+            <div style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", fontSize:14 }}>⏳</div>
+          )}
+        </div>
+        {pdfs.length > 0 && (
+          <div style={{
+            position: "absolute", zIndex: 100, left: 0, right: 0,
+            background: C.white, border: `1px solid ${C.border}`,
+            borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+            maxHeight: 220, overflowY: "auto", marginTop: 2,
+          }}>
+            {pdfs.map(pdf => (
+              <div key={pdf.id} onClick={() => seleccionarPdf(pdf)} style={{
+                padding: "9px 14px", cursor: "pointer", fontSize: 13, color: C.dark,
+                borderBottom: `1px solid ${C.border}`,
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = C.primaryLight}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                📄 {pdf.nombre}
+              </div>
+            ))}
+          </div>
+        )}
+        {pdfsBuscados && !cargandoPdfs && pdfs.length === 0 && busqueda && (
+          <div style={{ fontSize: 12, color: C.gray, marginTop: 4 }}>Sin resultados para "{busqueda}"</div>
+        )}
         {form.drive_url && (
-          <div style={{ fontSize: 11, color: C.gray, marginTop: 4, wordBreak: "break-all", paddingLeft: 4 }}>
-            {form.drive_url}
+          <div style={{ marginTop: 6, padding: "7px 10px", background: C.primaryLight, borderRadius: 7, fontSize: 12, color: C.primaryDark }}>
+            ✅ PDF vinculado correctamente
           </div>
         )}
       </div>
@@ -7414,9 +7423,6 @@ function CancioneroFormCancion({ onGuardado, onCancelar }) {
       <div style={{ display: "flex", gap: 8 }}>
         <Btn onClick={guardar} disabled={guardando}>{guardando ? "Guardando…" : "💾 Guardar canción"}</Btn>
         <Btn variant="ghost" onClick={onCancelar}>Cancelar</Btn>
-      </div>
-      <div style={{ marginTop: 14, padding: "12px 14px", background: C.primaryLight, borderRadius: 8, fontSize: 12, color: C.primaryDark }}>
-        💡 <strong>Tip:</strong> Al hacer clic en "Seleccionar PDF desde Google Drive" se abrirá un explorador para elegir el archivo directamente. Asegúrate de que el PDF sea accesible (no privado).
       </div>
     </Card>
   );
