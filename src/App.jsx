@@ -7214,30 +7214,32 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
         </div>
 
         {/* Transpositor */}
-        <div style={{
+        <div title={modoPDF ? "Cambia a modo Texto para transponer" : undefined} style={{
           display: "flex", alignItems: "center", gap: 6,
-          background: C.primaryLight, borderRadius: 10, padding: "6px 12px",
-          border: `1px solid ${C.primary}30`,
+          background: modoPDF ? C.light : C.primaryLight, borderRadius: 10, padding: "6px 12px",
+          border: `1px solid ${modoPDF ? C.border : C.primary + "30"}`,
+          opacity: modoPDF ? 0.6 : 1,
+          transition: "all 0.2s",
         }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: C.primaryDark }}>Tono:</span>
-          <button onClick={() => setSemis(s => s - 1)} style={{
-            width: 26, height: 26, borderRadius: 6, border: `1px solid ${C.primary}50`,
-            background: C.white, cursor: "pointer", color: C.primary, fontSize: 15, fontWeight: 700,
+          <span style={{ fontSize: 11, fontWeight: 600, color: modoPDF ? C.gray : C.primaryDark }}>Tono:</span>
+          <button onClick={() => { setModoPDF(false); setSemis(s => s - 1); }} style={{
+            width: 26, height: 26, borderRadius: 6, border: `1px solid ${modoPDF ? C.border : C.primary + "50"}`,
+            background: C.white, cursor: "pointer", color: modoPDF ? C.gray : C.primary, fontSize: 15, fontWeight: 700,
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>−</button>
-          <span style={{ fontSize: 15, fontWeight: 800, color: C.primary, minWidth: 34, textAlign: "center" }}>
+          <span style={{ fontSize: 15, fontWeight: 800, color: modoPDF ? C.gray : C.primary, minWidth: 34, textAlign: "center" }}>
             {notaLatina(tonoActual)}
             {semis !== 0 && <span style={{ fontSize: 10, color: C.gray, fontWeight: 400 }}> ({semis > 0 ? "+" : ""}{semis})</span>}
           </span>
-          <button onClick={() => setSemis(s => s + 1)} style={{
-            width: 26, height: 26, borderRadius: 6, border: `1px solid ${C.primary}50`,
-            background: C.white, cursor: "pointer", color: C.primary, fontSize: 15, fontWeight: 700,
+          <button onClick={() => { setModoPDF(false); setSemis(s => s + 1); }} style={{
+            width: 26, height: 26, borderRadius: 6, border: `1px solid ${modoPDF ? C.border : C.primary + "50"}`,
+            background: C.white, cursor: "pointer", color: modoPDF ? C.gray : C.primary, fontSize: 15, fontWeight: 700,
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>+</button>
           {semis !== 0 && (
             <button onClick={() => setSemis(0)} style={{
               fontSize: 10, padding: "2px 7px", borderRadius: 5, border: "none",
-              background: C.primary + "20", color: C.primary, cursor: "pointer",
+              background: modoPDF ? C.border : C.primary + "20", color: modoPDF ? C.gray : C.primary, cursor: "pointer",
             }}>Reset</button>
           )}
         </div>
