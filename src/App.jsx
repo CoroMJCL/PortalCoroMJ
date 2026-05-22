@@ -7497,7 +7497,6 @@ Kyrie eleison` }
 
             {/* Letra con acordes — solo lectura, el usuario solo mueve acordes */}
             <LetraRenderer texto={letraTranspuesta} colorAcorde="#1a6fb5" formatoLatino={formatoLatino} />
-            </div>
 
             {/* Admin: botón guardar letra extraída (para que quede guardada la próxima vez) */}
             {isAdmin && !esTemp && textoLetra && (
