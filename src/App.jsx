@@ -6720,6 +6720,71 @@ const MOMENTOS_LITURGICOS = [
 
 const NOTAS_CROMATICAS = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
+// Nombres en formato latinoamericano (Do, Re, Mi...)
+const NOTA_LATINA = {
+  "C":  "Do",
+  "C#": "Do#",
+  "D":  "Re",
+  "D#": "Re#",
+  "E":  "Mi",
+  "F":  "Fa",
+  "F#": "Fa#",
+  "G":  "Sol",
+  "G#": "Sol#",
+  "A":  "La",
+  "A#": "La#",
+  "B":  "Si",
+};
+function notaLatina(nota) { return NOTA_LATINA[nota] || nota; }
+
+// Google Drive Picker (OAuth client-only, sin secreto)
+const GDRIVE_CLIENT_ID = "549816260958-jvbtlvfrt4sdnuodji7o90oamb1nfq9o.apps.googleusercontent.com";
+const GDRIVE_API_KEY   = GCAL_API_KEY; // reutilizamos la misma clave de API pública
+
+async function abrirGoogleDrivePicker(callback) {
+  // Cargar gapi si no está disponible
+  await new Promise((resolve, reject) => {
+    if (window.gapi) return resolve();
+    const s = document.createElement("script");
+    s.src = "https://apis.google.com/js/api.js";
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  await new Promise((resolve) => window.gapi.load("picker", resolve));
+
+  // Cargar la librería de Identity Services para obtener token OAuth
+  await new Promise((resolve, reject) => {
+    if (window.google?.accounts) return resolve();
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+
+  window.google.accounts.oauth2.initTokenClient({
+    client_id: GDRIVE_CLIENT_ID,
+    scope: "https://www.googleapis.com/auth/drive.readonly",
+    callback: (tokenResponse) => {
+      if (tokenResponse.error) return;
+      const picker = new window.google.picker.PickerBuilder()
+        .addView(new window.google.picker.DocsView()
+          .setMimeTypes("application/pdf")
+          .setMode(window.google.picker.DocsViewMode.LIST))
+        .setOAuthToken(tokenResponse.access_token)
+        .setDeveloperKey(GDRIVE_API_KEY)
+        .setCallback((data) => {
+          if (data.action === window.google.picker.Action.PICKED) {
+            const doc = data.docs[0];
+            const url = `https://drive.google.com/file/d/${doc.id}/view`;
+            callback(url, doc.name);
+          }
+        })
+        .build();
+      picker.setVisible(true);
+    },
+  }).requestAccessToken({ prompt: "consent" });
+}
+
 function transponerAcorde(acorde, semis) {
   if (!acorde || semis === 0) return acorde;
   const flatMap = { Db:"C#", Eb:"D#", Fb:"E", Gb:"F#", Ab:"G#", Bb:"A#", Cb:"B" };
@@ -6968,7 +7033,7 @@ function CancioneroBiblioteca({ canciones, isAdmin, onAbrir, onReload }) {
                     {c.nombre}
                   </div>
                   {c.artista && <div style={{ fontSize: 12, color: C.gray, marginTop: 2 }}>{c.artista}</div>}
-                  {c.tono_base && <div style={{ fontSize: 11, color: C.primary, fontWeight: 600, marginTop: 2 }}>Tono: {c.tono_base}</div>}
+                  {c.tono_base && <div style={{ fontSize: 11, color: C.primary, fontWeight: 600, marginTop: 2 }}>Tono: {notaLatina(c.tono_base)}</div>}
                 </div>
               </div>
 
@@ -7094,7 +7159,7 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload }) {
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>−</button>
           <span style={{ fontSize: 15, fontWeight: 800, color: C.primary, minWidth: 34, textAlign: "center" }}>
-            {tonoActual}
+            {notaLatina(tonoActual)}
             {semis !== 0 && <span style={{ fontSize: 10, color: C.gray, fontWeight: 400 }}> ({semis > 0 ? "+" : ""}{semis})</span>}
           </span>
           <button onClick={() => setSemis(s => s + 1)} style={{
@@ -7189,7 +7254,7 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: C.gray }}>
               📝 Letra con acordes
-              {semis !== 0 && <span style={{ color: C.primary }}> · Transpuesta {semis > 0 ? "+" : ""}{semis} semitonos → Tono {tonoActual}</span>}
+              {semis !== 0 && <span style={{ color: C.primary }}> · Transpuesta {semis > 0 ? "+" : ""}{semis} semitonos → Tono {notaLatina(tonoActual)}</span>}
             </div>
             {isAdmin && <Btn onClick={guardarLetra} style={{ fontSize: 12, padding: "5px 12px" }}>💾 Guardar letra</Btn>}
           </div>
@@ -7217,7 +7282,7 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload }) {
           {isAdmin && textoLetra && semis !== 0 && (
             <div style={{ marginTop: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: C.primary, marginBottom: 8 }}>
-                🎵 Vista previa transpuesta (tono {tonoActual}):
+                🎵 Vista previa transpuesta (tono {notaLatina(tonoActual)}):
               </div>
               <pre style={{
                 background: C.primaryLight, borderRadius: 10, padding: "14px 16px",
@@ -7238,6 +7303,7 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload }) {
 function CancioneroFormCancion({ onGuardado, onCancelar }) {
   const [form, setForm] = useState({ nombre: "", artista: "", drive_url: "", tono_base: "C", momentos: [], letra_texto: "" });
   const [guardando, setGuardando] = useState(false);
+  const [pickerLoading, setPickerLoading] = useState(false);
   const [error, setError] = useState("");
 
   const inp = {
@@ -7246,9 +7312,25 @@ function CancioneroFormCancion({ onGuardado, onCancelar }) {
     background: C.white, outline: "none", marginBottom: 10,
   };
 
+  async function abrirPicker() {
+    setPickerLoading(true);
+    try {
+      await abrirGoogleDrivePicker((url, nombre) => {
+        setForm(p => ({
+          ...p,
+          drive_url: url,
+          nombre: p.nombre || nombre.replace(/\.pdf$/i, ""),
+        }));
+      });
+    } catch (e) {
+      setError("No se pudo abrir Google Drive: " + e.message);
+    }
+    setPickerLoading(false);
+  }
+
   async function guardar() {
     if (!form.nombre.trim())     return setError("El nombre es obligatorio.");
-    if (!form.drive_url.trim())  return setError("La URL de Google Drive es obligatoria.");
+    if (!form.drive_url.trim())  return setError("Debes seleccionar un PDF desde Google Drive.");
     setError(""); setGuardando(true);
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/cancionero_canciones`, {
@@ -7276,13 +7358,35 @@ function CancioneroFormCancion({ onGuardado, onCancelar }) {
         onChange={e => setForm(p => ({...p, nombre: e.target.value}))} style={inp} />
       <input placeholder="Artista / compositor" value={form.artista}
         onChange={e => setForm(p => ({...p, artista: e.target.value}))} style={inp} />
-      <input placeholder="URL de Google Drive (PDF) *" value={form.drive_url}
-        onChange={e => setForm(p => ({...p, drive_url: e.target.value}))} style={inp} />
+
+      {/* ── Selector de PDF desde Google Drive ── */}
+      <div style={{ marginBottom: 10 }}>
+        <button onClick={abrirPicker} disabled={pickerLoading} style={{
+          width: "100%", padding: "10px 14px", borderRadius: 8,
+          border: `2px dashed ${form.drive_url ? C.primary : C.border}`,
+          background: form.drive_url ? C.primaryLight : C.light,
+          color: form.drive_url ? C.primaryDark : C.gray,
+          fontSize: 13, fontWeight: 600, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+        }}>
+          {pickerLoading
+            ? "⏳ Abriendo Google Drive…"
+            : form.drive_url
+              ? "✅ PDF seleccionado — clic para cambiar"
+              : "📂 Seleccionar PDF desde Google Drive"}
+        </button>
+        {form.drive_url && (
+          <div style={{ fontSize: 11, color: C.gray, marginTop: 4, wordBreak: "break-all", paddingLeft: 4 }}>
+            {form.drive_url}
+          </div>
+        )}
+      </div>
+
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
         <label style={{ fontSize: 13, color: C.gray, flexShrink: 0 }}>Tono base:</label>
         <select value={form.tono_base} onChange={e => setForm(p => ({...p, tono_base: e.target.value}))}
           style={{ ...inp, width: "auto", marginBottom: 0 }}>
-          {NOTAS_CROMATICAS.map(n => <option key={n} value={n}>{n}</option>)}
+          {NOTAS_CROMATICAS.map(n => <option key={n} value={n}>{notaLatina(n)}</option>)}
         </select>
       </div>
       <div style={{ marginBottom: 14 }}>
@@ -7312,7 +7416,7 @@ function CancioneroFormCancion({ onGuardado, onCancelar }) {
         <Btn variant="ghost" onClick={onCancelar}>Cancelar</Btn>
       </div>
       <div style={{ marginTop: 14, padding: "12px 14px", background: C.primaryLight, borderRadius: 8, fontSize: 12, color: C.primaryDark }}>
-        💡 <strong>Tip URL de Google Drive:</strong> Abre el PDF en Drive → clic derecho → "Obtener enlace" → Copiar. Acepta cualquier variante de URL (/view, /edit, /preview).
+        💡 <strong>Tip:</strong> Al hacer clic en "Seleccionar PDF desde Google Drive" se abrirá un explorador para elegir el archivo directamente. Asegúrate de que el PDF sea accesible (no privado).
       </div>
     </Card>
   );
@@ -7451,7 +7555,7 @@ function CancioneroDetallePauta({ pauta, canciones, isAdmin, onVolver, onReload 
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: C.dark,
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nombre}</div>
-                      {a.tono && <div style={{ fontSize: 11, color: C.primary, marginTop: 1 }}>Tono: {a.tono}</div>}
+                      {a.tono && <div style={{ fontSize: 11, color: C.primary, marginTop: 1 }}>Tono: {notaLatina(a.tono)}</div>}
                       {a.notas && <div style={{ fontSize: 11, color: C.gray, marginTop: 1, fontStyle: "italic" }}>{a.notas}</div>}
                     </div>
                   </div>
@@ -7632,7 +7736,7 @@ function CancioneroFormPauta({ canciones, onGuardado, onCancelar }) {
               <select value={a?.tono || ""} onChange={e => setAsig(mom.id, "tono", e.target.value)}
                 disabled={!a?.cancion_id} style={{ ...inpS, width: "100%", opacity: a?.cancion_id ? 1 : 0.4 }}>
                 <option value="">Tono</option>
-                {NOTAS_CROMATICAS.map(n => <option key={n} value={n}>{n}</option>)}
+                {NOTAS_CROMATICAS.map(n => <option key={n} value={n}>{notaLatina(n)}</option>)}
               </select>
             </div>
           );
