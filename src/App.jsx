@@ -7124,8 +7124,6 @@ function CancionCard({ cancion: c, isAdmin, onAbrir, onEliminar, guardada }) {
   );
 }
 
-}
-
 // ══════════════════════════════════════════
 //  VISOR DE CANCIÓN + TRANSPOSITOR
 // ══════════════════════════════════════════
