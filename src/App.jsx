@@ -272,6 +272,8 @@ const G = `
 `;
 
 const NAV = [
+  { id: "dashboard",   icon: "⊞",  label: "Inicio" },
+  { id: "perfil",      icon: "◎",  label: "Mi Perfil" },
   { id: "admin",       icon: "⚙",  label: "Administración" },
   { id: "agenda",      icon: "◫",  label: "Agenda" },
   { id: "asistencia",  icon: "✅", label: "Asistencia" },
@@ -279,9 +281,7 @@ const NAV = [
   { id: "biblioteca",  icon: "▤",  label: "Biblioteca" },
   { id: "cancionero",  icon: "♫",  label: "Canto Digital" },
   { id: "documentos",  icon: "⬇",  label: "Descargas Misas" },
-  { id: "dashboard",   icon: "⊞",  label: "Inicio" },
   { id: "integrantes", icon: "◎",  label: "Integrantes" },
-  { id: "perfil",      icon: "◎",  label: "Mi Perfil" },
   { id: "musica",      icon: "♪",  label: "Música" },
   { id: "oraciones",   icon: "✦",  label: "Oraciones" },
   { id: "pauta_misa",  icon: "🎼", label: "Pauta de Misa" },
@@ -7237,6 +7237,8 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
 
   const esTemp = !!cancion?._temporal;
 
+  const [errorExtraccion, setErrorExtraccion] = useState(false);
+
   // ── Al montar: si no hay letra, extraer automáticamente del PDF ──────
   useEffect(() => {
     if (!textoLetra) {
@@ -7252,19 +7254,10 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
 
     setExtrayendo(true);
     try {
-      // Descargar el PDF desde Drive
-      const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-      const pdfRes = await fetch(downloadUrl);
-      if (!pdfRes.ok) throw new Error("No se pudo descargar el PDF");
-      const arrayBuf = await pdfRes.arrayBuffer();
+      // URL pública de descarga directa (Drive público sin OAuth)
+      const pdfUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
 
-      // Convertir a base64
-      const bytes = new Uint8Array(arrayBuf);
-      let binary = "";
-      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-      const base64 = btoa(binary);
-
-      // Llamar a Claude con el PDF
+      // Llamar a Claude pasando la URL del PDF directamente
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -7274,14 +7267,19 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
           messages: [{
             role: "user",
             content: [
-              { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
-              { type: "text", text: `Extrae la letra completa y los acordes de esta canción litúrgica católica.
+              {
+                type: "document",
+                source: { type: "url", url: pdfUrl }
+              },
+              {
+                type: "text",
+                text: `Extrae la letra completa y los acordes de esta canción litúrgica católica.
 
 REGLAS ESTRICTAS:
 - Los acordes van en la línea ENCIMA de la sílaba correspondiente, en formato monoespaciado.
 - Usa acordes en inglés (C, Dm, Em, F, G, Am, etc.).
 - Marca secciones: INTRO, ESTROFA 1, ESTROFA 2, CORO, PUENTE, FINAL.
-- Si el PDF no tiene acordes, agrégalos tú según el estilo litúrgico.
+- Si el PDF no tiene acordes visibles, agrégalos según el estilo litúrgico.
 - Devuelve ÚNICAMENTE el texto formateado, sin explicaciones, sin markdown, sin comillas.
 
 Formato exacto:
@@ -7293,19 +7291,23 @@ Cristo ten piedad
 
 CORO
 C        G    Am
-Kyrie eleison` }
+Kyrie eleison`
+              }
             ]
           }]
         })
       });
 
-      if (!response.ok) throw new Error("Error API Claude");
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${response.status}`);
+      }
       const data = await response.json();
       const texto = data.content?.map(b => b.text || "").join("").trim();
       if (texto) setTextoLetra(texto);
     } catch (e) {
-      // Silencioso — el usuario puede ver el PDF en modo PDF si falla
       console.warn("Extracción IA falló:", e.message);
+      setErrorExtraccion(true);
     }
     setExtrayendo(false);
   }
@@ -7459,8 +7461,26 @@ Kyrie eleison` }
         </Card>
       )}
 
+      {/* ── Error de extracción: mostrar enlace al PDF ── */}
+      {!extrayendo && errorExtraccion && (
+        <Card style={{ padding: 32, textAlign: "center" }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>📄</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, marginBottom: 8 }}>
+            No se pudo extraer la letra automáticamente
+          </div>
+          <p style={{ fontSize: 13, color: C.gray, marginBottom: 16 }}>
+            El PDF no es accesible directamente. Puedes verlo en Google Drive.
+          </p>
+          <a href={cancion?.drive_url} target="_blank" rel="noreferrer" style={{
+            display: "inline-block", padding: "9px 20px", borderRadius: 8,
+            background: C.primary, color: "white", fontSize: 13, fontWeight: 600,
+            textDecoration: "none",
+          }}>📄 Abrir PDF en Drive</a>
+        </Card>
+      )}
+
       {/* ── Visor Texto / Acordes — se muestra cuando hay letra (o extrayendo terminó) ── */}
-      {!extrayendo && (
+      {!extrayendo && !errorExtraccion && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 60px", gap: 0, alignItems: "start" }}>
 
           {/* Contenido principal */}
