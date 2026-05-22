@@ -6818,16 +6818,15 @@ function QRImg({ data, size = 120, borderColor = "#1a3a2a" }) {
 function Cancionero({ user }) {
   const isAdmin = user?.cuerda === "Admin";
 
-  // Vista activa: "biblioteca" | "visor" | "nueva_cancion" | "pautas" | "nueva_pauta" | "ver_pauta"
-  const [vista, setVista] = useState("biblioteca");
+  // Vistas: "buscar" | "visor" | "pautas" | "nueva_pauta" | "ver_pauta"
+  const [vista, setVista] = useState("buscar");
 
-  // Datos
-  const [canciones, setCanciones]   = useState([]);
-  const [pautas, setPautas]         = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState("");
+  // Canciones guardadas en Supabase y pautas
+  const [canciones, setCanciones] = useState([]);
+  const [pautas, setPautas]       = useState([]);
+  const [loading, setLoading]     = useState(true);
 
-  // Ítem activo
+  // Ítem activo en el visor
   const [cancionActiva, setCancionActiva] = useState(null);
   const [pautaActiva, setPautaActiva]     = useState(null);
 
@@ -6835,7 +6834,6 @@ function Cancionero({ user }) {
 
   async function cargar() {
     setLoading(true);
-    setError("");
     try {
       const [c, p] = await Promise.all([
         supabase("cancionero_canciones", { order: "&order=nombre.asc" }).catch(() => []),
@@ -6843,9 +6841,7 @@ function Cancionero({ user }) {
       ]);
       setCanciones(Array.isArray(c) ? c : []);
       setPautas(Array.isArray(p) ? p : []);
-    } catch (e) {
-      setError("Error al cargar el cancionero: " + e.message);
-    }
+    } catch {}
     setLoading(false);
   }
 
@@ -6853,12 +6849,11 @@ function Cancionero({ user }) {
   function abrirPauta(pauta)   { setPautaActiva(pauta);     setVista("ver_pauta"); }
 
   const TAB_ITEMS = [
-    { id: "biblioteca", icon: "🎵", label: "Biblioteca" },
-    { id: "pautas",     icon: "📋", label: "Pautas de Misa" },
-    ...(isAdmin ? [{ id: "nueva_cancion", icon: "➕", label: "Agregar Canción" }] : []),
+    { id: "buscar",  icon: "🔍", label: "Buscar canción" },
+    { id: "pautas",  icon: "📋", label: "Pautas de Misa" },
   ];
 
-  const enSubvista = ["visor","nueva_cancion","nueva_pauta","ver_pauta"].includes(vista);
+  const enSubvista = ["visor","nueva_pauta","ver_pauta"].includes(vista);
 
   return (
     <div style={{ maxWidth: 1100 }}>
@@ -6881,7 +6876,7 @@ function Cancionero({ user }) {
           </div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-          {[{ n: canciones.length, l: "Canciones" }, { n: pautas.length, l: "Pautas" }].map((s, i) => (
+          {[{ n: canciones.length, l: "Guardadas" }, { n: pautas.length, l: "Pautas" }].map((s, i) => (
             <div key={i} style={{ background: "rgba(255,255,255,0.2)", borderRadius: 10, padding: "8px 14px", textAlign: "center" }}>
               <div style={{ fontSize: 20, fontWeight: 700, color: "white", lineHeight: 1 }}>{s.n}</div>
               <div style={{ fontSize: 10, color: "rgba(255,255,255,0.85)", marginTop: 2 }}>{s.l}</div>
@@ -6890,7 +6885,7 @@ function Cancionero({ user }) {
         </div>
       </div>
 
-      {/* ── Tabs (solo en vistas principales) ── */}
+      {/* ── Tabs ── */}
       {!enSubvista && (
         <div style={{ display: "flex", gap: 6, marginBottom: 20, overflowX: "auto", paddingBottom: 4 }}>
           {TAB_ITEMS.map(t => (
@@ -6910,20 +6905,13 @@ function Cancionero({ user }) {
         </div>
       )}
 
-      {error && (
-        <div style={{ background: "#fee2e2", color: "#b91c1c", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13 }}>
-          ⚠️ {error}
-        </div>
-      )}
-
       {loading ? <Spinner /> : (
         <>
-          {vista === "biblioteca"    && <CancioneroBiblioteca canciones={canciones} isAdmin={isAdmin} onAbrir={abrirVisor} onReload={cargar} />}
-          {vista === "visor"         && <CancioneroVisor cancion={cancionActiva} isAdmin={isAdmin} onVolver={() => setVista("biblioteca")} onReload={cargar} />}
-          {vista === "nueva_cancion" && <CancioneroFormCancion onGuardado={() => { cargar(); setVista("biblioteca"); }} onCancelar={() => setVista("biblioteca")} />}
-          {vista === "pautas"        && <CancioneroPautas pautas={pautas} canciones={canciones} isAdmin={isAdmin} onAbrir={abrirPauta} onNueva={() => setVista("nueva_pauta")} onReload={cargar} />}
-          {vista === "nueva_pauta"   && <CancioneroFormPauta canciones={canciones} onGuardado={() => { cargar(); setVista("pautas"); }} onCancelar={() => setVista("pautas")} />}
-          {vista === "ver_pauta"     && <CancioneroDetallePauta pauta={pautaActiva} canciones={canciones} isAdmin={isAdmin} onVolver={() => setVista("pautas")} onReload={cargar} />}
+          {vista === "buscar"      && <CancioneroBuscador canciones={canciones} isAdmin={isAdmin} onAbrir={abrirVisor} onReload={cargar} />}
+          {vista === "visor"       && <CancioneroVisor cancion={cancionActiva} isAdmin={isAdmin} onVolver={() => setVista("buscar")} onReload={cargar} canciones={canciones} />}
+          {vista === "pautas"      && <CancioneroPautas pautas={pautas} canciones={canciones} isAdmin={isAdmin} onAbrir={abrirPauta} onNueva={() => setVista("nueva_pauta")} onReload={cargar} />}
+          {vista === "nueva_pauta" && <CancioneroFormPauta canciones={canciones} onGuardado={() => { cargar(); setVista("pautas"); }} onCancelar={() => setVista("pautas")} />}
+          {vista === "ver_pauta"   && <CancioneroDetallePauta pauta={pautaActiva} canciones={canciones} isAdmin={isAdmin} onVolver={() => setVista("pautas")} onReload={cargar} />}
         </>
       )}
     </div>
@@ -6931,52 +6919,85 @@ function Cancionero({ user }) {
 }
 
 // ══════════════════════════════════════════
-//  BIBLIOTECA
+//  BUSCADOR PRINCIPAL (Drive + Guardadas)
 // ══════════════════════════════════════════
-function CancioneroBiblioteca({ canciones, isAdmin, onAbrir, onReload }) {
-  const [busqueda, setBusqueda]   = useState("");
-  const [filtroMom, setFiltroMom] = useState("");
-  const [deleting, setDeleting]   = useState(null);
+function CancioneroBuscador({ canciones, isAdmin, onAbrir, onReload }) {
+  const [busqueda, setBusqueda]     = useState("");
+  const [resultsDrive, setResultsDrive] = useState([]);
+  const [cargando, setCargando]     = useState(false);
+  const [buscado, setBuscado]       = useState(false);
+  const [filtroMom, setFiltroMom]   = useState("");
+  const timerRef = useRef(null);
 
-  const filtradas = canciones.filter(c => {
+  // Canciones ya guardadas en Supabase filtradas localmente
+  const guardadasFiltradas = canciones.filter(c => {
     const ok1 = !busqueda || c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
                 (c.artista || "").toLowerCase().includes(busqueda.toLowerCase());
     const ok2 = !filtroMom || (c.momentos || []).includes(filtroMom);
     return ok1 && ok2;
   });
 
+  // IDs ya guardados para marcarlos
+  const idsGuardados = new Set(canciones.map(c => {
+    const m = (c.drive_url || "").match(/\/d\/([a-zA-Z0-9_-]+)/);
+    return m ? m[1] : null;
+  }).filter(Boolean));
+
+  async function buscarEnDrive(q) {
+    setCargando(true);
+    setBuscado(true);
+    try {
+      const lista = await listarPDFsDrive(q);
+      // Filtrar los que ya están guardados para no duplicar
+      setResultsDrive(lista.filter(p => !idsGuardados.has(p.id)));
+    } catch (e) {
+      setResultsDrive([]);
+    }
+    setCargando(false);
+  }
+
+  function onChangeBusqueda(e) {
+    const val = e.target.value;
+    setBusqueda(val);
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => buscarEnDrive(val), 400);
+  }
+
+  function abrirDesdeDrive(pdf) {
+    // Crear objeto cancion temporal (no guardado) para el visor
+    onAbrir({
+      _temporal: true,
+      nombre: pdf.nombre,
+      artista: "",
+      drive_url: `https://drive.google.com/file/d/${pdf.id}/view`,
+      tono_base: "C",
+      momentos: [],
+      letra_texto: "",
+      _driveId: pdf.id,
+    });
+  }
+
   async function eliminar(id) {
     if (!confirm("¿Eliminar esta canción del cancionero?")) return;
-    setDeleting(id);
     try {
       await deleteRecord("cancionero_canciones", id);
       onReload();
     } catch (e) { alert("Error: " + e.message); }
-    setDeleting(null);
   }
-
-  if (canciones.length === 0) return (
-    <Card style={{ textAlign: "center", padding: 48 }}>
-      <div style={{ fontSize: 52, marginBottom: 16 }}>🎵</div>
-      <div style={{ fontSize: 16, fontWeight: 600, color: C.dark, marginBottom: 8 }}>El cancionero está vacío</div>
-      <p style={{ fontSize: 13, color: C.gray, lineHeight: 1.7 }}>
-        {isAdmin ? "Usa la pestaña ➕ Agregar Canción para subir letras desde Google Drive." : "El administrador aún no ha cargado canciones."}
-      </p>
-    </Card>
-  );
 
   return (
     <div>
-      {/* Barra de búsqueda + filtro */}
+      {/* Barra de búsqueda */}
       <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
         <div style={{
-          display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 200,
+          display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 220,
           background: C.white, borderRadius: 8, padding: "8px 12px", border: `1px solid ${C.border}`,
         }}>
           <span style={{ color: C.gray, fontSize: 14 }}>🔍</span>
-          <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
-            placeholder="Buscar canción o artista…"
+          <input value={busqueda} onChange={onChangeBusqueda}
+            placeholder="Buscar canción en el cancionero y Drive…"
             style={{ border: "none", outline: "none", fontSize: 13, width: "100%", color: C.dark, background: "none" }} />
+          {cargando && <span style={{ fontSize: 12, color: C.gray }}>⏳</span>}
         </div>
         <select value={filtroMom} onChange={e => setFiltroMom(e.target.value)} style={{
           padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`,
@@ -6987,81 +7008,128 @@ function CancioneroBiblioteca({ canciones, isAdmin, onAbrir, onReload }) {
         </select>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
-        {filtradas.map(c => {
-          const momentos = c.momentos || [];
-          return (
-            <Card key={c.id} hover style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-              {/* Cabecera */}
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                <div style={{
-                  width: 44, height: 44, borderRadius: 10, flexShrink: 0,
-                  background: C.primaryLight, display: "flex", alignItems: "center",
-                  justifyContent: "center", fontSize: 22,
-                }}>🎵</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, lineHeight: 1.3,
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {c.nombre}
+      {/* ── Canciones guardadas en cancionero ── */}
+      {guardadasFiltradas.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.primaryDark, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>
+            ⭐ Guardadas en el cancionero
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
+            {guardadasFiltradas.map(c => (
+              <CancionCard key={c.id} cancion={c} isAdmin={isAdmin} onAbrir={onAbrir} onEliminar={eliminar} guardada />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Resultados de Drive ── */}
+      {buscado && resultsDrive.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.gray, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>
+            📂 Más resultados en Google Drive
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
+            {resultsDrive.map(pdf => (
+              <Card key={pdf.id} hover style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: "#f3f4f6",
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>📄</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, lineHeight: 1.3,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pdf.nombre}</div>
+                    <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>Google Drive</div>
                   </div>
-                  {c.artista && <div style={{ fontSize: 12, color: C.gray, marginTop: 2 }}>{c.artista}</div>}
-                  {c.tono_base && <div style={{ fontSize: 11, color: C.primary, fontWeight: 600, marginTop: 2 }}>Tono: {notaLatina(c.tono_base)}</div>}
                 </div>
-              </div>
-
-              {/* Etiquetas litúrgicas */}
-              {momentos.length > 0 && (
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                  {momentos.slice(0,3).map(mid => {
-                    const mom = MOMENTOS_LITURGICOS.find(m => m.id === mid);
-                    return mom ? (
-                      <span key={mid} style={{
-                        fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 12,
-                        background: mom.color + "18", color: mom.color, border: `1px solid ${mom.color}30`,
-                      }}>{mom.icon} {mom.label.split(" ")[0]}</span>
-                    ) : null;
-                  })}
-                  {momentos.length > 3 && <span style={{ fontSize: 10, color: C.gray }}>+{momentos.length - 3}</span>}
-                </div>
-              )}
-
-              {/* Acciones */}
-              <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
-                <button onClick={() => onAbrir(c)} style={{
-                  flex: 1, padding: "7px 0", borderRadius: 7, border: "none",
+                <button onClick={() => abrirDesdeDrive(pdf)} style={{
+                  width: "100%", padding: "7px 0", borderRadius: 7, border: "none",
                   background: C.primary, color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                }}>📄 Ver letra</button>
-                {c.drive_url && (
-                  <a href={c.drive_url} target="_blank" rel="noopener" style={{
-                    padding: "7px 10px", borderRadius: 7, border: `1px solid ${C.border}`,
-                    background: C.light, color: C.gray, fontSize: 12, cursor: "pointer", textDecoration: "none",
-                  }}>☁️</a>
-                )}
-                {isAdmin && (
-                  <button onClick={() => eliminar(c.id)} disabled={deleting === c.id} style={{
-                    padding: "7px 10px", borderRadius: 7, border: "none",
-                    background: "#fee2e2", color: C.danger, fontSize: 12, cursor: "pointer",
-                  }}>{deleting === c.id ? "…" : "🗑"}</button>
-                )}
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+                }}>📄 Ver PDF + acordes</button>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {filtradas.length === 0 && (
+      {/* Estado vacío */}
+      {!busqueda && canciones.length === 0 && (
+        <Card style={{ textAlign: "center", padding: 48 }}>
+          <div style={{ fontSize: 52, marginBottom: 16 }}>🎵</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: C.dark, marginBottom: 8 }}>Busca una canción</div>
+          <p style={{ fontSize: 13, color: C.gray, lineHeight: 1.7 }}>
+            Escribe el nombre para buscar entre los 136 PDFs de Google Drive.<br/>
+            Las canciones guardadas aparecen siempre arriba.
+          </p>
+        </Card>
+      )}
+
+      {busqueda && !cargando && guardadasFiltradas.length === 0 && resultsDrive.length === 0 && (
         <div style={{ textAlign: "center", padding: "30px 0", color: C.gray, fontSize: 13 }}>
-          No se encontraron canciones con ese filtro.
+          No se encontraron canciones para "{busqueda}".
         </div>
       )}
     </div>
   );
 }
 
+function CancionCard({ cancion: c, isAdmin, onAbrir, onEliminar, guardada }) {
+  const momentos = c.momentos || [];
+  return (
+    <Card hover style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+          background: guardada ? C.primaryLight : "#f3f4f6",
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
+        }}>{guardada ? "🎵" : "📄"}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, lineHeight: 1.3,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nombre}</div>
+          {c.artista && <div style={{ fontSize: 12, color: C.gray, marginTop: 2 }}>{c.artista}</div>}
+          {c.tono_base && <div style={{ fontSize: 11, color: C.primary, fontWeight: 600, marginTop: 2 }}>Tono: {notaLatina(c.tono_base)}</div>}
+        </div>
+      </div>
+      {momentos.length > 0 && (
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {momentos.slice(0,3).map(mid => {
+            const mom = MOMENTOS_LITURGICOS.find(m => m.id === mid);
+            return mom ? (
+              <span key={mid} style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 12,
+                background: mom.color + "18", color: mom.color, border: `1px solid ${mom.color}30` }}>
+                {mom.icon} {mom.label.split(" ")[0]}
+              </span>
+            ) : null;
+          })}
+          {momentos.length > 3 && <span style={{ fontSize: 10, color: C.gray }}>+{momentos.length - 3}</span>}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
+        <button onClick={() => onAbrir(c)} style={{
+          flex: 1, padding: "7px 0", borderRadius: 7, border: "none",
+          background: C.primary, color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
+        }}>📄 Ver letra</button>
+        {c.drive_url && (
+          <a href={c.drive_url} target="_blank" rel="noopener" style={{
+            padding: "7px 10px", borderRadius: 7, border: `1px solid ${C.border}`,
+            background: C.light, color: C.gray, fontSize: 12, cursor: "pointer", textDecoration: "none",
+          }}>☁️</a>
+        )}
+        {isAdmin && guardada && (
+          <button onClick={() => onEliminar(c.id)} style={{
+            padding: "7px 10px", borderRadius: 7, border: "none",
+            background: "#fee2e2", color: C.danger, fontSize: 12, cursor: "pointer",
+          }}>🗑</button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+}
+
 // ══════════════════════════════════════════
 //  VISOR DE CANCIÓN + TRANSPOSITOR
 // ══════════════════════════════════════════
-function CancioneroVisor({ cancion, isAdmin, onVolver, onReload }) {
+function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
   const [semis, setSemis]           = useState(0);
   const [modoPDF, setModoPDF]       = useState(true);
   const [textoLetra, setTextoLetra] = useState(cancion?.letra_texto || "");
@@ -7069,6 +7137,35 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload }) {
   const [momsSel, setMomsSel]       = useState(cancion?.momentos || []);
   const [guardando, setGuardando]   = useState(false);
   const [msg, setMsg]               = useState("");
+  const [guardandoNew, setGuardandoNew] = useState(false);
+
+  const esTemp = !!cancion?._temporal;
+
+  async function guardarEnCancionero() {
+    setGuardandoNew(true);
+    setMsg("");
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/cancionero_canciones`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+          "Content-Type": "application/json", Prefer: "return=representation",
+        },
+        body: JSON.stringify({
+          nombre: cancion.nombre,
+          artista: cancion.artista || "",
+          drive_url: cancion.drive_url,
+          tono_base: cancion.tono_base || "C",
+          momentos: [],
+          letra_texto: "",
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setMsg("✅ Canción guardada en el cancionero.");
+      await onReload();
+    } catch (e) { setMsg("Error: " + e.message); }
+    setGuardandoNew(false);
+  }
 
   const tonoBase  = cancion?.tono_base || "C";
   const idxBase   = NOTAS_CROMATICAS.indexOf(tonoBase);
@@ -7158,7 +7255,13 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload }) {
           ))}
         </div>
 
-        {isAdmin && (
+        {isAdmin && esTemp && (
+          <button onClick={guardarEnCancionero} disabled={guardandoNew} style={{
+            padding: "7px 13px", borderRadius: 8, border: "none",
+            background: C.primary, color: "white", fontSize: 12, cursor: "pointer", fontWeight: 600,
+          }}>{guardandoNew ? "Guardando…" : "⭐ Guardar en cancionero"}</button>
+        )}
+        {isAdmin && !esTemp && (
           <button onClick={() => setAsignando(!asignando)} style={{
             padding: "7px 13px", borderRadius: 8, border: `1px solid ${C.primary}`,
             background: asignando ? C.primary : C.white,
@@ -7176,7 +7279,7 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload }) {
       )}
 
       {/* ── Panel asignación litúrgica ── */}
-      {asignando && isAdmin && (
+      {asignando && isAdmin && !esTemp && (
         <Card style={{ marginBottom: 14, padding: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: C.dark, marginBottom: 12 }}>
             ⛪ Selecciona en qué momentos litúrgicos se usa esta canción:
@@ -7228,7 +7331,7 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload }) {
               📝 Letra con acordes
               {semis !== 0 && <span style={{ color: C.primary }}> · Transpuesta {semis > 0 ? "+" : ""}{semis} semitonos → Tono {notaLatina(tonoActual)}</span>}
             </div>
-            {isAdmin && <Btn onClick={guardarLetra} style={{ fontSize: 12, padding: "5px 12px" }}>💾 Guardar letra</Btn>}
+            {isAdmin && !esTemp && <Btn onClick={guardarLetra} style={{ fontSize: 12, padding: "5px 12px" }}>💾 Guardar letra</Btn>}
           </div>
 
           {isAdmin ? (
@@ -7269,164 +7372,6 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload }) {
   );
 }
 
-// ══════════════════════════════════════════
-//  FORMULARIO: AGREGAR CANCIÓN
-// ══════════════════════════════════════════
-function CancioneroFormCancion({ onGuardado, onCancelar }) {
-  const [form, setForm] = useState({ nombre: "", artista: "", drive_url: "", tono_base: "C", momentos: [], letra_texto: "" });
-  const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState("");
-  const [busqueda, setBusqueda] = useState("");
-  const [pdfs, setPdfs] = useState([]);
-  const [cargandoPdfs, setCargandoPdfs] = useState(false);
-  const [pdfsBuscados, setPdfsBuscados] = useState(false);
-  const busquedaTimer = useRef(null);
-
-  const inp = {
-    width: "100%", padding: "9px 12px", borderRadius: 8,
-    border: `1px solid ${C.border}`, fontSize: 13, color: C.dark,
-    background: C.white, outline: "none", marginBottom: 10,
-  };
-
-  async function buscarPdfs(q) {
-    setCargandoPdfs(true);
-    setPdfsBuscados(true);
-    try {
-      const lista = await listarPDFsDrive(q);
-      setPdfs(lista);
-    } catch (e) {
-      setError("No se pudo acceder a la carpeta de Drive: " + e.message);
-      setPdfs([]);
-    }
-    setCargandoPdfs(false);
-  }
-
-  function onChangeBusqueda(e) {
-    const val = e.target.value;
-    setBusqueda(val);
-    setForm(p => ({ ...p, drive_url: "" }));
-    clearTimeout(busquedaTimer.current);
-    busquedaTimer.current = setTimeout(() => buscarPdfs(val), 400);
-  }
-
-  function seleccionarPdf(pdf) {
-    setForm(p => ({ ...p, drive_url: pdf.url, nombre: p.nombre || pdf.nombre }));
-    setPdfs([]);
-    setBusqueda(pdf.nombre);
-  }
-
-  async function guardar() {
-    if (!form.nombre.trim())    return setError("El nombre es obligatorio.");
-    if (!form.drive_url.trim()) return setError("Debes seleccionar un PDF de la lista.");
-    setError(""); setGuardando(true);
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/cancionero_canciones`, {
-        method: "POST",
-        headers: {
-          apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
-          "Content-Type": "application/json", Prefer: "return=representation",
-        },
-        body: JSON.stringify({
-          nombre: form.nombre.trim(), artista: form.artista.trim(),
-          drive_url: form.drive_url.trim(), tono_base: form.tono_base,
-          momentos: form.momentos, letra_texto: form.letra_texto,
-        }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      onGuardado();
-    } catch (e) { setError("Error al guardar: " + e.message); }
-    setGuardando(false);
-  }
-
-  return (
-    <Card style={{ maxWidth: 620 }}>
-      <div style={{ fontSize: 15, fontWeight: 700, color: C.dark, marginBottom: 18 }}>🎵 Agregar canción</div>
-      <input placeholder="Nombre de la canción *" value={form.nombre}
-        onChange={e => setForm(p => ({...p, nombre: e.target.value}))} style={inp} />
-      <input placeholder="Artista / compositor" value={form.artista}
-        onChange={e => setForm(p => ({...p, artista: e.target.value}))} style={inp} />
-
-      {/* ── Buscador de PDFs desde carpeta Drive pública ── */}
-      <div style={{ marginBottom: 14, position: "relative" }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, marginBottom: 6 }}>📂 Buscar PDF en Google Drive</div>
-        <div style={{ position: "relative" }}>
-          <input
-            placeholder="Escribe para buscar entre los 136 PDFs…"
-            value={busqueda}
-            onChange={onChangeBusqueda}
-            onFocus={() => { if (!pdfsBuscados) buscarPdfs(""); }}
-            style={{ ...inp, marginBottom: 0, paddingRight: cargandoPdfs ? 36 : 12 }}
-          />
-          {cargandoPdfs && (
-            <div style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", fontSize:14 }}>⏳</div>
-          )}
-        </div>
-        {pdfs.length > 0 && (
-          <div style={{
-            position: "absolute", zIndex: 100, left: 0, right: 0,
-            background: C.white, border: `1px solid ${C.border}`,
-            borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-            maxHeight: 220, overflowY: "auto", marginTop: 2,
-          }}>
-            {pdfs.map(pdf => (
-              <div key={pdf.id} onClick={() => seleccionarPdf(pdf)} style={{
-                padding: "9px 14px", cursor: "pointer", fontSize: 13, color: C.dark,
-                borderBottom: `1px solid ${C.border}`,
-              }}
-                onMouseEnter={e => e.currentTarget.style.background = C.primaryLight}
-                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-              >
-                📄 {pdf.nombre}
-              </div>
-            ))}
-          </div>
-        )}
-        {pdfsBuscados && !cargandoPdfs && pdfs.length === 0 && busqueda && (
-          <div style={{ fontSize: 12, color: C.gray, marginTop: 4 }}>Sin resultados para "{busqueda}"</div>
-        )}
-        {form.drive_url && (
-          <div style={{ marginTop: 6, padding: "7px 10px", background: C.primaryLight, borderRadius: 7, fontSize: 12, color: C.primaryDark }}>
-            ✅ PDF vinculado correctamente
-          </div>
-        )}
-      </div>
-
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
-        <label style={{ fontSize: 13, color: C.gray, flexShrink: 0 }}>Tono base:</label>
-        <select value={form.tono_base} onChange={e => setForm(p => ({...p, tono_base: e.target.value}))}
-          style={{ ...inp, width: "auto", marginBottom: 0 }}>
-          {NOTAS_CROMATICAS.map(n => <option key={n} value={n}>{notaLatina(n)}</option>)}
-        </select>
-      </div>
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, marginBottom: 8 }}>Momentos litúrgicos (opcional):</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-          {MOMENTOS_LITURGICOS.map(m => (
-            <label key={m.id} style={{
-              display: "flex", alignItems: "center", gap: 7, padding: "7px 10px",
-              borderRadius: 7, border: `1px solid ${form.momentos.includes(m.id) ? m.color : C.border}`,
-              background: form.momentos.includes(m.id) ? m.color + "12" : C.white,
-              cursor: "pointer", fontSize: 11,
-            }}>
-              <input type="checkbox" checked={form.momentos.includes(m.id)}
-                onChange={() => setForm(p => ({...p, momentos: p.momentos.includes(m.id) ? p.momentos.filter(x => x !== m.id) : [...p.momentos, m.id]}))}
-                style={{ accentColor: m.color }} />
-              {m.icon} {m.label}
-            </label>
-          ))}
-        </div>
-      </div>
-      <textarea placeholder={"Letra con acordes (opcional)\n\n Am       G\n Señor ten piedad…"}
-        value={form.letra_texto} onChange={e => setForm(p => ({...p, letra_texto: e.target.value}))}
-        style={{ ...inp, minHeight: 140, fontFamily: "monospace", lineHeight: 1.7, resize: "vertical", marginBottom: 14 }} />
-      {error && <div style={{ color: C.danger, fontSize: 12, marginBottom: 10 }}>⚠️ {error}</div>}
-      <div style={{ display: "flex", gap: 8 }}>
-        <Btn onClick={guardar} disabled={guardando}>{guardando ? "Guardando…" : "💾 Guardar canción"}</Btn>
-        <Btn variant="ghost" onClick={onCancelar}>Cancelar</Btn>
-      </div>
-    </Card>
-  );
-}
 
 // ══════════════════════════════════════════
 //  LISTA DE PAUTAS
