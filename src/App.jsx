@@ -272,23 +272,21 @@ const G = `
 `;
 
 const NAV = [
-  { id: "dashboard", icon: "⊞", label: "Inicio" },
-  { id: "perfil", icon: "◎", label: "Mi Perfil" },
-  { id: "agenda", icon: "◫", label: "Agenda" },
-  { id: "pauta_misa", icon: "🎼", label: "Pauta de Misa" },
-  { id: "documentos", icon: "⬇", label: "Descargas Misas" },
-  { id: "oraciones", icon: "✦", label: "Oraciones" },
-  { id: "noticias", icon: "◈", label: "Avisos" },
-  { id: "qanda", icon: "?", label: "Preguntas" },
-  { id: "integrantes", icon: "◎", label: "Integrantes" },
-  { id: "biblioteca", icon: "▤", label: "Biblioteca" },
-  { id: "musica", icon: "♪", label: "Música" },
-  { id: "fotos", icon: "◨", label: "Galería" },
-  { id: "podcast", icon: "◉", label: "Podcast" },
-  { id: "videos", icon: "▷", label: "Videos" },
-  { id: "cancionero", icon: "♫", label: "Cancionero" },
-  { id: "asistencia", icon: "✅", label: "Asistencia" },
-  { id: "admin", icon: "⚙", label: "Administración" },
+  { id: "admin",       icon: "⚙",  label: "Administración" },
+  { id: "agenda",      icon: "◫",  label: "Agenda" },
+  { id: "asistencia",  icon: "✅", label: "Asistencia" },
+  { id: "noticias",    icon: "◈",  label: "Avisos" },
+  { id: "biblioteca",  icon: "▤",  label: "Biblioteca" },
+  { id: "cancionero",  icon: "♫",  label: "Canto Digital" },
+  { id: "documentos",  icon: "⬇",  label: "Descargas Misas" },
+  { id: "dashboard",   icon: "⊞",  label: "Inicio" },
+  { id: "integrantes", icon: "◎",  label: "Integrantes" },
+  { id: "perfil",      icon: "◎",  label: "Mi Perfil" },
+  { id: "musica",      icon: "♪",  label: "Música" },
+  { id: "oraciones",   icon: "✦",  label: "Oraciones" },
+  { id: "pauta_misa",  icon: "🎼", label: "Pauta de Misa" },
+  { id: "podcast",     icon: "◉",  label: "Podcast" },
+  { id: "qanda",       icon: "?",  label: "Preguntas" },
 ];
 
 const BOTTOM_NAV = [
@@ -7128,7 +7126,7 @@ function CancionCard({ cancion: c, isAdmin, onAbrir, onEliminar, guardada }) {
 //  RENDERIZADOR VISUAL DE LETRA + ACORDES
 //  (estilo lacuerda.net)
 // ══════════════════════════════════════════
-const ACORDE_RE = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add|M)?\d*(\/[A-G][#b]?)?(\([^)]*\))?$/;
+const ACORDE_RE = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add|M|7|9|11|13)?\d*(\/[A-G][#b]?)?(\([^)]*\))?$/;
 
 function esLineaDeAcordes(linea) {
   const tokens = linea.trim().split(/\s+/).filter(Boolean);
@@ -7172,7 +7170,7 @@ function ParAcordeletra({ acordes, letra, colorAcorde, formatoLatino = false }) 
   const partes = [];
   let j = 0;
   // Recorremos la línea de acordes char por char detectando tokens
-  const re = /[A-G][#b]?(m|maj|min|dim|aug|sus|add|M)?\d*(\/[A-G][#b]?)?(\([^)]*\))?/g;
+  const re = /[A-G][#b]?(m|maj|min|dim|aug|sus|add|M|7|9|11|13)?\d*(\/[A-G][#b]?)?(\([^)]*\))?/g;
   let match;
   while ((match = re.exec(acordes)) !== null) {
     partes.push({ pos: match.index, acorde: match[0] });
@@ -7226,19 +7224,91 @@ function mostrarAcorde(acorde, formatoLatino) {
 // Transposición en semitonos fraccionados (½ = 1 semitono en display)
 // Internamente todo son semitonos enteros; ½ es solo display
 function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
-  const [semis, setSemis]           = useState(0);
-  // semisDisplay es el acumulado en "medios semitonos" para el display de botones +½/-½
-  // pero la transposición real siempre usa enteros; ½ redondea al más cercano
-  const [modoPDF, setModoPDF]       = useState(true);
-  const [textoLetra, setTextoLetra] = useState(cancion?.letra_texto || "");
-  const [asignando, setAsignando]   = useState(false);
-  const [momsSel, setMomsSel]       = useState(cancion?.momentos || []);
-  const [guardando, setGuardando]   = useState(false);
-  const [msg, setMsg]               = useState("");
+  const [semis, setSemis]               = useState(0);
+  const [modoPDF, setModoPDF]           = useState(false); // siempre abre en modo texto
+  const [textoLetra, setTextoLetra]     = useState(cancion?.letra_texto || "");
+  const [asignando, setAsignando]       = useState(false);
+  const [momsSel, setMomsSel]           = useState(cancion?.momentos || []);
+  const [guardando, setGuardando]       = useState(false);
+  const [msg, setMsg]                   = useState("");
   const [guardandoNew, setGuardandoNew] = useState(false);
-  const [formatoLatino, setFormatoLatino] = useState(true); // true = Do Re Mi, false = C D E
+  const [formatoLatino, setFormatoLatino] = useState(true);
+  const [extrayendo, setExtrayendo]     = useState(false);
 
   const esTemp = !!cancion?._temporal;
+
+  // ── Al montar: si no hay letra, extraer automáticamente del PDF ──────
+  useEffect(() => {
+    if (!textoLetra) {
+      extraerLetraConIA();
+    }
+  }, []);
+
+  async function extraerLetraConIA() {
+    const urlDrive = cancion?.drive_url || "";
+    const matchId  = urlDrive.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    const fileId   = cancion?._driveId || (matchId ? matchId[1] : null);
+    if (!fileId) return;
+
+    setExtrayendo(true);
+    try {
+      // Descargar el PDF desde Drive
+      const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+      const pdfRes = await fetch(downloadUrl);
+      if (!pdfRes.ok) throw new Error("No se pudo descargar el PDF");
+      const arrayBuf = await pdfRes.arrayBuffer();
+
+      // Convertir a base64
+      const bytes = new Uint8Array(arrayBuf);
+      let binary = "";
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      const base64 = btoa(binary);
+
+      // Llamar a Claude con el PDF
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 4000,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
+              { type: "text", text: `Extrae la letra completa y los acordes de esta canción litúrgica católica.
+
+REGLAS ESTRICTAS:
+- Los acordes van en la línea ENCIMA de la sílaba correspondiente, en formato monoespaciado.
+- Usa acordes en inglés (C, Dm, Em, F, G, Am, etc.).
+- Marca secciones: INTRO, ESTROFA 1, ESTROFA 2, CORO, PUENTE, FINAL.
+- Si el PDF no tiene acordes, agrégalos tú según el estilo litúrgico.
+- Devuelve ÚNICAMENTE el texto formateado, sin explicaciones, sin markdown, sin comillas.
+
+Formato exacto:
+ESTROFA 1
+Am          G
+Señor ten piedad
+     F          Em
+Cristo ten piedad
+
+CORO
+C        G    Am
+Kyrie eleison` }
+            ]
+          }]
+        })
+      });
+
+      if (!response.ok) throw new Error("Error API Claude");
+      const data = await response.json();
+      const texto = data.content?.map(b => b.text || "").join("").trim();
+      if (texto) setTextoLetra(texto);
+    } catch (e) {
+      // Silencioso — el usuario puede ver el PDF en modo PDF si falla
+      console.warn("Extracción IA falló:", e.message);
+    }
+    setExtrayendo(false);
+  }
 
   async function guardarEnCancionero() {
     setGuardandoNew(true);
@@ -7325,17 +7395,6 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
           {cancion?.artista && <div style={{ fontSize: 12, color: C.gray }}>{cancion.artista}</div>}
         </div>
 
-        {/* Toggle PDF / Texto */}
-        <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}` }}>
-          {[["PDF","📄"],["Texto","📝"]].map(([lbl, ico]) => (
-            <button key={lbl} onClick={() => setModoPDF(lbl === "PDF")} style={{
-              padding: "7px 13px", border: "none", cursor: "pointer", fontSize: 12,
-              background: (lbl === "PDF") === modoPDF ? C.primary : C.white,
-              color: (lbl === "PDF") === modoPDF ? "white" : C.gray, fontWeight: 500,
-            }}>{ico} {lbl}</button>
-          ))}
-        </div>
-
         {isAdmin && esTemp && (
           <button onClick={guardarEnCancionero} disabled={guardandoNew} style={{
             padding: "7px 13px", borderRadius: 8, border: "none",
@@ -7388,24 +7447,20 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
         </Card>
       )}
 
-      {/* ── Visor PDF ── */}
-      {modoPDF && (
-        <Card style={{ padding: 0, overflow: "hidden", minHeight: 620 }}>
-          {previewUrl ? (
-            <iframe src={previewUrl} style={{ width: "100%", height: 680, border: "none", display: "block" }}
-              title={cancion?.nombre} allow="autoplay" />
-          ) : (
-            <div style={{ padding: 48, textAlign: "center", color: C.gray }}>
-              <div style={{ fontSize: 44, marginBottom: 12 }}>📄</div>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Sin URL de Google Drive</div>
-              <p style={{ fontSize: 13 }}>Esta canción no tiene un PDF asociado. Cambia a la pestaña Texto para editar la letra.</p>
-            </div>
-          )}
+      {/* ── Spinner mientras la IA extrae la letra ── */}
+      {extrayendo && (
+        <Card style={{ padding: 40, textAlign: "center" }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>🎵</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, marginBottom: 6 }}>
+            Extrayendo letra y acordes con IA…
+          </div>
+          <div style={{ fontSize: 12, color: C.gray }}>Esto puede tomar unos segundos</div>
+          <Spinner />
         </Card>
       )}
 
-      {/* ── Visor Texto / Acordes (estilo lacuerda.net) ── */}
-      {!modoPDF && (
+      {/* ── Visor Texto / Acordes — se muestra cuando hay letra (o extrayendo terminó) ── */}
+      {!extrayendo && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 60px", gap: 0, alignItems: "start" }}>
 
           {/* Contenido principal */}
@@ -7440,34 +7495,14 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
               )}
             </div>
 
-            {isAdmin ? (
-              <>
-                <textarea value={textoLetra} onChange={e => setTextoLetra(e.target.value)}
-                  placeholder={"Pega aquí la letra con acordes encima de cada sílaba.\nEjemplo:\n\n Am        G\n Señor ten piedad\n      F          Em\n Cristo ten piedad\n\nLas líneas con mayormente acordes se transpondrán automáticamente."}
-                  style={{
-                    width: "100%", minHeight: 400, padding: "14px 16px",
-                    border: `1px solid ${C.border}`, borderRadius: 10,
-                    fontSize: 13, fontFamily: "monospace", lineHeight: 1.8,
-                    color: C.dark, background: C.light, resize: "vertical", outline: "none",
-                    boxSizing: "border-box",
-                  }} />
-                {textoLetra && (
-                  <div style={{ marginTop: 20 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: C.primary, marginBottom: 10 }}>
-                      Vista previa{semis !== 0 ? ` · Tono ${tonoDisplay}` : ""}:
-                    </div>
-                    <div style={{ background: C.light, borderRadius: 10, padding: "16px 20px", border: `1px solid ${C.border}`, overflowX: "auto" }}>
-                      <LetraRenderer texto={letraTranspuesta} colorAcorde={C.primary} formatoLatino={formatoLatino} />
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div style={{
-                background: "#fff", borderRadius: 10, padding: "16px 20px",
-                border: `1px solid ${C.border}`, minHeight: 200, overflowX: "auto",
-              }}>
-                <LetraRenderer texto={letraTranspuesta} colorAcorde="#1a6fb5" formatoLatino={formatoLatino} />
+            {/* Letra con acordes — solo lectura, el usuario solo mueve acordes */}
+            <LetraRenderer texto={letraTranspuesta} colorAcorde="#1a6fb5" formatoLatino={formatoLatino} />
+            </div>
+
+            {/* Admin: botón guardar letra extraída (para que quede guardada la próxima vez) */}
+            {isAdmin && !esTemp && textoLetra && (
+              <div style={{ marginTop: 12 }}>
+                <Btn onClick={guardarLetra} style={{ fontSize: 11, padding: "5px 10px" }}>💾 Guardar letra extraída</Btn>
               </div>
             )}
           </Card>
@@ -7479,24 +7514,18 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
             padding: "16px 8px", border: `1px solid ${C.border}`, borderLeft: "none",
             minHeight: 300,
           }}>
-            {/* Reset */}
-            <button onClick={() => setSemis(0)} style={btnTranspStyle(semis === 0)}
-              title="Tono original">
+            <button onClick={() => setSemis(0)} style={btnTranspStyle(semis === 0)} title="Tono original">
               <span style={{ fontSize: 11 }}>orig</span>
             </button>
-            {/* +1 */}
             <button onClick={() => setSemis(s => s + 1)} style={btnTranspStyle(false)} title="+1 semitono">
               <span>+1</span>
             </button>
-            {/* +½ */}
-            <button onClick={() => setSemis(s => s + 1)} style={{ ...btnTranspStyle(false), fontSize: 12 }} title="+½ tono (+1 semitono)">
+            <button onClick={() => setSemis(s => s + 1)} style={{ ...btnTranspStyle(false), fontSize: 12 }} title="+½ tono">
               +½
             </button>
-            {/* -½ */}
-            <button onClick={() => setSemis(s => s - 1)} style={{ ...btnTranspStyle(false), fontSize: 12 }} title="-½ tono (-1 semitono)">
+            <button onClick={() => setSemis(s => s - 1)} style={{ ...btnTranspStyle(false), fontSize: 12 }} title="-½ tono">
               −½
             </button>
-            {/* -1 */}
             <button onClick={() => setSemis(s => s - 1)} style={btnTranspStyle(false)} title="-1 semitono">
               <span>−1</span>
             </button>
