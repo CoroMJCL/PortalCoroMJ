@@ -6740,7 +6740,7 @@ function notaLatina(nota) { return NOTA_LATINA[nota] || nota; }
 // Google Drive Picker (OAuth client-only, sin secreto)
 // ID de la carpeta pública de Google Drive con los PDFs del cancionero
 const GDRIVE_FOLDER_ID = "18AqJFgonJlvXh-CxZuKRQC2oXLVK2BjF";
-const GDRIVE_API_KEY   = GCAL_API_KEY;
+const GDRIVE_API_KEY   = "AIzaSyAHncVhw60TS60FQIvwUwfGkLsJEO4XTuE";
 
 // Lista todos los PDFs de la carpeta pública sin OAuth
 async function listarPDFsDrive(busqueda = "") {
