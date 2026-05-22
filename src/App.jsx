@@ -7167,7 +7167,7 @@ function parsearLetra(texto) {
 }
 
 // Renderiza un par acorde/letra como inline con acordes flotando arriba
-function ParAcordeletra({ acordes, letra, colorAcorde }) {
+function ParAcordeletra({ acordes, letra, colorAcorde, formatoLatino = false }) {
   // Construir array de { pos, acorde } a partir de la línea de acordes
   const partes = [];
   let j = 0;
@@ -7201,7 +7201,7 @@ function ParAcordeletra({ acordes, letra, colorAcorde }) {
             fontSize: 12, fontWeight: 700, color: colorAcorde || "#1a6fb5",
             fontFamily: "monospace", letterSpacing: 0.3, lineHeight: 1.4,
             whiteSpace: "pre",
-          }}>{seg.acorde}</span>
+          }}>{mostrarAcorde(seg.acorde, formatoLatino)}</span>
           <span style={{ fontSize: 14, color: "#222", whiteSpace: "pre", lineHeight: 1.8 }}>{seg.fragmento || " "}</span>
         </span>
       ))}
@@ -7209,39 +7209,26 @@ function ParAcordeletra({ acordes, letra, colorAcorde }) {
   );
 }
 
-function LetraRenderer({ texto, colorAcorde }) {
-  const bloques = parsearLetra(texto);
-  if (!bloques.length) return <span style={{ color: "#aaa", fontStyle: "italic" }}>Sin letra cargada aún.</span>;
 
-  return (
-    <div style={{ fontFamily: "'Segoe UI', Arial, sans-serif", fontSize: 14, lineHeight: 1.8, color: "#222" }}>
-      {bloques.map((b, i) => {
-        if (b.tipo === "vacio") return <div key={i} style={{ height: 12 }} />;
-        if (b.tipo === "seccion") return (
-          <div key={i} style={{
-            fontSize: 11, fontWeight: 800, color: colorAcorde || "#1a6fb5",
-            textTransform: "uppercase", letterSpacing: 1.5,
-            marginTop: 18, marginBottom: 4,
-            background: (colorAcorde || "#1a6fb5") + "15",
-            display: "inline-block", padding: "2px 8px", borderRadius: 4,
-          }}>{b.texto}</div>
-        );
-        if (b.tipo === "par") return (
-          <ParAcordeletra key={i} acordes={b.acordes} letra={b.letra} colorAcorde={colorAcorde} />
-        );
-        if (b.tipo === "soloAcordes") return (
-          <div key={i} style={{ fontSize: 12, fontWeight: 700, color: colorAcorde || "#1a6fb5", fontFamily: "monospace", whiteSpace: "pre", lineHeight: 2 }}>{b.acordes}</div>
-        );
-        if (b.tipo === "letra") return (
-          <div key={i} style={{ fontSize: 14, color: "#222", lineHeight: 1.9 }}>{b.texto}</div>
-        );
-        return null;
-      })}
-    </div>
-  );
+// ── Convierte acordes americanos a formato latino o viceversa ──────────
+function mostrarAcorde(acorde, formatoLatino) {
+  if (!formatoLatino) return acorde;
+  // Reemplazar la nota raíz por su nombre latino, preservando sufijo
+  const flatMap = { Db:"C#", Eb:"D#", Fb:"E", Gb:"F#", Ab:"G#", Bb:"A#", Cb:"B" };
+  const m = acorde.match(/^([A-G][#b]?)(.*)/);
+  if (!m) return acorde;
+  const rawNote = m[1];
+  const suffix  = m[2];
+  const norm = flatMap[rawNote] || rawNote;
+  return (NOTA_LATINA[norm] || norm) + suffix;
 }
+
+// Transposición en semitonos fraccionados (½ = 1 semitono en display)
+// Internamente todo son semitonos enteros; ½ es solo display
 function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
   const [semis, setSemis]           = useState(0);
+  // semisDisplay es el acumulado en "medios semitonos" para el display de botones +½/-½
+  // pero la transposición real siempre usa enteros; ½ redondea al más cercano
   const [modoPDF, setModoPDF]       = useState(true);
   const [textoLetra, setTextoLetra] = useState(cancion?.letra_texto || "");
   const [asignando, setAsignando]   = useState(false);
@@ -7249,6 +7236,7 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
   const [guardando, setGuardando]   = useState(false);
   const [msg, setMsg]               = useState("");
   const [guardandoNew, setGuardandoNew] = useState(false);
+  const [formatoLatino, setFormatoLatino] = useState(true); // true = Do Re Mi, false = C D E
 
   const esTemp = !!cancion?._temporal;
 
@@ -7278,11 +7266,14 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
     setGuardandoNew(false);
   }
 
-  const tonoBase  = cancion?.tono_base || "C";
-  const idxBase   = NOTAS_CROMATICAS.indexOf(tonoBase);
+  const tonoBase   = cancion?.tono_base || "C";
+  const idxBase    = NOTAS_CROMATICAS.indexOf(tonoBase);
   const tonoActual = idxBase === -1 ? tonoBase : NOTAS_CROMATICAS[((idxBase + semis) % 12 + 12) % 12];
+  const tonoDisplay = formatoLatino ? (NOTA_LATINA[tonoActual] || tonoActual) : tonoActual;
 
   const previewUrl = drivePreviewUrl(cancion?.drive_url || "");
+
+  // Texto con acordes transpuestos
   const letraTranspuesta = transponerTextoCompleto(textoLetra, semis);
 
   async function guardarMomentos() {
@@ -7304,7 +7295,15 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
     } catch (e) { setMsg("Error: " + e.message); }
   }
 
-  const inpStyle = { border: "none", outline: "none", background: "none", fontSize: 13, cursor: "pointer" };
+  // Botones de transposición estilo lacuerda.net
+  const btnTranspStyle = (active) => ({
+    width: 44, height: 44, borderRadius: "50%", border: "none",
+    background: active ? "#555" : "#888",
+    color: "white", fontSize: 13, fontWeight: 700,
+    cursor: "pointer", display: "flex", alignItems: "center",
+    justifyContent: "center", transition: "background 0.15s",
+    boxShadow: "0 2px 6px rgba(0,0,0,0.18)",
+  });
 
   return (
     <div>
@@ -7324,35 +7323,6 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
           <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 15, fontWeight: 700, color: C.dark,
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cancion?.nombre}</div>
           {cancion?.artista && <div style={{ fontSize: 12, color: C.gray }}>{cancion.artista}</div>}
-        </div>
-
-        {/* Transpositor */}
-        <div style={{
-          display: "flex", alignItems: "center", gap: 6,
-          background: C.primaryLight, borderRadius: 10, padding: "6px 12px",
-          border: `1px solid ${C.primary}30`,
-        }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: C.primaryDark }}>Tono:</span>
-          <button onClick={() => setSemis(s => s - 1)} style={{
-            width: 26, height: 26, borderRadius: 6, border: `1px solid ${C.primary}50`,
-            background: C.white, cursor: "pointer", color: C.primary, fontSize: 15, fontWeight: 700,
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>−</button>
-          <span style={{ fontSize: 15, fontWeight: 800, color: C.primary, minWidth: 34, textAlign: "center" }}>
-            {notaLatina(tonoActual)}
-            {semis !== 0 && <span style={{ fontSize: 10, color: C.gray, fontWeight: 400 }}> ({semis > 0 ? "+" : ""}{semis})</span>}
-          </span>
-          <button onClick={() => setSemis(s => s + 1)} style={{
-            width: 26, height: 26, borderRadius: 6, border: `1px solid ${C.primary}50`,
-            background: C.white, cursor: "pointer", color: C.primary, fontSize: 15, fontWeight: 700,
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>+</button>
-          {semis !== 0 && (
-            <button onClick={() => setSemis(0)} style={{
-              fontSize: 10, padding: "2px 7px", borderRadius: 5, border: "none",
-              background: C.primary + "20", color: C.primary, cursor: "pointer",
-            }}>Reset</button>
-          )}
         </div>
 
         {/* Toggle PDF / Texto */}
@@ -7434,52 +7404,145 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
         </Card>
       )}
 
-      {/* ── Visor Texto / Acordes ── */}
+      {/* ── Visor Texto / Acordes (estilo lacuerda.net) ── */}
       {!modoPDF && (
-        <Card style={{ padding: 20 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.gray }}>
-              📝 Letra con acordes
-              {semis !== 0 && <span style={{ color: C.primary }}> · Transpuesta {semis > 0 ? "+" : ""}{semis} semitonos → Tono {notaLatina(tonoActual)}</span>}
-            </div>
-            {isAdmin && !esTemp && <Btn onClick={guardarLetra} style={{ fontSize: 12, padding: "5px 12px" }}>💾 Guardar letra</Btn>}
-          </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 60px", gap: 0, alignItems: "start" }}>
 
-          {isAdmin ? (
-            <textarea value={textoLetra} onChange={e => setTextoLetra(e.target.value)}
-              placeholder={"Pega aquí la letra con acordes encima de cada sílaba.\nEjemplo:\n\n Am        G\n Señor ten piedad\n      F          Em\n Cristo ten piedad\n\nLas líneas que son mayormente acordes se transpondrán automáticamente."}
-              style={{
-                width: "100%", minHeight: 400, padding: "14px 16px",
-                border: `1px solid ${C.border}`, borderRadius: 10,
-                fontSize: 13, fontFamily: "monospace", lineHeight: 1.8,
-                color: C.dark, background: C.light, resize: "vertical", outline: "none",
-              }} />
-          ) : (
-            <div style={{
-              background: C.light, borderRadius: 10, padding: "16px 20px",
-              border: `1px solid ${C.border}`, minHeight: 200,
-              overflowX: "auto",
-            }}>
-              <LetraRenderer texto={letraTranspuesta} colorAcorde={C.primary} />
-            </div>
-          )}
+          {/* Contenido principal */}
+          <Card style={{ padding: 20, borderRadius: "12px 0 0 12px" }}>
 
-          {/* Preview transpuesto cuando el admin edita */}
-          {isAdmin && textoLetra && semis !== 0 && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: C.primary, marginBottom: 8 }}>
-                🎵 Vista previa transpuesta (tono {notaLatina(tonoActual)}):
+            {/* Tono actual + botones formato */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 13, color: C.gray }}>
+                Tono:&nbsp;
+                <span style={{ fontWeight: 800, fontSize: 16, color: C.primary }}>{tonoDisplay}</span>
+                {semis !== 0 && (
+                  <span style={{ fontSize: 11, color: C.gray, marginLeft: 4 }}>
+                    ({semis > 0 ? "+" : ""}{semis} semitono{Math.abs(semis) !== 1 ? "s" : ""})
+                  </span>
+                )}
               </div>
+
+              {/* Toggle Americano / Latino */}
+              <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}`, marginLeft: "auto" }}>
+                {[["Latino", true], ["Americano", false]].map(([lbl, val]) => (
+                  <button key={lbl} onClick={() => setFormatoLatino(val)} style={{
+                    padding: "5px 12px", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
+                    background: formatoLatino === val ? C.primary : C.white,
+                    color: formatoLatino === val ? "white" : C.gray,
+                    transition: "all 0.15s",
+                  }}>{lbl}</button>
+                ))}
+              </div>
+
+              {isAdmin && !esTemp && (
+                <Btn onClick={guardarLetra} style={{ fontSize: 11, padding: "5px 10px" }}>💾 Guardar letra</Btn>
+              )}
+            </div>
+
+            {isAdmin ? (
+              <>
+                <textarea value={textoLetra} onChange={e => setTextoLetra(e.target.value)}
+                  placeholder={"Pega aquí la letra con acordes encima de cada sílaba.\nEjemplo:\n\n Am        G\n Señor ten piedad\n      F          Em\n Cristo ten piedad\n\nLas líneas con mayormente acordes se transpondrán automáticamente."}
+                  style={{
+                    width: "100%", minHeight: 400, padding: "14px 16px",
+                    border: `1px solid ${C.border}`, borderRadius: 10,
+                    fontSize: 13, fontFamily: "monospace", lineHeight: 1.8,
+                    color: C.dark, background: C.light, resize: "vertical", outline: "none",
+                    boxSizing: "border-box",
+                  }} />
+                {textoLetra && (
+                  <div style={{ marginTop: 20 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.primary, marginBottom: 10 }}>
+                      Vista previa{semis !== 0 ? ` · Tono ${tonoDisplay}` : ""}:
+                    </div>
+                    <div style={{ background: C.light, borderRadius: 10, padding: "16px 20px", border: `1px solid ${C.border}`, overflowX: "auto" }}>
+                      <LetraRenderer texto={letraTranspuesta} colorAcorde={C.primary} formatoLatino={formatoLatino} />
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
               <div style={{
-                background: C.primaryLight, borderRadius: 10, padding: "16px 20px",
-                border: `1px solid ${C.primary}30`, overflowX: "auto",
+                background: "#fff", borderRadius: 10, padding: "16px 20px",
+                border: `1px solid ${C.border}`, minHeight: 200, overflowX: "auto",
               }}>
-                <LetraRenderer texto={letraTranspuesta} colorAcorde={C.primary} />
+                <LetraRenderer texto={letraTranspuesta} colorAcorde="#1a6fb5" formatoLatino={formatoLatino} />
               </div>
-            </div>
-          )}
-        </Card>
+            )}
+          </Card>
+
+          {/* ── Panel de transposición lateral (estilo lacuerda.net) ── */}
+          <div style={{
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+            background: "#f0f0f0", borderRadius: "0 12px 12px 0",
+            padding: "16px 8px", border: `1px solid ${C.border}`, borderLeft: "none",
+            minHeight: 300,
+          }}>
+            {/* Reset */}
+            <button onClick={() => setSemis(0)} style={btnTranspStyle(semis === 0)}
+              title="Tono original">
+              <span style={{ fontSize: 11 }}>orig</span>
+            </button>
+            {/* +1 */}
+            <button onClick={() => setSemis(s => s + 1)} style={btnTranspStyle(false)} title="+1 semitono">
+              <span>+1</span>
+            </button>
+            {/* +½ */}
+            <button onClick={() => setSemis(s => s + 1)} style={{ ...btnTranspStyle(false), fontSize: 12 }} title="+½ tono (+1 semitono)">
+              +½
+            </button>
+            {/* -½ */}
+            <button onClick={() => setSemis(s => s - 1)} style={{ ...btnTranspStyle(false), fontSize: 12 }} title="-½ tono (-1 semitono)">
+              −½
+            </button>
+            {/* -1 */}
+            <button onClick={() => setSemis(s => s - 1)} style={btnTranspStyle(false)} title="-1 semitono">
+              <span>−1</span>
+            </button>
+          </div>
+        </div>
       )}
+    </div>
+  );
+}
+
+// ── LetraRenderer acepta formatoLatino para mostrar acordes en Do/Re/Mi ──
+function LetraRenderer({ texto, colorAcorde, formatoLatino = false }) {
+  const bloques = parsearLetra(texto);
+  if (!bloques.length) return <span style={{ color: "#aaa", fontStyle: "italic" }}>Sin letra cargada aún.</span>;
+
+  return (
+    <div style={{ fontFamily: "'Segoe UI', Arial, sans-serif", fontSize: 14, lineHeight: 1.8, color: "#222" }}>
+      {bloques.map((b, i) => {
+        if (b.tipo === "vacio") return <div key={i} style={{ height: 12 }} />;
+        if (b.tipo === "seccion") return (
+          <div key={i} style={{
+            fontSize: 11, fontWeight: 800, color: colorAcorde || "#1a6fb5",
+            textTransform: "uppercase", letterSpacing: 1.5,
+            marginTop: 18, marginBottom: 4,
+            background: (colorAcorde || "#1a6fb5") + "15",
+            display: "inline-block", padding: "2px 8px", borderRadius: 4,
+          }}>{b.texto}</div>
+        );
+        if (b.tipo === "par") return (
+          <ParAcordeletra key={i} acordes={b.acordes} letra={b.letra} colorAcorde={colorAcorde} formatoLatino={formatoLatino} />
+        );
+        if (b.tipo === "soloAcordes") {
+          // Reemplazar acordes en la línea al formato deseado
+          const lineaFormateada = b.acordes.replace(
+            /[A-G][#b]?(m|maj|min|dim|aug|sus|add|M)?\d*(\/[A-G][#b]?)?(\([^)]*\))?/g,
+            (match) => mostrarAcorde(match, formatoLatino)
+          );
+          return (
+            <div key={i} style={{ fontSize: 12, fontWeight: 700, color: colorAcorde || "#1a6fb5", fontFamily: "monospace", whiteSpace: "pre", lineHeight: 2 }}>{lineaFormateada}</div>
+          );
+        }
+        if (b.tipo === "letra") return (
+          <div key={i} style={{ fontSize: 14, color: "#222", lineHeight: 1.9 }}>{b.texto}</div>
+        );
+        return null;
+      })}
     </div>
   );
 }
