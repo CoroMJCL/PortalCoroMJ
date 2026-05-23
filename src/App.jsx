@@ -7472,7 +7472,7 @@ REGLAS ESTRICTAS:
 - Los acordes van en la línea ENCIMA de la sílaba correspondiente, usando espacios para alinear.
 - Usa acordes en formato americano (C, Dm, Em, F, G, Am, Bm, G7, etc.).
 - Marca las secciones: INTRO, ESTROFA 1, ESTROFA 2, CORO, PUENTE, FINAL.
-- Si los acordes aparecen en español (DO, RE, MI, FA, SOL, LA, SI), conviértelos a americano (C, D, E, F, G, A, B). SIm=Bm, REm=Dm, MIm=Em, LAm=Am, SOLm=Gm, DO7=C7, SOL7=G7, RE7=D7.
+- Si los acordes aparecen en español (DO, RE, MI, FA, SOL, LA, SI), conviértelos: SOL=G, RE=D, MIm=Em, LAm=Am, SIm=Bm, DO=C, FA=F, SOL7=G7, RE7=D7.
 - Devuelve ÚNICAMENTE el texto formateado, sin explicaciones, sin markdown, sin comillas.
 
 Formato exacto de salida:
@@ -7487,36 +7487,9 @@ C        G    Am
 Kyrie eleison`;
 
     try {
-      // ── Descargar la imagen de preview de Drive como base64 ──
-      // Google Drive permite acceder a thumbnails/previews de archivos públicos
-      const imageUrls = [
-        `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`,
-        `https://lh3.googleusercontent.com/d/${fileId}=w1600`,
-      ];
+      // Claude API soporta imágenes por URL directa (sin descargar ni CORS)
+      const imageUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`;
 
-      let base64Img = null;
-      let mimeType = "image/jpeg";
-
-      for (const imgUrl of imageUrls) {
-        try {
-          const res = await fetch(imgUrl, { signal: AbortSignal.timeout(15000) });
-          if (!res.ok) continue;
-          const contentType = res.headers.get("content-type") || "image/jpeg";
-          if (!contentType.startsWith("image/")) continue;
-          mimeType = contentType.split(";")[0].trim();
-          const buf = await res.arrayBuffer();
-          if (buf.byteLength < 1000) continue;
-          const bytes = new Uint8Array(buf);
-          let binary = "";
-          for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-          base64Img = btoa(binary);
-          break;
-        } catch { continue; }
-      }
-
-      if (!base64Img) throw new Error("No se pudo obtener imagen del PDF");
-
-      // ── Enviar imagen a Claude ──
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -7526,7 +7499,7 @@ Kyrie eleison`;
           messages: [{
             role: "user",
             content: [
-              { type: "image", source: { type: "base64", media_type: mimeType, data: base64Img } },
+              { type: "image", source: { type: "url", url: imageUrl } },
               { type: "text", text: PROMPT_IA },
             ],
           }],
