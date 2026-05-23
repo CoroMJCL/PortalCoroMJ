@@ -7443,6 +7443,9 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
   const [extrayendo, setExtrayendo]     = useState(false);
   const [errorExtraccion, setErrorExtraccion] = useState(false);
   const [pdfCargado, setPdfCargado]     = useState(false);
+  const [modoManual, setModoManual]     = useState(false);
+  const [textoManual, setTextoManual]   = useState("");
+  const [procesandoManual, setProcesandoManual] = useState(false);
 
   const esTemp = !!cancion?._temporal;
 
@@ -7462,80 +7465,35 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
     setExtrayendo(true);
     setErrorExtraccion(false);
 
-    // Intentar descargar el PDF via proxies CORS y enviarlo como base64
-    const driveDownload = `https://drive.google.com/uc?export=download&id=${fileId}`;
-    const proxies = [
-      `https://corsproxy.io/?url=${encodeURIComponent(driveDownload)}`,
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(driveDownload)}`,
-      `https://cors-anywhere.herokuapp.com/${driveDownload}`,
-    ];
-
-    let base64 = null;
-    for (const proxyUrl of proxies) {
-      try {
-        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(20000) });
-        if (!res.ok) continue;
-        const buf = await res.arrayBuffer();
-        const header = new Uint8Array(buf, 0, 4);
-        const isPdf = header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46;
-        if (!isPdf) continue;
-        let binary = "";
-        const bytes = new Uint8Array(buf);
-        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-        base64 = btoa(binary);
-        break;
-      } catch { continue; }
-    }
-
-    if (!base64) {
-      setErrorExtraccion(true);
-      setExtrayendo(false);
-      return;
-    }
-
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      // ── Llamar a la Edge Function de Supabase (descarga el PDF server-side) ──
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/extraer-letra`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 4000,
-          messages: [{
-            role: "user",
-            content: [
-              { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
-              { type: "text", text: `Extrae la letra completa y los acordes de esta canción litúrgica católica.
-
-REGLAS ESTRICTAS:
-- Los acordes van en la línea ENCIMA de la sílaba correspondiente, en formato monoespaciado.
-- Usa acordes en inglés/americano (C, Dm, Em, F, G, Am, Bm, etc.) — el sistema los convierte a latino.
-- Marca secciones: INTRO, ESTROFA 1, ESTROFA 2, CORO, PUENTE, FINAL.
-- Si el PDF no tiene acordes visibles, agrégalos según el estilo litúrgico de la canción.
-- Devuelve ÚNICAMENTE el texto formateado, sin explicaciones, sin markdown, sin comillas.
-
-Formato exacto:
-ESTROFA 1
-Am          G
-Señor ten piedad
-     F          Em
-Cristo ten piedad
-
-CORO
-C        G    Am
-Kyrie eleison` }
-            ]
-          }]
-        })
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_KEY,
+          "Authorization": `Bearer ${_authToken || SUPABASE_KEY}`,
+        },
+        body: JSON.stringify({ fileId }),
+        signal: AbortSignal.timeout(60000), // 60 segundos (descarga + Claude)
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      const texto = data.content?.map(b => b.text || "").join("").trim();
-      if (texto) setTextoLetra(texto);
-      else throw new Error("Sin texto");
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data.letra && data.letra.length > 20) {
+        setTextoLetra(data.letra);
+      } else {
+        throw new Error("Respuesta vacía de la Edge Function");
+      }
     } catch (e) {
-      console.warn("Claude API falló:", e.message);
+      console.warn("extraerLetraConIA falló:", e.message);
       setErrorExtraccion(true);
     }
+
     setExtrayendo(false);
   }
 
@@ -7749,30 +7707,120 @@ Kyrie eleison` }
             </Card>
           )}
 
-          {/* ── Error de extracción ── */}
-          {!extrayendo && errorExtraccion && (
-            <Card style={{ padding: 32, textAlign: "center", borderRadius: "0 0 12px 12px" }}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>📄</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, marginBottom: 8 }}>
-                No se pudo extraer la letra automáticamente
+          {/* ── Error de extracción: modo manual ── */}
+          {!extrayendo && errorExtraccion && !modoManual && (
+            <Card style={{ padding: 28, borderRadius: "0 0 12px 12px" }}>
+              <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+                <div style={{ fontSize: 40 }}>📄</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.dark, marginBottom: 6 }}>
+                    No se pudo descargar el PDF automáticamente
+                  </div>
+                  <p style={{ fontSize: 13, color: C.gray, marginBottom: 14, lineHeight: 1.6 }}>
+                    Google Drive bloquea la descarga directa por CORS. Tienes dos opciones:
+                  </p>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+                    <button onClick={() => setTabVisor("pdf")} style={{
+                      padding: "8px 16px", borderRadius: 8, background: C.primary, color: "white",
+                      fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
+                    }}>📄 Ver PDF aquí</button>
+                    <a href={cancion?.drive_url} target="_blank" rel="noreferrer" style={{
+                      display: "inline-block", padding: "8px 16px", borderRadius: 8,
+                      background: C.light, color: C.dark, fontSize: 13, fontWeight: 600,
+                      textDecoration: "none", border: `1px solid ${C.border}`,
+                    }}>🔗 Abrir en Drive</a>
+                    <button onClick={extraerLetraConIA} style={{
+                      padding: "8px 16px", borderRadius: 8, background: "#6b7280", color: "white",
+                      fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
+                    }}>🔄 Reintentar</button>
+                  </div>
+                  <div style={{
+                    background: "#fef3c7", border: "1px solid #fbbf24", borderRadius: 8,
+                    padding: "10px 14px", fontSize: 13, color: "#92400e",
+                  }}>
+                    <strong>💡 Opción rápida:</strong> Abre el PDF en Drive, selecciona el texto con Ctrl+A, cópialo y usa el botón de abajo para que la IA lo formatee con acordes.
+                    <div style={{ marginTop: 8 }}>
+                      <button onClick={() => setModoManual(true)} style={{
+                        padding: "7px 14px", borderRadius: 7, background: "#f59e0b", color: "white",
+                        fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer",
+                      }}>✏️ Pegar texto manualmente</button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <p style={{ fontSize: 13, color: C.gray, marginBottom: 16 }}>
-                El PDF no es accesible directamente vía proxy. Puedes ver el PDF en la pestaña "Ver PDF original" o abrirlo en Drive.
+            </Card>
+          )}
+
+          {/* ── Modo manual: pegar texto del PDF ── */}
+          {!extrayendo && errorExtraccion && modoManual && (
+            <Card style={{ padding: 20, borderRadius: "0 0 12px 12px" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.dark, marginBottom: 8 }}>
+                ✏️ Pega el texto de la canción (copia desde el PDF en Drive)
+              </div>
+              <p style={{ fontSize: 12, color: C.gray, marginBottom: 10, lineHeight: 1.5 }}>
+                Abre el PDF en Drive, selecciona todo el texto (Ctrl+A), cópialo y pégalo aquí. La IA lo formateará con acordes automáticamente.
               </p>
-              <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-                <button onClick={() => setTabVisor("pdf")} style={{
-                  padding: "9px 20px", borderRadius: 8, background: C.primary, color: "white",
-                  fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
-                }}>📄 Ver PDF aquí</button>
-                <a href={cancion?.drive_url} target="_blank" rel="noreferrer" style={{
-                  display: "inline-block", padding: "9px 20px", borderRadius: 8,
-                  background: C.light, color: C.dark, fontSize: 13, fontWeight: 600,
-                  textDecoration: "none", border: `1px solid ${C.border}`,
-                }}>🔗 Abrir en Drive</a>
-                <button onClick={extraerLetraConIA} style={{
-                  padding: "9px 20px", borderRadius: 8, background: "#6b7280", color: "white",
-                  fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
-                }}>🔄 Reintentar</button>
+              <textarea
+                value={textoManual}
+                onChange={e => setTextoManual(e.target.value)}
+                placeholder="Pega aquí el texto completo de la canción..."
+                style={{
+                  width: "100%", minHeight: 160, padding: "10px 12px",
+                  border: `1px solid ${C.border}`, borderRadius: 8,
+                  fontSize: 13, color: C.dark, fontFamily: "monospace",
+                  resize: "vertical", boxSizing: "border-box", marginBottom: 10,
+                }}
+              />
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  disabled={!textoManual.trim() || procesandoManual}
+                  onClick={async () => {
+                    if (!textoManual.trim()) return;
+                    setProcesandoManual(true);
+                    try {
+                      const response = await fetch("https://api.anthropic.com/v1/messages", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          model: "claude-sonnet-4-20250514",
+                          max_tokens: 4000,
+                          messages: [{
+                            role: "user",
+                            content: [{
+                              type: "text",
+                              text: `Aquí está el texto de la canción litúrgica católica "${cancion?.nombre}":\n\n${textoManual}\n\nFormatéala con acordes en el estilo de lacuerda.net.\n\nREGLAS:\n- Los acordes van en la línea ENCIMA de la sílaba correspondiente, usando espacios para alinear.\n- Usa acordes americanos (C, Dm, Em, F, G, Am, etc.) el sistema los muestra en latino.\n- Marca secciones: INTRO, ESTROFA 1, ESTROFA 2, CORO, PUENTE, FINAL.\n- Si el texto no trae acordes AGRÉGALOS tú según el estilo litúrgico de la canción.\n- Devuelve ÚNICAMENTE el texto formateado sin explicaciones sin markdown sin comillas.`
+                            }]
+                          }]
+                        })
+                      });
+                      const data = await response.json();
+                      const texto = data.content?.map(b => b.text || "").join("").trim();
+                      if (texto && texto.length > 20) {
+                        setTextoLetra(texto);
+                        setErrorExtraccion(false);
+                        setModoManual(false);
+                        setTextoManual("");
+                      } else {
+                        alert("La IA no pudo procesar el texto. Intenta de nuevo.");
+                      }
+                    } catch (e) {
+                      alert("Error al procesar: " + e.message);
+                    }
+                    setProcesandoManual(false);
+                  }}
+                  style={{
+                    padding: "8px 18px", borderRadius: 8,
+                    background: textoManual.trim() ? C.primary : "#ccc",
+                    color: "white", fontSize: 13, fontWeight: 700,
+                    border: "none", cursor: textoManual.trim() ? "pointer" : "default",
+                  }}
+                >
+                  {procesandoManual ? "⏳ Procesando con IA…" : "🤖 Formatear con IA"}
+                </button>
+                <button onClick={() => { setModoManual(false); setTextoManual(""); }} style={{
+                  padding: "8px 14px", borderRadius: 8, background: C.light,
+                  color: C.gray, fontSize: 13, border: `1px solid ${C.border}`, cursor: "pointer",
+                }}>Cancelar</button>
               </div>
             </Card>
           )}
