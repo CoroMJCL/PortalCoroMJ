@@ -6755,6 +6755,27 @@ async function listarPDFsDrive(busqueda = "") {
   }));
 }
 
+// Lista TODOS los PDFs sin filtro (para el directorio completo)
+async function listarTodosDrive() {
+  let allFiles = [];
+  let pageToken = null;
+  do {
+    const q = `'${GDRIVE_FOLDER_ID}' in parents and mimeType='application/pdf' and trashed=false`;
+    let url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&key=${GDRIVE_API_KEY}&fields=files(id,name),nextPageToken&orderBy=name&pageSize=200`;
+    if (pageToken) url += `&pageToken=${pageToken}`;
+    const res = await fetch(url);
+    if (!res.ok) break;
+    const data = await res.json();
+    allFiles = allFiles.concat(data.files || []);
+    pageToken = data.nextPageToken || null;
+  } while (pageToken);
+  return allFiles.map(f => ({
+    id: f.id,
+    nombre: f.name.replace(/\.pdf$/i, ""),
+    url: `https://drive.google.com/file/d/${f.id}/view`,
+  }));
+}
+
 function transponerAcorde(acorde, semis) {
   if (!acorde || semis === 0) return acorde;
   const flatMap = { Db:"C#", Eb:"D#", Fb:"E", Gb:"F#", Ab:"G#", Bb:"A#", Cb:"B" };
@@ -6816,8 +6837,8 @@ function QRImg({ data, size = 120, borderColor = "#1a3a2a" }) {
 function Cancionero({ user }) {
   const isAdmin = user?.cuerda === "Admin";
 
-  // Vistas: "buscar" | "visor" | "pautas" | "nueva_pauta" | "ver_pauta"
-  const [vista, setVista] = useState("buscar");
+  // Vistas: "buscar" | "directorio" | "visor" | "pautas" | "nueva_pauta" | "ver_pauta"
+  const [vista, setVista] = useState("directorio");
 
   // Canciones guardadas en Supabase y pautas
   const [canciones, setCanciones] = useState([]);
@@ -6827,6 +6848,9 @@ function Cancionero({ user }) {
   // Ítem activo en el visor
   const [cancionActiva, setCancionActiva] = useState(null);
   const [pautaActiva, setPautaActiva]     = useState(null);
+
+  // Vista previa del visor (qué tab se abrió desde)
+  const [vistaAnterior, setVistaAnterior] = useState("directorio");
 
   useEffect(() => { cargar(); }, []);
 
@@ -6843,12 +6867,17 @@ function Cancionero({ user }) {
     setLoading(false);
   }
 
-  function abrirVisor(cancion) { setCancionActiva(cancion); setVista("visor"); }
-  function abrirPauta(pauta)   { setPautaActiva(pauta);     setVista("ver_pauta"); }
+  function abrirVisor(cancion, desde = null) {
+    setCancionActiva(cancion);
+    setVistaAnterior(desde || vista);
+    setVista("visor");
+  }
+  function abrirPauta(pauta) { setPautaActiva(pauta); setVista("ver_pauta"); }
 
   const TAB_ITEMS = [
-    { id: "buscar",  icon: "🔍", label: "Buscar canción" },
-    { id: "pautas",  icon: "📋", label: "Pautas de Misa" },
+    { id: "directorio", icon: "📂", label: "Directorio" },
+    { id: "buscar",     icon: "🔍", label: "Mis canciones" },
+    { id: "pautas",     icon: "📋", label: "Pautas de Misa" },
   ];
 
   const enSubvista = ["visor","nueva_pauta","ver_pauta"].includes(vista);
@@ -6905,8 +6934,9 @@ function Cancionero({ user }) {
 
       {loading ? <Spinner /> : (
         <>
-          {vista === "buscar"      && <CancioneroBuscador canciones={canciones} isAdmin={isAdmin} onAbrir={abrirVisor} onReload={cargar} />}
-          {vista === "visor"       && <CancioneroVisor cancion={cancionActiva} isAdmin={isAdmin} onVolver={() => setVista("buscar")} onReload={cargar} canciones={canciones} />}
+          {vista === "directorio"  && <CancioneroDirectorio canciones={canciones} isAdmin={isAdmin} onAbrir={(c) => abrirVisor(c, "directorio")} />}
+          {vista === "buscar"      && <CancioneroBuscador canciones={canciones} isAdmin={isAdmin} onAbrir={(c) => abrirVisor(c, "buscar")} onReload={cargar} />}
+          {vista === "visor"       && <CancioneroVisor cancion={cancionActiva} isAdmin={isAdmin} onVolver={() => setVista(vistaAnterior)} onReload={cargar} canciones={canciones} />}
           {vista === "pautas"      && <CancioneroPautas pautas={pautas} canciones={canciones} isAdmin={isAdmin} onAbrir={abrirPauta} onNueva={() => setVista("nueva_pauta")} onReload={cargar} />}
           {vista === "nueva_pauta" && <CancioneroFormPauta canciones={canciones} onGuardado={() => { cargar(); setVista("pautas"); }} onCancelar={() => setVista("pautas")} />}
           {vista === "ver_pauta"   && <CancioneroDetallePauta pauta={pautaActiva} canciones={canciones} isAdmin={isAdmin} onVolver={() => setVista("pautas")} onReload={cargar} />}
@@ -6917,7 +6947,185 @@ function Cancionero({ user }) {
 }
 
 // ══════════════════════════════════════════
-//  BUSCADOR PRINCIPAL (Drive + Guardadas)
+//  DIRECTORIO COMPLETO DE DRIVE
+// ══════════════════════════════════════════
+function CancioneroDirectorio({ canciones, isAdmin, onAbrir }) {
+  const [todos, setTodos]         = useState([]);
+  const [cargando, setCargando]   = useState(true);
+  const [errorDrive, setErrorDrive] = useState("");
+  const [filtro, setFiltro]       = useState("");
+  const [pagina, setPagina]       = useState(0);
+  const POR_PAGINA = 30;
+
+  // IDs ya guardados en cancionero
+  const idsGuardados = new Set(canciones.map(c => {
+    const m = (c.drive_url || "").match(/\/d\/([a-zA-Z0-9_-]+)/);
+    return m ? m[1] : null;
+  }).filter(Boolean));
+
+  useEffect(() => {
+    listarTodosDrive()
+      .then(lista => { setTodos(lista); setCargando(false); })
+      .catch(e => { setErrorDrive(e.message); setCargando(false); });
+  }, []);
+
+  const filtrados = todos.filter(f =>
+    !filtro.trim() || f.nombre.toLowerCase().includes(filtro.toLowerCase())
+  );
+
+  const totalPags = Math.ceil(filtrados.length / POR_PAGINA);
+  const pagActual = Math.min(pagina, Math.max(0, totalPags - 1));
+  const visibles  = filtrados.slice(pagActual * POR_PAGINA, (pagActual + 1) * POR_PAGINA);
+
+  // Reagrupar por letra inicial
+  const grupos = {};
+  visibles.forEach(f => {
+    const letra = f.nombre[0]?.toUpperCase() || "#";
+    if (!grupos[letra]) grupos[letra] = [];
+    grupos[letra].push(f);
+  });
+
+  function abrirPdf(pdf) {
+    // Buscar si ya está guardada en el cancionero
+    const guardada = canciones.find(c => {
+      const m = (c.drive_url || "").match(/\/d\/([a-zA-Z0-9_-]+)/);
+      return m && m[1] === pdf.id;
+    });
+    if (guardada) {
+      onAbrir(guardada);
+    } else {
+      onAbrir({
+        _temporal: true,
+        nombre: pdf.nombre,
+        artista: "",
+        drive_url: `https://drive.google.com/file/d/${pdf.id}/view`,
+        tono_base: "C",
+        momentos: [],
+        letra_texto: "",
+        _driveId: pdf.id,
+      });
+    }
+  }
+
+  return (
+    <div>
+      {/* Barra de búsqueda */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8, marginBottom: 16,
+        background: C.white, borderRadius: 10, padding: "10px 14px",
+        border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+      }}>
+        <span style={{ fontSize: 16 }}>🔍</span>
+        <input
+          value={filtro}
+          onChange={e => { setFiltro(e.target.value); setPagina(0); }}
+          placeholder="Filtrar por nombre…"
+          style={{ border: "none", outline: "none", fontSize: 14, flex: 1, color: C.dark, background: "none" }}
+        />
+        {filtro && (
+          <button onClick={() => { setFiltro(""); setPagina(0); }} style={{
+            background: "none", border: "none", cursor: "pointer", color: C.gray, fontSize: 16,
+          }}>✕</button>
+        )}
+        {!cargando && (
+          <span style={{ fontSize: 12, color: C.gray, whiteSpace: "nowrap" }}>
+            {filtrados.length} canciones
+          </span>
+        )}
+      </div>
+
+      {cargando && <Spinner />}
+
+      {errorDrive && (
+        <Card style={{ padding: 24, textAlign: "center" }}>
+          <div style={{ fontSize: 13, color: C.danger }}>⚠️ No se pudo cargar el directorio: {errorDrive}</div>
+        </Card>
+      )}
+
+      {!cargando && !errorDrive && (
+        <>
+          {/* Lista agrupada por letra */}
+          {Object.keys(grupos).sort().map(letra => (
+            <div key={letra} style={{ marginBottom: 16 }}>
+              <div style={{
+                fontSize: 11, fontWeight: 800, color: C.primaryDark, textTransform: "uppercase",
+                letterSpacing: 2, marginBottom: 6, paddingLeft: 4,
+                borderLeft: `3px solid ${C.primary}`, paddingLeft: 8,
+              }}>{letra}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 8 }}>
+                {grupos[letra].map(pdf => {
+                  const guardada = idsGuardados.has(pdf.id);
+                  return (
+                    <button key={pdf.id} onClick={() => abrirPdf(pdf)} style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "10px 12px", borderRadius: 9,
+                      border: `1px solid ${guardada ? C.primary + "40" : C.border}`,
+                      background: guardada ? C.primaryLight : C.white,
+                      cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+                    }}
+                    onMouseOver={e => e.currentTarget.style.borderColor = C.primary}
+                    onMouseOut={e => e.currentTarget.style.borderColor = guardada ? C.primary + "40" : C.border}
+                    >
+                      <span style={{ fontSize: 20, flexShrink: 0 }}>{guardada ? "🎵" : "📄"}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontSize: 13, fontWeight: 600, color: C.dark,
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>{pdf.nombre}</div>
+                        {guardada && (
+                          <div style={{ fontSize: 10, color: C.primary, fontWeight: 600, marginTop: 1 }}>
+                            ⭐ En cancionero
+                          </div>
+                        )}
+                      </div>
+                      <span style={{ fontSize: 11, color: C.gray, flexShrink: 0 }}>▶</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* Paginación */}
+          {totalPags > 1 && (
+            <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 20, flexWrap: "wrap" }}>
+              <button onClick={() => setPagina(0)} disabled={pagActual === 0} style={paginaBtnStyle(false, pagActual === 0)}>«</button>
+              <button onClick={() => setPagina(p => Math.max(0, p - 1))} disabled={pagActual === 0} style={paginaBtnStyle(false, pagActual === 0)}>‹</button>
+              {Array.from({ length: Math.min(7, totalPags) }, (_, i) => {
+                const pg = Math.max(0, Math.min(totalPags - 7, pagActual - 3)) + i;
+                return (
+                  <button key={pg} onClick={() => setPagina(pg)} style={paginaBtnStyle(pg === pagActual, false)}>
+                    {pg + 1}
+                  </button>
+                );
+              })}
+              <button onClick={() => setPagina(p => Math.min(totalPags - 1, p + 1))} disabled={pagActual === totalPags - 1} style={paginaBtnStyle(false, pagActual === totalPags - 1)}>›</button>
+              <button onClick={() => setPagina(totalPags - 1)} disabled={pagActual === totalPags - 1} style={paginaBtnStyle(false, pagActual === totalPags - 1)}>»</button>
+            </div>
+          )}
+
+          {filtrados.length === 0 && (
+            <div style={{ textAlign: "center", padding: "40px 0", color: C.gray, fontSize: 13 }}>
+              No se encontraron canciones para "{filtro}".
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function paginaBtnStyle(activo, disabled) {
+  return {
+    padding: "6px 12px", borderRadius: 7, border: `1px solid ${activo ? C.primary : C.border}`,
+    background: activo ? C.primary : C.white, color: activo ? "white" : disabled ? "#ccc" : C.dark,
+    fontSize: 13, fontWeight: activo ? 700 : 400, cursor: disabled ? "default" : "pointer",
+    minWidth: 34, textAlign: "center",
+  };
+}
+
+// ══════════════════════════════════════════
+//  MIS CANCIONES (guardadas en Supabase)
 // ══════════════════════════════════════════
 function CancioneroBuscador({ canciones, isAdmin, onAbrir, onReload }) {
   const [busqueda, setBusqueda]     = useState("");
@@ -6946,7 +7154,6 @@ function CancioneroBuscador({ canciones, isAdmin, onAbrir, onReload }) {
     setBuscado(true);
     try {
       const lista = await listarPDFsDrive(q);
-      // Filtrar los que ya están guardados para no duplicar
       setResultsDrive(lista.filter(p => !idsGuardados.has(p.id)));
     } catch (e) {
       setResultsDrive([]);
@@ -6962,7 +7169,6 @@ function CancioneroBuscador({ canciones, isAdmin, onAbrir, onReload }) {
   }
 
   function abrirDesdeDrive(pdf) {
-    // Crear objeto cancion temporal (no guardado) para el visor
     onAbrir({
       _temporal: true,
       nombre: pdf.nombre,
@@ -6993,9 +7199,10 @@ function CancioneroBuscador({ canciones, isAdmin, onAbrir, onReload }) {
         }}>
           <span style={{ color: C.gray, fontSize: 14 }}>🔍</span>
           <input value={busqueda} onChange={onChangeBusqueda}
-            placeholder="Buscar canción en el cancionero y Drive…"
+            placeholder="Buscar en guardadas y Drive…"
             style={{ border: "none", outline: "none", fontSize: 13, width: "100%", color: C.dark, background: "none" }} />
           {cargando && <span style={{ fontSize: 12, color: C.gray }}>⏳</span>}
+          {busqueda && <button onClick={() => { setBusqueda(""); setResultsDrive([]); setBuscado(false); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.gray }}>✕</button>}
         </div>
         <select value={filtroMom} onChange={e => setFiltroMom(e.target.value)} style={{
           padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`,
@@ -7010,7 +7217,7 @@ function CancioneroBuscador({ canciones, isAdmin, onAbrir, onReload }) {
       {guardadasFiltradas.length > 0 && (
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.primaryDark, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>
-            ⭐ Guardadas en el cancionero
+            ⭐ Guardadas en el cancionero ({guardadasFiltradas.length})
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
             {guardadasFiltradas.map(c => (
@@ -7024,7 +7231,7 @@ function CancioneroBuscador({ canciones, isAdmin, onAbrir, onReload }) {
       {buscado && resultsDrive.length > 0 && (
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.gray, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>
-            📂 Más resultados en Google Drive
+            📂 Más resultados en Google Drive ({resultsDrive.length})
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
             {resultsDrive.map(pdf => (
@@ -7041,7 +7248,7 @@ function CancioneroBuscador({ canciones, isAdmin, onAbrir, onReload }) {
                 <button onClick={() => abrirDesdeDrive(pdf)} style={{
                   width: "100%", padding: "7px 0", borderRadius: 7, border: "none",
                   background: C.primary, color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                }}>📄 Ver PDF + acordes</button>
+                }}>🎵 Ver letra y acordes</button>
               </Card>
             ))}
           </div>
@@ -7051,11 +7258,11 @@ function CancioneroBuscador({ canciones, isAdmin, onAbrir, onReload }) {
       {/* Estado vacío */}
       {!busqueda && canciones.length === 0 && (
         <Card style={{ textAlign: "center", padding: 48 }}>
-          <div style={{ fontSize: 52, marginBottom: 16 }}>🎵</div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: C.dark, marginBottom: 8 }}>Busca una canción</div>
+          <div style={{ fontSize: 52, marginBottom: 16 }}>⭐</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: C.dark, marginBottom: 8 }}>Sin canciones guardadas</div>
           <p style={{ fontSize: 13, color: C.gray, lineHeight: 1.7 }}>
-            Escribe el nombre para buscar entre los 136 PDFs de Google Drive.<br/>
-            Las canciones guardadas aparecen siempre arriba.
+            Ve al <strong>Directorio</strong> para explorar todos los PDFs.<br/>
+            Las canciones que guardes aparecerán aquí con sus acordes y momentos litúrgicos.
           </p>
         </Card>
       )}
@@ -7225,19 +7432,19 @@ function mostrarAcorde(acorde, formatoLatino) {
 // Internamente todo son semitonos enteros; ½ es solo display
 function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
   const [semis, setSemis]               = useState(0);
-  const [modoPDF, setModoPDF]           = useState(false); // siempre abre en modo texto
+  const [tabVisor, setTabVisor]         = useState("letra"); // "letra" | "pdf"
   const [textoLetra, setTextoLetra]     = useState(cancion?.letra_texto || "");
   const [asignando, setAsignando]       = useState(false);
   const [momsSel, setMomsSel]           = useState(cancion?.momentos || []);
   const [guardando, setGuardando]       = useState(false);
   const [msg, setMsg]                   = useState("");
   const [guardandoNew, setGuardandoNew] = useState(false);
-  const [formatoLatino, setFormatoLatino] = useState(true);
+  const [formatoLatino, setFormatoLatino] = useState(true); // Latino por defecto
   const [extrayendo, setExtrayendo]     = useState(false);
+  const [errorExtraccion, setErrorExtraccion] = useState(false);
+  const [pdfCargado, setPdfCargado]     = useState(false);
 
   const esTemp = !!cancion?._temporal;
-
-  const [errorExtraccion, setErrorExtraccion] = useState(false);
 
   // ── Al montar: si no hay letra, extraer automáticamente del PDF ──────
   useEffect(() => {
@@ -7253,11 +7460,40 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
     if (!fileId) return;
 
     setExtrayendo(true);
-    try {
-      // URL pública de descarga directa (Drive público sin OAuth)
-      const pdfUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    setErrorExtraccion(false);
 
-      // Llamar a Claude pasando la URL del PDF directamente
+    // Intentar descargar el PDF via proxies CORS y enviarlo como base64
+    const driveDownload = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    const proxies = [
+      `https://corsproxy.io/?url=${encodeURIComponent(driveDownload)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(driveDownload)}`,
+      `https://cors-anywhere.herokuapp.com/${driveDownload}`,
+    ];
+
+    let base64 = null;
+    for (const proxyUrl of proxies) {
+      try {
+        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(20000) });
+        if (!res.ok) continue;
+        const buf = await res.arrayBuffer();
+        const header = new Uint8Array(buf, 0, 4);
+        const isPdf = header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46;
+        if (!isPdf) continue;
+        let binary = "";
+        const bytes = new Uint8Array(buf);
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        base64 = btoa(binary);
+        break;
+      } catch { continue; }
+    }
+
+    if (!base64) {
+      setErrorExtraccion(true);
+      setExtrayendo(false);
+      return;
+    }
+
+    try {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -7267,19 +7503,14 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
           messages: [{
             role: "user",
             content: [
-              {
-                type: "document",
-                source: { type: "url", url: pdfUrl }
-              },
-              {
-                type: "text",
-                text: `Extrae la letra completa y los acordes de esta canción litúrgica católica.
+              { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
+              { type: "text", text: `Extrae la letra completa y los acordes de esta canción litúrgica católica.
 
 REGLAS ESTRICTAS:
 - Los acordes van en la línea ENCIMA de la sílaba correspondiente, en formato monoespaciado.
-- Usa acordes en inglés (C, Dm, Em, F, G, Am, etc.).
+- Usa acordes en inglés/americano (C, Dm, Em, F, G, Am, Bm, etc.) — el sistema los convierte a latino.
 - Marca secciones: INTRO, ESTROFA 1, ESTROFA 2, CORO, PUENTE, FINAL.
-- Si el PDF no tiene acordes visibles, agrégalos según el estilo litúrgico.
+- Si el PDF no tiene acordes visibles, agrégalos según el estilo litúrgico de la canción.
 - Devuelve ÚNICAMENTE el texto formateado, sin explicaciones, sin markdown, sin comillas.
 
 Formato exacto:
@@ -7291,22 +7522,18 @@ Cristo ten piedad
 
 CORO
 C        G    Am
-Kyrie eleison`
-              }
+Kyrie eleison` }
             ]
           }]
         })
       });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error?.message || `HTTP ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       const texto = data.content?.map(b => b.text || "").join("").trim();
       if (texto) setTextoLetra(texto);
+      else throw new Error("Sin texto");
     } catch (e) {
-      console.warn("Extracción IA falló:", e.message);
+      console.warn("Claude API falló:", e.message);
       setErrorExtraccion(true);
     }
     setExtrayendo(false);
@@ -7328,7 +7555,7 @@ Kyrie eleison`
           drive_url: cancion.drive_url,
           tono_base: cancion.tono_base || "C",
           momentos: [],
-          letra_texto: "",
+          letra_texto: textoLetra || "",
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -7370,12 +7597,14 @@ Kyrie eleison`
   // Botones de transposición estilo lacuerda.net
   const btnTranspStyle = (active) => ({
     width: 44, height: 44, borderRadius: "50%", border: "none",
-    background: active ? "#555" : "#888",
+    background: active ? C.primary : "#888",
     color: "white", fontSize: 13, fontWeight: 700,
     cursor: "pointer", display: "flex", alignItems: "center",
     justifyContent: "center", transition: "background 0.15s",
     boxShadow: "0 2px 6px rgba(0,0,0,0.18)",
   });
+
+  const tieneLetra = !!textoLetra;
 
   return (
     <div>
@@ -7400,7 +7629,8 @@ Kyrie eleison`
         {isAdmin && esTemp && (
           <button onClick={guardarEnCancionero} disabled={guardandoNew} style={{
             padding: "7px 13px", borderRadius: 8, border: "none",
-            background: C.primary, color: "white", fontSize: 12, cursor: "pointer", fontWeight: 600,
+            background: "#f59e0b", color: "white", fontSize: 12, cursor: "pointer", fontWeight: 600,
+            display: "flex", alignItems: "center", gap: 5,
           }}>{guardandoNew ? "Guardando…" : "⭐ Guardar en cancionero"}</button>
         )}
         {isAdmin && !esTemp && (
@@ -7449,107 +7679,240 @@ Kyrie eleison`
         </Card>
       )}
 
-      {/* ── Spinner mientras la IA extrae la letra ── */}
-      {extrayendo && (
-        <Card style={{ padding: 40, textAlign: "center" }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🎵</div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, marginBottom: 6 }}>
-            Extrayendo letra y acordes con IA…
-          </div>
-          <div style={{ fontSize: 12, color: C.gray }}>Esto puede tomar unos segundos</div>
-          <Spinner />
+      {/* ── Tabs Letra / PDF ── */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 0, borderRadius: "10px 10px 0 0", overflow: "hidden", border: `1px solid ${C.border}`, borderBottom: "none" }}>
+        <button onClick={() => setTabVisor("letra")} style={{
+          flex: 1, padding: "10px 18px", border: "none", cursor: "pointer",
+          fontSize: 13, fontWeight: tabVisor === "letra" ? 700 : 400,
+          background: tabVisor === "letra" ? C.white : "#f3f4f6",
+          color: tabVisor === "letra" ? C.primary : C.gray,
+          borderRight: `1px solid ${C.border}`,
+          transition: "all 0.15s",
+        }}>🎵 Letra y Acordes{tieneLetra ? "" : " (extrayendo…)"}</button>
+        <button onClick={() => setTabVisor("pdf")} style={{
+          flex: 1, padding: "10px 18px", border: "none", cursor: "pointer",
+          fontSize: 13, fontWeight: tabVisor === "pdf" ? 700 : 400,
+          background: tabVisor === "pdf" ? C.white : "#f3f4f6",
+          color: tabVisor === "pdf" ? C.primary : C.gray,
+          transition: "all 0.15s",
+        }}>📄 Ver PDF original</button>
+      </div>
+
+      {/* ── TAB: PDF ── */}
+      {tabVisor === "pdf" && (
+        <Card style={{ padding: 0, borderRadius: "0 0 12px 12px", overflow: "hidden", minHeight: 600 }}>
+          {previewUrl ? (
+            <div style={{ position: "relative" }}>
+              {!pdfCargado && (
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+                  alignItems: "center", justifyContent: "center", gap: 12, background: "#f9fafb", zIndex: 1, minHeight: 400 }}>
+                  <Spinner />
+                  <div style={{ fontSize: 13, color: C.gray }}>Cargando PDF…</div>
+                </div>
+              )}
+              <iframe
+                src={previewUrl}
+                onLoad={() => setPdfCargado(true)}
+                style={{ width: "100%", height: "80vh", border: "none", display: "block" }}
+                allow="autoplay"
+                title={cancion?.nombre}
+              />
+            </div>
+          ) : (
+            <div style={{ padding: 40, textAlign: "center" }}>
+              <div style={{ fontSize: 13, color: C.gray }}>No hay URL de PDF disponible.</div>
+            </div>
+          )}
+          {cancion?.drive_url && (
+            <div style={{ padding: "10px 16px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <a href={cancion.drive_url} target="_blank" rel="noreferrer" style={{
+                padding: "7px 14px", borderRadius: 8, background: C.primary, color: "white",
+                fontSize: 12, fontWeight: 600, textDecoration: "none",
+              }}>🔗 Abrir en Google Drive</a>
+            </div>
+          )}
         </Card>
       )}
 
-      {/* ── Error de extracción: mostrar enlace al PDF ── */}
-      {!extrayendo && errorExtraccion && (
-        <Card style={{ padding: 32, textAlign: "center" }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>📄</div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, marginBottom: 8 }}>
-            No se pudo extraer la letra automáticamente
-          </div>
-          <p style={{ fontSize: 13, color: C.gray, marginBottom: 16 }}>
-            El PDF no es accesible directamente. Puedes verlo en Google Drive.
-          </p>
-          <a href={cancion?.drive_url} target="_blank" rel="noreferrer" style={{
-            display: "inline-block", padding: "9px 20px", borderRadius: 8,
-            background: C.primary, color: "white", fontSize: 13, fontWeight: 600,
-            textDecoration: "none",
-          }}>📄 Abrir PDF en Drive</a>
-        </Card>
-      )}
-
-      {/* ── Visor Texto / Acordes — se muestra cuando hay letra (o extrayendo terminó) ── */}
-      {!extrayendo && !errorExtraccion && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 60px", gap: 0, alignItems: "start" }}>
-
-          {/* Contenido principal */}
-          <Card style={{ padding: 20, borderRadius: "12px 0 0 12px" }}>
-
-            {/* Tono actual + botones formato */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-              <div style={{ fontSize: 13, color: C.gray }}>
-                Tono:&nbsp;
-                <span style={{ fontWeight: 800, fontSize: 16, color: C.primary }}>{tonoDisplay}</span>
-                {semis !== 0 && (
-                  <span style={{ fontSize: 11, color: C.gray, marginLeft: 4 }}>
-                    ({semis > 0 ? "+" : ""}{semis} semitono{Math.abs(semis) !== 1 ? "s" : ""})
-                  </span>
-                )}
+      {/* ── TAB: LETRA + ACORDES ── */}
+      {tabVisor === "letra" && (
+        <>
+          {/* ── Spinner mientras la IA extrae la letra ── */}
+          {extrayendo && (
+            <Card style={{ padding: 40, textAlign: "center", borderRadius: "0 0 12px 12px" }}>
+              <div style={{ fontSize: 36, marginBottom: 12 }}>🎵</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, marginBottom: 6 }}>
+                Extrayendo letra y acordes con IA…
               </div>
+              <div style={{ fontSize: 12, color: C.gray }}>Esto puede tomar unos segundos</div>
+              <Spinner />
+            </Card>
+          )}
 
-              {/* Toggle Americano / Latino */}
-              <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}`, marginLeft: "auto" }}>
-                {[["Latino", true], ["Americano", false]].map(([lbl, val]) => (
-                  <button key={lbl} onClick={() => setFormatoLatino(val)} style={{
-                    padding: "5px 12px", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
-                    background: formatoLatino === val ? C.primary : C.white,
-                    color: formatoLatino === val ? "white" : C.gray,
-                    transition: "all 0.15s",
-                  }}>{lbl}</button>
+          {/* ── Error de extracción ── */}
+          {!extrayendo && errorExtraccion && (
+            <Card style={{ padding: 32, textAlign: "center", borderRadius: "0 0 12px 12px" }}>
+              <div style={{ fontSize: 36, marginBottom: 12 }}>📄</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, marginBottom: 8 }}>
+                No se pudo extraer la letra automáticamente
+              </div>
+              <p style={{ fontSize: 13, color: C.gray, marginBottom: 16 }}>
+                El PDF no es accesible directamente vía proxy. Puedes ver el PDF en la pestaña "Ver PDF original" o abrirlo en Drive.
+              </p>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                <button onClick={() => setTabVisor("pdf")} style={{
+                  padding: "9px 20px", borderRadius: 8, background: C.primary, color: "white",
+                  fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
+                }}>📄 Ver PDF aquí</button>
+                <a href={cancion?.drive_url} target="_blank" rel="noreferrer" style={{
+                  display: "inline-block", padding: "9px 20px", borderRadius: 8,
+                  background: C.light, color: C.dark, fontSize: 13, fontWeight: 600,
+                  textDecoration: "none", border: `1px solid ${C.border}`,
+                }}>🔗 Abrir en Drive</a>
+                <button onClick={extraerLetraConIA} style={{
+                  padding: "9px 20px", borderRadius: 8, background: "#6b7280", color: "white",
+                  fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
+                }}>🔄 Reintentar</button>
+              </div>
+            </Card>
+          )}
+
+          {/* ── Visor Texto / Acordes ── */}
+          {!extrayendo && !errorExtraccion && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 62px", gap: 0, alignItems: "start" }}>
+
+              {/* Contenido principal */}
+              <Card style={{ padding: 20, borderRadius: "0 0 0 12px", borderRight: "none" }}>
+
+                {/* Barra superior: tono + formato */}
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10, marginBottom: 16,
+                  flexWrap: "wrap", padding: "10px 12px", background: "#f8f9fa",
+                  borderRadius: 8, border: `1px solid ${C.border}`,
+                }}>
+                  {/* Tono actual */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 12, color: C.gray }}>Tono:</span>
+                    <span style={{ fontWeight: 800, fontSize: 18, color: C.primary, fontFamily: "monospace" }}>
+                      {tonoDisplay}
+                    </span>
+                    {semis !== 0 && (
+                      <span style={{ fontSize: 11, color: C.gray }}>
+                        ({semis > 0 ? "+" : ""}{semis} st)
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Separador */}
+                  <div style={{ width: 1, height: 20, background: C.border }} />
+
+                  {/* Toggle Latino / Americano */}
+                  <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: `1px solid ${C.border}` }}>
+                    {[["🎵 Latino", true], ["ABC Americano", false]].map(([lbl, val]) => (
+                      <button key={lbl} onClick={() => setFormatoLatino(val)} style={{
+                        padding: "4px 10px", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
+                        background: formatoLatino === val ? C.primary : C.white,
+                        color: formatoLatino === val ? "white" : C.gray,
+                        transition: "all 0.15s", whiteSpace: "nowrap",
+                      }}>{lbl}</button>
+                    ))}
+                  </div>
+
+                  {isAdmin && !esTemp && (
+                    <Btn onClick={guardarLetra} style={{ fontSize: 11, padding: "4px 10px", marginLeft: "auto" }}>💾 Guardar letra</Btn>
+                  )}
+                </div>
+
+                {/* Letra con acordes */}
+                <LetraRenderer texto={letraTranspuesta} colorAcorde="#1a6fb5" formatoLatino={formatoLatino} />
+
+              </Card>
+
+              {/* ── Panel de transposición lateral (estilo lacuerda.net) ── */}
+              <div style={{
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                background: "#2d2d2d",
+                borderRadius: "0 0 12px 0",
+                padding: "14px 8px",
+                border: `1px solid ${C.border}`,
+                borderLeft: "none",
+                minHeight: 320,
+              }}>
+                <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+                  tono
+                </div>
+
+                {/* Tono actual en el panel */}
+                <div style={{
+                  width: 44, height: 44, borderRadius: 8,
+                  background: C.primary, color: "white",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 14, fontWeight: 800, fontFamily: "monospace",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                }}>
+                  {tonoDisplay}
+                </div>
+
+                <div style={{ width: 30, height: 1, background: "#555", margin: "4px 0" }} />
+
+                {/* Subir tono */}
+                <button onClick={() => setSemis(s => s + 1)} style={{
+                  width: 44, height: 36, borderRadius: 8, border: "none",
+                  background: "#4ade80", color: "#065f46", fontSize: 16, fontWeight: 700,
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+                }} title="+1 semitono">▲</button>
+
+                {/* Indicador de semitonos */}
+                <div style={{
+                  fontSize: 11, color: semis === 0 ? "#666" : "#f59e0b",
+                  fontWeight: 700, textAlign: "center",
+                  background: semis !== 0 ? "#f59e0b20" : "transparent",
+                  borderRadius: 4, padding: "2px 4px", width: 40, textAlign: "center",
+                }}>
+                  {semis > 0 ? `+${semis}` : semis < 0 ? `${semis}` : "orig"}
+                </div>
+
+                {/* Bajar tono */}
+                <button onClick={() => setSemis(s => s - 1)} style={{
+                  width: 44, height: 36, borderRadius: 8, border: "none",
+                  background: "#f87171", color: "#7f1d1d", fontSize: 16, fontWeight: 700,
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+                }} title="-1 semitono">▼</button>
+
+                <div style={{ width: 30, height: 1, background: "#555", margin: "4px 0" }} />
+
+                {/* Reset */}
+                <button onClick={() => setSemis(0)} style={{
+                  width: 44, height: 30, borderRadius: 7, border: `1px solid #555`,
+                  background: semis !== 0 ? "#f59e0b" : "#444",
+                  color: semis !== 0 ? "#fff" : "#888",
+                  fontSize: 10, fontWeight: 700, cursor: "pointer",
+                  transition: "all 0.15s",
+                }} title="Tono original">orig</button>
+
+                {/* Atajos de tonos comunes */}
+                <div style={{ width: 30, height: 1, background: "#555", margin: "4px 0" }} />
+                <div style={{ fontSize: 8, color: "#666", textAlign: "center", lineHeight: 1.3 }}>
+                  saltos
+                </div>
+                {[
+                  { label: "+3", delta: 3 },
+                  { label: "+5", delta: 5 },
+                  { label: "-3", delta: -3 },
+                  { label: "-5", delta: -5 },
+                ].map(({ label, delta }) => (
+                  <button key={label} onClick={() => setSemis(s => s + delta)} style={{
+                    width: 44, height: 26, borderRadius: 6, border: `1px solid #555`,
+                    background: "#3a3a3a", color: "#ccc",
+                    fontSize: 10, fontWeight: 600, cursor: "pointer",
+                  }}>{label}</button>
                 ))}
               </div>
-
-              {isAdmin && !esTemp && (
-                <Btn onClick={guardarLetra} style={{ fontSize: 11, padding: "5px 10px" }}>💾 Guardar letra</Btn>
-              )}
             </div>
-
-            {/* Letra con acordes — solo lectura, el usuario solo mueve acordes */}
-            <LetraRenderer texto={letraTranspuesta} colorAcorde="#1a6fb5" formatoLatino={formatoLatino} />
-
-            {/* Admin: botón guardar letra extraída (para que quede guardada la próxima vez) */}
-            {isAdmin && !esTemp && textoLetra && (
-              <div style={{ marginTop: 12 }}>
-                <Btn onClick={guardarLetra} style={{ fontSize: 11, padding: "5px 10px" }}>💾 Guardar letra extraída</Btn>
-              </div>
-            )}
-          </Card>
-
-          {/* ── Panel de transposición lateral (estilo lacuerda.net) ── */}
-          <div style={{
-            display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-            background: "#f0f0f0", borderRadius: "0 12px 12px 0",
-            padding: "16px 8px", border: `1px solid ${C.border}`, borderLeft: "none",
-            minHeight: 300,
-          }}>
-            <button onClick={() => setSemis(0)} style={btnTranspStyle(semis === 0)} title="Tono original">
-              <span style={{ fontSize: 11 }}>orig</span>
-            </button>
-            <button onClick={() => setSemis(s => s + 1)} style={btnTranspStyle(false)} title="+1 semitono">
-              <span>+1</span>
-            </button>
-            <button onClick={() => setSemis(s => s + 1)} style={{ ...btnTranspStyle(false), fontSize: 12 }} title="+½ tono">
-              +½
-            </button>
-            <button onClick={() => setSemis(s => s - 1)} style={{ ...btnTranspStyle(false), fontSize: 12 }} title="-½ tono">
-              −½
-            </button>
-            <button onClick={() => setSemis(s => s - 1)} style={btnTranspStyle(false)} title="-1 semitono">
-              <span>−1</span>
-            </button>
-          </div>
-        </div>
+          )}
+        </>
       )}
     </div>
   );
