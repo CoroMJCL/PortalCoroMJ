@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 // ══════════════════════════════════════════
 const SUPABASE_URL = "https://ttbipbhfswcwwgcwaist.supabase.co";
 const SUPABASE_KEY = "sb_publishable_mz6TyeuTP3TA6XQPOunXFQ_ad0Cp9fg";
+const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR0YmlwYmhmc3djd3dnY3dhaXN0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTA1MDExNiwiZXhwIjoyMDk0NjI2MTE2fQ.brVGJoNX6dBEC7Z6wQIQ4RxrqrxkGt7EFkAjpZmqCMs";
 
 // Código secreto para registrarse como Admin
 const SECRET_ADMIN_CODE = "CoroCJM2026!";
@@ -197,14 +198,31 @@ async function authSignIn(email, password) {
 }
 
 async function authResetPassword(email) {
+  const redirectTo = window.location.origin + window.location.pathname + "?type=recovery";
   const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
     method: "POST",
     headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, gotrue_meta_security: {}, redirect_to: redirectTo }),
   });
   if (!res.ok) {
     const d = await res.json();
     throw new Error(d.msg || "Error");
+  }
+}
+
+async function authUpdatePassword(newPassword) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    method: "PUT",
+    headers: {
+      apikey: SUPABASE_KEY,
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${_authToken}`,
+    },
+    body: JSON.stringify({ password: newPassword }),
+  });
+  if (!res.ok) {
+    const d = await res.json();
+    throw new Error(d.msg || "Error al actualizar contraseña");
   }
 }
 
@@ -731,7 +749,27 @@ function RadioMariaWidget() {
 
 
 export default function App() {
-  const [view, setView] = useState("login"); // "login" | "register" | "recover" | "app"
+  // Detectar si venimos del enlace de recuperación de contraseña
+  const _initialView = (() => {
+    const hash = window.location.hash; // #access_token=...&type=recovery
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("type") === "recovery" || hash.includes("type=recovery")) return "reset";
+    // Supabase envía el token en el hash: extraerlo y guardarlo
+    if (hash.includes("access_token")) {
+      try {
+        const hp = new URLSearchParams(hash.replace("#", ""));
+        const at = hp.get("access_token");
+        const rt = hp.get("refresh_token");
+        if (at && hp.get("type") === "recovery") {
+          _authToken = at;
+          if (rt) _refreshToken = rt;
+          return "reset";
+        }
+      } catch(e) {}
+    }
+    return "login";
+  })();
+  const [view, setView] = useState(_initialView); // "login" | "register" | "recover" | "reset" | "app"
   const [user, setUser] = useState(null);
   const [authToken, setAuthToken] = useState(null);
   const [section, setSection] = useState("dashboard");
@@ -809,6 +847,24 @@ export default function App() {
     }
     setDbLoading(false);
   }
+
+  // Detectar token de recuperación en el hash de la URL (Supabase lo envía así)
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes("access_token") && hash.includes("type=recovery")) {
+      try {
+        const hp = new URLSearchParams(hash.replace("#", ""));
+        const at = hp.get("access_token");
+        const rt = hp.get("refresh_token");
+        if (at) {
+          _authToken = at;
+          if (rt) _refreshToken = rt;
+          setView("reset");
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } catch(e) {}
+    }
+  }, []);
 
   useEffect(() => {
     if (view === "app") {
@@ -2416,6 +2472,43 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
             </form>
           )}
 
+          {/* ── NUEVA CONTRASEÑA (desde enlace de email) ── */}
+          {view === "reset" && (
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setError(""); setLoading(true);
+              const np = e.target.newpass.value;
+              const np2 = e.target.newpass2.value;
+              if (np !== np2) { setError("Las contraseñas no coinciden."); setLoading(false); return; }
+              if (np.length < 6) { setError("La contraseña debe tener al menos 6 caracteres."); setLoading(false); return; }
+              try {
+                await authUpdatePassword(np);
+                setSuccess("✅ Contraseña actualizada correctamente. Iniciando sesión...");
+                setTimeout(() => {
+                  setView("login");
+                  setSuccess("");
+                }, 2500);
+              } catch(err) { setError(err.message); }
+              setLoading(false);
+            }}>
+              <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 16, lineHeight: 1.6 }}>
+                Ingresa tu nueva contraseña para continuar.
+              </p>
+              <div style={{ marginBottom: 14 }}>
+                <label style={lbl}>Nueva contraseña</label>
+                <input name="newpass" type="password" required minLength={6} placeholder="Mínimo 6 caracteres" style={inp} />
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <label style={lbl}>Confirmar contraseña</label>
+                <input name="newpass2" type="password" required minLength={6} placeholder="Repite la contraseña" style={inp} />
+              </div>
+              <button type="submit" disabled={loading}
+                style={{ width: "100%", padding: "13px", background: "#1D9E75", border: "none", borderRadius: 8, color: "white", fontSize: 14, fontFamily: "'Poppins',sans-serif", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1 }}>
+                {loading ? "Guardando..." : "Cambiar contraseña"}
+              </button>
+            </form>
+          )}
+
           {/* ── RECUPERAR ── */}
           {view === "recover" && (
             <form onSubmit={doRecover}>
@@ -3082,7 +3175,7 @@ function Dashboard({
   );
   const misPresentes = misAsistencias.filter(a => a.estado === "presente").length;
   const misJustificados = misAsistencias.filter(a => a.estado === "justificado").length;
-  const totalEvaluados = misAsistencias.filter(a => a.estado !== "justificado").length;
+  const totalEvaluados = misAsistencias.filter(a => !["justificado","excluido","nuevo"].includes(a.estado)).length;
   const pctAsistencia = totalEvaluados > 0 ? Math.round((misPresentes / totalEvaluados) * 100) : null;
 
   const fmtEventoFecha = (f) => {
@@ -8409,6 +8502,7 @@ const ADMIN_TABS = [
   { id: "pautas", label: "🎼 Pautas Misa" },
   { id: "galeria", label: "🖼️ Galería" },
   { id: "comunidades", label: "⛪ Comunidades" },
+  { id: "cuentas", label: "🔐 Cuentas" },
 ];
 
 function AdminTab({ label, active, onClick }) {
@@ -13155,7 +13249,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
 
   const calcPct = (memberId) => {
     const misReg = asistencia.filter(a => a.member_id === memberId);
-    const evaluados = misReg.filter(a => a.estado !== "justificado");
+    const evaluados = misReg.filter(a => !["justificado","excluido","nuevo"].includes(a.estado));
     const presentes = evaluados.filter(a => a.estado === "presente").length;
     return evaluados.length > 0 ? Math.round((presentes / evaluados.length) * 100) : null;
   };
@@ -13172,7 +13266,9 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
   const misPresentes = misReg.filter(a => a.estado === "presente").length;
   const misAusentes = misReg.filter(a => a.estado === "ausente").length;
   const misJustificados = misReg.filter(a => a.estado === "justificado").length;
-  const evaluados = misReg.filter(a => a.estado !== "justificado").length;
+  const misExcluidos = misReg.filter(a => a.estado === "excluido").length;
+  const misNuevos = misReg.filter(a => a.estado === "nuevo").length;
+  const evaluados = misReg.filter(a => !["justificado","excluido","nuevo"].includes(a.estado)).length;
   const pct = calcPct(user?.id);
   const colPct = colorPct(pct);
   const circum = 2 * Math.PI * 38; // radio 38
@@ -13250,8 +13346,8 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                 const reg = misReg.find(a => a.evento_id === e.id);
                 const estado = reg?.estado;
                 if (!estado) return null;
-                const color = estado === "presente" ? C.primary : estado === "justificado" ? "#f59e0b" : "#ef4444";
-                const icono = estado === "presente" ? "✅" : estado === "justificado" ? "🟡" : "❌";
+                const color = estado === "presente" ? C.primary : estado === "justificado" ? "#f59e0b" : estado === "excluido" ? "#8b5cf6" : estado === "nuevo" ? "#06b6d4" : "#ef4444";
+                const icono = estado === "presente" ? "✅" : estado === "justificado" ? "🟡" : estado === "excluido" ? "🔵" : estado === "nuevo" ? "🆕" : "❌";
                 const tipoEmoji = e.tipo === "ensayo" ? "🎵" : e.tipo === "misa" ? "⛪" : "📅";
                 return (
                   <div key={e.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: color + "15", border: `1px solid ${color}30`, borderRadius: 10, padding: "6px 10px", fontSize: 11 }}>
@@ -13291,6 +13387,8 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                     const presentes = mReg.filter(a => a.estado === "presente").length;
                     const ausentes = mReg.filter(a => a.estado === "ausente").length;
                     const justificados = mReg.filter(a => a.estado === "justificado").length;
+                    const excluidos = mReg.filter(a => a.estado === "excluido").length;
+                    const nuevos = mReg.filter(a => a.estado === "nuevo").length;
                     const p = calcPct(m.id);
                     const mcc = CUERDAS[m.cuerda] || C.primary;
                     return (
@@ -13342,7 +13440,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                 {eventosConAsistencia.map(e => {
                   const regEvento = asistencia.filter(a => a.evento_id === e.id);
                   const presentes = regEvento.filter(a => a.estado === "presente").length;
-                  const total = regEvento.filter(a => a.estado !== "justificado").length;
+                  const total = regEvento.filter(a => !["justificado","excluido","nuevo"].includes(a.estado)).length;
                   const p = total > 0 ? Math.round((presentes / total) * 100) : 0;
                   const isOpen = eventoSeleccionado === e.id;
                   return (
@@ -13354,7 +13452,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 600, color: C.dark, fontSize: 13 }}>{e.titulo}</div>
-                          <div style={{ fontSize: 11, color: C.gray }}>{presentes} presentes · {regEvento.filter(a => a.estado === "ausente").length} ausentes · {regEvento.filter(a => a.estado === "justificado").length} justificados</div>
+                          <div style={{ fontSize: 11, color: C.gray }}>{presentes} presentes · {regEvento.filter(a => a.estado === "ausente").length} ausentes · {regEvento.filter(a => a.estado === "justificado").length} justificados{regEvento.filter(a => a.estado === "excluido").length > 0 ? ` · ${regEvento.filter(a => a.estado === "excluido").length} 🔵` : ""}{regEvento.filter(a => a.estado === "nuevo").length > 0 ? ` · ${regEvento.filter(a => a.estado === "nuevo").length} 🆕` : ""}</div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           <span style={{ fontWeight: 700, color: colorPct(p), fontSize: 14 }}>{p}%</span>
@@ -13366,8 +13464,8 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                           {members.map(m => {
                             const reg = regEvento.find(a => a.member_id === m.id);
                             const estado = reg?.estado || "sin registro";
-                            const color = estado === "presente" ? C.primary : estado === "justificado" ? "#f59e0b" : estado === "ausente" ? "#ef4444" : C.gray;
-                            const icono = estado === "presente" ? "✅" : estado === "justificado" ? "🟡" : estado === "ausente" ? "❌" : "⬜";
+                            const color = estado === "presente" ? C.primary : estado === "justificado" ? "#f59e0b" : estado === "ausente" ? "#ef4444" : estado === "excluido" ? "#8b5cf6" : estado === "nuevo" ? "#06b6d4" : C.gray;
+                            const icono = estado === "presente" ? "✅" : estado === "justificado" ? "🟡" : estado === "ausente" ? "❌" : estado === "excluido" ? "🔵" : estado === "nuevo" ? "🆕" : "⬜";
                             return (
                               <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 6, background: color + "15", border: `1px solid ${color}30`, borderRadius: 20, padding: "4px 10px", fontSize: 12 }}>
                                 <span>{icono}</span>
@@ -13400,6 +13498,54 @@ function AdminAsistencia({ members, eventos, asistencia, onReload }) {
   const [saved, setSaved] = useState(false);
   const [gcalLoading, setGcalLoading] = useState(false);
   const [gcalEventos, setGcalEventos] = useState(eventos || []);
+  const [resetMsg, setResetMsg] = useState("");
+  const [confirmResetAll, setConfirmResetAll] = useState(false);
+  const [confirmResetMember, setConfirmResetMember] = useState(null); // member id
+  const [resetting, setResetting] = useState(false);
+
+  const flashReset = (txt) => { setResetMsg(txt); setTimeout(() => setResetMsg(""), 3500); };
+
+  // Borrar TODA la asistencia del grupo
+  const resetearTodo = async () => {
+    setResetting(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/asistencia`, {
+        method: "DELETE",
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!res.ok) throw new Error("Error al borrar asistencia");
+      flashReset("✅ Asistencia completa del grupo reseteada.");
+      setConfirmResetAll(false);
+      setRegistros({});
+      onReload();
+    } catch (e) { flashReset("❌ " + e.message); }
+    setResetting(false);
+  };
+
+  // Borrar asistencia de un integrante específico
+  const resetearMiembro = async (memberId) => {
+    setResetting(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?member_id=eq.${memberId}`, {
+        method: "DELETE",
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!res.ok) throw new Error("Error al borrar asistencia");
+      const nombre = members.find(m => m.id === memberId)?.nombre || "integrante";
+      flashReset(`✅ Asistencia de ${nombre} reseteada.`);
+      setConfirmResetMember(null);
+      onReload();
+    } catch (e) { flashReset("❌ " + e.message); }
+    setResetting(false);
+  };
 
   // Si no hay eventos pasados, intentar cargar desde GCal directamente
   useEffect(() => {
@@ -13493,6 +13639,8 @@ function AdminAsistencia({ members, eventos, asistencia, onReload }) {
   const presentes = Object.values(registros).filter(e => e === "presente").length;
   const justificados = Object.values(registros).filter(e => e === "justificado").length;
   const ausentes = Object.values(registros).filter(e => e === "ausente").length;
+  const excluidos = Object.values(registros).filter(e => e === "excluido").length;
+  const nuevosCount = Object.values(registros).filter(e => e === "nuevo").length;
 
   return (
     <div>
@@ -13532,12 +13680,21 @@ function AdminAsistencia({ members, eventos, asistencia, onReload }) {
               <div style={{ fontSize: 20, fontWeight: 800, color: "#ef4444" }}>{ausentes}</div>
               <div style={{ fontSize: 11, color: "#ef4444" }}>Ausentes</div>
             </div>
+            <div style={{ flex: 1, minWidth: 80, background: "#ede9fe", borderRadius: 10, padding: "10px 14px", textAlign: "center" }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#8b5cf6" }}>{excluidos}</div>
+              <div style={{ fontSize: 11, color: "#8b5cf6" }}>🔵 Excluidos</div>
+            </div>
+            <div style={{ flex: 1, minWidth: 80, background: "#cffafe", borderRadius: 10, padding: "10px 14px", textAlign: "center" }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#06b6d4" }}>{nuevosCount}</div>
+              <div style={{ fontSize: 11, color: "#06b6d4" }}>🆕 Nuevos</div>
+            </div>
           </div>
 
           {/* Botones marcar todos */}
           <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
             <button onClick={() => marcarTodos("presente")} style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.primary}`, background: C.primaryLight, color: C.primary, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>✅ Todos presentes</button>
             <button onClick={() => marcarTodos("ausente")} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #ef4444", background: "#fee2e2", color: "#ef4444", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>❌ Todos ausentes</button>
+            <button onClick={() => marcarTodos("excluido")} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #8b5cf6", background: "#ede9fe", color: "#8b5cf6", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔵 Excluir todos</button>
           </div>
 
           {/* Lista de integrantes */}
@@ -13555,13 +13712,14 @@ function AdminAsistencia({ members, eventos, asistencia, onReload }) {
                     <div style={{ fontSize: 11, color: cc }}>{rolLabel(m.cuerda)}</div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
-                    {["presente", "justificado", "ausente"].map(op => {
-                      const labels = { presente: "✅", justificado: "🟡", ausente: "❌" };
-                      const colors = { presente: C.primary, justificado: "#f59e0b", ausente: "#ef4444" };
+                    {["presente", "justificado", "ausente", "excluido", "nuevo"].map(op => {
+                      const labels = { presente: "✅", justificado: "🟡", ausente: "❌", excluido: "🔵", nuevo: "🆕" };
+                      const colors = { presente: C.primary, justificado: "#f59e0b", ausente: "#ef4444", excluido: "#8b5cf6", nuevo: "#06b6d4" };
+                      const tooltips = { presente: "Presente", justificado: "Justificado", ausente: "Ausente", excluido: "Excluido (no aplica)", nuevo: "Integrante nuevo" };
                       const activo = estado === op;
                       return (
                         <button key={op} onClick={() => setRegistros(r => ({ ...r, [m.id]: op }))}
-                          title={op.charAt(0).toUpperCase() + op.slice(1)}
+                          title={tooltips[op]}
                           style={{ width: 34, height: 34, borderRadius: 8, border: activo ? `2px solid ${colors[op]}` : `1px solid ${C.border}`, background: activo ? colors[op] + "20" : "white", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
                           {labels[op]}
                         </button>
@@ -13577,6 +13735,313 @@ function AdminAsistencia({ members, eventos, asistencia, onReload }) {
             {saving ? "Guardando..." : saved ? "✅ Guardado correctamente" : "Guardar asistencia"}
           </button>
         </>
+      )}
+
+      {/* ── RESET DE ASISTENCIA ── */}
+      <div style={{ marginTop: 28, borderTop: `2px solid ${C.border}`, paddingTop: 20 }}>
+        <div style={{ fontWeight: 700, color: C.dark, fontSize: 14, marginBottom: 4 }}>🗑️ Resetear asistencia</div>
+        <div style={{ fontSize: 12, color: C.gray, marginBottom: 14 }}>Borra registros de asistencia de forma permanente. Esta acción no se puede deshacer.</div>
+
+        {resetMsg && (
+          <div style={{ padding: "10px 14px", borderRadius: 10, marginBottom: 12, fontSize: 13, fontWeight: 600,
+            background: resetMsg.startsWith("✅") ? "#d1fae5" : "#fee2e2",
+            color: resetMsg.startsWith("✅") ? "#065f46" : "#991b1b",
+            border: `1px solid ${resetMsg.startsWith("✅") ? "#6ee7b7" : "#fca5a5"}` }}>
+            {resetMsg}
+          </div>
+        )}
+
+        {/* Reset por integrante */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: C.gray, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Por integrante</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 10, padding: 8 }}>
+            {members.map(m => {
+              const cc = CUERDAS[m.cuerda] || C.primary;
+              const count = asistencia.filter(a => a.member_id === m.id).length;
+              const isConfirm = confirmResetMember === m.id;
+              return (
+                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, background: isConfirm ? "#fee2e2" : "transparent" }}>
+                  <div style={{ width: 30, height: 30, borderRadius: "50%", background: cc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 11, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                    {m.foto_url ? <img src={m.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(m.nombre || "?")}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, color: C.dark, fontSize: 12 }}>{m.nombre}</div>
+                    <div style={{ fontSize: 10, color: C.gray }}>{count} registro{count !== 1 ? "s" : ""}</div>
+                  </div>
+                  {isConfirm ? (
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <button onClick={() => resetearMiembro(m.id)} disabled={resetting}
+                        style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #ef4444", background: "#ef4444", color: "white", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                        {resetting ? "..." : "Confirmar"}
+                      </button>
+                      <button onClick={() => setConfirmResetMember(null)}
+                        style={{ padding: "4px 8px", borderRadius: 8, border: `1px solid ${C.border}`, background: "white", color: C.gray, fontSize: 11, cursor: "pointer" }}>
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setConfirmResetMember(m.id)} disabled={count === 0}
+                      style={{ padding: "4px 10px", borderRadius: 8, border: count === 0 ? `1px solid ${C.border}` : "1px solid #ef4444", background: count === 0 ? "transparent" : "#fff0f0", color: count === 0 ? C.gray : "#ef4444", fontSize: 11, fontWeight: 600, cursor: count === 0 ? "default" : "pointer" }}>
+                      Resetear
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Reset total */}
+        <div style={{ background: "#fff0f0", border: "1px solid #fca5a5", borderRadius: 10, padding: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#991b1b", marginBottom: 6 }}>⚠️ Resetear todo el grupo</div>
+          <div style={{ fontSize: 12, color: "#7f1d1d", marginBottom: 12 }}>Borra todos los registros de asistencia de todos los integrantes. No se puede deshacer.</div>
+          {confirmResetAll ? (
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={resetearTodo} disabled={resetting}
+                style={{ flex: 1, padding: "10px", borderRadius: 10, border: "none", background: "#ef4444", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                {resetting ? "Borrando..." : "Sí, borrar todo"}
+              </button>
+              <button onClick={() => setConfirmResetAll(false)}
+                style={{ flex: 1, padding: "10px", borderRadius: 10, border: `1px solid ${C.border}`, background: "white", color: C.gray, fontSize: 13, cursor: "pointer" }}>
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmResetAll(true)}
+              style={{ width: "100%", padding: "10px", borderRadius: 10, border: "1px solid #ef4444", background: "white", color: "#ef4444", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+              🗑️ Resetear asistencia completa
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+//  ADMIN CUENTAS
+// ══════════════════════════════════════════
+function AdminCuentas({ members, onReload }) {
+  const [selectedId, setSelectedId] = useState(null);
+  const [newPass, setNewPass] = useState("");
+  const [newPass2, setNewPass2] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [msgType, setMsgType] = useState("ok"); // "ok" | "error"
+  const [confirmBaja, setConfirmBaja] = useState(null); // member id
+
+  const selected = members.find(m => m.id === selectedId);
+
+  const flash = (text, type = "ok") => {
+    setMsg(text); setMsgType(type);
+    setTimeout(() => setMsg(""), 3500);
+  };
+
+  // Cambiar contraseña usando service_role (Admin API)
+  const cambiarPassword = async () => {
+    if (!selectedId) return;
+    if (newPass.length < 6) { flash("La contraseña debe tener al menos 6 caracteres.", "error"); return; }
+    if (newPass !== newPass2) { flash("Las contraseñas no coinciden.", "error"); return; }
+    setSaving(true);
+    try {
+      // Buscar el auth_user_id del integrante
+      const member = members.find(m => m.id === selectedId);
+      if (!member?.auth_id) throw new Error("No se encontró el auth_id del integrante.");
+      // Usar Admin API de Supabase con service_role
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${member.auth_id}`, {
+        method: "PUT",
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password: newPass }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.msg || d.message || "Error al cambiar contraseña");
+      }
+      flash("✅ Contraseña cambiada correctamente.");
+      setNewPass(""); setNewPass2("");
+    } catch (e) {
+      flash(e.message, "error");
+    }
+    setSaving(false);
+  };
+
+  // Dar de baja: deshabilitar cuenta en Supabase Auth
+  const darDeBaja = async (memberId) => {
+    const member = members.find(m => m.id === memberId);
+    if (!member) return;
+    setSaving(true);
+    try {
+      // Deshabilitar en auth
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${member.auth_id}`, {
+        method: "PUT",
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ban_duration: "876000h" }), // ~100 años = baja permanente
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.msg || d.message || "Error al dar de baja");
+      }
+      // Marcar en tabla integrantes
+      await fetch(`${SUPABASE_URL}/rest/v1/integrantes?id=eq.${memberId}`, {
+        method: "PATCH",
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ activo: false }),
+      });
+      flash("✅ Cuenta dada de baja correctamente.");
+      setConfirmBaja(null);
+      if (selectedId === memberId) setSelectedId(null);
+      onReload();
+    } catch (e) {
+      flash(e.message, "error");
+    }
+    setSaving(false);
+  };
+
+  // Reactivar cuenta
+  const reactivar = async (memberId) => {
+    const member = members.find(m => m.id === memberId);
+    if (!member) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${member.auth_id}`, {
+        method: "PUT",
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ban_duration: "none" }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.msg || d.message || "Error al reactivar");
+      }
+      await fetch(`${SUPABASE_URL}/rest/v1/integrantes?id=eq.${memberId}`, {
+        method: "PATCH",
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ activo: true }),
+      });
+      flash("✅ Cuenta reactivada correctamente.");
+      onReload();
+    } catch (e) {
+      flash(e.message, "error");
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: C.gray, marginBottom: 16, lineHeight: 1.6 }}>
+        Gestiona las cuentas de los integrantes. Puedes cambiar contraseñas y dar de baja cuentas.
+      </div>
+
+      {msg && (
+        <div style={{ padding: "10px 14px", borderRadius: 10, marginBottom: 14, fontSize: 13, fontWeight: 600,
+          background: msgType === "ok" ? "#d1fae5" : "#fee2e2",
+          color: msgType === "ok" ? "#065f46" : "#991b1b",
+          border: `1px solid ${msgType === "ok" ? "#6ee7b7" : "#fca5a5"}` }}>
+          {msg}
+        </div>
+      )}
+
+      {/* Lista de integrantes */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, color: C.dark, display: "block", marginBottom: 8 }}>
+          Selecciona un integrante
+        </label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 12, padding: 8 }}>
+          {members.map(m => {
+            const cc = CUERDAS[m.cuerda] || C.primary;
+            const inactivo = m.activo === false;
+            const sel = selectedId === m.id;
+            return (
+              <div key={m.id} onClick={() => { setSelectedId(sel ? null : m.id); setNewPass(""); setNewPass2(""); setMsg(""); }}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, cursor: "pointer",
+                  background: sel ? C.primary + "15" : "transparent",
+                  border: sel ? `1.5px solid ${C.primary}` : "1.5px solid transparent",
+                  opacity: inactivo ? 0.5 : 1 }}>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: cc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 13, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                  {m.foto_url ? <img src={m.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(m.nombre || "?")}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, color: C.dark, fontSize: 13 }}>{m.nombre} {inactivo && <span style={{ fontSize: 10, color: "#ef4444", fontWeight: 700 }}>BAJA</span>}</div>
+                  <div style={{ fontSize: 11, color: cc }}>{rolLabel(m.cuerda)}</div>
+                </div>
+                {inactivo ? (
+                  <button onClick={e => { e.stopPropagation(); reactivar(m.id); }} disabled={saving}
+                    style={{ padding: "4px 10px", borderRadius: 8, border: `1px solid ${C.primary}`, background: C.primaryLight, color: C.primary, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                    Reactivar
+                  </button>
+                ) : (
+                  confirmBaja === m.id ? (
+                    <div style={{ display: "flex", gap: 4 }} onClick={e => e.stopPropagation()}>
+                      <button onClick={() => darDeBaja(m.id)} disabled={saving}
+                        style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #ef4444", background: "#fee2e2", color: "#ef4444", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                        Confirmar baja
+                      </button>
+                      <button onClick={() => setConfirmBaja(null)}
+                        style={{ padding: "4px 8px", borderRadius: 8, border: `1px solid ${C.border}`, background: "white", color: C.gray, fontSize: 11, cursor: "pointer" }}>
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={e => { e.stopPropagation(); setConfirmBaja(m.id); }}
+                      style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #ef4444", background: "#fff0f0", color: "#ef4444", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                      Dar de baja
+                    </button>
+                  )
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Panel de cambio de contraseña */}
+      {selected && selected.activo !== false && (
+        <div style={{ background: C.bg, borderRadius: 12, padding: 16, border: `1px solid ${C.border}` }}>
+          <div style={{ fontWeight: 700, color: C.dark, fontSize: 14, marginBottom: 12 }}>
+            🔑 Cambiar contraseña — {selected.nombre}
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: C.gray, display: "block", marginBottom: 4 }}>Nueva contraseña</label>
+            <input type="password" value={newPass} onChange={e => setNewPass(e.target.value)}
+              placeholder="Mínimo 6 caracteres" minLength={6}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 14, boxSizing: "border-box" }} />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: C.gray, display: "block", marginBottom: 4 }}>Repetir contraseña</label>
+            <input type="password" value={newPass2} onChange={e => setNewPass2(e.target.value)}
+              placeholder="Repite la contraseña" minLength={6}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 14, boxSizing: "border-box" }} />
+          </div>
+          <div style={{ fontSize: 11, color: C.gray, marginBottom: 12, background: "#fef3c7", padding: "8px 12px", borderRadius: 8, border: "1px solid #fde68a" }}>
+            💡 Asigna una contraseña temporal y comunícasela al integrante para que luego la cambie desde su perfil.
+          </div>
+          <button onClick={cambiarPassword} disabled={saving || !newPass || !newPass2}
+            style={{ width: "100%", padding: "11px", borderRadius: 10, border: "none",
+              background: saving || !newPass || !newPass2 ? "#e5e7eb" : C.primary,
+              color: saving || !newPass || !newPass2 ? C.gray : "white",
+              fontSize: 14, fontWeight: 700, cursor: saving || !newPass || !newPass2 ? "not-allowed" : "pointer" }}>
+            {saving ? "Guardando..." : "Cambiar contraseña"}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -14240,6 +14705,7 @@ function Admin({
         {tab === "asistencia" && <AdminAsistencia members={members} eventos={eventos} asistencia={asistencia} onReload={onReload} />}
         {tab === "galeria" && <AdminGaleria fotos={fotos} onReload={onReload} />}
         {tab === "comunidades" && <AdminComunidades comunidades={comunidades} onReload={onReload} />}
+        {tab === "cuentas" && <AdminCuentas members={members} onReload={onReload} />}
       </Card>
 
       <SqlSetupBlock />
