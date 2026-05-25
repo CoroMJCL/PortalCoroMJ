@@ -837,7 +837,13 @@ export default function App() {
         supabase("asistencia", { order: "&order=created_at.desc" }).catch(() => []),
         supabase("galeria", { order: "&order=orden.asc,created_at.asc" }).catch(() => []),
         supabase("comunidades", { order: "&order=orden.asc,created_at.asc" }).catch(() => []),
-        supabase("reconocimientos", { order: "&order=created_at.desc" }).catch(() => []),
+        fetch(`${SUPABASE_URL}/rest/v1/reconocimientos?select=*&order=created_at.desc`, {
+          headers: {
+            apikey: SUPABASE_SERVICE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }).then(r => r.ok ? r.json() : []).catch(() => []),
       ]);
       setMembers(m || []);
       setEventos(ev || []);
@@ -14208,9 +14214,21 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
   // "general" | "evento"
   const [tipoReco, setTipoReco] = useState("general");
   const [eventoId, setEventoId] = useState("");
+  // "persona" | "grupo"
+  const [modoDestinatario, setModoDestinatario] = useState("persona");
+  const [grupoSelec, setGrupoSelec] = useState("");
+
+  const GRUPOS = [
+    { id: "Soprano",   label: "Sopranos",   icon: "🎶", color: CUERDAS.Soprano },
+    { id: "Contralto", label: "Contraltos", icon: "🎵", color: CUERDAS.Contralto },
+    { id: "Tenor",     label: "Tenores",    icon: "🎼", color: CUERDAS.Tenor },
+    { id: "Bajo",      label: "Bajos",      icon: "🎹", color: CUERDAS.Bajo },
+    { id: "Coro",      label: "Todo el coro", icon: "🌟", color: C.primary },
+  ];
 
   const otrosMembers = (members || []).filter((m) => m.id !== user?.id);
   const paraInfo = members.find((m) => m.id === paraId);
+  const grupoInfo = GRUPOS.find((g) => g.id === grupoSelec);
 
   // Eventos pasados + próximos de Google Calendar (últimos 30 días + próximos 60)
   const eventosDisponibles = (gcalEventos || []);
@@ -14220,44 +14238,46 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
     : (reconocimientos || []);
 
   async function handleEnviar() {
-    if (!paraId) { setError("Selecciona a quién quieres reconocer."); return; }
+    if (modoDestinatario === "persona" && !paraId) { setError("Selecciona a quién quieres reconocer."); return; }
+    if (modoDestinatario === "grupo" && !grupoSelec) { setError("Selecciona qué grupo quieres reconocer."); return; }
     if (tipoReco === "evento" && !eventoId) { setError("Selecciona el evento al que corresponde este reconocimiento."); return; }
     if (!mensaje.trim()) { setError("Escribe un mensaje de reconocimiento."); return; }
     if (mensaje.trim().length < 10) { setError("El mensaje es muy corto. ¡Exprésate con cariño!"); return; }
 
-    // Validar duplicados
-    if (tipoReco === "evento") {
-      // Solo 1 reconocimiento de mí → esa persona en ese evento
-      const yaExiste = (reconocimientos || []).some(
-        (r) => r.de_id === user.id && r.para_id === paraId && r.evento_id === eventoId
-      );
-      if (yaExiste) {
-        setError("Ya reconociste a esta persona en ese evento. Puedes hacerlo en otro evento diferente.");
-        return;
-      }
-    } else {
-      // General: límite de 7 días entre reconocimientos a la misma persona
-      const hace7dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const reciente = (reconocimientos || []).find(
-        (r) =>
-          r.de_id === user.id &&
-          r.para_id === paraId &&
-          !r.evento_id &&
-          new Date(r.created_at) > hace7dias
-      );
-      if (reciente) {
-        const dias = Math.ceil((Date.now() - new Date(reciente.created_at)) / (1000 * 60 * 60 * 24));
-        setError(`Ya enviaste un reconocimiento general a esta persona hace ${dias} día${dias !== 1 ? "s" : ""}. Espera ${7 - dias} día${(7 - dias) !== 1 ? "s" : ""} más, o reconócela por un evento específico.`);
-        return;
+    // Validar duplicados (solo para persona, no grupo)
+    if (modoDestinatario === "persona") {
+      if (tipoReco === "evento") {
+        const yaExiste = (reconocimientos || []).some(
+          (r) => r.de_id === user.id && r.para_id === paraId && r.evento_id === eventoId
+        );
+        if (yaExiste) {
+          setError("Ya reconociste a esta persona en ese evento. Puedes hacerlo en otro evento diferente.");
+          return;
+        }
+      } else {
+        const hace7dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const reciente = (reconocimientos || []).find(
+          (r) =>
+            r.de_id === user.id &&
+            r.para_id === paraId &&
+            !r.evento_id &&
+            new Date(r.created_at) > hace7dias
+        );
+        if (reciente) {
+          const dias = Math.ceil((Date.now() - new Date(reciente.created_at)) / (1000 * 60 * 60 * 24));
+          setError(`Ya enviaste un reconocimiento general a esta persona hace ${dias} día${dias !== 1 ? "s" : ""}. Espera ${7 - dias} día${(7 - dias) !== 1 ? "s" : ""} más, o reconócela por un evento específico.`);
+          return;
+        }
       }
     }
 
     setSaving(true);
     setError("");
     try {
-      const para = members.find((m) => m.id === paraId);
+      const para = modoDestinatario === "persona" ? members.find((m) => m.id === paraId) : null;
+      const grupo = modoDestinatario === "grupo" ? GRUPOS.find((g) => g.id === grupoSelec) : null;
       const eventoSelec = tipoReco === "evento" ? eventosDisponibles.find((e) => e.id === eventoId) : null;
-      // Usamos service key para saltar RLS en reconocimientos
+
       const res = await fetch(`${SUPABASE_URL}/rest/v1/reconocimientos`, {
         method: "POST",
         headers: {
@@ -14269,13 +14289,12 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
         body: JSON.stringify({
           de_id: user.id,
           de_nombre: user.nombre,
-          para_id: paraId,
-          para_nombre: para?.nombre || "",
+          para_id: para?.id || null,
+          para_nombre: para?.nombre || (grupo ? grupo.label : ""),
           para_email: para?.email || "",
+          para_grupo: grupo?.id || null,
           mensaje: mensaje.trim(),
           categoria,
-          // Solo incluir campos de evento si hay evento seleccionado
-          // (evita error si aún no se han ejecutado los ALTER TABLE)
           ...(eventoSelec ? {
             evento_id: eventoSelec.id,
             evento_titulo: eventoSelec.titulo,
@@ -14284,7 +14303,6 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
         }),
       });
       if (!res.ok) throw new Error(await res.text());
-      // Intentar enviar email (no bloqueante)
       if (para?.email) {
         await sendRecoEmail(para.email, para.nombre, user.nombre, categoria, mensaje.trim());
       }
@@ -14294,6 +14312,8 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
       setMensaje("");
       setEventoId("");
       setTipoReco("general");
+      setGrupoSelec("");
+      setModoDestinatario("persona");
       onReload();
       setTimeout(() => setSuccess(false), 4000);
     } catch (e) {
@@ -14441,25 +14461,66 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
             </div>
           )}
 
-          {/* Seleccionar persona */}
+          {/* Modo destinatario: persona o grupo */}
           <div style={{ marginBottom: 14 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: C.dark, display: "block", marginBottom: 6 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: C.dark, display: "block", marginBottom: 8 }}>
               ¿A quién quieres reconocer? *
             </label>
-            <select
-              value={paraId}
-              onChange={(e) => setParaId(e.target.value)}
-              style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, color: C.dark, background: "white", outline: "none" }}
-            >
-              <option value="">— Selecciona un integrante —</option>
-              {otrosMembers.map((m) => (
-                <option key={m.id} value={m.id}>{m.nombre} ({rolLabel(m.cuerda)})</option>
+            <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+              {[
+                { id: "persona", icon: "👤", label: "Una persona" },
+                { id: "grupo",   icon: "👥", label: "Un grupo / cuerda" },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => { setModoDestinatario(t.id); setParaId(""); setGrupoSelec(""); }}
+                  style={{
+                    flex: 1, padding: "7px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                    background: modoDestinatario === t.id ? C.primary : C.light,
+                    color: modoDestinatario === t.id ? "white" : C.dark,
+                    border: modoDestinatario === t.id ? `1px solid ${C.primaryDark}` : `1px solid ${C.border}`,
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  }}
+                >
+                  <span>{t.icon}</span><span>{t.label}</span>
+                </button>
               ))}
-            </select>
+            </div>
+
+            {modoDestinatario === "persona" ? (
+              <select
+                value={paraId}
+                onChange={(e) => setParaId(e.target.value)}
+                style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, color: C.dark, background: "white", outline: "none" }}
+              >
+                <option value="">— Selecciona un integrante —</option>
+                {otrosMembers.map((m) => (
+                  <option key={m.id} value={m.id}>{m.nombre} ({rolLabel(m.cuerda)})</option>
+                ))}
+              </select>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {GRUPOS.map((g) => (
+                  <button
+                    key={g.id}
+                    onClick={() => setGrupoSelec(g.id)}
+                    style={{
+                      padding: "8px 14px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                      background: grupoSelec === g.id ? g.color : C.light,
+                      color: grupoSelec === g.id ? "white" : C.dark,
+                      border: grupoSelec === g.id ? `1px solid ${g.color}` : `1px solid ${C.border}`,
+                      display: "flex", alignItems: "center", gap: 5,
+                    }}
+                  >
+                    <span>{g.icon}</span><span>{g.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Vista previa del destinatario */}
-          {paraInfo && (
+          {modoDestinatario === "persona" && paraInfo && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.primaryLight, borderRadius: 10, padding: "10px 12px", marginBottom: 14, border: `1px solid ${C.primary}30` }}>
               <div style={{ width: 36, height: 36, borderRadius: "50%", background: getColor(paraId), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 13, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
                 {paraInfo.foto_url ? <img src={paraInfo.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(paraInfo.nombre || "?")}
@@ -14469,6 +14530,19 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
                 <div style={{ fontSize: 11, color: getColor(paraId) }}>{rolLabel(paraInfo.cuerda)}</div>
               </div>
               <span style={{ marginLeft: "auto", fontSize: 16 }}>✉️</span>
+            </div>
+          )}
+          {modoDestinatario === "grupo" && grupoInfo && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: grupoInfo.color + "15", borderRadius: 10, padding: "10px 12px", marginBottom: 14, border: `1px solid ${grupoInfo.color}30` }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: grupoInfo.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
+                {grupoInfo.icon}
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: C.dark }}>{grupoInfo.label}</div>
+                <div style={{ fontSize: 11, color: grupoInfo.color }}>
+                  {grupoInfo.id === "Coro" ? "Todos los integrantes" : `${(members || []).filter(m => m.cuerda === grupoInfo.id).length} integrantes`}
+                </div>
+              </div>
             </div>
           )}
 
@@ -14571,7 +14645,15 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
               {filtered.map((r) => {
                 const para = getAvatar(r.para_id);
                 const de = getAvatar(r.de_id);
-                const cc = CUERDAS[para?.cuerda] || C.primary;
+                const esGrupo = !r.para_id && r.para_grupo;
+                const grupoCard = esGrupo ? [
+                  { id: "Soprano",   label: "Sopranos",    icon: "🎶", color: CUERDAS.Soprano },
+                  { id: "Contralto", label: "Contraltos",  icon: "🎵", color: CUERDAS.Contralto },
+                  { id: "Tenor",     label: "Tenores",     icon: "🎼", color: CUERDAS.Tenor },
+                  { id: "Bajo",      label: "Bajos",       icon: "🎹", color: CUERDAS.Bajo },
+                  { id: "Coro",      label: "Todo el coro",icon: "🌟", color: C.primary },
+                ].find(g => g.id === r.para_grupo) : null;
+                const cc = esGrupo ? (grupoCard?.color || C.primary) : (CUERDAS[para?.cuerda] || C.primary);
                 const dc = CUERDAS[de?.cuerda] || C.gray;
                 const cat = RECO_CATS.find(c => c.id === r.categoria);
                 const fecha = r.created_at ? new Date(r.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" }) : "";
@@ -14584,14 +14666,20 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
                   }}>
                     {/* Cabecera destinatario */}
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: cc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 12, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
-                        {para?.foto_url ? <img src={para.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(r.para_nombre || "?")}
+                      <div style={{ width: 36, height: 36, borderRadius: esGrupo ? 10 : "50%", background: cc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: esGrupo ? 18 : 12, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                        {esGrupo
+                          ? grupoCard?.icon || "👥"
+                          : para?.foto_url
+                            ? <img src={para.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            : ini(r.para_nombre || "?")}
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: C.dark }}>
                           Para <span style={{ color: cc }}>{r.para_nombre}</span>
                         </div>
-                        <div style={{ fontSize: 11, color: C.gray }}>{rolLabel(para?.cuerda)}</div>
+                        <div style={{ fontSize: 11, color: C.gray }}>
+                          {esGrupo ? "Reconocimiento grupal" : rolLabel(para?.cuerda)}
+                        </div>
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <div style={{ fontSize: 18 }}>{cat?.icon || "🌟"}</div>
@@ -14702,11 +14790,12 @@ function SqlSetupBlock() {
             drop policy if exists "asis_all" on asistencia;<br />
             create policy "asis_all" on asistencia for all using (true) with check (true);<br />
             -- Tabla reconocimientos:<br />
-            create table if not exists reconocimientos (id uuid default gen_random_uuid() primary key, de_id uuid references integrantes(id), de_nombre text, para_id uuid references integrantes(id), para_nombre text, para_email text, mensaje text not null, categoria text default 'general', evento_id text, evento_titulo text, evento_fecha date, created_at timestamptz default now());<br />
+            create table if not exists reconocimientos (id uuid default gen_random_uuid() primary key, de_id uuid references integrantes(id), de_nombre text, para_id uuid references integrantes(id), para_nombre text, para_email text, para_grupo text, mensaje text not null, categoria text default 'general', evento_id text, evento_titulo text, evento_fecha date, created_at timestamptz default now());<br />
             -- Migración si la tabla ya existe (ejecutar una sola vez):<br />
             alter table reconocimientos add column if not exists evento_id text;<br />
             alter table reconocimientos add column if not exists evento_titulo text;<br />
             alter table reconocimientos add column if not exists evento_fecha date;<br />
+            alter table reconocimientos add column if not exists para_grupo text;<br />
             alter table reconocimientos enable row level security;<br />
             drop policy if exists "reco_all" on reconocimientos;<br />
             create policy "reco_all" on reconocimientos for all using (true) with check (true);
