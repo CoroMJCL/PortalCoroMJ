@@ -198,7 +198,7 @@ async function authSignIn(email, password) {
 }
 
 async function authResetPassword(email) {
-  const redirectTo = window.location.origin + window.location.pathname + "?type=recovery";
+  const redirectTo = "https://portal-coro-mj.vercel.app/?type=recovery";
   const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
     method: "POST",
     headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
@@ -13498,54 +13498,6 @@ function AdminAsistencia({ members, eventos, asistencia, onReload }) {
   const [saved, setSaved] = useState(false);
   const [gcalLoading, setGcalLoading] = useState(false);
   const [gcalEventos, setGcalEventos] = useState(eventos || []);
-  const [resetMsg, setResetMsg] = useState("");
-  const [confirmResetAll, setConfirmResetAll] = useState(false);
-  const [confirmResetMember, setConfirmResetMember] = useState(null); // member id
-  const [resetting, setResetting] = useState(false);
-
-  const flashReset = (txt) => { setResetMsg(txt); setTimeout(() => setResetMsg(""), 3500); };
-
-  // Borrar TODA la asistencia del grupo
-  const resetearTodo = async () => {
-    setResetting(true);
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/asistencia`, {
-        method: "DELETE",
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!res.ok) throw new Error("Error al borrar asistencia");
-      flashReset("✅ Asistencia completa del grupo reseteada.");
-      setConfirmResetAll(false);
-      setRegistros({});
-      onReload();
-    } catch (e) { flashReset("❌ " + e.message); }
-    setResetting(false);
-  };
-
-  // Borrar asistencia de un integrante específico
-  const resetearMiembro = async (memberId) => {
-    setResetting(true);
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?member_id=eq.${memberId}`, {
-        method: "DELETE",
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!res.ok) throw new Error("Error al borrar asistencia");
-      const nombre = members.find(m => m.id === memberId)?.nombre || "integrante";
-      flashReset(`✅ Asistencia de ${nombre} reseteada.`);
-      setConfirmResetMember(null);
-      onReload();
-    } catch (e) { flashReset("❌ " + e.message); }
-    setResetting(false);
-  };
 
   // Si no hay eventos pasados, intentar cargar desde GCal directamente
   useEffect(() => {
@@ -13736,84 +13688,6 @@ function AdminAsistencia({ members, eventos, asistencia, onReload }) {
           </button>
         </>
       )}
-
-      {/* ── RESET DE ASISTENCIA ── */}
-      <div style={{ marginTop: 28, borderTop: `2px solid ${C.border}`, paddingTop: 20 }}>
-        <div style={{ fontWeight: 700, color: C.dark, fontSize: 14, marginBottom: 4 }}>🗑️ Resetear asistencia</div>
-        <div style={{ fontSize: 12, color: C.gray, marginBottom: 14 }}>Borra registros de asistencia de forma permanente. Esta acción no se puede deshacer.</div>
-
-        {resetMsg && (
-          <div style={{ padding: "10px 14px", borderRadius: 10, marginBottom: 12, fontSize: 13, fontWeight: 600,
-            background: resetMsg.startsWith("✅") ? "#d1fae5" : "#fee2e2",
-            color: resetMsg.startsWith("✅") ? "#065f46" : "#991b1b",
-            border: `1px solid ${resetMsg.startsWith("✅") ? "#6ee7b7" : "#fca5a5"}` }}>
-            {resetMsg}
-          </div>
-        )}
-
-        {/* Reset por integrante */}
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: C.gray, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Por integrante</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 10, padding: 8 }}>
-            {members.map(m => {
-              const cc = CUERDAS[m.cuerda] || C.primary;
-              const count = asistencia.filter(a => a.member_id === m.id).length;
-              const isConfirm = confirmResetMember === m.id;
-              return (
-                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, background: isConfirm ? "#fee2e2" : "transparent" }}>
-                  <div style={{ width: 30, height: 30, borderRadius: "50%", background: cc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 11, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
-                    {m.foto_url ? <img src={m.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(m.nombre || "?")}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, color: C.dark, fontSize: 12 }}>{m.nombre}</div>
-                    <div style={{ fontSize: 10, color: C.gray }}>{count} registro{count !== 1 ? "s" : ""}</div>
-                  </div>
-                  {isConfirm ? (
-                    <div style={{ display: "flex", gap: 4 }}>
-                      <button onClick={() => resetearMiembro(m.id)} disabled={resetting}
-                        style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #ef4444", background: "#ef4444", color: "white", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-                        {resetting ? "..." : "Confirmar"}
-                      </button>
-                      <button onClick={() => setConfirmResetMember(null)}
-                        style={{ padding: "4px 8px", borderRadius: 8, border: `1px solid ${C.border}`, background: "white", color: C.gray, fontSize: 11, cursor: "pointer" }}>
-                        Cancelar
-                      </button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setConfirmResetMember(m.id)} disabled={count === 0}
-                      style={{ padding: "4px 10px", borderRadius: 8, border: count === 0 ? `1px solid ${C.border}` : "1px solid #ef4444", background: count === 0 ? "transparent" : "#fff0f0", color: count === 0 ? C.gray : "#ef4444", fontSize: 11, fontWeight: 600, cursor: count === 0 ? "default" : "pointer" }}>
-                      Resetear
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Reset total */}
-        <div style={{ background: "#fff0f0", border: "1px solid #fca5a5", borderRadius: 10, padding: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#991b1b", marginBottom: 6 }}>⚠️ Resetear todo el grupo</div>
-          <div style={{ fontSize: 12, color: "#7f1d1d", marginBottom: 12 }}>Borra todos los registros de asistencia de todos los integrantes. No se puede deshacer.</div>
-          {confirmResetAll ? (
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={resetearTodo} disabled={resetting}
-                style={{ flex: 1, padding: "10px", borderRadius: 10, border: "none", background: "#ef4444", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                {resetting ? "Borrando..." : "Sí, borrar todo"}
-              </button>
-              <button onClick={() => setConfirmResetAll(false)}
-                style={{ flex: 1, padding: "10px", borderRadius: 10, border: `1px solid ${C.border}`, background: "white", color: C.gray, fontSize: 13, cursor: "pointer" }}>
-                Cancelar
-              </button>
-            </div>
-          ) : (
-            <button onClick={() => setConfirmResetAll(true)}
-              style={{ width: "100%", padding: "10px", borderRadius: 10, border: "1px solid #ef4444", background: "white", color: "#ef4444", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-              🗑️ Resetear asistencia completa
-            </button>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
