@@ -14098,21 +14098,21 @@ function ValoresWidget() {
         {/* Lado derecho: valor activo */}
         <div style={{ flex:1, padding:"24px 28px", display:"flex", alignItems:"center", gap:20, minWidth:0 }}>
           <div style={{
-            width:56, height:56, borderRadius:16, flexShrink:0,
-            background:"rgba(255,255,255,0.10)",
-            border:"1px solid rgba(255,255,255,0.15)",
+            width:64, height:64, borderRadius:18, flexShrink:0,
+            background:"rgba(255,255,255,0.13)",
+            border:"1px solid rgba(255,255,255,0.20)",
             display:"flex", alignItems:"center", justifyContent:"center",
-            fontSize:28,
+            fontSize:34,
             boxShadow:"0 4px 16px rgba(0,0,0,0.2)",
             transition:"all 0.3s",
           }}>
             {v.icon}
           </div>
           <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:20, fontWeight:700, color:"white", marginBottom:6, lineHeight:1.2 }}>
+            <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:26, fontWeight:800, color:"white", marginBottom:8, lineHeight:1.1, letterSpacing:"-0.3px" }}>
               {v.label}
             </div>
-            <div style={{ fontSize:13, color:"rgba(255,255,255,0.75)", lineHeight:1.65, fontWeight:400 }}>
+            <div style={{ fontSize:14, color:"rgba(255,255,255,0.88)", lineHeight:1.6, fontWeight:500 }}>
               {v.desc}
             </div>
           </div>
@@ -14128,8 +14128,8 @@ function ValoresWidget() {
               cursor:"pointer", textAlign:"left", transition:"all 0.2s",
               borderLeft: i === activo ? "3px solid #7fffd4" : "3px solid transparent",
             }}>
-              <span style={{ fontSize:16 }}>{val.icon}</span>
-              <span style={{ fontSize:12, fontWeight: i === activo ? 700 : 500, color: i === activo ? "white" : "rgba(255,255,255,0.55)", whiteSpace:"nowrap" }}>
+              <span style={{ fontSize:18 }}>{val.icon}</span>
+              <span style={{ fontSize:13, fontWeight: i === activo ? 700 : 500, color: i === activo ? "white" : "rgba(255,255,255,0.65)", whiteSpace:"nowrap" }}>
                 {val.label}
               </span>
             </button>
@@ -14145,7 +14145,7 @@ function ValoresWidget() {
 // ═══════════════════════════════════════════════════════════════
 // ── Reacciones por reconocimiento ──────────────────────────────
 const REACCIONES_DEF = [
-  { tipo: "like",     emoji: "👍", label: "Me gusta" },
+  { tipo: "like",     emoji: "🤜", label: "Dale!" },
   { tipo: "corazon",  emoji: "❤️", label: "Me encanta" },
   { tipo: "estrella", emoji: "⭐", label: "Destacado" },
 ];
@@ -14217,20 +14217,35 @@ function ReaccionesBar({ recoId, userId }) {
             title={userId ? label : "Inicia sesión para reaccionar"}
             onClick={() => toggleReaccion(tipo)}
             style={{
-              display: "flex", alignItems: "center", gap: 3,
-              padding: "3px 8px", borderRadius: 20,
-              border: active ? "1px solid #d1d5db" : "1px solid #e5e7eb",
-              background: active ? "#f3f4f6" : "transparent",
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "5px 12px", borderRadius: 24,
+              border: active
+                ? tipo === "like"     ? "1px solid rgba(99,102,241,0.5)"
+                : tipo === "corazon"  ? "1px solid rgba(239,68,68,0.5)"
+                :                       "1px solid rgba(251,191,36,0.5)"
+                : "1px solid rgba(0,0,0,0.10)",
+              background: active
+                ? tipo === "like"     ? "rgba(99,102,241,0.10)"
+                : tipo === "corazon"  ? "rgba(239,68,68,0.10)"
+                :                       "rgba(251,191,36,0.10)"
+                : "rgba(0,0,0,0.03)",
               cursor: userId ? "pointer" : "default",
               fontSize: 13, lineHeight: 1,
-              transition: "all 0.15s",
-              transform: active ? "scale(1.08)" : "scale(1)",
-              boxShadow: active ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+              transition: "all 0.18s",
+              transform: active ? "scale(1.10)" : "scale(1)",
+              boxShadow: active ? "0 2px 8px rgba(0,0,0,0.10)" : "none",
             }}
           >
-            <span style={{ fontSize: 14 }}>{emoji}</span>
+            <span style={{ fontSize: 16, lineHeight:1 }}>{emoji}</span>
             {count > 0 && (
-              <span style={{ fontSize: 10, fontWeight: 600, color: active ? "#374151" : "#9ca3af", minWidth: 10 }}>
+              <span style={{
+                fontSize: 11, fontWeight: 700, minWidth: 12,
+                color: active
+                  ? tipo === "like"    ? "#4f46e5"
+                  : tipo === "corazon" ? "#dc2626"
+                  :                      "#d97706"
+                  : "#9ca3af",
+              }}>
                 {count}
               </span>
             )}
@@ -14242,10 +14257,18 @@ function ReaccionesBar({ recoId, userId }) {
 }
 
 function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
+  // Mostrar los 6 reconocimientos más recientes creados en los últimos 30 días.
+  // Cada tarjeta desaparece 7 días después de su propia fecha de creación.
   const ahora = new Date();
-  const hace7dias = new Date(ahora.getTime() - 7 * 24 * 60 * 60 * 1000);
-  // Mostrar reconocimientos creados en los últimos 7 días (visibles hasta 7 días después de su creación)
-  const recientes = (reconocimientos || []).filter(r => new Date(r.created_at) >= hace7dias).slice(0, 6);
+  const hace30 = new Date(ahora.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const recientes = (reconocimientos || [])
+    .filter(r => {
+      const creado = new Date(r.created_at);
+      if (creado < hace30) return false;                         // más de 30 días: ignorar
+      const expira = new Date(creado.getTime() + 7 * 24 * 60 * 60 * 1000);
+      return ahora < expira;                                     // dentro de 7 días desde creación
+    })
+    .slice(0, 6);
   const total     = (reconocimientos || []).length;
 
   return (
@@ -14505,7 +14528,8 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
     { id: "Coro",      label: "Todo el coro", icon: "🌟", color: C.primary },
   ];
 
-  const otrosMembers = (members || []).filter((m) => m.id !== user?.id);
+  // Incluir al Admin (Encargado) en la lista — solo excluir al propio usuario logueado
+  const otrosMembers = (members || []).filter((m) => m.id !== user?.id && m.activo !== false);
   const paraInfo = members.find((m) => m.id === paraId);
   const grupoInfo = GRUPOS.find((g) => g.id === grupoSelec);
 
@@ -14608,19 +14632,32 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
     <div style={{ maxWidth: 860 }}>
       {/* Header */}
       <div style={{
-        background: `linear-gradient(135deg,${C.primaryDark},${C.primary},#1ab87e)`,
+        background: "linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)",
         borderRadius: 16, padding: "22px 24px", marginBottom: 20,
-        display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap",
+        display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.35)",
+        border: "1px solid rgba(255,215,0,0.15)",
+        position: "relative", overflow: "hidden",
       }}>
-        <div style={{ width: 64, height: 64, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <img src={LOGO_RECONOCIMIENTO_PERSONAL} alt="Reconóceme" style={{ width: 64, height: 64, objectFit: "contain", filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.25))" }} />
+        {/* Destellos decorativos */}
+        <div style={{ position:"absolute", top:-30, right:-30, width:140, height:140, borderRadius:"50%", background:"rgba(255,215,0,0.04)", pointerEvents:"none" }} />
+        <div style={{ position:"absolute", bottom:-20, left:80, width:90, height:90, borderRadius:"50%", background:"rgba(255,215,0,0.03)", pointerEvents:"none" }} />
+        {/* Estrella dorada SVG */}
+        <div style={{ flexShrink:0, width:64, height:64, borderRadius:18, background:"rgba(255,215,0,0.10)", border:"1px solid rgba(255,215,0,0.25)", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 0 20px rgba(255,215,0,0.15)" }}>
+          <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
+            <polygon points="19,3 23.5,13.5 35,14.5 26.5,22.5 29,34 19,27.8 9,34 11.5,22.5 3,14.5 14.5,13.5" fill="#FFD700" stroke="#FFA500" strokeWidth="1" strokeLinejoin="round"/>
+            <polygon points="19,7 22.5,15.5 32,16.3 25,23 27.2,32 19,27.2 10.8,32 13,23 6,16.3 15.5,15.5" fill="#FFE44D"/>
+          </svg>
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 19, fontWeight: 700, color: "white" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 20, fontWeight: 800, color: "white", letterSpacing:"-0.3px", lineHeight:1.2 }}>
             Reconóceme
           </div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 2 }}>
-            Reconoce públicamente a un compañero del coro · {(reconocimientos || []).length} reconocimientos entregados
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.60)", marginTop: 4, fontWeight:400 }}>
+            Reconoce públicamente a un compañero del coro
+            <span style={{ marginLeft:8, background:"rgba(255,215,0,0.15)", color:"#FFD700", borderRadius:20, padding:"2px 10px", fontSize:11, fontWeight:700 }}>
+              {(reconocimientos || []).length} entregados
+            </span>
           </div>
         </div>
       </div>
@@ -14774,9 +14811,17 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
                 style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, color: C.dark, background: "white", outline: "none" }}
               >
                 <option value="">— Selecciona un integrante —</option>
-                {otrosMembers.map((m) => (
-                  <option key={m.id} value={m.id}>{m.nombre} ({rolLabel(m.cuerda)})</option>
-                ))}
+                {[...otrosMembers]
+                  .sort((a, b) => {
+                    // Admin al final, resto ordenado por nombre
+                    if (a.cuerda === "Admin" && b.cuerda !== "Admin") return 1;
+                    if (b.cuerda === "Admin" && a.cuerda !== "Admin") return -1;
+                    return (a.nombre || "").localeCompare(b.nombre || "", "es");
+                  })
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>{m.nombre} ({rolLabel(m.cuerda)})</option>
+                  ))
+                }
               </select>
             ) : (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -14990,6 +15035,11 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
                     {/* Mensaje */}
                     <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.65, fontFamily: "'Inter', 'Poppins', sans-serif", fontWeight: 400, marginBottom: 10, background: "#f9fafb", borderRadius: 8, padding: "10px 12px", borderLeft: "3px solid #e5e7eb" }}>
                       {r.mensaje}
+                    </div>
+
+                    {/* Reacciones */}
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", paddingTop:8, borderTop:"1px solid #f0f0f0", marginBottom:8 }}>
+                      <ReaccionesBar recoId={r.id} userId={user?.id} />
                     </div>
 
                     {/* Remitente */}
