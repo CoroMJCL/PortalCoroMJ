@@ -4017,6 +4017,9 @@ function Dashboard({
         </div>
       )}
 
+      {/* ── Valores del coro ── */}
+      <ValoresWidget />
+
       {/* ── Reconocimientos destacado ── */}
       <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} user={user} />
 
@@ -4261,7 +4264,6 @@ function Dashboard({
             <YoutubeWidget compact />
           </Card>
           <ComunidadesWidget comunidades={comunidades} isAdmin={isAdmin} setSection={setSection} />
-          <ValoresWidget />
         </div>
       </div>
 
@@ -4452,9 +4454,10 @@ function Dashboard({
 
       {/* ── Pauta de Misa vigente con QR ── */}
       {(() => {
+        const hoy = new Date(); hoy.setHours(0,0,0,0);
         const publicadas = (pautas || [])
-          .filter((p) => p.publicada)
-          .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+          .filter((p) => p.publicada && new Date(p.fecha + "T00:00:00") >= hoy)
+          .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
         const proxima = publicadas[0];
         if (!proxima) return null;
         const fechaFmt = new Date(
@@ -14048,40 +14051,92 @@ const VALORES = [
 ];
 
 function ValoresWidget() {
-  const [open, setOpen] = useState(false);
+  const [activo, setActivo] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setActivo(i => (i + 1) % VALORES.length), 4000);
+    return () => clearInterval(t);
+  }, []);
+  const v = VALORES[activo];
   return (
-    <Card style={{ padding: "14px 16px" }}>
-      <button
-        onClick={() => setOpen(p => !p)}
-        style={{ width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 18 }}>🕊️</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>Nuestros valores</span>
+    <div style={{
+      borderRadius: 20,
+      marginBottom: 14,
+      background: "linear-gradient(135deg, #0d3d2e 0%, #155e45 60%, #0f4d38 100%)",
+      boxShadow: "0 8px 32px rgba(13,61,46,0.22)",
+      overflow: "hidden",
+      position: "relative",
+    }}>
+      {/* Decoración fondo */}
+      <div style={{ position:"absolute", top:-40, right:-40, width:200, height:200, borderRadius:"50%", background:"rgba(255,255,255,0.03)", pointerEvents:"none" }} />
+      <div style={{ position:"absolute", bottom:-30, left:-20, width:140, height:140, borderRadius:"50%", background:"rgba(255,255,255,0.025)", pointerEvents:"none" }} />
+
+      <div style={{ display:"flex", alignItems:"stretch", flexWrap:"wrap" }}>
+        {/* Lado izquierdo: título */}
+        <div style={{ padding:"24px 28px", display:"flex", flexDirection:"column", justifyContent:"center", borderRight:"1px solid rgba(255,255,255,0.08)", minWidth:200, flexShrink:0 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <polygon points="14,3 17,10.5 25,11.2 19.5,16.5 21.3,24 14,19.8 6.7,24 8.5,16.5 3,11.2 11,10.5" fill="#FFD700" stroke="#FFA500" strokeWidth="0.8" strokeLinejoin="round"/>
+            </svg>
+            <div>
+              <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.5)", letterSpacing:"0.1em", textTransform:"uppercase" }}>Lo que nos une</div>
+              <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:16, fontWeight:700, color:"white", lineHeight:1.2 }}>Nuestros Valores</div>
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            {VALORES.map(v => (
-              <span key={v.label} style={{ fontSize: 15 }}>{v.icon}</span>
+          {/* Indicadores */}
+          <div style={{ display:"flex", gap:5, marginTop:10 }}>
+            {VALORES.map((_, i) => (
+              <button key={i} onClick={() => setActivo(i)} style={{
+                width: i === activo ? 22 : 7, height:7, borderRadius:4,
+                background: i === activo ? "#7fffd4" : "rgba(255,255,255,0.25)",
+                border:"none", cursor:"pointer", padding:0,
+                transition:"all 0.35s",
+              }} />
             ))}
-            <span style={{ fontSize: 11, color: C.gray, marginLeft: 4 }}>{open ? "▲" : "▼"}</span>
           </div>
         </div>
-      </button>
-      {open && (
-        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-          {VALORES.map(v => (
-            <div key={v.label} style={{ display: "flex", alignItems: "flex-start", gap: 10, background: v.bg, borderRadius: 10, padding: "10px 12px", borderLeft: `3px solid ${v.color}` }}>
-              <span style={{ fontSize: 18, flexShrink: 0 }}>{v.icon}</span>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 13, color: v.color, marginBottom: 2 }}>{v.label}</div>
-                <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.5 }}>{v.desc}</div>
-              </div>
+
+        {/* Lado derecho: valor activo */}
+        <div style={{ flex:1, padding:"24px 28px", display:"flex", alignItems:"center", gap:20, minWidth:0 }}>
+          <div style={{
+            width:56, height:56, borderRadius:16, flexShrink:0,
+            background:"rgba(255,255,255,0.10)",
+            border:"1px solid rgba(255,255,255,0.15)",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            fontSize:28,
+            boxShadow:"0 4px 16px rgba(0,0,0,0.2)",
+            transition:"all 0.3s",
+          }}>
+            {v.icon}
+          </div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:20, fontWeight:700, color:"white", marginBottom:6, lineHeight:1.2 }}>
+              {v.label}
             </div>
+            <div style={{ fontSize:13, color:"rgba(255,255,255,0.75)", lineHeight:1.65, fontWeight:400 }}>
+              {v.desc}
+            </div>
+          </div>
+        </div>
+
+        {/* Rejilla mini de los 4 valores */}
+        <div style={{ display:"flex", flexDirection:"column", justifyContent:"center", gap:2, padding:"16px 20px 16px 4px", borderLeft:"1px solid rgba(255,255,255,0.08)", flexShrink:0 }}>
+          {VALORES.map((val, i) => (
+            <button key={i} onClick={() => setActivo(i)} style={{
+              display:"flex", alignItems:"center", gap:8,
+              background: i === activo ? "rgba(255,255,255,0.12)" : "transparent",
+              border:"none", borderRadius:10, padding:"7px 12px",
+              cursor:"pointer", textAlign:"left", transition:"all 0.2s",
+              borderLeft: i === activo ? "3px solid #7fffd4" : "3px solid transparent",
+            }}>
+              <span style={{ fontSize:16 }}>{val.icon}</span>
+              <span style={{ fontSize:12, fontWeight: i === activo ? 700 : 500, color: i === activo ? "white" : "rgba(255,255,255,0.55)", whiteSpace:"nowrap" }}>
+                {val.label}
+              </span>
+            </button>
           ))}
         </div>
-      )}
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -14188,8 +14243,7 @@ function ReaccionesBar({ recoId, userId }) {
 
 function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
   const hace7dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const enWidget  = (reconocimientos || []).filter(r => new Date(r.created_at) >= hace7dias);
-  const recientes = enWidget.slice(0, 6);
+  const recientes = (reconocimientos || []).filter(r => new Date(r.created_at) >= hace7dias).slice(0, 6);
   const total     = (reconocimientos || []).length;
 
   return (
@@ -14250,7 +14304,10 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
           {total > 0 ? (
             <>
               <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>Sin reconocimientos recientes</div>
-              <div style={{ fontSize: 11, marginTop: 4, color: "rgba(255,255,255,0.45)" }}>Los de los últimos 7 días aparecen aquí · <span style={{ textDecoration: "underline", cursor: "pointer" }} onClick={() => setSection("reconoceme")}>Ver todos ({total})</span></div>
+              <div style={{ fontSize: 11, marginTop: 4, color: "rgba(255,255,255,0.45)" }}>
+                Los últimos 7 días aparecen aquí ·{" "}
+                <span style={{ textDecoration: "underline", cursor: "pointer" }} onClick={() => setSection("reconoceme")}>Ver todos ({total})</span>
+              </div>
             </>
           ) : (
             <>
@@ -14362,7 +14419,7 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
             })}
           </div>
 
-          {(recientes.length > 6 || total > recientes.length) && (
+          {(recientes.length >= 6 || total > recientes.length) && (
             <button
               onClick={() => setSection("reconoceme")}
               style={{
