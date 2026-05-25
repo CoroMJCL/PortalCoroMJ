@@ -3578,8 +3578,11 @@ function Dashboard({
               {rolLabel(user?.cuerda)}
             </div>
             {pctAsistencia !== null ? (
-              <div style={{ fontSize: 11, color: pctAsistencia >= 75 ? C.primary : pctAsistencia >= 50 ? "#f59e0b" : "#ef4444", fontWeight: 600, marginTop: 2 }}>
+              <div style={{ fontSize: 11, color: pctAsistencia >= 75 ? C.primary : pctAsistencia >= 50 ? "#f59e0b" : "#ef4444", fontWeight: 600, marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
                 ✅ Asistencia: {pctAsistencia}%
+                {pctAsistencia === 100 && (
+                  <span title="¡Asistencia perfecta!" style={{ fontSize: 14, lineHeight: 1 }}>⭐</span>
+                )}
               </div>
             ) : (
               <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>Sin registros aún</div>
@@ -13313,7 +13316,10 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
             {pct !== null ? (
               <>
                 <span style={{ fontSize: 20, fontWeight: 800, color: colPct, lineHeight: 1 }}>{pct}%</span>
-                <span style={{ fontSize: 9, color: C.gray, fontWeight: 600, marginTop: 1 }}>asistencia</span>
+                {pct === 100
+                  ? <span style={{ fontSize: 16, lineHeight: 1, marginTop: 1 }}>⭐</span>
+                  : <span style={{ fontSize: 9, color: C.gray, fontWeight: 600, marginTop: 1 }}>asistencia</span>
+                }
               </>
             ) : (
               <span style={{ fontSize: 10, color: C.gray, textAlign: "center", lineHeight: 1.3, padding: "0 8px" }}>sin datos</span>
@@ -13332,7 +13338,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
               <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>{rolLabel(user?.cuerda)}</div>
             </div>
           </div>
-          {msgPct && <div style={{ fontSize: 12, color: colPct, fontWeight: 600, marginBottom: 10 }}>{msgPct}</div>}
+          {msgPct && <div style={{ fontSize: 12, color: colPct, fontWeight: 600, marginBottom: 10, display: "flex", alignItems: "center", gap: 4 }}>{msgPct}{pct === 100 && <span style={{ fontSize: 16 }}>⭐</span>}</div>}
 
           {/* Contadores */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
