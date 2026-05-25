@@ -13430,7 +13430,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
               <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>{rolLabel(user?.cuerda)}</div>
             </div>
           </div>
-          {msgPct && <div style={{ fontSize: 12, color: colPct, fontWeight: 600, marginBottom: 10, display: "flex", alignItems: "center", gap: 4 }}>{msgPct}{pct === 100 && <span style={{ fontSize: 16 }}>⭐</span>}</div>}
+          {msgPct && <div style={{ fontSize: 12, color: colPct, fontWeight: 600, marginBottom: 10, display: "flex", alignItems: "center", gap: 4 }}>{msgPct}{tieneEstrella && <span style={{ fontSize: 16 }}>⭐</span>}</div>}
 
           {/* Contadores */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -13524,7 +13524,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                                 <div style={{ width: `${p}%`, height: "100%", background: colorPct(p), borderRadius: 3, transition: "width 0.3s" }} />
                               </div>
                               <span style={{ fontWeight: 700, color: colorPct(p), fontSize: 13 }}>{p}%</span>
-                              {ausentes === 0 && presentes > 0 && <span title="¡Sin ausencias!" style={{ fontSize: 14, lineHeight: 1 }}>⭐</span>}
+                              {ausentes === 0 && justificados === 0 && presentes > 0 && <span title="¡Sin ausencias!" style={{ fontSize: 14, lineHeight: 1 }}>⭐</span>}
                             </div>
                           ) : (
                             <span style={{ color: C.gray, fontSize: 12 }}>Sin registros</span>
@@ -14207,7 +14207,7 @@ function ReaccionesBar({ recoId, userId }) {
   }, [recoId, userId]);
 
   async function toggleReaccion(tipo) {
-    if (!userId || loading) return;
+    if (!userId || !recoId || loading) return;
     setLoading(true);
     const yaTengo = mias.has(tipo);
     const tipoAnterior = [...mias].find(t => t !== tipo) || null;
@@ -14471,7 +14471,7 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
                   </div>
 
                   {/* Reacciones */}
-                  <ReaccionesBar recoId={r.id} userId={user?.id} />
+                  {r.id && <ReaccionesBar recoId={r.id} userId={user?.id} />}
 
                   {/* Pie: de quién + fecha */}
                   <div style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 8, borderTop: "1px solid #f0f0f0" }}>
@@ -15087,7 +15087,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
 
                     {/* Reacciones */}
                     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", paddingTop:8, borderTop:"1px solid #f0f0f0", marginBottom:8 }}>
-                      <ReaccionesBar recoId={r.id} userId={user?.id} />
+                      {r.id && <ReaccionesBar recoId={r.id} userId={user?.id} />}
                     </div>
 
                     {/* Remitente */}
@@ -15732,7 +15732,7 @@ function AdminHistorialAsistencia({ members }) {
                                 <div style={{ width: `${p}%`, height: "100%", background: colorPct(p), borderRadius: 3 }} />
                               </div>
                               <span style={{ fontWeight: 700, color: colorPct(p), fontSize: 13 }}>{p}%</span>
-                              {ausentes === 0 && presentes > 0 && <span title="¡Sin ausencias!" style={{ fontSize: 14, lineHeight: 1 }}>⭐</span>}
+                              {ausentes === 0 && justificados === 0 && presentes > 0 && <span title="¡Sin ausencias!" style={{ fontSize: 14, lineHeight: 1 }}>⭐</span>}
                             </div>
                           ) : (
                             <span style={{ color: C.gray, fontSize: 12 }}>Sin registros</span>
