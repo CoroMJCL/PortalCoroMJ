@@ -4017,10 +4017,10 @@ function Dashboard({
         </div>
       )}
 
-      <VideoDestacadoWidget isAdmin={isAdmin} />
-
       {/* ── Reconocimientos destacado ── */}
       <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} />
+
+      <VideoDestacadoWidget isAdmin={isAdmin} />
 
       <div
         className="grid-dash-main"
@@ -14094,75 +14094,178 @@ function ReconocemeWidget({ reconocimientos, members, setSection }) {
 
   return (
     <div style={{
-      background: `linear-gradient(135deg, #e8f7f2 0%, #fff9f0 60%, #fbeaf0 100%)`,
-      borderRadius: 16,
-      border: `1.5px solid ${C.primary}30`,
-      padding: "18px 20px",
+      background: `linear-gradient(145deg, #0d3d2e 0%, #155e45 45%, #0f4d38 100%)`,
+      borderRadius: 20,
+      padding: "22px 24px",
       marginBottom: 14,
+      position: "relative",
+      overflow: "hidden",
+      boxShadow: "0 8px 32px rgba(13,61,46,0.25)",
     }}>
+      {/* Decoración de fondo */}
+      <div style={{ position: "absolute", top: -30, right: -30, width: 160, height: 160, borderRadius: "50%", background: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: -40, left: -20, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,0.03)", pointerEvents: "none" }} />
+
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: `linear-gradient(135deg,${C.primaryDark},${C.primary})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>🌟</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10, position: "relative" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <img src={LOGO_RECONOCIMIENTO_PERSONAL} alt="" style={{ width: 58, height: 58, objectFit: "contain", flexShrink: 0, filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.4))" }} />
           <div>
-            <div style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 15, color: C.dark }}>Reconocimientos del coro</div>
-            <div style={{ fontSize: 11, color: C.gray }}>{total > 0 ? `${total} reconocimiento${total !== 1 ? "s" : ""} entregado${total !== 1 ? "s" : ""}` : "Sé el primero en reconocer a alguien"}</div>
+            <div style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 17, color: "white", lineHeight: 1.2 }}>
+              Reconocimientos
+            </div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 3 }}>
+              {total > 0
+                ? <span><strong style={{ color: "#7fffd4" }}>{total}</strong> reconocimiento{total !== 1 ? "s" : ""} entregado{total !== 1 ? "s" : ""} 🎉</span>
+                : "Sé el primero en reconocer a alguien"}
+            </div>
           </div>
         </div>
         <button
           onClick={() => setSection("reconoceme")}
-          style={{ fontSize: 12, color: "white", background: C.primary, border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
+          style={{
+            fontSize: 12, color: "#0d3d2e", background: "#7fffd4",
+            border: "none", borderRadius: 10, padding: "9px 16px",
+            fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+            display: "flex", alignItems: "center", gap: 6,
+          }}
         >
-          🌟 Reconocer a alguien
+          <img src={LOGO_RECONOCIMIENTO_PERSONAL} alt="" style={{ width: 18, height: 18, objectFit: "contain" }} />
+          Reconocer a alguien
         </button>
       </div>
 
       {recientes.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "20px 0", color: C.gray }}>
-          <div style={{ fontSize: 32, marginBottom: 6 }}>🌟</div>
-          <div style={{ fontSize: 13, fontWeight: 500 }}>¡Aún no hay reconocimientos!</div>
-          <div style={{ fontSize: 12, marginTop: 4 }}>Haz clic en el botón y reconoce a un compañero del coro.</div>
+        <div style={{
+          textAlign: "center", padding: "28px 0",
+          background: "rgba(255,255,255,0.06)", borderRadius: 14,
+          border: "1px dashed rgba(255,255,255,0.15)",
+        }}>
+          <img src={LOGO_RECONOCIMIENTO_PERSONAL} alt="" style={{ width: 52, height: 52, objectFit: "contain", marginBottom: 10, opacity: 0.5 }} />
+          <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>¡Aún no hay reconocimientos!</div>
+          <div style={{ fontSize: 11, marginTop: 4, color: "rgba(255,255,255,0.45)" }}>Haz clic en el botón y reconoce a un compañero del coro.</div>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
-          {recientes.map((r) => {
-            const para = members.find(m => m.id === r.para_id);
-            const de = members.find(m => m.id === r.de_id);
-            const cc = CUERDAS[para?.cuerda] || C.primary;
-            const dc = CUERDAS[de?.cuerda] || C.gray;
-            const cat = RECO_CATS.find(c => c.id === r.categoria);
-            return (
-              <div key={r.id} style={{ background: "white", borderRadius: 12, padding: "12px 14px", border: `1px solid ${C.border}`, borderLeft: `4px solid ${cc}` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: cc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 11, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
-                    {para?.foto_url ? <img src={para.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(r.para_nombre || "?")}
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12, position: "relative" }}>
+            {recientes.map((r) => {
+              const para = members.find(m => m.id === r.para_id);
+              const de = members.find(m => m.id === r.de_id);
+              const esGrupo = !r.para_id && r.para_grupo;
+              const GRUPOS_W = [
+                { id: "Soprano", color: CUERDAS.Soprano }, { id: "Contralto", color: CUERDAS.Contralto },
+                { id: "Tenor", color: CUERDAS.Tenor }, { id: "Bajo", color: CUERDAS.Bajo },
+                { id: "Coro", color: C.primary },
+              ];
+              const grupoCard = esGrupo ? GRUPOS_W.find(g => g.id === r.para_grupo) : null;
+              const cc = esGrupo ? (grupoCard?.color || C.primary) : (CUERDAS[para?.cuerda] || C.primary);
+              const dc = CUERDAS[de?.cuerda] || "#888";
+              const cat = RECO_CATS.find(c => c.id === r.categoria);
+              const fecha = r.created_at ? new Date(r.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short" }) : "";
+              return (
+                <div key={r.id} style={{
+                  background: "rgba(255,255,255,0.09)",
+                  backdropFilter: "blur(8px)",
+                  borderRadius: 14,
+                  padding: "14px 16px",
+                  border: `1px solid rgba(255,255,255,0.12)`,
+                  borderTop: `3px solid ${cc}`,
+                  display: "flex", flexDirection: "column", gap: 10,
+                }}>
+                  {/* Para quién */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                    <div style={{
+                      width: 38, height: 38, borderRadius: esGrupo ? 10 : "50%",
+                      background: cc, display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "white", fontSize: esGrupo ? 16 : 13, fontWeight: 700,
+                      flexShrink: 0, overflow: "hidden",
+                      boxShadow: `0 2px 8px ${cc}66`,
+                    }}>
+                      {esGrupo
+                        ? (r.para_grupo === "Soprano" ? "🎶" : r.para_grupo === "Contralto" ? "🎵" : r.para_grupo === "Tenor" ? "🎼" : r.para_grupo === "Bajo" ? "🎹" : "🌟")
+                        : para?.foto_url
+                          ? <img src={para.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          : ini(r.para_nombre || "?")}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "white", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {r.para_nombre}
+                      </div>
+                      <div style={{ fontSize: 10, color: cc, fontWeight: 600, marginTop: 1 }}>
+                        {esGrupo ? "Grupo" : rolLabel(para?.cuerda)}
+                      </div>
+                    </div>
+                    <img
+                      src={esGrupo ? LOGO_RECONOCIMIENTO_GRUPAL : LOGO_RECONOCIMIENTO_PERSONAL}
+                      alt=""
+                      style={{ width: 30, height: 30, objectFit: "contain", flexShrink: 0, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.3))" }}
+                    />
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 12, color: C.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Para <span style={{ color: cc }}>{r.para_nombre}</span></div>
-                    <div style={{ fontSize: 10, color: C.gray }}>de {r.de_nombre}</div>
-                  </div>
-                  <span style={{ fontSize: 16 }}>{cat?.icon || "🌟"}</span>
-                </div>
-                <div style={{ fontSize: 11, color: "#374151", fontStyle: "italic", lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                  "{r.mensaje}"
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
-      {total > 3 && (
-        <button
-          onClick={() => setSection("reconoceme")}
-          style={{ marginTop: 10, fontSize: 12, color: C.primary, background: "none", border: "none", cursor: "pointer", fontWeight: 600, display: "block", width: "100%", textAlign: "center" }}
-        >
-          Ver todos los reconocimientos ({total}) →
-        </button>
+                  {/* Categoría */}
+                  {cat && (
+                    <div style={{
+                      fontSize: 10, fontWeight: 700, color: cc,
+                      background: cc + "22", borderRadius: 20,
+                      padding: "3px 10px", display: "inline-flex", alignItems: "center", gap: 4,
+                      alignSelf: "flex-start", textTransform: "uppercase", letterSpacing: "0.05em",
+                      border: `1px solid ${cc}44`,
+                    }}>
+                      {cat.icon} {cat.label}
+                    </div>
+                  )}
+
+                  {/* Mensaje */}
+                  <div style={{
+                    fontSize: 12, color: "rgba(255,255,255,0.88)", lineHeight: 1.6,
+                    fontFamily: "'Inter', 'Poppins', sans-serif", fontWeight: 400, flex: 1,
+                    display: "-webkit-box", WebkitLineClamp: 3,
+                    WebkitBoxOrient: "vertical", overflow: "hidden",
+                  }}>
+                    {r.mensaje}
+                  </div>
+
+                  {/* Pie: de quién + fecha */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                    <div style={{
+                      width: 20, height: 20, borderRadius: "50%", background: dc,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "white", fontSize: 8, fontWeight: 700, flexShrink: 0, overflow: "hidden",
+                    }}>
+                      {de?.foto_url ? <img src={de.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(r.de_nombre || "?")}
+                    </div>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      De <span style={{ color: "rgba(255,255,255,0.75)", fontWeight: 600 }}>{r.de_nombre}</span>
+                    </div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap" }}>{fecha}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {total > 3 && (
+            <button
+              onClick={() => setSection("reconoceme")}
+              style={{
+                marginTop: 14, fontSize: 12, color: "rgba(255,255,255,0.7)",
+                background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)",
+                borderRadius: 10, cursor: "pointer", fontWeight: 600,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                width: "100%", padding: "9px 0",
+              }}
+            >
+              Ver todos los reconocimientos ({total}) →
+            </button>
+          )}
+        </>
       )}
     </div>
   );
 }
+const LOGO_RECONOCIMIENTO_PERSONAL = "data:image/png;base64,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";
+const LOGO_RECONOCIMIENTO_GRUPAL = "data:image/png;base64,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";
 
 // ═══════════════════════════════════════════════════════════════
 //  RECONÓCEME — Módulo principal
@@ -14333,10 +14436,9 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
         borderRadius: 16, padding: "22px 24px", marginBottom: 20,
         display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap",
       }}>
-        <div style={{
-          width: 52, height: 52, background: "rgba(255,255,255,0.2)", borderRadius: 14,
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, flexShrink: 0,
-        }}>🌟</div>
+        <div style={{ width: 64, height: 64, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <img src={LOGO_RECONOCIMIENTO_PERSONAL} alt="Reconóceme" style={{ width: 64, height: 64, objectFit: "contain", filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.25))" }} />
+        </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 19, fontWeight: 700, color: "white" }}>
             Reconóceme
@@ -14354,7 +14456,9 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
         border: `1px solid ${C.primary}25`,
         display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start",
       }}>
-        <div style={{ fontSize: 36, flexShrink: 0, lineHeight: 1 }}>🌟</div>
+        <div style={{ flexShrink: 0, lineHeight: 1 }}>
+          <img src={LOGO_RECONOCIMIENTO_PERSONAL} alt="" style={{ width: 56, height: 56, objectFit: "contain" }} />
+        </div>
         <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 15, color: C.dark, marginBottom: 6 }}>
             ¿De qué se trata "Reconóceme"?
@@ -14682,7 +14786,11 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
                         </div>
                       </div>
                       <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 18 }}>{cat?.icon || "🌟"}</div>
+                        <img
+                          src={esGrupo ? LOGO_RECONOCIMIENTO_GRUPAL : LOGO_RECONOCIMIENTO_PERSONAL}
+                          alt=""
+                          style={{ width: 40, height: 40, objectFit: "contain", display: "block" }}
+                        />
                         <div style={{ fontSize: 9, color: C.gray, marginTop: 1, whiteSpace: "nowrap" }}>{fecha}</div>
                       </div>
                     </div>
@@ -14704,8 +14812,8 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
                     )}
 
                     {/* Mensaje */}
-                    <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6, fontStyle: "italic", marginBottom: 10, background: "#f9fafb", borderRadius: 8, padding: "10px 12px" }}>
-                      "{r.mensaje}"
+                    <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.65, fontFamily: "'Inter', 'Poppins', sans-serif", fontWeight: 400, marginBottom: 10, background: "#f9fafb", borderRadius: 8, padding: "10px 12px", borderLeft: "3px solid #e5e7eb" }}>
+                      {r.mensaje}
                     </div>
 
                     {/* Remitente */}
