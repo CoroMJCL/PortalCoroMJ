@@ -2000,6 +2000,7 @@ export default function App() {
                   user={user}
                   reconocimientos={reconocimientos}
                   onReload={loadData}
+                  gcalEventos={gcalEventos}
                 />
               )}
               {section === "asistencia" && (
@@ -4012,6 +4013,9 @@ function Dashboard({
 
       <VideoDestacadoWidget isAdmin={isAdmin} />
 
+      {/* ── Reconocimientos destacado ── */}
+      <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} />
+
       <div
         className="grid-dash-main"
         style={{
@@ -4251,7 +4255,7 @@ function Dashboard({
             <YoutubeWidget compact />
           </Card>
           <ComunidadesWidget comunidades={comunidades} isAdmin={isAdmin} setSection={setSection} />
-          <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} />
+          <ValoresWidget />
         </div>
       </div>
 
@@ -14028,57 +14032,112 @@ function AdminCuentas({ members, onReload }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RECONÓCEME — Widget para el Dashboard
+//  WIDGET VALORES DEL CORO
+// ═══════════════════════════════════════════════════════════════
+const VALORES = [
+  { icon: "✝️", label: "Fe",          color: "#1D9E75", bg: "#e8f7f2", desc: "Cantamos porque creemos. Nuestra voz es oración, nuestro servicio es adoración." },
+  { icon: "🤝", label: "Respeto",     color: "#534AB7", bg: "#eeedfe", desc: "Valoramos a cada persona, su tiempo, su voz y su lugar en el coro." },
+  { icon: "📅", label: "Compromiso",  color: "#BA7517", bg: "#faeeda", desc: "Cumplimos con nuestra palabra: en los ensayos, en las misas y en el grupo." },
+  { icon: "💜", label: "Comunidad",   color: "#D4537E", bg: "#fbeaf0", desc: "Somos más que un coro, somos una familia que camina junta en la fe." },
+];
+
+function ValoresWidget() {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card style={{ padding: "14px 16px" }}>
+      <button
+        onClick={() => setOpen(p => !p)}
+        style={{ width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 18 }}>🕊️</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>Nuestros valores</span>
+          </div>
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            {VALORES.map(v => (
+              <span key={v.label} style={{ fontSize: 15 }}>{v.icon}</span>
+            ))}
+            <span style={{ fontSize: 11, color: C.gray, marginLeft: 4 }}>{open ? "▲" : "▼"}</span>
+          </div>
+        </div>
+      </button>
+      {open && (
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+          {VALORES.map(v => (
+            <div key={v.label} style={{ display: "flex", alignItems: "flex-start", gap: 10, background: v.bg, borderRadius: 10, padding: "10px 12px", borderLeft: `3px solid ${v.color}` }}>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>{v.icon}</span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: v.color, marginBottom: 2 }}>{v.label}</div>
+                <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.5 }}>{v.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RECONÓCEME — Widget para el Dashboard (full-width destacado)
 // ═══════════════════════════════════════════════════════════════
 function ReconocemeWidget({ reconocimientos, members, setSection }) {
   const recientes = (reconocimientos || []).slice(0, 3);
-  const getAvatar = (id) => members.find((m) => m.id === id);
+  const total = (reconocimientos || []).length;
+
   return (
-    <Card style={{ flex: 1 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 18 }}>🌟</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>Reconocimientos</span>
+    <div style={{
+      background: `linear-gradient(135deg, #e8f7f2 0%, #fff9f0 60%, #fbeaf0 100%)`,
+      borderRadius: 16,
+      border: `1.5px solid ${C.primary}30`,
+      padding: "18px 20px",
+      marginBottom: 14,
+    }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: `linear-gradient(135deg,${C.primaryDark},${C.primary})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>🌟</div>
+          <div>
+            <div style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 15, color: C.dark }}>Reconocimientos del coro</div>
+            <div style={{ fontSize: 11, color: C.gray }}>{total > 0 ? `${total} reconocimiento${total !== 1 ? "s" : ""} entregado${total !== 1 ? "s" : ""}` : "Sé el primero en reconocer a alguien"}</div>
+          </div>
         </div>
         <button
           onClick={() => setSection("reconoceme")}
-          style={{ fontSize: 11, color: C.primary, background: C.primaryLight, border: `1px solid ${C.primary}40`, borderRadius: 8, padding: "4px 10px", fontWeight: 600, cursor: "pointer" }}
+          style={{ fontSize: 12, color: "white", background: C.primary, border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
         >
-          Ver todos
+          🌟 Reconocer a alguien
         </button>
       </div>
+
       {recientes.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "16px 0", color: C.gray, fontSize: 12 }}>
-          <div style={{ fontSize: 28, marginBottom: 6 }}>🌟</div>
-          <div>¡Sé el primero en reconocer a un compañero!</div>
-          <button
-            onClick={() => setSection("reconoceme")}
-            style={{ marginTop: 8, fontSize: 11, color: "white", background: C.primary, border: "none", borderRadius: 8, padding: "6px 14px", fontWeight: 600, cursor: "pointer" }}
-          >
-            Reconocer ahora
-          </button>
+        <div style={{ textAlign: "center", padding: "20px 0", color: C.gray }}>
+          <div style={{ fontSize: 32, marginBottom: 6 }}>🌟</div>
+          <div style={{ fontSize: 13, fontWeight: 500 }}>¡Aún no hay reconocimientos!</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>Haz clic en el botón y reconoce a un compañero del coro.</div>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
           {recientes.map((r) => {
-            const para = getAvatar(r.para_id);
-            const de = getAvatar(r.de_id);
+            const para = members.find(m => m.id === r.para_id);
+            const de = members.find(m => m.id === r.de_id);
             const cc = CUERDAS[para?.cuerda] || C.primary;
+            const dc = CUERDAS[de?.cuerda] || C.gray;
+            const cat = RECO_CATS.find(c => c.id === r.categoria);
             return (
-              <div key={r.id} style={{ background: `linear-gradient(135deg,${C.primaryLight},#fff9f0)`, borderRadius: 10, padding: "10px 12px", border: `1px solid ${C.primary}20` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: cc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 10, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+              <div key={r.id} style={{ background: "white", borderRadius: 12, padding: "12px 14px", border: `1px solid ${C.border}`, borderLeft: `4px solid ${cc}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: cc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 11, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
                     {para?.foto_url ? <img src={para.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(r.para_nombre || "?")}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: C.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      Para <span style={{ color: cc }}>{r.para_nombre}</span>
-                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: C.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Para <span style={{ color: cc }}>{r.para_nombre}</span></div>
                     <div style={{ fontSize: 10, color: C.gray }}>de {r.de_nombre}</div>
                   </div>
-                  <span style={{ fontSize: 14 }}>{RECO_CATS.find(c => c.id === r.categoria)?.icon || "🌟"}</span>
+                  <span style={{ fontSize: 16 }}>{cat?.icon || "🌟"}</span>
                 </div>
-                <div style={{ fontSize: 11, color: "#374151", lineHeight: 1.5, fontStyle: "italic", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                <div style={{ fontSize: 11, color: "#374151", fontStyle: "italic", lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                   "{r.mensaje}"
                 </div>
               </div>
@@ -14086,7 +14145,16 @@ function ReconocemeWidget({ reconocimientos, members, setSection }) {
           })}
         </div>
       )}
-    </Card>
+
+      {total > 3 && (
+        <button
+          onClick={() => setSection("reconoceme")}
+          style={{ marginTop: 10, fontSize: 12, color: C.primary, background: "none", border: "none", cursor: "pointer", fontWeight: 600, display: "block", width: "100%", textAlign: "center" }}
+        >
+          Ver todos los reconocimientos ({total}) →
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -14099,7 +14167,7 @@ const RECO_CATS = [
   { id: "importante",  icon: "💜", label: "Persona importante para el grupo" },
   { id: "liderazgo",   icon: "⭐", label: "Liderazgo y servicio" },
   { id: "fe",          icon: "✝️", label: "Testimonio de fe" },
-  { id: "general",     icon: "🌟", label: "Reconocimiento general" },
+  { id: "salmos",      icon: "🎵", label: "Interpretación de Salmos" },
 ];
 
 async function sendRecoEmail(paraEmail, paraNombre, deNombre, categoria, mensaje) {
@@ -14129,17 +14197,23 @@ async function sendRecoEmail(paraEmail, paraNombre, deNombre, categoria, mensaje
   }
 }
 
-function Reconoceme({ members, user, reconocimientos, onReload }) {
+function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
   const [paraId, setParaId] = useState("");
-  const [categoria, setCategoria] = useState("general");
+  const [categoria, setCategoria] = useState("compañero");
   const [mensaje, setMensaje] = useState("");
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [filtroId, setFiltroId] = useState("");
+  // "general" | "evento"
+  const [tipoReco, setTipoReco] = useState("general");
+  const [eventoId, setEventoId] = useState("");
 
   const otrosMembers = (members || []).filter((m) => m.id !== user?.id);
   const paraInfo = members.find((m) => m.id === paraId);
+
+  // Eventos pasados + próximos de Google Calendar (últimos 30 días + próximos 60)
+  const eventosDisponibles = (gcalEventos || []);
 
   const filtered = filtroId
     ? (reconocimientos || []).filter((r) => r.para_id === filtroId)
@@ -14147,15 +14221,52 @@ function Reconoceme({ members, user, reconocimientos, onReload }) {
 
   async function handleEnviar() {
     if (!paraId) { setError("Selecciona a quién quieres reconocer."); return; }
+    if (tipoReco === "evento" && !eventoId) { setError("Selecciona el evento al que corresponde este reconocimiento."); return; }
     if (!mensaje.trim()) { setError("Escribe un mensaje de reconocimiento."); return; }
     if (mensaje.trim().length < 10) { setError("El mensaje es muy corto. ¡Exprésate con cariño!"); return; }
+
+    // Validar duplicados
+    if (tipoReco === "evento") {
+      // Solo 1 reconocimiento de mí → esa persona en ese evento
+      const yaExiste = (reconocimientos || []).some(
+        (r) => r.de_id === user.id && r.para_id === paraId && r.evento_id === eventoId
+      );
+      if (yaExiste) {
+        setError("Ya reconociste a esta persona en ese evento. Puedes hacerlo en otro evento diferente.");
+        return;
+      }
+    } else {
+      // General: límite de 7 días entre reconocimientos a la misma persona
+      const hace7dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const reciente = (reconocimientos || []).find(
+        (r) =>
+          r.de_id === user.id &&
+          r.para_id === paraId &&
+          !r.evento_id &&
+          new Date(r.created_at) > hace7dias
+      );
+      if (reciente) {
+        const dias = Math.ceil((Date.now() - new Date(reciente.created_at)) / (1000 * 60 * 60 * 24));
+        setError(`Ya enviaste un reconocimiento general a esta persona hace ${dias} día${dias !== 1 ? "s" : ""}. Espera ${7 - dias} día${(7 - dias) !== 1 ? "s" : ""} más, o reconócela por un evento específico.`);
+        return;
+      }
+    }
+
     setSaving(true);
     setError("");
     try {
       const para = members.find((m) => m.id === paraId);
-      await supabase("reconocimientos", {
+      const eventoSelec = tipoReco === "evento" ? eventosDisponibles.find((e) => e.id === eventoId) : null;
+      // Usamos service key para saltar RLS en reconocimientos
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/reconocimientos`, {
         method: "POST",
-        body: {
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify({
           de_id: user.id,
           de_nombre: user.nombre,
           para_id: paraId,
@@ -14163,16 +14274,22 @@ function Reconoceme({ members, user, reconocimientos, onReload }) {
           para_email: para?.email || "",
           mensaje: mensaje.trim(),
           categoria,
-        },
+          evento_id: eventoSelec?.id || null,
+          evento_titulo: eventoSelec?.titulo || null,
+          evento_fecha: eventoSelec?.fecha || null,
+        }),
       });
+      if (!res.ok) throw new Error(await res.text());
       // Intentar enviar email (no bloqueante)
       if (para?.email) {
         await sendRecoEmail(para.email, para.nombre, user.nombre, categoria, mensaje.trim());
       }
       setSuccess(true);
       setParaId("");
-      setCategoria("general");
+      setCategoria("compañero");
       setMensaje("");
+      setEventoId("");
+      setTipoReco("general");
       onReload();
       setTimeout(() => setSuccess(false), 4000);
     } catch (e) {
@@ -14206,6 +14323,40 @@ function Reconoceme({ members, user, reconocimientos, onReload }) {
         </div>
       </div>
 
+      {/* Explicación */}
+      <div style={{
+        background: `linear-gradient(135deg, #e8f7f2, #fff9f0)`,
+        borderRadius: 14, padding: "18px 20px", marginBottom: 20,
+        border: `1px solid ${C.primary}25`,
+        display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start",
+      }}>
+        <div style={{ fontSize: 36, flexShrink: 0, lineHeight: 1 }}>🌟</div>
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <div style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 15, color: C.dark, marginBottom: 6 }}>
+            ¿De qué se trata "Reconóceme"?
+          </div>
+          <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.75 }}>
+            En nuestro coro cada integrante aporta de manera única y valiosa. Esta sección existe para <strong>reconocer públicamente esos aportes reales</strong> que hacen que el coro funcione, crezca y sirva mejor a la comunidad.
+          </div>
+          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 7 }}>
+            {[
+              { icon: "✍️", texto: "Elige a un integrante y escríbele un reconocimiento por un aporte concreto que hayas valorado." },
+              { icon: "📢", texto: "Tu reconocimiento quedará visible para todos en el muro público del coro." },
+              { icon: "✉️", texto: "La persona reconocida recibirá una notificación a su correo." },
+              { icon: "💪", texto: "Reconoce a quienes han hecho algo que realmente marcó una diferencia: participar y apoyar siempre con fidelidad, preparar e interpretar un salmo, velar por el orden y la comodidad del grupo, o fomentar un ambiente de buenas relaciones entre todos." },
+            ].map((p, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>{p.icon}</span>
+                <span style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.5 }}>{p.texto}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 12, background: C.primaryLight, borderRadius: 8, padding: "8px 12px", fontSize: 12, color: C.primaryDark, fontWeight: 500 }}>
+            💡 Reconocer el esfuerzo real de los demás fortalece el compromiso y la unidad del coro.
+          </div>
+        </div>
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }} className="grid-2">
 
         {/* FORMULARIO */}
@@ -14223,6 +14374,65 @@ function Reconoceme({ members, user, reconocimientos, onReload }) {
               <div>
                 <div style={{ fontWeight: 700, color: "#065f46", fontSize: 13 }}>¡Reconocimiento enviado!</div>
                 <div style={{ fontSize: 11, color: "#047857" }}>Ya está visible en el muro y se notificó por correo.</div>
+              </div>
+            </div>
+          )}
+
+          {/* Tipo de reconocimiento: general o por evento */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: C.dark, display: "block", marginBottom: 8 }}>
+              ¿Qué tipo de reconocimiento es? *
+            </label>
+            <div style={{ display: "flex", gap: 8 }}>
+              {[
+                { id: "general", icon: "💬", label: "General", desc: "Reconocimiento a su forma de ser siempre" },
+                { id: "evento", icon: "📅", label: "Por evento", desc: "Asociado a un evento de la agenda" },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => { setTipoReco(t.id); setEventoId(""); }}
+                  style={{
+                    flex: 1, padding: "10px 8px", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                    background: tipoReco === t.id ? C.primary : C.light,
+                    color: tipoReco === t.id ? "white" : C.dark,
+                    border: tipoReco === t.id ? `1px solid ${C.primaryDark}` : `1px solid ${C.border}`,
+                    textAlign: "center", lineHeight: 1.4,
+                  }}
+                >
+                  <div style={{ fontSize: 18, marginBottom: 3 }}>{t.icon}</div>
+                  <div>{t.label}</div>
+                  <div style={{ fontSize: 10, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>{t.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Selector de evento (solo si tipoReco === "evento") */}
+          {tipoReco === "evento" && (
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: C.dark, display: "block", marginBottom: 6 }}>
+                ¿A qué evento corresponde? *
+              </label>
+              {eventosDisponibles.length === 0 ? (
+                <div style={{ fontSize: 12, color: C.gray, padding: "8px 12px", background: C.light, borderRadius: 8 }}>
+                  No se encontraron eventos en la agenda. Verifica tu conexión.
+                </div>
+              ) : (
+                <select
+                  value={eventoId}
+                  onChange={(e) => setEventoId(e.target.value)}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, color: C.dark, background: "white", outline: "none" }}
+                >
+                  <option value="">— Selecciona un evento —</option>
+                  {eventosDisponibles.map((ev) => (
+                    <option key={ev.id} value={ev.id}>
+                      {ev.titulo} · {ev.fecha}{ev.hora ? ` ${ev.hora}` : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div style={{ fontSize: 11, color: C.gray, marginTop: 4 }}>
+                Puedes reconocer a la misma persona en distintos eventos.
               </div>
             </div>
           )}
@@ -14392,6 +14602,15 @@ function Reconoceme({ members, user, reconocimientos, onReload }) {
                       </div>
                     )}
 
+                    {/* Evento vinculado */}
+                    {r.evento_titulo && (
+                      <div style={{ fontSize: 11, color: "#6b7280", background: "#f3f4f6", borderRadius: 8, padding: "4px 10px", display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 8, maxWidth: "100%" }}>
+                        <span>📅</span>
+                        <span style={{ fontWeight: 600 }}>{r.evento_titulo}</span>
+                        {r.evento_fecha && <span style={{ opacity: 0.7 }}>· {new Date(r.evento_fecha + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" })}</span>}
+                      </div>
+                    )}
+
                     {/* Mensaje */}
                     <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6, fontStyle: "italic", marginBottom: 10, background: "#f9fafb", borderRadius: 8, padding: "10px 12px" }}>
                       "{r.mensaje}"
@@ -14479,7 +14698,11 @@ function SqlSetupBlock() {
             drop policy if exists "asis_all" on asistencia;<br />
             create policy "asis_all" on asistencia for all using (true) with check (true);<br />
             -- Tabla reconocimientos:<br />
-            create table if not exists reconocimientos (id uuid default gen_random_uuid() primary key, de_id uuid references integrantes(id), de_nombre text, para_id uuid references integrantes(id), para_nombre text, para_email text, mensaje text not null, categoria text default 'general', created_at timestamptz default now());<br />
+            create table if not exists reconocimientos (id uuid default gen_random_uuid() primary key, de_id uuid references integrantes(id), de_nombre text, para_id uuid references integrantes(id), para_nombre text, para_email text, mensaje text not null, categoria text default 'general', evento_id text, evento_titulo text, evento_fecha date, created_at timestamptz default now());<br />
+            -- Migración si la tabla ya existe (ejecutar una sola vez):<br />
+            alter table reconocimientos add column if not exists evento_id text;<br />
+            alter table reconocimientos add column if not exists evento_titulo text;<br />
+            alter table reconocimientos add column if not exists evento_fecha date;<br />
             alter table reconocimientos enable row level security;<br />
             drop policy if exists "reco_all" on reconocimientos;<br />
             create policy "reco_all" on reconocimientos for all using (true) with check (true);
