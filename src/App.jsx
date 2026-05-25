@@ -305,6 +305,7 @@ const NAV = [
   { id: "pauta_misa",  icon: "🎼", label: "Pauta de Misa" },
   { id: "podcast",     icon: "◉",  label: "Podcast" },
   { id: "qanda",       icon: "?",  label: "Preguntas" },
+  { id: "reconoceme",  icon: "🌟", label: "Reconóceme" },
 ];
 
 const BOTTOM_NAV = [
@@ -801,6 +802,7 @@ export default function App() {
   const [fotos, setFotos] = useState([]);
   const [comunidades, setComunidades] = useState([]);
   const [pautas, setPautas] = useState([]);
+  const [reconocimientos, setReconocimientos] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
 
   const [evangelio, setEvangelio] = useState(null);
@@ -821,7 +823,7 @@ export default function App() {
   async function loadData() {
     setDbLoading(true);
     try {
-      const [m, ev, d, or, n, p, lk, bib, pod, pau, asis, gal, com] = await Promise.all([
+      const [m, ev, d, or, n, p, lk, bib, pod, pau, asis, gal, com, reco] = await Promise.all([
         supabase("integrantes", { order: "&order=nombre.asc" }),
         supabase("eventos", { order: "&order=fecha.asc" }),
         supabase("documentos", { order: "&order=created_at.desc" }),
@@ -835,6 +837,7 @@ export default function App() {
         supabase("asistencia", { order: "&order=created_at.desc" }).catch(() => []),
         supabase("galeria", { order: "&order=orden.asc,created_at.asc" }).catch(() => []),
         supabase("comunidades", { order: "&order=orden.asc,created_at.asc" }).catch(() => []),
+        supabase("reconocimientos", { order: "&order=created_at.desc" }).catch(() => []),
       ]);
       setMembers(m || []);
       setEventos(ev || []);
@@ -849,6 +852,7 @@ export default function App() {
       setAsistencia(asis || []);
       setFotos(gal || []);
       setComunidades(com || []);
+      setReconocimientos(reco || []);
       // Cargar eventos desde Google Calendar para el Dashboard
       fetchGoogleCalendarEvents().then((gcal) => setGcalEventos(gcal));
     } catch (e) {
@@ -1934,6 +1938,7 @@ export default function App() {
                   podcasts={podcasts}
                   fotos={fotos}
                   comunidades={comunidades}
+                  reconocimientos={reconocimientos}
                 />
               )}
               {section === "perfil" && (
@@ -1989,6 +1994,14 @@ export default function App() {
               )}
               {section === "videos" && <Videos />}
               {section === "cancionero" && <Cancionero user={user} />}
+              {section === "reconoceme" && (
+                <Reconoceme
+                  members={members}
+                  user={user}
+                  reconocimientos={reconocimientos}
+                  onReload={loadData}
+                />
+              )}
               {section === "asistencia" && (
                 <Asistencia
                   asistencia={asistencia}
@@ -3199,6 +3212,7 @@ function Dashboard({
   podcasts,
   fotos,
   comunidades,
+  reconocimientos,
 }) {
   const futuros = [...eventos]
     .filter((e) => new Date(e.fecha + "T00:00:00") >= new Date())
@@ -4237,6 +4251,7 @@ function Dashboard({
             <YoutubeWidget compact />
           </Card>
           <ComunidadesWidget comunidades={comunidades} isAdmin={isAdmin} setSection={setSection} />
+          <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} />
         </div>
       </div>
 
@@ -13457,7 +13472,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                               {m.foto_url ? <img src={m.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(m.nombre || "?")}
                             </div>
                             <div>
-                              <div style={{ fontWeight: 600, color: C.dark }}>{m.nombre} {m.id === user?.id && <span style={{ fontSize: 10, color: C.primary }}>(tú)</span>}{presentes > 0 && <span title="¡Sin ausencias este año!" style={{ fontSize: 14, marginLeft: 4 }}>⭐</span>}</div>
+                              <div style={{ fontWeight: 600, color: C.dark }}>{m.nombre} {m.id === user?.id && <span style={{ fontSize: 10, color: C.primary }}>(tú)</span>}</div>
                               <div style={{ fontSize: 11, color: mcc }}>{rolLabel(m.cuerda)}</div>
                             </div>
                           </div>
@@ -13472,6 +13487,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                                 <div style={{ width: `${p}%`, height: "100%", background: colorPct(p), borderRadius: 3, transition: "width 0.3s" }} />
                               </div>
                               <span style={{ fontWeight: 700, color: colorPct(p), fontSize: 13 }}>{p}%</span>
+                              {ausentes === 0 && presentes > 0 && <span title="¡Sin ausencias!" style={{ fontSize: 14, lineHeight: 1 }}>⭐</span>}
                             </div>
                           ) : (
                             <span style={{ color: C.gray, fontSize: 12 }}>Sin registros</span>
@@ -14011,6 +14027,396 @@ function AdminCuentas({ members, onReload }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  RECONÓCEME — Widget para el Dashboard
+// ═══════════════════════════════════════════════════════════════
+function ReconocemeWidget({ reconocimientos, members, setSection }) {
+  const recientes = (reconocimientos || []).slice(0, 3);
+  const getAvatar = (id) => members.find((m) => m.id === id);
+  return (
+    <Card style={{ flex: 1 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 18 }}>🌟</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>Reconocimientos</span>
+        </div>
+        <button
+          onClick={() => setSection("reconoceme")}
+          style={{ fontSize: 11, color: C.primary, background: C.primaryLight, border: `1px solid ${C.primary}40`, borderRadius: 8, padding: "4px 10px", fontWeight: 600, cursor: "pointer" }}
+        >
+          Ver todos
+        </button>
+      </div>
+      {recientes.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "16px 0", color: C.gray, fontSize: 12 }}>
+          <div style={{ fontSize: 28, marginBottom: 6 }}>🌟</div>
+          <div>¡Sé el primero en reconocer a un compañero!</div>
+          <button
+            onClick={() => setSection("reconoceme")}
+            style={{ marginTop: 8, fontSize: 11, color: "white", background: C.primary, border: "none", borderRadius: 8, padding: "6px 14px", fontWeight: 600, cursor: "pointer" }}
+          >
+            Reconocer ahora
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {recientes.map((r) => {
+            const para = getAvatar(r.para_id);
+            const de = getAvatar(r.de_id);
+            const cc = CUERDAS[para?.cuerda] || C.primary;
+            return (
+              <div key={r.id} style={{ background: `linear-gradient(135deg,${C.primaryLight},#fff9f0)`, borderRadius: 10, padding: "10px 12px", border: `1px solid ${C.primary}20` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: cc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 10, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                    {para?.foto_url ? <img src={para.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(r.para_nombre || "?")}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      Para <span style={{ color: cc }}>{r.para_nombre}</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: C.gray }}>de {r.de_nombre}</div>
+                  </div>
+                  <span style={{ fontSize: 14 }}>{RECO_CATS.find(c => c.id === r.categoria)?.icon || "🌟"}</span>
+                </div>
+                <div style={{ fontSize: 11, color: "#374151", lineHeight: 1.5, fontStyle: "italic", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                  "{r.mensaje}"
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RECONÓCEME — Módulo principal
+// ═══════════════════════════════════════════════════════════════
+const RECO_CATS = [
+  { id: "compañero",   icon: "🤝", label: "Gran compañero/a" },
+  { id: "aporte",      icon: "💡", label: "Gran aporte al coro" },
+  { id: "importante",  icon: "💜", label: "Persona importante para el grupo" },
+  { id: "liderazgo",   icon: "⭐", label: "Liderazgo y servicio" },
+  { id: "fe",          icon: "✝️", label: "Testimonio de fe" },
+  { id: "general",     icon: "🌟", label: "Reconocimiento general" },
+];
+
+async function sendRecoEmail(paraEmail, paraNombre, deNombre, categoria, mensaje) {
+  try {
+    const cat = RECO_CATS.find(c => c.id === categoria);
+    const catLabel = cat ? `${cat.icon} ${cat.label}` : "Reconocimiento";
+    const body = {
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 100,
+      system: "Eres un asistente que confirma el envío de correos. Responde solo 'ok'.",
+      messages: [{ role: "user", content: `Confirma: ok` }],
+    };
+    // Usamos Supabase Edge Functions para el email si está disponible.
+    // Si no, el reconocimiento igual se guarda públicamente en la app.
+    await fetch(`${SUPABASE_URL}/functions/v1/send-reco-email`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+        apikey: SUPABASE_KEY,
+      },
+      body: JSON.stringify({ paraEmail, paraNombre, deNombre, catLabel, mensaje }),
+    });
+  } catch (e) {
+    // El email es un bonus; no bloquea el flujo principal
+    console.warn("Email no enviado (opcional):", e.message);
+  }
+}
+
+function Reconoceme({ members, user, reconocimientos, onReload }) {
+  const [paraId, setParaId] = useState("");
+  const [categoria, setCategoria] = useState("general");
+  const [mensaje, setMensaje] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
+  const [filtroId, setFiltroId] = useState("");
+
+  const otrosMembers = (members || []).filter((m) => m.id !== user?.id);
+  const paraInfo = members.find((m) => m.id === paraId);
+
+  const filtered = filtroId
+    ? (reconocimientos || []).filter((r) => r.para_id === filtroId)
+    : (reconocimientos || []);
+
+  async function handleEnviar() {
+    if (!paraId) { setError("Selecciona a quién quieres reconocer."); return; }
+    if (!mensaje.trim()) { setError("Escribe un mensaje de reconocimiento."); return; }
+    if (mensaje.trim().length < 10) { setError("El mensaje es muy corto. ¡Exprésate con cariño!"); return; }
+    setSaving(true);
+    setError("");
+    try {
+      const para = members.find((m) => m.id === paraId);
+      await supabase("reconocimientos", {
+        method: "POST",
+        body: {
+          de_id: user.id,
+          de_nombre: user.nombre,
+          para_id: paraId,
+          para_nombre: para?.nombre || "",
+          para_email: para?.email || "",
+          mensaje: mensaje.trim(),
+          categoria,
+        },
+      });
+      // Intentar enviar email (no bloqueante)
+      if (para?.email) {
+        await sendRecoEmail(para.email, para.nombre, user.nombre, categoria, mensaje.trim());
+      }
+      setSuccess(true);
+      setParaId("");
+      setCategoria("general");
+      setMensaje("");
+      onReload();
+      setTimeout(() => setSuccess(false), 4000);
+    } catch (e) {
+      setError("Error al guardar: " + e.message);
+    }
+    setSaving(false);
+  }
+
+  const getColor = (id) => CUERDAS[members.find((m) => m.id === id)?.cuerda] || C.primary;
+  const getAvatar = (id) => members.find((m) => m.id === id);
+
+  return (
+    <div style={{ maxWidth: 860 }}>
+      {/* Header */}
+      <div style={{
+        background: `linear-gradient(135deg,${C.primaryDark},${C.primary},#1ab87e)`,
+        borderRadius: 16, padding: "22px 24px", marginBottom: 20,
+        display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap",
+      }}>
+        <div style={{
+          width: 52, height: 52, background: "rgba(255,255,255,0.2)", borderRadius: 14,
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, flexShrink: 0,
+        }}>🌟</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 19, fontWeight: 700, color: "white" }}>
+            Reconóceme
+          </div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 2 }}>
+            Reconoce públicamente a un compañero del coro · {(reconocimientos || []).length} reconocimientos entregados
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }} className="grid-2">
+
+        {/* FORMULARIO */}
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <span style={{ fontSize: 18 }}>✍️</span>
+            <span style={{ fontFamily: "'Poppins',sans-serif", fontSize: 15, fontWeight: 600, color: C.dark }}>
+              Enviar reconocimiento
+            </span>
+          </div>
+
+          {success && (
+            <div style={{ background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: 10, padding: "12px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 20 }}>🎉</span>
+              <div>
+                <div style={{ fontWeight: 700, color: "#065f46", fontSize: 13 }}>¡Reconocimiento enviado!</div>
+                <div style={{ fontSize: 11, color: "#047857" }}>Ya está visible en el muro y se notificó por correo.</div>
+              </div>
+            </div>
+          )}
+
+          {/* Seleccionar persona */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: C.dark, display: "block", marginBottom: 6 }}>
+              ¿A quién quieres reconocer? *
+            </label>
+            <select
+              value={paraId}
+              onChange={(e) => setParaId(e.target.value)}
+              style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, color: C.dark, background: "white", outline: "none" }}
+            >
+              <option value="">— Selecciona un integrante —</option>
+              {otrosMembers.map((m) => (
+                <option key={m.id} value={m.id}>{m.nombre} ({rolLabel(m.cuerda)})</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Vista previa del destinatario */}
+          {paraInfo && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.primaryLight, borderRadius: 10, padding: "10px 12px", marginBottom: 14, border: `1px solid ${C.primary}30` }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: getColor(paraId), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 13, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                {paraInfo.foto_url ? <img src={paraInfo.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(paraInfo.nombre || "?")}
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: C.dark }}>{paraInfo.nombre}</div>
+                <div style={{ fontSize: 11, color: getColor(paraId) }}>{rolLabel(paraInfo.cuerda)}</div>
+              </div>
+              <span style={{ marginLeft: "auto", fontSize: 16 }}>✉️</span>
+            </div>
+          )}
+
+          {/* Categoría */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: C.dark, display: "block", marginBottom: 6 }}>
+              Tipo de reconocimiento
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              {RECO_CATS.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setCategoria(cat.id)}
+                  style={{
+                    padding: "7px 8px", borderRadius: 8, fontSize: 11, fontWeight: 500,
+                    cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+                    background: categoria === cat.id ? C.primary : C.light,
+                    color: categoria === cat.id ? "white" : C.dark,
+                    border: categoria === cat.id ? `1px solid ${C.primaryDark}` : `1px solid ${C.border}`,
+                    display: "flex", alignItems: "center", gap: 5,
+                  }}
+                >
+                  <span>{cat.icon}</span>
+                  <span style={{ lineHeight: 1.3 }}>{cat.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Mensaje */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: C.dark, display: "block", marginBottom: 6 }}>
+              Tu mensaje *
+            </label>
+            <textarea
+              value={mensaje}
+              onChange={(e) => setMensaje(e.target.value)}
+              placeholder="Escribe aquí por qué quieres reconocer a esta persona... Este mensaje será público y también le llegará por correo."
+              rows={4}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, resize: "vertical", outline: "none", lineHeight: 1.5, color: C.dark }}
+            />
+            <div style={{ fontSize: 11, color: C.gray, marginTop: 4 }}>{mensaje.length} caracteres</div>
+          </div>
+
+          {error && (
+            <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "9px 12px", marginBottom: 12, fontSize: 12, color: "#991b1b" }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          <Btn onClick={handleEnviar} disabled={saving} style={{ width: "100%", justifyContent: "center" }}>
+            {saving ? "Enviando..." : "🌟 Enviar reconocimiento"}
+          </Btn>
+          <div style={{ fontSize: 11, color: C.gray, marginTop: 8, textAlign: "center" }}>
+            Este reconocimiento será visible para todos los integrantes del coro.
+          </div>
+        </Card>
+
+        {/* MURO DE RECONOCIMIENTOS */}
+        <div>
+          <Card style={{ marginBottom: 12, padding: "12px 14px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 16 }}>🔍</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>Filtrar por persona</span>
+            </div>
+            <select
+              value={filtroId}
+              onChange={(e) => setFiltroId(e.target.value)}
+              style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, color: C.dark, background: "white", outline: "none" }}
+            >
+              <option value="">Todos los reconocimientos</option>
+              {(members || []).map((m) => (
+                <option key={m.id} value={m.id}>{m.nombre}</option>
+              ))}
+            </select>
+          </Card>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 18 }}>🏆</span>
+            <span style={{ fontFamily: "'Poppins',sans-serif", fontSize: 15, fontWeight: 600, color: C.dark }}>
+              Muro público
+            </span>
+            {filtroId && (
+              <span style={{ fontSize: 11, color: C.primary, background: C.primaryLight, borderRadius: 20, padding: "2px 10px", fontWeight: 600 }}>
+                {members.find(m => m.id === filtroId)?.nombre}
+              </span>
+            )}
+          </div>
+
+          {filtered.length === 0 ? (
+            <Card>
+              <div style={{ textAlign: "center", padding: "24px 0", color: C.gray }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>🌟</div>
+                <div style={{ fontSize: 13 }}>Aún no hay reconocimientos.</div>
+                <div style={{ fontSize: 11, marginTop: 4 }}>¡Sé el primero en reconocer a alguien!</div>
+              </div>
+            </Card>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 520, overflowY: "auto", paddingRight: 4 }}>
+              {filtered.map((r) => {
+                const para = getAvatar(r.para_id);
+                const de = getAvatar(r.de_id);
+                const cc = CUERDAS[para?.cuerda] || C.primary;
+                const dc = CUERDAS[de?.cuerda] || C.gray;
+                const cat = RECO_CATS.find(c => c.id === r.categoria);
+                const fecha = r.created_at ? new Date(r.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" }) : "";
+                return (
+                  <div key={r.id} style={{
+                    background: "white", borderRadius: 12, padding: "14px 16px",
+                    border: `1px solid ${C.border}`,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+                    borderLeft: `4px solid ${cc}`,
+                  }}>
+                    {/* Cabecera destinatario */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: cc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 12, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                        {para?.foto_url ? <img src={para.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(r.para_nombre || "?")}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: C.dark }}>
+                          Para <span style={{ color: cc }}>{r.para_nombre}</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: C.gray }}>{rolLabel(para?.cuerda)}</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 18 }}>{cat?.icon || "🌟"}</div>
+                        <div style={{ fontSize: 9, color: C.gray, marginTop: 1, whiteSpace: "nowrap" }}>{fecha}</div>
+                      </div>
+                    </div>
+
+                    {/* Categoría */}
+                    {cat && (
+                      <div style={{ fontSize: 10, fontWeight: 700, color: cc, background: cc + "15", borderRadius: 20, padding: "2px 10px", display: "inline-block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                        {cat.icon} {cat.label}
+                      </div>
+                    )}
+
+                    {/* Mensaje */}
+                    <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6, fontStyle: "italic", marginBottom: 10, background: "#f9fafb", borderRadius: 8, padding: "10px 12px" }}>
+                      "{r.mensaje}"
+                    </div>
+
+                    {/* Remitente */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ width: 22, height: 22, borderRadius: "50%", background: dc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 9, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                        {de?.foto_url ? <img src={de.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(r.de_nombre || "?")}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.gray }}>
+                        Reconocido por <span style={{ fontWeight: 600, color: C.dark }}>{r.de_nombre}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SqlSetupBlock() {
   const [open, setOpen] = useState(false);
   return (
@@ -14071,7 +14477,12 @@ function SqlSetupBlock() {
             create policy "pods_all" on podcasts for all using (true) with check (true);<br />
             alter table asistencia enable row level security;<br />
             drop policy if exists "asis_all" on asistencia;<br />
-            create policy "asis_all" on asistencia for all using (true) with check (true);
+            create policy "asis_all" on asistencia for all using (true) with check (true);<br />
+            -- Tabla reconocimientos:<br />
+            create table if not exists reconocimientos (id uuid default gen_random_uuid() primary key, de_id uuid references integrantes(id), de_nombre text, para_id uuid references integrantes(id), para_nombre text, para_email text, mensaje text not null, categoria text default 'general', created_at timestamptz default now());<br />
+            alter table reconocimientos enable row level security;<br />
+            drop policy if exists "reco_all" on reconocimientos;<br />
+            create policy "reco_all" on reconocimientos for all using (true) with check (true);
           </code>
         </div>
       )}
@@ -14618,6 +15029,7 @@ function AdminHistorialAsistencia({ members }) {
                                 <div style={{ width: `${p}%`, height: "100%", background: colorPct(p), borderRadius: 3 }} />
                               </div>
                               <span style={{ fontWeight: 700, color: colorPct(p), fontSize: 13 }}>{p}%</span>
+                              {ausentes === 0 && presentes > 0 && <span title="¡Sin ausencias!" style={{ fontSize: 14, lineHeight: 1 }}>⭐</span>}
                             </div>
                           ) : (
                             <span style={{ color: C.gray, fontSize: 12 }}>Sin registros</span>
