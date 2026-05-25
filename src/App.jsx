@@ -275,6 +275,7 @@ const G = `
     .grid-dash-sub  { grid-template-columns: 1fr !important; }
     .grid-2 { grid-template-columns: 1fr !important; }
     .grid-3 { grid-template-columns: 1fr 1fr !important; }
+    .grid-reco { grid-template-columns: 1fr !important; }
     .perfil-grid { grid-template-columns: 1fr !important; }
     .section-title-row { flex-direction: column !important; align-items: flex-start !important; gap:8px !important; }
     .links-bar { flex-wrap: wrap !important; }
@@ -282,6 +283,12 @@ const G = `
     .topbar { padding: 0 12px !important; }
     .topbar-greeting { display: none !important; }
     .bottom-nav { display: flex !important; }
+  }
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .grid-reco { grid-template-columns: 1fr 1fr !important; }
+    .grid-3 { grid-template-columns: 1fr 1fr !important; }
+    .grid-dash-main { grid-template-columns: 1fr !important; }
+    .main-content { padding: 16px !important; }
   }
   @media (min-width: 769px) {
     .show-mobile { display: none !important; }
@@ -14179,10 +14186,8 @@ function ReaccionesBar({ recoId, userId }) {
     if (!userId || loading) return;
     setLoading(true);
     const yaTengo = mias.has(tipo);
-    // Reacción previa distinta a la que se está eligiendo (para desactivarla)
     const tipoAnterior = [...mias].find(t => t !== tipo) || null;
 
-    // Actualización optimista del estado local
     setCounts(prev => {
       const next = { ...prev, [tipo]: Math.max(0, prev[tipo] + (yaTengo ? -1 : 1)) };
       if (!yaTengo && tipoAnterior) next[tipoAnterior] = Math.max(0, prev[tipoAnterior] - 1);
@@ -14191,7 +14196,6 @@ function ReaccionesBar({ recoId, userId }) {
     setMias(() => yaTengo ? new Set() : new Set([tipo]));
 
     try {
-      // Si había otra reacción activa, eliminarla primero
       if (!yaTengo && tipoAnterior) {
         await fetch(
           `${SUPABASE_URL}/rest/v1/reco_reacciones?reco_id=eq.${recoId}&user_id=eq.${userId}&tipo=eq.${tipoAnterior}`,
@@ -14199,13 +14203,11 @@ function ReaccionesBar({ recoId, userId }) {
         );
       }
       if (yaTengo) {
-        // Quitar la reacción actual
         await fetch(
           `${SUPABASE_URL}/rest/v1/reco_reacciones?reco_id=eq.${recoId}&user_id=eq.${userId}&tipo=eq.${tipo}`,
           { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` } }
         );
       } else {
-        // Agregar la nueva reacción
         await fetch(`${SUPABASE_URL}/rest/v1/reco_reacciones`, {
           method: "POST",
           headers: {
@@ -14218,7 +14220,6 @@ function ReaccionesBar({ recoId, userId }) {
         });
       }
     } catch {
-      // Revertir cambios optimistas si falla
       setCounts(prev => {
         const next = { ...prev, [tipo]: Math.max(0, prev[tipo] + (yaTengo ? 1 : -1)) };
         if (!yaTengo && tipoAnterior) next[tipoAnterior] = Math.max(0, prev[tipoAnterior] + 1);
@@ -14365,7 +14366,7 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
         </div>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, position: "relative" }}>
+          <div className="grid-reco" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, position: "relative" }}>
             {recientes.map((r) => {
               const para = members.find(m => m.id === r.para_id);
               const de = members.find(m => m.id === r.de_id);
