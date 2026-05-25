@@ -13457,7 +13457,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                               {m.foto_url ? <img src={m.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(m.nombre || "?")}
                             </div>
                             <div>
-                              <div style={{ fontWeight: 600, color: C.dark }}>{m.nombre} {m.id === user?.id && <span style={{ fontSize: 10, color: C.primary }}>(tú)</span>}</div>
+                              <div style={{ fontWeight: 600, color: C.dark }}>{m.nombre} {m.id === user?.id && <span style={{ fontSize: 10, color: C.primary }}>(tú)</span>}{presentes > 0 && <span title="¡Sin ausencias este año!" style={{ fontSize: 14, marginLeft: 4 }}>⭐</span>}</div>
                               <div style={{ fontSize: 11, color: mcc }}>{rolLabel(m.cuerda)}</div>
                             </div>
                           </div>
