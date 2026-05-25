@@ -295,6 +295,7 @@ const NAV = [
   { id: "admin",       icon: "⚙",  label: "Administración" },
   { id: "agenda",      icon: "◫",  label: "Agenda" },
   { id: "asistencia",  icon: "✅", label: "Asistencia" },
+  { id: "reconoceme",  icon: "🌟", label: "Reconóceme" },
   { id: "noticias",    icon: "◈",  label: "Avisos" },
   { id: "biblioteca",  icon: "▤",  label: "Biblioteca" },
   { id: "cancionero",  icon: "♫",  label: "Canto Digital" },
@@ -305,7 +306,6 @@ const NAV = [
   { id: "pauta_misa",  icon: "🎼", label: "Pauta de Misa" },
   { id: "podcast",     icon: "◉",  label: "Podcast" },
   { id: "qanda",       icon: "?",  label: "Preguntas" },
-  { id: "reconoceme",  icon: "🌟", label: "Reconóceme" },
 ];
 
 const BOTTOM_NAV = [
@@ -4018,7 +4018,7 @@ function Dashboard({
       )}
 
       {/* ── Reconocimientos destacado ── */}
-      <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} />
+      <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} user={user} />
 
       <VideoDestacadoWidget isAdmin={isAdmin} />
 
@@ -14088,9 +14088,109 @@ function ValoresWidget() {
 // ═══════════════════════════════════════════════════════════════
 //  RECONÓCEME — Widget para el Dashboard (full-width destacado)
 // ═══════════════════════════════════════════════════════════════
-function ReconocemeWidget({ reconocimientos, members, setSection }) {
-  const recientes = (reconocimientos || []).slice(0, 3);
-  const total = (reconocimientos || []).length;
+// ── Reacciones por reconocimiento ──────────────────────────────
+const REACCIONES_DEF = [
+  { tipo: "like",     emoji: "👍", label: "Me gusta" },
+  { tipo: "corazon",  emoji: "❤️", label: "Me encanta" },
+  { tipo: "estrella", emoji: "⭐", label: "Destacado" },
+];
+
+function ReaccionesBar({ recoId, userId }) {
+  const [counts, setCounts]   = useState({ like: 0, corazon: 0, estrella: 0 });
+  const [mias,   setMias]     = useState(new Set());
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!recoId) return;
+    fetch(
+      `${SUPABASE_URL}/rest/v1/reco_reacciones?reco_id=eq.${recoId}&select=tipo,user_id`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` } }
+    )
+      .then(r => r.ok ? r.json() : [])
+      .then(rows => {
+        const c = { like: 0, corazon: 0, estrella: 0 };
+        const m = new Set();
+        rows.forEach(row => {
+          c[row.tipo] = (c[row.tipo] || 0) + 1;
+          if (row.user_id === userId) m.add(row.tipo);
+        });
+        setCounts(c);
+        setMias(m);
+      })
+      .catch(() => {});
+  }, [recoId, userId]);
+
+  async function toggleReaccion(tipo) {
+    if (!userId || loading) return;
+    setLoading(true);
+    const yaTengo = mias.has(tipo);
+    setCounts(prev => ({ ...prev, [tipo]: Math.max(0, prev[tipo] + (yaTengo ? -1 : 1)) }));
+    setMias(prev => { const s = new Set(prev); yaTengo ? s.delete(tipo) : s.add(tipo); return s; });
+    try {
+      if (yaTengo) {
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/reco_reacciones?reco_id=eq.${recoId}&user_id=eq.${userId}&tipo=eq.${tipo}`,
+          { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` } }
+        );
+      } else {
+        await fetch(`${SUPABASE_URL}/rest/v1/reco_reacciones`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({ reco_id: recoId, user_id: userId, tipo }),
+        });
+      }
+    } catch {
+      setCounts(prev => ({ ...prev, [tipo]: Math.max(0, prev[tipo] + (yaTengo ? 1 : -1)) }));
+      setMias(prev => { const s = new Set(prev); yaTengo ? s.add(tipo) : s.delete(tipo); return s; });
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      {REACCIONES_DEF.map(({ tipo, emoji, label }) => {
+        const active = mias.has(tipo);
+        const count  = counts[tipo] || 0;
+        return (
+          <button
+            key={tipo}
+            title={userId ? label : "Inicia sesión para reaccionar"}
+            onClick={() => toggleReaccion(tipo)}
+            style={{
+              display: "flex", alignItems: "center", gap: 3,
+              padding: "3px 8px", borderRadius: 20,
+              border: active ? "1px solid #d1d5db" : "1px solid #e5e7eb",
+              background: active ? "#f3f4f6" : "transparent",
+              cursor: userId ? "pointer" : "default",
+              fontSize: 13, lineHeight: 1,
+              transition: "all 0.15s",
+              transform: active ? "scale(1.08)" : "scale(1)",
+              boxShadow: active ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+            }}
+          >
+            <span style={{ fontSize: 14 }}>{emoji}</span>
+            {count > 0 && (
+              <span style={{ fontSize: 10, fontWeight: 600, color: active ? "#374151" : "#9ca3af", minWidth: 10 }}>
+                {count}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
+  const hace7dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const enWidget  = (reconocimientos || []).filter(r => new Date(r.created_at) >= hace7dias);
+  const recientes = enWidget.slice(0, 6);
+  const total     = (reconocimientos || []).length;
 
   return (
     <div style={{
@@ -14147,12 +14247,21 @@ function ReconocemeWidget({ reconocimientos, members, setSection }) {
           border: "1px dashed rgba(255,255,255,0.15)",
         }}>
           <img src={LOGO_RECONOCIMIENTO_PERSONAL} alt="" style={{ width: 52, height: 52, objectFit: "contain", marginBottom: 10, opacity: 0.5 }} />
-          <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>¡Aún no hay reconocimientos!</div>
-          <div style={{ fontSize: 11, marginTop: 4, color: "rgba(255,255,255,0.45)" }}>Haz clic en el botón y reconoce a un compañero del coro.</div>
+          {total > 0 ? (
+            <>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>Sin reconocimientos recientes</div>
+              <div style={{ fontSize: 11, marginTop: 4, color: "rgba(255,255,255,0.45)" }}>Los de los últimos 7 días aparecen aquí · <span style={{ textDecoration: "underline", cursor: "pointer" }} onClick={() => setSection("reconoceme")}>Ver todos ({total})</span></div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>¡Aún no hay reconocimientos!</div>
+              <div style={{ fontSize: 11, marginTop: 4, color: "rgba(255,255,255,0.45)" }}>Haz clic en el botón y reconoce a un compañero del coro.</div>
+            </>
+          )}
         </div>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12, position: "relative" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, position: "relative" }}>
             {recientes.map((r) => {
               const para = members.find(m => m.id === r.para_id);
               const de = members.find(m => m.id === r.de_id);
@@ -14231,8 +14340,11 @@ function ReconocemeWidget({ reconocimientos, members, setSection }) {
                     {r.mensaje}
                   </div>
 
+                  {/* Reacciones */}
+                  <ReaccionesBar recoId={r.id} userId={user?.id} />
+
                   {/* Pie: de quién + fecha */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2, paddingTop: 8, borderTop: "1px solid #f0f0f0" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 8, borderTop: "1px solid #f0f0f0" }}>
                     <div style={{
                       width: 20, height: 20, borderRadius: "50%", background: dc,
                       display: "flex", alignItems: "center", justifyContent: "center",
@@ -14250,7 +14362,7 @@ function ReconocemeWidget({ reconocimientos, members, setSection }) {
             })}
           </div>
 
-          {total > 3 && (
+          {(recientes.length > 6 || total > recientes.length) && (
             <button
               onClick={() => setSection("reconoceme")}
               style={{
@@ -14911,7 +15023,12 @@ function SqlSetupBlock() {
             alter table reconocimientos add column if not exists para_grupo text;<br />
             alter table reconocimientos enable row level security;<br />
             drop policy if exists "reco_all" on reconocimientos;<br />
-            create policy "reco_all" on reconocimientos for all using (true) with check (true);
+            create policy "reco_all" on reconocimientos for all using (true) with check (true);<br />
+            -- Tabla reacciones para reconocimientos:<br />
+            create table if not exists reco_reacciones (id uuid default gen_random_uuid() primary key, reco_id uuid not null, user_id uuid, tipo text check (tipo in ('like','corazon','estrella')), created_at timestamptz default now(), unique(reco_id, user_id, tipo));<br />
+            alter table reco_reacciones enable row level security;<br />
+            drop policy if exists "reac_all" on reco_reacciones;<br />
+            create policy "reac_all" on reco_reacciones for all using (true) with check (true);
           </code>
         </div>
       )}
