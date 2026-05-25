@@ -13711,17 +13711,19 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
         if (!estado) continue;
         const existe = asisActual.find(a => a.evento_id === eventoId && a.member_id === m.id);
         if (existe) {
-          await fetch(`${SUPABASE_URL}/rest/v1/asistencia?id=eq.${existe.id}`, {
+          const r = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?id=eq.${existe.id}`, {
             method: "PATCH",
             headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
             body: JSON.stringify({ estado }),
           });
+          if (!r.ok) { const e = await r.text(); console.error("Error PATCH asistencia:", r.status, e); }
         } else {
-          await fetch(`${SUPABASE_URL}/rest/v1/asistencia`, {
+          const r = await fetch(`${SUPABASE_URL}/rest/v1/asistencia`, {
             method: "POST",
             headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "return=minimal" },
             body: JSON.stringify({ evento_id: eventoId, member_id: m.id, estado }),
           });
+          if (!r.ok) { const e = await r.text(); console.error("Error POST asistencia:", r.status, e); }
         }
       }
       // Recargar localmente después de guardar
@@ -14235,7 +14237,11 @@ function ReaccionesBar({ recoId, userId }) {
           headers: { ...hdrs, "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal" },
           body: JSON.stringify({ reco_id: recoId, user_id: userId, tipo }),
         });
-        if (!res.ok) { const err = await res.text(); console.error("Reacción error:", res.status, err); throw new Error(err); }
+        if (!res.ok) {
+          const err = await res.text();
+          console.error("Reacción error:", res.status, err);
+          if (res.status !== 409) throw new Error(err); // 409 = ya existe, no revertir
+        }
       }
     } catch(e) {
       console.error("toggleReaccion catch:", e);
@@ -14263,7 +14269,7 @@ function ReaccionesBar({ recoId, userId }) {
           <button
             key={tipo}
             title={userId ? label : "Inicia sesión para reaccionar"}
-            onClick={() => toggleReaccion(tipo)}
+            onClick={(e) => { e.stopPropagation(); toggleReaccion(tipo); }}
             style={{
               display: "flex", alignItems: "center", gap: 5,
               padding: "5px 12px", borderRadius: 24,
