@@ -3257,9 +3257,7 @@ function Dashboard({
   const misAusentes2 = misAsistencias.filter(a => a.estado === "ausente").length;
   const totalEvaluados = misAsistencias.filter(a => !["justificado","excluido","nuevo"].includes(a.estado)).length;
   const pctAsistencia = totalEvaluados > 0 ? Math.round((misPresentes / totalEvaluados) * 100) : null;
-  const tieneEstrella = misPresentes > 0;
-
-  const fmtEventoFecha = (f) => {
+  const tieneEstrella = misPresentes > 0 && misAusentes2 === 0 && misJustificados === 0;
     const d = new Date(f + "T00:00:00");
     return d.toLocaleDateString("es-CL", {
       weekday: "long",
@@ -13378,7 +13376,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
   const pct = calcPct(user?.id);
   const colPct = colorPct(pct);
   const circum = 2 * Math.PI * 38;
-  const tieneEstrella = misPresentes > 0;
+  const tieneEstrella = misPresentes > 0 && misAusentes === 0 && misJustificados === 0;
 
   const msgPct = pct === null ? null : pct >= 75 ? "¡Vas muy bien! Sigue así 💪" : pct >= 50 ? "Puedes mejorar tu asistencia 🎵" : "Tu asistencia necesita atención ⚠️";
   const bgPct = pct === null ? C.bg : pct >= 75 ? C.primary + "12" : pct >= 50 ? "#fef3c7" : "#fee2e2";
@@ -13683,7 +13681,12 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
       const init = {};
       members.forEach(m => {
         const reg = asisActual.find(a => a.evento_id === eventoId && a.member_id === m.id);
-        init[m.id] = reg?.estado || "ausente";
+        if (reg) {
+          init[m.id] = reg.estado; // respetar siempre el estado guardado
+        } else {
+          // Sin registro previo: nuevo integrante → "nuevo", resto → "ausente"
+          init[m.id] = m.es_nuevo ? "nuevo" : "ausente";
+        }
       });
       setRegistros(init);
     });
@@ -13703,7 +13706,8 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
       // Siempre obtener la asistencia más reciente de Supabase antes de guardar
       const asisActual = await recargarAsistencia();
       for (const m of members) {
-        const estado = registros[m.id] || "ausente";
+        const estado = registros[m.id];
+        if (!estado) continue; // no guardar si no tiene estado definido
         const existe = asisActual.find(a => a.evento_id === eventoId && a.member_id === m.id);
         if (existe) {
           await fetch(`${SUPABASE_URL}/rest/v1/asistencia?id=eq.${existe.id}`, {
@@ -13796,7 +13800,7 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
           <Card style={{ padding: 0, overflow: "hidden", marginBottom: 16 }}>
             {members.map((m, i) => {
               const cc = CUERDAS[m.cuerda] || C.primary;
-              const estado = registros[m.id] || "ausente";
+              const estado = registros[m.id] ?? "ausente";
               return (
                 <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderTop: i > 0 ? `1px solid ${C.border}` : "none", background: i % 2 === 0 ? "#fff" : C.bg }}>
                   <div style={{ width: 36, height: 36, borderRadius: "50%", background: cc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 13, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
@@ -14208,7 +14212,7 @@ function ReaccionesBar({ recoId, userId }) {
     if (!recoId) return;
     fetch(
       `${SUPABASE_URL}/rest/v1/reco_reacciones?reco_id=eq.${recoId}&select=tipo,user_id`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` } }
+      { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } }
     )
       .then(r => r.ok ? r.json() : [])
       .then(rows => {
@@ -14235,31 +14239,34 @@ function ReaccionesBar({ recoId, userId }) {
       return next;
     });
     setMias(() => yaTengo ? new Set() : new Set([tipo]));
+    const SK = SUPABASE_SERVICE_KEY;
+    const hdrs = { apikey: SK, Authorization: `Bearer ${SK}` };
     try {
       if (!yaTengo && tipoAnterior) {
         await fetch(
           `${SUPABASE_URL}/rest/v1/reco_reacciones?reco_id=eq.${recoId}&user_id=eq.${userId}&tipo=eq.${tipoAnterior}`,
-          { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` } }
+          { method: "DELETE", headers: hdrs }
         );
       }
       if (yaTengo) {
         await fetch(
           `${SUPABASE_URL}/rest/v1/reco_reacciones?reco_id=eq.${recoId}&user_id=eq.${userId}&tipo=eq.${tipo}`,
-          { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` } }
+          { method: "DELETE", headers: hdrs }
         );
       } else {
-        await fetch(`${SUPABASE_URL}/rest/v1/reco_reacciones`, {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/reco_reacciones`, {
           method: "POST",
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
-            "Content-Type": "application/json",
-            Prefer: "resolution=ignore-duplicates,return=minimal",
-          },
+          headers: { ...hdrs, "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal" },
           body: JSON.stringify({ reco_id: recoId, user_id: userId, tipo }),
         });
+        if (!res.ok) {
+          const err = await res.text();
+          console.error("Reacción error:", res.status, err);
+          throw new Error(err);
+        }
       }
-    } catch {
+    } catch (e) {
+      console.error("toggleReaccion catch:", e);
       setCounts(prev => {
         const next = { ...prev, [tipo]: Math.max(0, prev[tipo] + (yaTengo ? 1 : -1)) };
         if (!yaTengo && tipoAnterior) next[tipoAnterior] = Math.max(0, prev[tipoAnterior] + 1);
