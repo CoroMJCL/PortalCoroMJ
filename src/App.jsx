@@ -13502,7 +13502,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
 // ══════════════════════════════════════════
 //  ADMIN ASISTENCIA
 // ══════════════════════════════════════════
-function AdminAsistencia({ members, eventos, asistencia, onReload }) {
+function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReload }) {
   // eventos = gcalEventos (Google Calendar)
   const [eventoId, setEventoId] = useState("");
   const [registros, setRegistros] = useState({});
@@ -13510,6 +13510,31 @@ function AdminAsistencia({ members, eventos, asistencia, onReload }) {
   const [saved, setSaved] = useState(false);
   const [gcalLoading, setGcalLoading] = useState(false);
   const [gcalEventos, setGcalEventos] = useState(eventos || []);
+  // Copia local de asistencia para siempre tener datos frescos
+  const [asistenciaLocal, setAsistenciaLocal] = useState(asistenciaProp || []);
+
+  // Sincronizar asistenciaLocal cuando cambia la prop del padre
+  useEffect(() => {
+    setAsistenciaLocal(asistenciaProp || []);
+  }, [asistenciaProp]);
+
+  // Función para recargar asistencia directamente desde Supabase
+  const recargarAsistencia = async () => {
+    try {
+      const token = _authToken || SUPABASE_KEY;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?select=*&order=created_at.desc`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAsistenciaLocal(data || []);
+        return data || [];
+      }
+    } catch(e) {
+      console.warn("Error recargando asistencia:", e);
+    }
+    return asistenciaLocal;
+  };
 
   // Si no hay eventos pasados, intentar cargar desde GCal directamente
   useEffect(() => {
@@ -13551,16 +13576,19 @@ function AdminAsistencia({ members, eventos, asistencia, onReload }) {
 
   const eventosOrdenados = [...gcalEventos].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
+  // Al cambiar evento, recargar asistencia fresca desde Supabase antes de inicializar registros
   useEffect(() => {
     if (!eventoId) return;
-    const init = {};
-    members.forEach(m => {
-      const reg = asistencia.find(a => a.evento_id === eventoId && a.member_id === m.id);
-      init[m.id] = reg?.estado || "ausente";
-    });
-    setRegistros(init);
     setSaved(false);
-  }, [eventoId, asistencia, members]);
+    recargarAsistencia().then(asisActual => {
+      const init = {};
+      members.forEach(m => {
+        const reg = asisActual.find(a => a.evento_id === eventoId && a.member_id === m.id);
+        init[m.id] = reg?.estado || "ausente";
+      });
+      setRegistros(init);
+    });
+  }, [eventoId, members]);
 
   const marcarTodos = (estado) => {
     const nuevo = {};
@@ -13573,9 +13601,11 @@ function AdminAsistencia({ members, eventos, asistencia, onReload }) {
     setSaving(true);
     const token = _authToken || SUPABASE_KEY;
     try {
+      // Siempre obtener la asistencia más reciente de Supabase antes de guardar
+      const asisActual = await recargarAsistencia();
       for (const m of members) {
         const estado = registros[m.id] || "ausente";
-        const existe = asistencia.find(a => a.evento_id === eventoId && a.member_id === m.id);
+        const existe = asisActual.find(a => a.evento_id === eventoId && a.member_id === m.id);
         if (existe) {
           await fetch(`${SUPABASE_URL}/rest/v1/asistencia?id=eq.${existe.id}`, {
             method: "PATCH",
@@ -13590,6 +13620,8 @@ function AdminAsistencia({ members, eventos, asistencia, onReload }) {
           });
         }
       }
+      // Recargar localmente después de guardar
+      await recargarAsistencia();
       setSaved(true);
       onReload();
     } catch(err) {
