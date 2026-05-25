@@ -14179,15 +14179,33 @@ function ReaccionesBar({ recoId, userId }) {
     if (!userId || loading) return;
     setLoading(true);
     const yaTengo = mias.has(tipo);
-    setCounts(prev => ({ ...prev, [tipo]: Math.max(0, prev[tipo] + (yaTengo ? -1 : 1)) }));
-    setMias(prev => { const s = new Set(prev); yaTengo ? s.delete(tipo) : s.add(tipo); return s; });
+    // Reacción previa distinta a la que se está eligiendo (para desactivarla)
+    const tipoAnterior = [...mias].find(t => t !== tipo) || null;
+
+    // Actualización optimista del estado local
+    setCounts(prev => {
+      const next = { ...prev, [tipo]: Math.max(0, prev[tipo] + (yaTengo ? -1 : 1)) };
+      if (!yaTengo && tipoAnterior) next[tipoAnterior] = Math.max(0, prev[tipoAnterior] - 1);
+      return next;
+    });
+    setMias(() => yaTengo ? new Set() : new Set([tipo]));
+
     try {
+      // Si había otra reacción activa, eliminarla primero
+      if (!yaTengo && tipoAnterior) {
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/reco_reacciones?reco_id=eq.${recoId}&user_id=eq.${userId}&tipo=eq.${tipoAnterior}`,
+          { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` } }
+        );
+      }
       if (yaTengo) {
+        // Quitar la reacción actual
         await fetch(
           `${SUPABASE_URL}/rest/v1/reco_reacciones?reco_id=eq.${recoId}&user_id=eq.${userId}&tipo=eq.${tipo}`,
           { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` } }
         );
       } else {
+        // Agregar la nueva reacción
         await fetch(`${SUPABASE_URL}/rest/v1/reco_reacciones`, {
           method: "POST",
           headers: {
@@ -14200,8 +14218,18 @@ function ReaccionesBar({ recoId, userId }) {
         });
       }
     } catch {
-      setCounts(prev => ({ ...prev, [tipo]: Math.max(0, prev[tipo] + (yaTengo ? 1 : -1)) }));
-      setMias(prev => { const s = new Set(prev); yaTengo ? s.add(tipo) : s.delete(tipo); return s; });
+      // Revertir cambios optimistas si falla
+      setCounts(prev => {
+        const next = { ...prev, [tipo]: Math.max(0, prev[tipo] + (yaTengo ? 1 : -1)) };
+        if (!yaTengo && tipoAnterior) next[tipoAnterior] = Math.max(0, prev[tipoAnterior] + 1);
+        return next;
+      });
+      setMias(prev => {
+        const s = new Set(prev);
+        yaTengo ? s.add(tipo) : s.delete(tipo);
+        if (!yaTengo && tipoAnterior) s.add(tipoAnterior);
+        return s;
+      });
     }
     setLoading(false);
   }
