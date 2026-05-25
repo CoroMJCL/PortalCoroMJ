@@ -14257,19 +14257,13 @@ function ReaccionesBar({ recoId, userId }) {
 }
 
 function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
-  // Mostrar los 6 reconocimientos más recientes creados en los últimos 30 días.
-  // Cada tarjeta desaparece 7 días después de su propia fecha de creación.
-  const ahora = new Date();
-  const hace30 = new Date(ahora.getTime() - 30 * 24 * 60 * 60 * 1000);
+  // Mostrar los 6 más recientes que tengan menos de 7 días desde su creación.
+  // Si no hay ninguno dentro de ese plazo, el widget queda vacío hasta el próximo reconocimiento.
+  const _ahora = Date.now();
   const recientes = (reconocimientos || [])
-    .filter(r => {
-      const creado = new Date(r.created_at);
-      if (creado < hace30) return false;                         // más de 30 días: ignorar
-      const expira = new Date(creado.getTime() + 7 * 24 * 60 * 60 * 1000);
-      return ahora < expira;                                     // dentro de 7 días desde creación
-    })
+    .filter(r => (_ahora - new Date(r.created_at).getTime()) < 7 * 24 * 60 * 60 * 1000)
     .slice(0, 6);
-  const total     = (reconocimientos || []).length;
+  const total = (reconocimientos || []).length;
 
   return (
     <div style={{
