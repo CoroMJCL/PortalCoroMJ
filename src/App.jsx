@@ -14274,9 +14274,13 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos }) {
           para_email: para?.email || "",
           mensaje: mensaje.trim(),
           categoria,
-          evento_id: eventoSelec?.id || null,
-          evento_titulo: eventoSelec?.titulo || null,
-          evento_fecha: eventoSelec?.fecha || null,
+          // Solo incluir campos de evento si hay evento seleccionado
+          // (evita error si aún no se han ejecutado los ALTER TABLE)
+          ...(eventoSelec ? {
+            evento_id: eventoSelec.id,
+            evento_titulo: eventoSelec.titulo,
+            evento_fecha: eventoSelec.fecha || null,
+          } : {}),
         }),
       });
       if (!res.ok) throw new Error(await res.text());
