@@ -14046,7 +14046,7 @@ function AdminCuentas({ members, onReload }) {
 const VALORES = [
   { icon: "✝️", label: "Fe",          color: "#1D9E75", bg: "#e8f7f2", desc: "Cantamos porque creemos. Nuestra voz es oración, nuestro servicio es adoración." },
   { icon: "🤝", label: "Respeto",     color: "#534AB7", bg: "#eeedfe", desc: "Valoramos a cada persona, su tiempo, su voz y su lugar en el coro." },
-  { icon: "📅", label: "Compromiso",  color: "#BA7517", bg: "#faeeda", desc: "Cumplimos con nuestra palabra: en los ensayos, en las misas y en el grupo." },
+  { icon: "🤜", label: "Compromiso",  color: "#BA7517", bg: "#faeeda", desc: "Cumplimos con nuestra palabra: en los ensayos, en las misas y en el grupo." },
   { icon: "💜", label: "Comunidad",   color: "#D4537E", bg: "#fbeaf0", desc: "Somos más que un coro, somos una familia que camina junta en la fe." },
 ];
 
@@ -14061,8 +14061,8 @@ function ValoresWidget() {
     <div style={{
       borderRadius: 20,
       marginBottom: 14,
-      background: "linear-gradient(135deg, #0d3d2e 0%, #155e45 60%, #0f4d38 100%)",
-      boxShadow: "0 8px 32px rgba(13,61,46,0.22)",
+      background: "linear-gradient(135deg, #1e2028 0%, #2d3142 60%, #232633 100%)",
+      boxShadow: "0 8px 32px rgba(10,12,20,0.30)",
       overflow: "hidden",
       position: "relative",
     }}>
@@ -14242,7 +14242,9 @@ function ReaccionesBar({ recoId, userId }) {
 }
 
 function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
-  const hace7dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const ahora = new Date();
+  const hace7dias = new Date(ahora.getTime() - 7 * 24 * 60 * 60 * 1000);
+  // Mostrar reconocimientos creados en los últimos 7 días (visibles hasta 7 días después de su creación)
   const recientes = (reconocimientos || []).filter(r => new Date(r.created_at) >= hace7dias).slice(0, 6);
   const total     = (reconocimientos || []).length;
 
