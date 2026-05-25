@@ -14109,14 +14109,19 @@ function ReconocemeWidget({ reconocimientos, members, setSection }) {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10, position: "relative" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <img src={LOGO_RECONOCIMIENTO_PERSONAL} alt="" style={{ width: 58, height: 58, objectFit: "contain", flexShrink: 0, filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.4))" }} />
+          {/* Estrella dorada como ícono del título */}
+          <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.35))" }}>
+            <circle cx="26" cy="26" r="26" fill="rgba(255,255,255,0.10)" />
+            <polygon points="26,8 30.9,20.2 44,21.2 34.3,29.6 37.4,42.4 26,35.4 14.6,42.4 17.7,29.6 8,21.2 21.1,20.2" fill="#FFD700" stroke="#FFA500" strokeWidth="1.2" strokeLinejoin="round" />
+            <polygon points="26,12 30,22.2 41,23 33,30 35.6,41 26,35.2 16.4,41 19,30 11,23 22,22.2" fill="#FFE44D" />
+          </svg>
           <div>
             <div style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 17, color: "white", lineHeight: 1.2 }}>
               Reconocimientos
             </div>
             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 3 }}>
               {total > 0
-                ? <span><strong style={{ color: "#7fffd4" }}>{total}</strong> reconocimiento{total !== 1 ? "s" : ""} entregado{total !== 1 ? "s" : ""} 🎉</span>
+                ? <span><strong style={{ color: "#FFE44D" }}>{total}</strong> reconocimiento{total !== 1 ? "s" : ""} entregado{total !== 1 ? "s" : ""} 🎉</span>
                 : "Sé el primero en reconocer a alguien"}
             </div>
           </div>
@@ -14131,8 +14136,7 @@ function ReconocemeWidget({ reconocimientos, members, setSection }) {
             display: "flex", alignItems: "center", gap: 6,
           }}
         >
-          <img src={LOGO_RECONOCIMIENTO_PERSONAL} alt="" style={{ width: 18, height: 18, objectFit: "contain" }} />
-          Reconocer a alguien
+          ✦ Reconocer a alguien
         </button>
       </div>
 
@@ -14165,13 +14169,14 @@ function ReconocemeWidget({ reconocimientos, members, setSection }) {
               const fecha = r.created_at ? new Date(r.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short" }) : "";
               return (
                 <div key={r.id} style={{
-                  background: "rgba(255,255,255,0.09)",
-                  backdropFilter: "blur(8px)",
+                  background: "#ffffff",
+                  backdropFilter: "none",
                   borderRadius: 14,
                   padding: "14px 16px",
-                  border: `1px solid rgba(255,255,255,0.12)`,
+                  border: `1px solid #e5e7eb`,
                   borderTop: `3px solid ${cc}`,
                   display: "flex", flexDirection: "column", gap: 10,
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
                 }}>
                   {/* Para quién */}
                   <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
@@ -14189,7 +14194,7 @@ function ReconocemeWidget({ reconocimientos, members, setSection }) {
                           : ini(r.para_nombre || "?")}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "white", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1a2332", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {r.para_nombre}
                       </div>
                       <div style={{ fontSize: 10, color: cc, fontWeight: 600, marginTop: 1 }}>
@@ -14199,18 +14204,18 @@ function ReconocemeWidget({ reconocimientos, members, setSection }) {
                     <img
                       src={esGrupo ? LOGO_RECONOCIMIENTO_GRUPAL : LOGO_RECONOCIMIENTO_PERSONAL}
                       alt=""
-                      style={{ width: 30, height: 30, objectFit: "contain", flexShrink: 0, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.3))" }}
+                      style={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }}
                     />
                   </div>
 
                   {/* Categoría */}
                   {cat && (
                     <div style={{
-                      fontSize: 10, fontWeight: 700, color: cc,
-                      background: cc + "22", borderRadius: 20,
+                      fontSize: 10, fontWeight: 700, color: "#374151",
+                      background: "#f3f4f6", borderRadius: 20,
                       padding: "3px 10px", display: "inline-flex", alignItems: "center", gap: 4,
                       alignSelf: "flex-start", textTransform: "uppercase", letterSpacing: "0.05em",
-                      border: `1px solid ${cc}44`,
+                      border: `1px solid #e5e7eb`,
                     }}>
                       {cat.icon} {cat.label}
                     </div>
@@ -14218,7 +14223,7 @@ function ReconocemeWidget({ reconocimientos, members, setSection }) {
 
                   {/* Mensaje */}
                   <div style={{
-                    fontSize: 12, color: "rgba(255,255,255,0.88)", lineHeight: 1.6,
+                    fontSize: 12, color: "#4b5563", lineHeight: 1.6,
                     fontFamily: "'Inter', 'Poppins', sans-serif", fontWeight: 400, flex: 1,
                     display: "-webkit-box", WebkitLineClamp: 3,
                     WebkitBoxOrient: "vertical", overflow: "hidden",
@@ -14227,7 +14232,7 @@ function ReconocemeWidget({ reconocimientos, members, setSection }) {
                   </div>
 
                   {/* Pie: de quién + fecha */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2, paddingTop: 8, borderTop: "1px solid #f0f0f0" }}>
                     <div style={{
                       width: 20, height: 20, borderRadius: "50%", background: dc,
                       display: "flex", alignItems: "center", justifyContent: "center",
@@ -14235,10 +14240,10 @@ function ReconocemeWidget({ reconocimientos, members, setSection }) {
                     }}>
                       {de?.foto_url ? <img src={de.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(r.de_nombre || "?")}
                     </div>
-                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      De <span style={{ color: "rgba(255,255,255,0.75)", fontWeight: 600 }}>{r.de_nombre}</span>
+                    <div style={{ fontSize: 10, color: "#6b7280", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      De <span style={{ color: "#374151", fontWeight: 600 }}>{r.de_nombre}</span>
                     </div>
-                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap" }}>{fecha}</div>
+                    <div style={{ fontSize: 9, color: "#9ca3af", whiteSpace: "nowrap" }}>{fecha}</div>
                   </div>
                 </div>
               );
@@ -14249,8 +14254,8 @@ function ReconocemeWidget({ reconocimientos, members, setSection }) {
             <button
               onClick={() => setSection("reconoceme")}
               style={{
-                marginTop: 14, fontSize: 12, color: "rgba(255,255,255,0.7)",
-                background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)",
+                marginTop: 14, fontSize: 12, color: "rgba(255,255,255,0.85)",
+                background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.2)",
                 borderRadius: 10, cursor: "pointer", fontWeight: 600,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                 width: "100%", padding: "9px 0",
