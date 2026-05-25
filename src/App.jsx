@@ -887,6 +887,42 @@ export default function App() {
       if (params.get("pauta")) {
         setSection("pauta_misa");
       }
+      // Reset automático de asistencia el 1 de enero (con respaldo previo)
+      const hoyDate = new Date();
+      const esEnero1 = hoyDate.getMonth() === 0 && hoyDate.getDate() === 1;
+      const anoActual = hoyDate.getFullYear();
+      const anoAnterior = anoActual - 1;
+      const claveReset = `asistencia_reset_${anoActual}`;
+      if (esEnero1 && !localStorage.getItem(claveReset)) {
+        const token = _authToken || SUPABASE_KEY;
+        (async () => {
+          try {
+            // 1. Obtener todos los registros actuales
+            const resGet = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?select=*`, {
+              headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` },
+            });
+            if (!resGet.ok) throw new Error("No se pudo leer asistencia");
+            const registros = await resGet.json();
+            // 2. Guardar en historial con el año anterior
+            if (registros.length > 0) {
+              await fetch(`${SUPABASE_URL}/rest/v1/asistencia_historial`, {
+                method: "POST",
+                headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+                body: JSON.stringify({ ano: anoAnterior, datos: registros }),
+              });
+            }
+            // 3. Borrar tabla asistencia
+            await fetch(`${SUPABASE_URL}/rest/v1/asistencia`, {
+              method: "DELETE",
+              headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            });
+            localStorage.setItem(claveReset, "1");
+            console.log(`Asistencia de ${anoAnterior} respaldada y tabla reseteada`);
+          } catch(e) {
+            console.warn("Error en reset/respaldo de asistencia:", e);
+          }
+        })();
+      }
     }
   }, [view]);
 
@@ -3187,8 +3223,10 @@ function Dashboard({
   );
   const misPresentes = misAsistencias.filter(a => a.estado === "presente").length;
   const misJustificados = misAsistencias.filter(a => a.estado === "justificado").length;
+  const misAusentes2 = misAsistencias.filter(a => a.estado === "ausente").length;
   const totalEvaluados = misAsistencias.filter(a => !["justificado","excluido","nuevo"].includes(a.estado)).length;
   const pctAsistencia = totalEvaluados > 0 ? Math.round((misPresentes / totalEvaluados) * 100) : null;
+  const tieneEstrella = misPresentes > 0;
 
   const fmtEventoFecha = (f) => {
     const d = new Date(f + "T00:00:00");
@@ -3580,8 +3618,8 @@ function Dashboard({
             {pctAsistencia !== null ? (
               <div style={{ fontSize: 11, color: pctAsistencia >= 75 ? C.primary : pctAsistencia >= 50 ? "#f59e0b" : "#ef4444", fontWeight: 600, marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
                 ✅ Asistencia: {pctAsistencia}%
-                {pctAsistencia === 100 && (
-                  <span title="¡Asistencia perfecta!" style={{ fontSize: 14, lineHeight: 1 }}>⭐</span>
+                {tieneEstrella && (
+                  <span title="¡Sin ausencias este año!" style={{ fontSize: 14, lineHeight: 1 }}>⭐</span>
                 )}
               </div>
             ) : (
@@ -8518,6 +8556,7 @@ const ADMIN_TABS = [
   { id: "galeria", label: "🖼️ Galería" },
   { id: "comunidades", label: "⛪ Comunidades" },
   { id: "cuentas", label: "🔐 Cuentas" },
+  { id: "historial", label: "📅 Historial Asistencia" },
 ];
 
 function AdminTab({ label, active, onClick }) {
@@ -13286,7 +13325,8 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
   const evaluados = misReg.filter(a => !["justificado","excluido","nuevo"].includes(a.estado)).length;
   const pct = calcPct(user?.id);
   const colPct = colorPct(pct);
-  const circum = 2 * Math.PI * 38; // radio 38
+  const circum = 2 * Math.PI * 38;
+  const tieneEstrella = misPresentes > 0;
 
   const msgPct = pct === null ? null : pct >= 75 ? "¡Vas muy bien! Sigue así 💪" : pct >= 50 ? "Puedes mejorar tu asistencia 🎵" : "Tu asistencia necesita atención ⚠️";
   const bgPct = pct === null ? C.bg : pct >= 75 ? C.primary + "12" : pct >= 50 ? "#fef3c7" : "#fee2e2";
@@ -13316,7 +13356,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
             {pct !== null ? (
               <>
                 <span style={{ fontSize: 20, fontWeight: 800, color: colPct, lineHeight: 1 }}>{pct}%</span>
-                {pct === 100
+                {tieneEstrella
                   ? <span style={{ fontSize: 16, lineHeight: 1, marginTop: 1 }}>⭐</span>
                   : <span style={{ fontSize: 9, color: C.gray, fontWeight: 600, marginTop: 1 }}>asistencia</span>
                 }
@@ -14471,6 +14511,131 @@ function AdminGaleria({ fotos, onReload }) {
   );
 }
 
+
+// ══════════════════════════════════════════
+//  ADMIN HISTORIAL ASISTENCIA
+// ══════════════════════════════════════════
+function AdminHistorialAsistencia({ members }) {
+  const [historial, setHistorial] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [anoSeleccionado, setAnoSeleccionado] = useState(null);
+
+  useEffect(() => {
+    const token = _authToken || SUPABASE_KEY;
+    fetch(`${SUPABASE_URL}/rest/v1/asistencia_historial?select=*&order=ano.desc`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(data => {
+        setHistorial(data || []);
+        if (data && data.length > 0) setAnoSeleccionado(data[0].ano);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const registroAno = historial.find(h => h.ano === anoSeleccionado);
+  const datos = registroAno?.datos || [];
+
+  const calcPctHist = (memberId) => {
+    const misReg = datos.filter(a => a.member_id === memberId);
+    const evaluados = misReg.filter(a => !["justificado","excluido","nuevo"].includes(a.estado));
+    const presentes = evaluados.filter(a => a.estado === "presente").length;
+    return evaluados.length > 0 ? Math.round((presentes / evaluados.length) * 100) : null;
+  };
+  const colorPct = (p) => p === null ? C.gray : p >= 75 ? C.primary : p >= 50 ? "#f59e0b" : "#ef4444";
+
+  if (loading) return <div style={{ padding: 32, textAlign: "center", color: C.gray }}>⏳ Cargando historial...</div>;
+
+  if (historial.length === 0) return (
+    <div style={{ padding: 32, textAlign: "center" }}>
+      <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
+      <div style={{ color: C.gray, fontSize: 14 }}>Aún no hay historial de años anteriores.</div>
+      <div style={{ color: C.gray, fontSize: 12, marginTop: 6 }}>El primer respaldo se creará automáticamente el 1 de enero del próximo año.</div>
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <span style={{ fontWeight: 700, fontSize: 14, color: C.dark }}>Año:</span>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {historial.map(h => (
+            <button key={h.ano} onClick={() => setAnoSeleccionado(h.ano)}
+              style={{ padding: "6px 16px", borderRadius: 8, border: `2px solid ${anoSeleccionado === h.ano ? C.primary : C.border}`, background: anoSeleccionado === h.ano ? C.primaryLight : "white", color: anoSeleccionado === h.ano ? C.primary : C.dark, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+              {h.ano}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {registroAno && (
+        <>
+          <div style={{ fontSize: 12, color: C.gray, marginBottom: 12 }}>
+            {datos.length} registros · respaldado el 1 de enero de {anoSeleccionado + 1}
+          </div>
+          <Card style={{ padding: 0, overflow: "hidden" }}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: C.bg }}>
+                    <th style={{ padding: "10px 16px", textAlign: "left", color: C.gray, fontWeight: 600 }}>Integrante</th>
+                    <th style={{ padding: "10px 16px", textAlign: "center", color: C.gray, fontWeight: 600 }}>Presentes</th>
+                    <th style={{ padding: "10px 16px", textAlign: "center", color: C.gray, fontWeight: 600 }}>Ausentes</th>
+                    <th style={{ padding: "10px 16px", textAlign: "center", color: C.gray, fontWeight: 600 }}>Justificados</th>
+                    <th style={{ padding: "10px 16px", textAlign: "center", color: C.gray, fontWeight: 600 }}>Asistencia</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {members.map((m, i) => {
+                    const mReg = datos.filter(a => a.member_id === m.id);
+                    if (mReg.length === 0) return null;
+                    const presentes = mReg.filter(a => a.estado === "presente").length;
+                    const ausentes = mReg.filter(a => a.estado === "ausente").length;
+                    const justificados = mReg.filter(a => a.estado === "justificado").length;
+                    const p = calcPctHist(m.id);
+                    const mcc = CUERDAS[m.cuerda] || C.primary;
+                    return (
+                      <tr key={m.id} style={{ borderTop: `1px solid ${C.border}`, background: i % 2 === 0 ? "#fff" : C.bg }}>
+                        <td style={{ padding: "10px 16px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 32, height: 32, borderRadius: "50%", background: mcc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 12, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                              {m.foto_url ? <img src={m.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(m.nombre || "?")}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, color: C.dark }}>{m.nombre}</div>
+                              <div style={{ fontSize: 11, color: mcc }}>{rolLabel(m.cuerda)}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: "10px 16px", textAlign: "center", color: C.primary, fontWeight: 600 }}>{presentes}</td>
+                        <td style={{ padding: "10px 16px", textAlign: "center", color: "#ef4444", fontWeight: 600 }}>{ausentes}</td>
+                        <td style={{ padding: "10px 16px", textAlign: "center", color: "#f59e0b", fontWeight: 600 }}>{justificados}</td>
+                        <td style={{ padding: "10px 16px", textAlign: "center" }}>
+                          {p !== null ? (
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                              <div style={{ width: 60, height: 6, borderRadius: 3, background: "#e5e7eb", overflow: "hidden" }}>
+                                <div style={{ width: `${p}%`, height: "100%", background: colorPct(p), borderRadius: 3 }} />
+                              </div>
+                              <span style={{ fontWeight: 700, color: colorPct(p), fontSize: 13 }}>{p}%</span>
+                            </div>
+                          ) : (
+                            <span style={{ color: C.gray, fontSize: 12 }}>Sin registros</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
 function Admin({
   members,
   eventos,
@@ -14630,6 +14795,7 @@ function Admin({
         {tab === "galeria" && <AdminGaleria fotos={fotos} onReload={onReload} />}
         {tab === "comunidades" && <AdminComunidades comunidades={comunidades} onReload={onReload} />}
         {tab === "cuentas" && <AdminCuentas members={members} onReload={onReload} />}
+        {tab === "historial" && <AdminHistorialAsistencia members={members} />}
       </Card>
 
       <SqlSetupBlock />
