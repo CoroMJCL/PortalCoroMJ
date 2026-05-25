@@ -751,22 +751,31 @@ function RadioMariaWidget() {
 export default function App() {
   // Detectar si venimos del enlace de recuperación de contraseña
   const _initialView = (() => {
-    const hash = window.location.hash; // #access_token=...&type=recovery
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("type") === "recovery" || hash.includes("type=recovery")) return "reset";
-    // Supabase envía el token en el hash: extraerlo y guardarlo
-    if (hash.includes("access_token")) {
-      try {
-        const hp = new URLSearchParams(hash.replace("#", ""));
-        const at = hp.get("access_token");
-        const rt = hp.get("refresh_token");
-        if (at && hp.get("type") === "recovery") {
-          _authToken = at;
-          if (rt) _refreshToken = rt;
-          return "reset";
-        }
-      } catch(e) {}
-    }
+    // Supabase puede enviar el token en el hash (#) o en query string (?)
+    // Formato hash: #access_token=xxx&type=recovery&refresh_token=yyy
+    // Formato query: ?type=recovery (con token en el hash igualmente)
+    try {
+      const hash = window.location.hash.replace("#", "");
+      const params = new URLSearchParams(window.location.search);
+      const hp = new URLSearchParams(hash);
+
+      const typeQ = params.get("type");
+      const typeH = hp.get("type");
+      const at = hp.get("access_token") || params.get("access_token");
+      const rt = hp.get("refresh_token") || params.get("refresh_token");
+
+      if ((typeQ === "recovery" || typeH === "recovery") && at) {
+        _authToken = at;
+        if (rt) _refreshToken = rt;
+        // Limpiar la URL para que no quede el token visible
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return "reset";
+      }
+      // Sin token pero con indicador de recovery — mostrar reset igual
+      if (typeQ === "recovery" || typeH === "recovery") {
+        return "reset";
+      }
+    } catch(e) {}
     return "login";
   })();
   const [view, setView] = useState(_initialView); // "login" | "register" | "recover" | "reset" | "app"
@@ -848,22 +857,25 @@ export default function App() {
     setDbLoading(false);
   }
 
-  // Detectar token de recuperación en el hash de la URL (Supabase lo envía así)
+  // Detectar token de recuperación en la URL al montar (por si _initialView no lo capturó)
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash.includes("access_token") && hash.includes("type=recovery")) {
-      try {
-        const hp = new URLSearchParams(hash.replace("#", ""));
-        const at = hp.get("access_token");
-        const rt = hp.get("refresh_token");
+    try {
+      const hash = window.location.hash.replace("#", "");
+      const params = new URLSearchParams(window.location.search);
+      const hp = new URLSearchParams(hash);
+      const typeQ = params.get("type");
+      const typeH = hp.get("type");
+      const at = hp.get("access_token") || params.get("access_token");
+      const rt = hp.get("refresh_token") || params.get("refresh_token");
+      if ((typeQ === "recovery" || typeH === "recovery")) {
         if (at) {
           _authToken = at;
           if (rt) _refreshToken = rt;
-          setView("reset");
-          window.history.replaceState({}, document.title, window.location.pathname);
         }
-      } catch(e) {}
-    }
+        setView("reset");
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    } catch(e) {}
   }, []);
 
   useEffect(() => {
