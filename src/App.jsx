@@ -3258,6 +3258,8 @@ function Dashboard({
   const totalEvaluados = misAsistencias.filter(a => !["justificado","excluido","nuevo"].includes(a.estado)).length;
   const pctAsistencia = totalEvaluados > 0 ? Math.round((misPresentes / totalEvaluados) * 100) : null;
   const tieneEstrella = misPresentes > 0 && misAusentes2 === 0 && misJustificados === 0;
+
+  const fmtEventoFecha = (f) => {
     const d = new Date(f + "T00:00:00");
     return d.toLocaleDateString("es-CL", {
       weekday: "long",
@@ -13682,9 +13684,8 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
       members.forEach(m => {
         const reg = asisActual.find(a => a.evento_id === eventoId && a.member_id === m.id);
         if (reg) {
-          init[m.id] = reg.estado; // respetar siempre el estado guardado
+          init[m.id] = reg.estado;
         } else {
-          // Sin registro previo: nuevo integrante → "nuevo", resto → "ausente"
           init[m.id] = m.es_nuevo ? "nuevo" : "ausente";
         }
       });
@@ -13707,7 +13708,7 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
       const asisActual = await recargarAsistencia();
       for (const m of members) {
         const estado = registros[m.id];
-        if (!estado) continue; // no guardar si no tiene estado definido
+        if (!estado) continue;
         const existe = asisActual.find(a => a.evento_id === eventoId && a.member_id === m.id);
         if (existe) {
           await fetch(`${SUPABASE_URL}/rest/v1/asistencia?id=eq.${existe.id}`, {
@@ -13800,7 +13801,7 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
           <Card style={{ padding: 0, overflow: "hidden", marginBottom: 16 }}>
             {members.map((m, i) => {
               const cc = CUERDAS[m.cuerda] || C.primary;
-              const estado = registros[m.id] ?? "ausente";
+              const estado = registros[m.id] || "ausente";
               return (
                 <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderTop: i > 0 ? `1px solid ${C.border}` : "none", background: i % 2 === 0 ? "#fff" : C.bg }}>
                   <div style={{ width: 36, height: 36, borderRadius: "50%", background: cc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 13, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
@@ -14094,36 +14095,15 @@ function ValoresWidget() {
       overflow: "hidden",
       position: "relative",
     }}>
-      <style>{`
-        .valores-layout { display: flex; align-items: stretch; }
-        .valores-left { padding: 24px 28px; display: flex; flex-direction: column; justify-content: center; border-right: 1px solid rgba(255,255,255,0.08); min-width: 200px; flex-shrink: 0; }
-        .valores-center { flex: 1; padding: 24px 28px; display: flex; align-items: center; gap: 20px; min-width: 0; }
-        .valores-right { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 16px 20px 16px 4px; border-left: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
-        .valores-icon-box { width: 64px; height: 64px; border-radius: 18px; flex-shrink: 0; background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.20); display: flex; align-items: center; justify-content: center; font-size: 34px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); transition: all 0.3s; }
-        .valores-title-text { font-family: 'Poppins',sans-serif; font-size: 26px; font-weight: 800; color: white; margin-bottom: 8px; line-height: 1.1; letter-spacing: -0.3px; }
-        .valores-dots { display: flex; gap: 5px; margin-top: 10px; }
-        .valores-pills { display: none; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
-        @media (max-width: 768px) {
-          .valores-layout { flex-direction: column; }
-          .valores-left { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.08); padding: 16px 18px 14px; min-width: unset; flex-direction: row; align-items: center; justify-content: space-between; }
-          .valores-center { padding: 16px 18px; gap: 14px; }
-          .valores-right { display: none !important; }
-          .valores-icon-box { width: 48px; height: 48px; font-size: 26px; border-radius: 14px; }
-          .valores-title-text { font-size: 20px; margin-bottom: 4px; }
-          .valores-dots { margin-top: 0; }
-          .valores-pills { display: flex; }
-        }
-      `}</style>
-
       {/* Decoración fondo */}
       <div style={{ position:"absolute", top:-40, right:-40, width:200, height:200, borderRadius:"50%", background:"rgba(255,255,255,0.03)", pointerEvents:"none" }} />
       <div style={{ position:"absolute", bottom:-30, left:-20, width:140, height:140, borderRadius:"50%", background:"rgba(255,255,255,0.025)", pointerEvents:"none" }} />
 
-      <div className="valores-layout">
+      <div style={{ display:"flex", alignItems:"stretch", flexWrap:"wrap" }}>
         {/* Lado izquierdo: título */}
-        <div className="valores-left">
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" style={{ flexShrink:0 }}>
+        <div style={{ padding:"24px 28px", display:"flex", flexDirection:"column", justifyContent:"center", borderRight:"1px solid rgba(255,255,255,0.08)", minWidth:200, flexShrink:0 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
               <polygon points="14,3 17,10.5 25,11.2 19.5,16.5 21.3,24 14,19.8 6.7,24 8.5,16.5 3,11.2 11,10.5" fill="#FFD700" stroke="#FFA500" strokeWidth="0.8" strokeLinejoin="round"/>
             </svg>
             <div>
@@ -14131,48 +14111,44 @@ function ValoresWidget() {
               <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:16, fontWeight:700, color:"white", lineHeight:1.2 }}>Nuestros Valores</div>
             </div>
           </div>
-          {/* Indicadores (puntos) */}
-          <div className="valores-dots">
+          {/* Indicadores */}
+          <div style={{ display:"flex", gap:5, marginTop:10 }}>
             {VALORES.map((_, i) => (
               <button key={i} onClick={() => setActivo(i)} style={{
                 width: i === activo ? 22 : 7, height:7, borderRadius:4,
                 background: i === activo ? "#7fffd4" : "rgba(255,255,255,0.25)",
-                border:"none", cursor:"pointer", padding:0, transition:"all 0.35s",
+                border:"none", cursor:"pointer", padding:0,
+                transition:"all 0.35s",
               }} />
             ))}
           </div>
         </div>
 
-        {/* Centro: valor activo */}
-        <div className="valores-center">
-          <div className="valores-icon-box">{v.icon}</div>
+        {/* Lado derecho: valor activo */}
+        <div style={{ flex:1, padding:"24px 28px", display:"flex", alignItems:"center", gap:20, minWidth:0 }}>
+          <div style={{
+            width:64, height:64, borderRadius:18, flexShrink:0,
+            background:"rgba(255,255,255,0.13)",
+            border:"1px solid rgba(255,255,255,0.20)",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            fontSize:34,
+            boxShadow:"0 4px 16px rgba(0,0,0,0.2)",
+            transition:"all 0.3s",
+          }}>
+            {v.icon}
+          </div>
           <div style={{ flex:1, minWidth:0 }}>
-            <div className="valores-title-text">{v.label}</div>
+            <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:26, fontWeight:800, color:"white", marginBottom:8, lineHeight:1.1, letterSpacing:"-0.3px" }}>
+              {v.label}
+            </div>
             <div style={{ fontSize:14, color:"rgba(255,255,255,0.88)", lineHeight:1.6, fontWeight:500 }}>
               {v.desc}
-            </div>
-            {/* Pills de navegación solo en móvil */}
-            <div className="valores-pills">
-              {VALORES.map((val, i) => (
-                <button key={i} onClick={() => setActivo(i)} style={{
-                  display:"flex", alignItems:"center", gap:5,
-                  background: i === activo ? "rgba(127,255,212,0.18)" : "rgba(255,255,255,0.08)",
-                  border: i === activo ? "1px solid rgba(127,255,212,0.5)" : "1px solid rgba(255,255,255,0.12)",
-                  borderRadius: 20, padding:"5px 12px",
-                  cursor:"pointer", transition:"all 0.2s",
-                }}>
-                  <span style={{ fontSize:14 }}>{val.icon}</span>
-                  <span style={{ fontSize:12, fontWeight: i === activo ? 700 : 500, color: i === activo ? "#7fffd4" : "rgba(255,255,255,0.6)" }}>
-                    {val.label}
-                  </span>
-                </button>
-              ))}
             </div>
           </div>
         </div>
 
-        {/* Derecha: lista (solo desktop/tablet) */}
-        <div className="valores-right">
+        {/* Rejilla mini de los 4 valores */}
+        <div style={{ display:"flex", flexDirection:"column", justifyContent:"center", gap:2, padding:"16px 20px 16px 4px", borderLeft:"1px solid rgba(255,255,255,0.08)", flexShrink:0 }}>
           {VALORES.map((val, i) => (
             <button key={i} onClick={() => setActivo(i)} style={{
               display:"flex", alignItems:"center", gap:8,
@@ -14259,13 +14235,9 @@ function ReaccionesBar({ recoId, userId }) {
           headers: { ...hdrs, "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal" },
           body: JSON.stringify({ reco_id: recoId, user_id: userId, tipo }),
         });
-        if (!res.ok) {
-          const err = await res.text();
-          console.error("Reacción error:", res.status, err);
-          throw new Error(err);
-        }
+        if (!res.ok) { const err = await res.text(); console.error("Reacción error:", res.status, err); throw new Error(err); }
       }
-    } catch (e) {
+    } catch(e) {
       console.error("toggleReaccion catch:", e);
       setCounts(prev => {
         const next = { ...prev, [tipo]: Math.max(0, prev[tipo] + (yaTengo ? 1 : -1)) };
@@ -14328,120 +14300,6 @@ function ReaccionesBar({ recoId, userId }) {
           </button>
         );
       })}
-    </div>
-  );
-}
-
-function RecoCard({ r, members, user, cc, dc, cat, fecha, esGrupo, grupoCard }) {
-  const [expandido, setExpandido] = useState(false);
-  const para = members.find(m => m.id === r.para_id);
-  const de   = members.find(m => m.id === r.de_id);
-  const GRUPOS_W = [
-    { id: "Soprano", color: CUERDAS.Soprano }, { id: "Contralto", color: CUERDAS.Contralto },
-    { id: "Tenor", color: CUERDAS.Tenor }, { id: "Bajo", color: CUERDAS.Bajo },
-    { id: "Coro", color: C.primary },
-  ];
-  const _esGrupo = !r.para_id && r.para_grupo;
-  const _grupoCard = _esGrupo ? GRUPOS_W.find(g => g.id === r.para_grupo) : null;
-  const _cc = _esGrupo ? (_grupoCard?.color || C.primary) : (CUERDAS[para?.cuerda] || C.primary);
-  const _dc = CUERDAS[de?.cuerda] || "#888";
-  const _cat = RECO_CATS.find(c => c.id === r.categoria);
-  const _fecha = r.created_at ? new Date(r.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short" }) : "";
-  const mensajeLargo = r.mensaje && r.mensaje.length > 120;
-
-  return (
-    <div key={r.id} style={{
-      background: "#ffffff",
-      backdropFilter: "none",
-      borderRadius: 14,
-      padding: "14px 16px",
-      border: `1px solid #e5e7eb`,
-      borderTop: `3px solid ${_cc}`,
-      display: "flex", flexDirection: "column", gap: 10,
-      boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-    }}>
-      {/* Para quién */}
-      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-        <div style={{
-          width: 38, height: 38, borderRadius: _esGrupo ? 10 : "50%",
-          background: _cc, display: "flex", alignItems: "center", justifyContent: "center",
-          color: "white", fontSize: _esGrupo ? 16 : 13, fontWeight: 700,
-          flexShrink: 0, overflow: "hidden",
-          boxShadow: `0 2px 8px ${_cc}66`,
-        }}>
-          {_esGrupo
-            ? (r.para_grupo === "Soprano" ? "🎶" : r.para_grupo === "Contralto" ? "🎵" : r.para_grupo === "Tenor" ? "🎼" : r.para_grupo === "Bajo" ? "🎹" : "🌟")
-            : para?.foto_url
-              ? <img src={para.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : ini(r.para_nombre || "?")}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a2332", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {r.para_nombre}
-          </div>
-          <div style={{ fontSize: 10, color: _cc, fontWeight: 600, marginTop: 1 }}>
-            {_esGrupo ? "Grupo" : rolLabel(para?.cuerda)}
-          </div>
-        </div>
-        <img
-          src={_esGrupo ? LOGO_RECONOCIMIENTO_GRUPAL : LOGO_RECONOCIMIENTO_PERSONAL}
-          alt=""
-          style={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }}
-        />
-      </div>
-
-      {/* Categoría */}
-      {_cat && (
-        <div style={{
-          fontSize: 10, fontWeight: 700, color: "#374151",
-          background: "#f3f4f6", borderRadius: 20,
-          padding: "3px 10px", display: "inline-flex", alignItems: "center", gap: 4,
-          alignSelf: "flex-start", textTransform: "uppercase", letterSpacing: "0.05em",
-          border: `1px solid #e5e7eb`,
-        }}>
-          {_cat.icon} {_cat.label}
-        </div>
-      )}
-
-      {/* Mensaje con leer más */}
-      <div>
-        <div style={{
-          fontSize: 12, color: "#4b5563", lineHeight: 1.6,
-          fontFamily: "'Inter', 'Poppins', sans-serif", fontWeight: 400,
-          ...(!expandido ? {
-            display: "-webkit-box", WebkitLineClamp: 3,
-            WebkitBoxOrient: "vertical", overflow: "hidden",
-          } : {}),
-        }}>
-          {r.mensaje}
-        </div>
-        {mensajeLargo && (
-          <button onClick={() => setExpandido(e => !e)} style={{
-            background: "none", border: "none", padding: "2px 0 0", cursor: "pointer",
-            fontSize: 11, fontWeight: 700, color: _cc, marginTop: 2,
-          }}>
-            {expandido ? "Leer menos ▲" : "Leer más ▼"}
-          </button>
-        )}
-      </div>
-
-      {/* Reacciones */}
-      <ReaccionesBar recoId={r.id} userId={user?.id} />
-
-      {/* Pie: de quién + fecha */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 8, borderTop: "1px solid #f0f0f0" }}>
-        <div style={{
-          width: 20, height: 20, borderRadius: "50%", background: _dc,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          color: "white", fontSize: 8, fontWeight: 700, flexShrink: 0, overflow: "hidden",
-        }}>
-          {de?.foto_url ? <img src={de.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(r.de_nombre || "?")}
-        </div>
-        <div style={{ fontSize: 10, color: "#6b7280", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          De <span style={{ color: "#374151", fontWeight: 600 }}>{r.de_nombre}</span>
-        </div>
-        <div style={{ fontSize: 9, color: "#9ca3af", whiteSpace: "nowrap" }}>{_fecha}</div>
-      </div>
     </div>
   );
 }
@@ -14528,9 +14386,104 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
       ) : (
         <>
           <div className="grid-reco" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, position: "relative" }}>
-            {recientes.map((r) => (
-              <RecoCard key={r.id} r={r} members={members} user={user} />
-            ))}
+            {recientes.map((r) => {
+              const para = members.find(m => m.id === r.para_id);
+              const de = members.find(m => m.id === r.de_id);
+              const esGrupo = !r.para_id && r.para_grupo;
+              const GRUPOS_W = [
+                { id: "Soprano", color: CUERDAS.Soprano }, { id: "Contralto", color: CUERDAS.Contralto },
+                { id: "Tenor", color: CUERDAS.Tenor }, { id: "Bajo", color: CUERDAS.Bajo },
+                { id: "Coro", color: C.primary },
+              ];
+              const grupoCard = esGrupo ? GRUPOS_W.find(g => g.id === r.para_grupo) : null;
+              const cc = esGrupo ? (grupoCard?.color || C.primary) : (CUERDAS[para?.cuerda] || C.primary);
+              const dc = CUERDAS[de?.cuerda] || "#888";
+              const cat = RECO_CATS.find(c => c.id === r.categoria);
+              const fecha = r.created_at ? new Date(r.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short" }) : "";
+              return (
+                <div key={r.id} style={{
+                  background: "#ffffff",
+                  backdropFilter: "none",
+                  borderRadius: 14,
+                  padding: "14px 16px",
+                  border: `1px solid #e5e7eb`,
+                  borderTop: `3px solid ${cc}`,
+                  display: "flex", flexDirection: "column", gap: 10,
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+                }}>
+                  {/* Para quién */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                    <div style={{
+                      width: 38, height: 38, borderRadius: esGrupo ? 10 : "50%",
+                      background: cc, display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "white", fontSize: esGrupo ? 16 : 13, fontWeight: 700,
+                      flexShrink: 0, overflow: "hidden",
+                      boxShadow: `0 2px 8px ${cc}66`,
+                    }}>
+                      {esGrupo
+                        ? (r.para_grupo === "Soprano" ? "🎶" : r.para_grupo === "Contralto" ? "🎵" : r.para_grupo === "Tenor" ? "🎼" : r.para_grupo === "Bajo" ? "🎹" : "🌟")
+                        : para?.foto_url
+                          ? <img src={para.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          : ini(r.para_nombre || "?")}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1a2332", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {r.para_nombre}
+                      </div>
+                      <div style={{ fontSize: 10, color: cc, fontWeight: 600, marginTop: 1 }}>
+                        {esGrupo ? "Grupo" : rolLabel(para?.cuerda)}
+                      </div>
+                    </div>
+                    <img
+                      src={esGrupo ? LOGO_RECONOCIMIENTO_GRUPAL : LOGO_RECONOCIMIENTO_PERSONAL}
+                      alt=""
+                      style={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }}
+                    />
+                  </div>
+
+                  {/* Categoría */}
+                  {cat && (
+                    <div style={{
+                      fontSize: 10, fontWeight: 700, color: "#374151",
+                      background: "#f3f4f6", borderRadius: 20,
+                      padding: "3px 10px", display: "inline-flex", alignItems: "center", gap: 4,
+                      alignSelf: "flex-start", textTransform: "uppercase", letterSpacing: "0.05em",
+                      border: `1px solid #e5e7eb`,
+                    }}>
+                      {cat.icon} {cat.label}
+                    </div>
+                  )}
+
+                  {/* Mensaje */}
+                  <div style={{
+                    fontSize: 12, color: "#4b5563", lineHeight: 1.6,
+                    fontFamily: "'Inter', 'Poppins', sans-serif", fontWeight: 400, flex: 1,
+                    display: "-webkit-box", WebkitLineClamp: 3,
+                    WebkitBoxOrient: "vertical", overflow: "hidden",
+                  }}>
+                    {r.mensaje}
+                  </div>
+
+                  {/* Reacciones */}
+                  <ReaccionesBar recoId={r.id} userId={user?.id} />
+
+                  {/* Pie: de quién + fecha */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 8, borderTop: "1px solid #f0f0f0" }}>
+                    <div style={{
+                      width: 20, height: 20, borderRadius: "50%", background: dc,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "white", fontSize: 8, fontWeight: 700, flexShrink: 0, overflow: "hidden",
+                    }}>
+                      {de?.foto_url ? <img src={de.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(r.de_nombre || "?")}
+                    </div>
+                    <div style={{ fontSize: 10, color: "#6b7280", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      De <span style={{ color: "#374151", fontWeight: 600 }}>{r.de_nombre}</span>
+                    </div>
+                    <div style={{ fontSize: 9, color: "#9ca3af", whiteSpace: "nowrap" }}>{fecha}</div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {(recientes.length >= 6 || total > recientes.length) && (
@@ -14597,9 +14550,6 @@ async function sendRecoEmail(paraEmail, paraNombre, deNombre, categoria, mensaje
 function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, preParaId, onClearPrePara }) {
   const [paraId, setParaId] = useState(preParaId || "");
   const [categoria, setCategoria] = useState("compañero");
-  useEffect(() => {
-    if (preParaId) { setParaId(preParaId); setModoDestinatario("persona"); if (onClearPrePara) onClearPrePara(); }
-  }, [preParaId]);
   const [mensaje, setMensaje] = useState("");
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
