@@ -16011,7 +16011,6 @@ function Admin({
 //
 // ══════════════════════════════════════════════════════════════════════
 
-import { useState, useEffect, useRef, useCallback } from "react";
 
 // ── Re‑usar config global (ya definida en App.jsx) ───────────────────
 const SUPABASE_URL = "https://ttbipbhfswcwwgcwaist.supabase.co";
