@@ -331,6 +331,13 @@ const CUERDAS = {
   Admin: "#6b7280",
 };
 const rolLabel = (r) => (r === "Admin" ? "Encargado de Coro" : r || "");
+const rolFullLabel = (m) => {
+  if (!m) return "";
+  const cargo = m.cargo?.trim() || "";
+  const cuerda = rolLabel(m.cuerda);
+  if (cargo && cuerda) return `${cargo} | ${cuerda}`;
+  return cargo || cuerda;
+};
 const ini = (n) =>
   n
     .split(" ")
@@ -1671,7 +1678,7 @@ export default function App() {
                   {user?.nombre}
                 </div>
                 <div style={{ fontSize: 10, color: C.primary }}>
-                  {rolLabel(user?.cuerda)}
+                  {rolFullLabel(user)}
                 </div>
               </div>
             )}
@@ -3347,7 +3354,7 @@ function Dashboard({
                       border: "1px solid rgba(255,255,255,0.4)",
                     }}
                   >
-                    🎶 {c.nombre} · {rolLabel(c.cuerda)}
+                    🎶 {c.nombre} · {rolFullLabel(c)}
                   </span>
                 ))}
               </div>
@@ -3644,7 +3651,7 @@ function Dashboard({
               {user?.nombre?.split(" ")[0]}
             </div>
             <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>
-              {rolLabel(user?.cuerda)}
+              {rolFullLabel(user)}
             </div>
             {pctAsistencia !== null ? (
               <div style={{ fontSize: 11, color: pctAsistencia >= 75 ? C.primary : pctAsistencia >= 50 ? "#f59e0b" : "#ef4444", fontWeight: 600, marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
@@ -5103,7 +5110,7 @@ function Perfil({ user, members, setUser }) {
           >
             {user?.nombre}
           </div>
-          <Chip label={rolLabel(user?.cuerda)} color={cc} />
+          <Chip label={rolFullLabel(user)} color={cc} />
           <p
             style={{
               color: C.gray,
@@ -5133,7 +5140,7 @@ function Perfil({ user, members, setUser }) {
             { label: "Nombre", value: user?.nombre, icon: "👤" },
             {
               label: "Rol en el Coro",
-              value: rolLabel(user?.cuerda),
+              value: rolFullLabel(user),
               icon: "🎵",
             },
           ].map((f, i) => (
@@ -8722,6 +8729,7 @@ function AdminIntegrantes({ members, onReload }) {
     nombre: "",
     email: "",
     cuerda: "Soprano",
+    cargo: "",
     cumpleanos: "",
     foto_url: "",
   });
@@ -8740,6 +8748,7 @@ function AdminIntegrantes({ members, onReload }) {
         nombre: "",
         email: "",
         cuerda: "Soprano",
+        cargo: "",
         cumpleanos: "",
         foto_url: "",
       });
@@ -8946,6 +8955,14 @@ function AdminIntegrantes({ members, onReload }) {
               ))}
             </select>
             <input
+              placeholder="Cargo (ej: Encargado de coro)"
+              value={form.cargo}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, cargo: e.target.value }))
+              }
+              style={inputS}
+            />
+            <input
               placeholder="Cumpleaños (DD/MM)"
               value={form.cumpleanos}
               onChange={(e) =>
@@ -8996,6 +9013,7 @@ function AdminIntegrantes({ members, onReload }) {
                 "Nombre",
                 "Email",
                 "Cuerda",
+                "Cargo",
                 "Cumpleaños",
                 "Activo",
                 "Acciones",
@@ -9052,6 +9070,16 @@ function AdminIntegrantes({ members, onReload }) {
                           <option key={c}>{c}</option>
                         ))}
                       </select>
+                    </td>
+                    <td style={{ padding: "8px 12px" }}>
+                      <input
+                        placeholder="Cargo (opcional)"
+                        value={editData.cargo !== undefined ? editData.cargo : (m.cargo || "")}
+                        onChange={(e) =>
+                          setEditData((p) => ({ ...p, cargo: e.target.value }))
+                        }
+                        style={inputS}
+                      />
                     </td>
                     <td style={{ padding: "8px 12px" }}>
                       <input
@@ -9132,9 +9160,12 @@ function AdminIntegrantes({ members, onReload }) {
                     </td>
                     <td style={{ padding: "10px 12px" }}>
                       <Chip
-                        label={rolLabel(m.cuerda)}
+                        label={rolFullLabel(m)}
                         color={CUERDAS[m.cuerda] || C.gray}
                       />
+                    </td>
+                    <td style={{ padding: "10px 12px", color: C.gray, fontSize: 12 }}>
+                      {m.cargo || <span style={{ color: C.border }}>—</span>}
                     </td>
                     <td style={{ padding: "10px 12px", color: C.gray }}>
                       {m.cumpleanos || "-"}
@@ -13427,7 +13458,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: 15, color: C.dark }}>{user?.nombre?.split(" ")[0]}</div>
-              <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>{rolLabel(user?.cuerda)}</div>
+              <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>{rolFullLabel(user)}</div>
             </div>
           </div>
           {msgPct && <div style={{ fontSize: 12, color: colPct, fontWeight: 600, marginBottom: 10, display: "flex", alignItems: "center", gap: 4 }}>{msgPct}{tieneEstrella && <span style={{ fontSize: 16 }}>⭐</span>}</div>}
@@ -13510,7 +13541,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                             </div>
                             <div>
                               <div style={{ fontWeight: 600, color: C.dark }}>{m.nombre} {m.id === user?.id && <span style={{ fontSize: 10, color: C.primary }}>(tú)</span>}</div>
-                              <div style={{ fontSize: 11, color: mcc }}>{rolLabel(m.cuerda)}</div>
+                              <div style={{ fontSize: 11, color: mcc }}>{rolFullLabel(m)}</div>
                             </div>
                           </div>
                         </td>
@@ -13811,7 +13842,7 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, color: C.dark, fontSize: 13 }}>{m.nombre}</div>
-                    <div style={{ fontSize: 11, color: cc }}>{rolLabel(m.cuerda)}</div>
+                    <div style={{ fontSize: 11, color: cc }}>{rolFullLabel(m)}</div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
                     {["presente", "justificado", "ausente", "excluido", "nuevo"].map(op => {
@@ -14005,7 +14036,7 @@ function AdminCuentas({ members, onReload }) {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, color: C.dark, fontSize: 13 }}>{m.nombre} {inactivo && <span style={{ fontSize: 10, color: "#ef4444", fontWeight: 700 }}>BAJA</span>}</div>
-                  <div style={{ fontSize: 11, color: cc }}>{rolLabel(m.cuerda)}</div>
+                  <div style={{ fontSize: 11, color: cc }}>{rolFullLabel(m)}</div>
                 </div>
                 {inactivo ? (
                   <button onClick={e => { e.stopPropagation(); reactivar(m.id); }} disabled={saving}
@@ -14437,7 +14468,7 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
                         {r.para_nombre}
                       </div>
                       <div style={{ fontSize: 10, color: cc, fontWeight: 600, marginTop: 1 }}>
-                        {esGrupo ? "Grupo" : rolLabel(para?.cuerda)}
+                        {esGrupo ? "Grupo" : rolFullLabel(para)}
                       </div>
                     </div>
                     <img
@@ -14867,7 +14898,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
                     return (a.nombre || "").localeCompare(b.nombre || "", "es");
                   })
                   .map((m) => (
-                    <option key={m.id} value={m.id}>{m.nombre} ({rolLabel(m.cuerda)})</option>
+                    <option key={m.id} value={m.id}>{m.nombre} ({rolFullLabel(m)})</option>
                   ))
                 }
               </select>
@@ -14900,7 +14931,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 13, color: C.dark }}>{paraInfo.nombre}</div>
-                <div style={{ fontSize: 11, color: getColor(paraId) }}>{rolLabel(paraInfo.cuerda)}</div>
+                <div style={{ fontSize: 11, color: getColor(paraId) }}>{rolFullLabel(paraInfo)}</div>
               </div>
               <span style={{ marginLeft: "auto", fontSize: 16 }}>✉️</span>
             </div>
@@ -15051,7 +15082,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
                           Para <span style={{ color: cc }}>{r.para_nombre}</span>
                         </div>
                         <div style={{ fontSize: 11, color: C.gray }}>
-                          {esGrupo ? "Reconocimiento grupal" : rolLabel(para?.cuerda)}
+                          {esGrupo ? "Reconocimiento grupal" : rolFullLabel(para)}
                         </div>
                       </div>
                       <div style={{ textAlign: "right" }}>
@@ -15718,7 +15749,7 @@ function AdminHistorialAsistencia({ members }) {
                             </div>
                             <div>
                               <div style={{ fontWeight: 600, color: C.dark }}>{m.nombre}</div>
-                              <div style={{ fontSize: 11, color: mcc }}>{rolLabel(m.cuerda)}</div>
+                              <div style={{ fontSize: 11, color: mcc }}>{rolFullLabel(m)}</div>
                             </div>
                           </div>
                         </td>
