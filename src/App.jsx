@@ -16998,6 +16998,8 @@ function TabReporte({ members, cuotas, pagos, miembrosEnCuotas }) {
   // Moroso solo si ya venció el último día del mes de pago
   const ultimoDiaMesR = new Date(rAnio, rMes, 0);
   const mesVencidoR = hoyR > ultimoDiaMesR;
+
+  function exportCSV() {
     const rows = [
       ["Nombre", "Estado", "Mes", "Valor cuota"],
       ...alDia.map((m) => [m.nombre, "PAGADO", finMesLabel(mesReporte), cuotaMes?.valor || ""]),
