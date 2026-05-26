@@ -334,9 +334,17 @@ const rolLabel = (r) => (r === "Admin" ? "Encargado de Coro" : r || "");
 const rolFullLabel = (m) => {
   if (!m) return "";
   const cargo = m.cargo?.trim() || "";
-  const cuerda = rolLabel(m.cuerda);
-  if (cargo && cuerda) return `${cargo} | ${cuerda}`;
-  return cargo || cuerda;
+  // Si es Admin y tiene cuerda_vocal, muestra "Encargado de Coro | Tenor"
+  const cuerdaVocal = m.cuerda === "Admin" && m.cuerda_vocal?.trim()
+    ? m.cuerda_vocal.trim()
+    : "";
+  const cuerdaBase = rolLabel(m.cuerda);
+  // Parte izquierda: cargo personalizado o rol base
+  const left = cargo || cuerdaBase;
+  // Parte derecha: cuerda vocal (solo si es Admin con cuerda_vocal)
+  const right = cuerdaVocal;
+  if (left && right) return `${left} | ${right}`;
+  return left || right;
 };
 const ini = (n) =>
   n
@@ -8876,7 +8884,23 @@ function AdminIntegrantes({ members, onReload }) {
                 </div>
                 <div style={{ fontSize: 11, color: C.gray }}>{m.email}</div>
               </div>
-              <Chip label="Encargado de Coro" color={CUERDAS["Admin"]} />
+              <Chip label={rolFullLabel(m)} color={CUERDAS["Admin"]} />
+              <select
+                value={m.cuerda_vocal || ""}
+                onChange={async (e) => {
+                  try {
+                    await updateRecord("integrantes", m.id, { cuerda_vocal: e.target.value });
+                    onReload();
+                  } catch (err) { alert("Error: " + err.message); }
+                }}
+                style={{ padding: "4px 8px", fontSize: 11, borderRadius: 6, border: `1px solid ${C.border}`, cursor: "pointer" }}
+                title="Cuerda vocal de este admin"
+              >
+                <option value="">Cuerda vocal...</option>
+                {["Soprano", "Contralto", "Tenor", "Bajo"].map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
               <button
                 onClick={() => toggleAdmin(m)}
                 disabled={roleLoading === m.id}
@@ -9070,6 +9094,20 @@ function AdminIntegrantes({ members, onReload }) {
                           <option key={c}>{c}</option>
                         ))}
                       </select>
+                      {(editData.cuerda || m.cuerda) === "Admin" && (
+                        <select
+                          value={editData.cuerda_vocal !== undefined ? editData.cuerda_vocal : (m.cuerda_vocal || "")}
+                          onChange={(e) =>
+                            setEditData((p) => ({ ...p, cuerda_vocal: e.target.value }))
+                          }
+                          style={{ ...inputS, marginTop: 4 }}
+                        >
+                          <option value="">Cuerda vocal...</option>
+                          {["Soprano", "Contralto", "Tenor", "Bajo"].map((c) => (
+                            <option key={c}>{c}</option>
+                          ))}
+                        </select>
+                      )}
                     </td>
                     <td style={{ padding: "8px 12px" }}>
                       <input
