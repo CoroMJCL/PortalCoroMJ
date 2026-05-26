@@ -3327,94 +3327,6 @@ function Dashboard({
   };
   return (
     <div style={{ maxWidth: 1100 }}>
-      {cumple.length > 0 && (
-        <div
-          style={{
-            background: `linear-gradient(135deg,#B8922A,#d4a843,#B8922A)`,
-            backgroundSize: "200% 200%",
-            borderRadius: 16,
-            padding: "20px 24px",
-            marginBottom: 16,
-            border: "2px solid #d4a84360",
-            boxShadow: "0 8px 32px rgba(184,146,42,0.25)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 16,
-              flexWrap: "wrap",
-            }}
-          >
-            <div
-              style={{
-                fontSize: 52,
-                lineHeight: 1,
-                flexShrink: 0,
-                filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.2))",
-              }}
-            >
-              🎂
-            </div>
-            <div style={{ flex: 1 }}>
-              <div
-                style={{
-                  color: "white",
-                  fontFamily: "'Poppins',sans-serif",
-                  fontSize: 18,
-                  fontWeight: 700,
-                  marginBottom: 4,
-                  textShadow: "0 1px 4px rgba(0,0,0,0.15)",
-                }}
-              >
-                🎉 ¡Feliz Cumpleaños,{" "}
-                {cumple.map((c) => c.nombre.split(" ")[0]).join(" y ")}!
-              </div>
-              <div
-                style={{
-                  color: "rgba(255,255,255,0.95)",
-                  fontSize: 13,
-                  lineHeight: 1.7,
-                  fontStyle: "italic",
-                }}
-              >
-                "Que el Señor te bendiga y te guarde en este nuevo año de vida.
-                <br />
-                El coro te abraza con alegría y gratitud por tu presencia y tu
-                voz. 🎵✨"
-              </div>
-              <div
-                style={{
-                  marginTop: 8,
-                  display: "flex",
-                  gap: 6,
-                  flexWrap: "wrap",
-                }}
-              >
-                {cumple.map((c) => (
-                  <span
-                    key={c.id}
-                    style={{
-                      background: "rgba(255,255,255,0.25)",
-                      borderRadius: 20,
-                      padding: "3px 12px",
-                      fontSize: 12,
-                      color: "white",
-                      fontWeight: 600,
-                      border: "1px solid rgba(255,255,255,0.4)",
-                    }}
-                  >
-                    🎶 {c.nombre} · {rolFullLabel(c)}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div style={{ fontSize: 32, flexShrink: 0, opacity: 0.7 }}>🕊️</div>
-          </div>
-        </div>
-      )}
-
       {/* ── Aviso pauta en borrador (solo Admin) ── */}
       {isAdmin && pautasBorrador.length > 0 && (
         <div
@@ -4091,7 +4003,14 @@ function Dashboard({
       {/* ── Reconocimientos destacado ── */}
       <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} user={user} />
 
+      {/* ── Widget cumpleaños del DÍA (solo aparece ese día) ── */}
+      {cumple.length > 0 && <CumpleanosHoyWidget cumple={cumple} />}
+
+      {/* ── Video destacado (se reordena solo si no hay cumpleañeros hoy) ── */}
       <VideoDestacadoWidget isAdmin={isAdmin} />
+
+      {/* ── Próximos cumpleaños del mes ── */}
+      <ProximosCumpleanosWidget members={members} setSection={setSection} />
 
       <div
         className="grid-dash-main"
@@ -17634,6 +17553,185 @@ export function InfoGastos({ user, members }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════
+//  WIDGET CUMPLEAÑOS HOY (solo aparece el día del cumpleaños)
+// ══════════════════════════════════════════════════════════════════════
+function CumpleanosHoyWidget({ cumple }) {
+  return (
+    <div
+      style={{
+        background: "linear-gradient(135deg,#1D9E75 0%,#157a5a 50%,#0f5c44 100%)",
+        borderRadius: 18,
+        padding: "22px 26px",
+        marginBottom: 16,
+        border: "2px solid #1D9E7560",
+        boxShadow: "0 12px 40px rgba(29,158,117,0.30)",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* Decorative circles */}
+      <div style={{ position:"absolute", top:-30, right:-30, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,0.06)", pointerEvents:"none" }} />
+      <div style={{ position:"absolute", bottom:-20, left:-20, width:80, height:80, borderRadius:"50%", background:"rgba(255,255,255,0.04)", pointerEvents:"none" }} />
+
+      <div style={{ display:"flex", alignItems:"center", gap:18, flexWrap:"wrap", position:"relative" }}>
+        {/* Big cake */}
+        <div style={{ fontSize:60, lineHeight:1, flexShrink:0, filter:"drop-shadow(0 4px 12px rgba(0,0,0,0.25))" }}>🎂</div>
+
+        <div style={{ flex:1, minWidth:180 }}>
+          <div style={{ color:"white", fontFamily:"'Poppins',sans-serif", fontSize:20, fontWeight:700, marginBottom:6, textShadow:"0 2px 8px rgba(0,0,0,0.2)", letterSpacing:"-0.3px" }}>
+            🎉 ¡Feliz Cumpleaños,&nbsp;
+            {cumple.map((c,i) => (
+              <span key={c.id}>
+                {i > 0 && " y "}
+                <span style={{ textDecoration:"underline", textDecorationStyle:"wavy", textDecorationColor:"rgba(255,255,255,0.5)" }}>
+                  {c.nombre.split(" ")[0]}
+                </span>
+              </span>
+            ))}
+            !
+          </div>
+          <div style={{ color:"rgba(255,255,255,0.90)", fontSize:13, lineHeight:1.8, fontStyle:"italic", marginBottom:10 }}>
+            "Que el Señor te bendiga y te guarde en este nuevo año de vida.<br />
+            El coro te abraza con alegría y gratitud por tu presencia y tu voz. 🎵✨"
+          </div>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+            {cumple.map((c) => (
+              <span key={c.id} style={{
+                background:"rgba(255,255,255,0.18)",
+                borderRadius:20,
+                padding:"4px 14px",
+                fontSize:12,
+                color:"white",
+                fontWeight:600,
+                border:"1px solid rgba(255,255,255,0.35)",
+                backdropFilter:"blur(4px)",
+              }}>
+                🎶 {c.nombre} · {rolFullLabel(c) || c.cuerda}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ fontSize:36, flexShrink:0, opacity:0.8 }}>🕊️</div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  WIDGET PRÓXIMOS CUMPLEAÑOS DEL MES
+// ══════════════════════════════════════════════════════════════════════
+function ProximosCumpleanosWidget({ members, setSection }) {
+  const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  const hoy = new Date();
+  const mesActual = hoy.getMonth() + 1;
+  const diaActual = hoy.getDate();
+
+  function parseCumple(str) {
+    if (!str) return null;
+    const parts = str.split("/");
+    if (parts.length < 2) return null;
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    if (!day || !month || month < 1 || month > 12) return null;
+    return { day, month };
+  }
+
+  // Filter members with birthday this month, upcoming (day >= today), excluding today (those have their own widget)
+  const proximos = members
+    .filter((m) => {
+      const p = parseCumple(m.cumpleanos);
+      if (!p) return false;
+      return p.month === mesActual && p.day > diaActual;
+    })
+    .map((m) => ({ ...m, _day: parseCumple(m.cumpleanos).day }))
+    .sort((a, b) => a._day - b._day);
+
+  if (proximos.length === 0) return null;
+
+  return (
+    <div style={{
+      background: C.white,
+      borderRadius: 14,
+      border: `1px solid ${C.border}`,
+      padding: "16px 20px",
+      marginBottom: 14,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+    }}>
+      {/* Header */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ fontSize:20 }}>🎂</span>
+          <span style={{ fontFamily:"'Poppins',sans-serif", fontSize:14, fontWeight:600, color:C.dark }}>
+            Cumpleaños en {MESES[mesActual - 1]}
+          </span>
+        </div>
+        <button
+          onClick={() => setSection("cumpleanos")}
+          style={{ background:"none", border:"none", cursor:"pointer", fontSize:12, color:C.primary, fontWeight:600, padding:"2px 6px" }}
+        >
+          Ver todos →
+        </button>
+      </div>
+
+      {/* List */}
+      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        {proximos.map((m) => {
+          const cuerdaColor = CUERDAS[m.cuerda] || C.gray;
+          const diasFaltan = m._day - diaActual;
+          return (
+            <div key={m.id} style={{
+              display:"flex",
+              alignItems:"center",
+              gap:10,
+              padding:"8px 12px",
+              borderRadius:10,
+              background: diasFaltan <= 3 ? C.primary + "0a" : C.light,
+              border: `1px solid ${diasFaltan <= 3 ? C.primary + "30" : C.border}`,
+            }}>
+              {/* Avatar */}
+              <div style={{
+                width:34, height:34, borderRadius:"50%",
+                background: cuerdaColor + "22",
+                border: `2px solid ${cuerdaColor}40`,
+                display:"flex", alignItems:"center", justifyContent:"center",
+                fontSize:12, fontWeight:700, color:cuerdaColor,
+                flexShrink:0, overflow:"hidden",
+              }}>
+                {m.foto_url
+                  ? <img src={m.foto_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                  : ini(m.nombre || "?")}
+              </div>
+
+              {/* Name */}
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:600, color:C.dark, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                  {m.nombre}
+                </div>
+                <div style={{ fontSize:11, color:C.gray }}>{rolFullLabel(m) || m.cuerda}</div>
+              </div>
+
+              {/* Badge días */}
+              <div style={{
+                flexShrink:0,
+                textAlign:"right",
+              }}>
+                <div style={{ fontSize:13, fontWeight:700, color: diasFaltan <= 3 ? C.primary : C.dark }}>
+                  {String(m._day).padStart(2,"0")}/{String(mesActual).padStart(2,"0")}
+                </div>
+                <div style={{ fontSize:10, color: diasFaltan <= 3 ? C.primary : C.gray, fontWeight: diasFaltan <= 3 ? 600 : 400 }}>
+                  {diasFaltan === 1 ? "¡Mañana! 🎉" : `en ${diasFaltan} días`}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
 //  COMPONENTE CUMPLEAÑOS
 // ══════════════════════════════════════════════════════════════════════
 function Cumpleanos({ members }) {
@@ -17642,7 +17740,6 @@ function Cumpleanos({ members }) {
     "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"
   ];
 
-  // Parse DD/MM or DD/MM/YYYY  →  { day, month } (month 1-12)
   function parseCumple(str) {
     if (!str) return null;
     const parts = str.split("/");
@@ -17654,26 +17751,21 @@ function Cumpleanos({ members }) {
   }
 
   const hoy = new Date();
-  const mesActual = hoy.getMonth() + 1; // 1-12
+  const mesActual = hoy.getMonth() + 1;
 
-  // Group members by month
   const byMonth = {};
   for (let i = 1; i <= 12; i++) byMonth[i] = [];
   members.forEach((m) => {
     const p = parseCumple(m.cumpleanos);
     if (p) byMonth[p.month].push({ ...m, _day: p.day, _month: p.month });
   });
-  // Sort each month by day
   for (let i = 1; i <= 12; i++) {
     byMonth[i].sort((a, b) => a._day - b._day);
   }
 
-  // Months in fixed order: January to December
   const orderedMonths = [1,2,3,4,5,6,7,8,9,10,11,12];
 
-  // Export to Excel using SheetJS (loaded via CDN if available, else CSV fallback)
   function exportarExcel() {
-    // Build flat array
     const rows = [];
     for (let i = 1; i <= 12; i++) {
       byMonth[i].forEach((m) => {
@@ -17681,13 +17773,11 @@ function Cumpleanos({ members }) {
           Mes: MESES[i - 1],
           Nombre: m.nombre || "",
           Cumpleaños: m.cumpleanos || "",
-          Cuerda: m.cuerda || "",
           Email: m.email || "",
         });
       });
     }
 
-    // Try SheetJS (xlsx) if available globally
     if (typeof window !== "undefined" && window.XLSX) {
       const ws = window.XLSX.utils.json_to_sheet(rows);
       const wb = window.XLSX.utils.book_new();
@@ -17696,10 +17786,9 @@ function Cumpleanos({ members }) {
       return;
     }
 
-    // Fallback: CSV download
-    const header = ["Mes","Nombre","Cumpleaños","Cuerda","Email"].join(",");
+    const header = ["Mes","Nombre","Cumpleaños","Email"].join(",");
     const csvRows = rows.map((r) =>
-      [r.Mes, r.Nombre, r.Cumpleaños, r.Cuerda, r.Email]
+      [r.Mes, r.Nombre, r["Cumpleaños"], r.Email]
         .map((v) => `"${String(v).replace(/"/g, '""')}"`)
         .join(",")
     );
@@ -17713,7 +17802,6 @@ function Cumpleanos({ members }) {
     URL.revokeObjectURL(url);
   }
 
-  // Load SheetJS dynamically
   const [xlsxReady, setXlsxReady] = useState(false);
   useEffect(() => {
     if (window.XLSX) { setXlsxReady(true); return; }
@@ -17726,12 +17814,12 @@ function Cumpleanos({ members }) {
   const totalConCumple = members.filter((m) => parseCumple(m.cumpleanos)).length;
 
   return (
-    <div style={{ maxWidth: 700, margin: "0 auto" }}>
+    <div style={{ maxWidth: 900 }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
         <div>
-          <h2 style={{ fontSize: 20, fontFamily: "'Poppins',sans-serif", fontWeight: 600, color: C.dark, marginBottom: 2 }}>
-            🎂 Cumpleaños del Coro
+          <h2 style={{ fontSize: 22, fontFamily: "'Poppins',sans-serif", fontWeight: 700, color: C.dark, marginBottom: 3 }}>
+            Cumpleaños del Coro
           </h2>
           <p style={{ fontSize: 13, color: C.gray }}>
             {totalConCumple} integrante{totalConCumple !== 1 ? "s" : ""} con fecha registrada
@@ -17746,24 +17834,30 @@ function Cumpleanos({ members }) {
       {orderedMonths.map((mes) => {
         const lista = byMonth[mes];
         const esActual = mes === mesActual;
+        if (lista.length === 0) return null;
         return (
-          <div key={mes} style={{ marginBottom: 20 }}>
+          <div key={mes} style={{ marginBottom: 28 }}>
             {/* Month header */}
             <div style={{
               display: "flex",
               alignItems: "center",
               gap: 10,
-              marginBottom: 10,
-              paddingBottom: 8,
-              borderBottom: `2px solid ${esActual ? C.primary : C.border}`,
+              marginBottom: 12,
             }}>
+              <div style={{
+                width: 4,
+                height: 20,
+                borderRadius: 2,
+                background: esActual ? C.primary : C.border,
+                flexShrink: 0,
+              }} />
               <span style={{
                 fontSize: 13,
                 fontWeight: 700,
                 fontFamily: "'Poppins',sans-serif",
-                color: esActual ? C.primary : C.gray,
+                color: esActual ? C.primary : C.dark,
                 textTransform: "uppercase",
-                letterSpacing: 1,
+                letterSpacing: "0.08em",
               }}>
                 {MESES[mes - 1]}
               </span>
@@ -17779,21 +17873,30 @@ function Cumpleanos({ members }) {
                   Mes actual
                 </span>
               )}
-              <span style={{ fontSize: 12, color: C.gray, marginLeft: "auto" }}>
-                {lista.length} persona{lista.length !== 1 ? "s" : ""}
-              </span>
+              {lista.length > 0 && (
+                <span style={{
+                  marginLeft: "auto",
+                  fontSize: 11,
+                  color: C.gray,
+                  background: C.light,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 20,
+                  padding: "1px 10px",
+                }}>
+                  {lista.length} {lista.length !== 1 ? "personas" : "persona"}
+                </span>
+              )}
             </div>
 
-            {/* Members list */}
-            {lista.length === 0 ? (
-              <div style={{ fontSize: 12, color: C.gray, fontStyle: "italic", padding: "8px 0" }}>
-                Sin cumpleaños registrados este mes.
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {/* Members list — 2-col grid on wide screens */}
+            {lista.length === 0 ? null : (
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
+                gap: 8,
+              }}>
                 {lista.map((m) => {
                   const cuerdaColor = CUERDAS[m.cuerda] || C.gray;
-                  // Check if birthday is today
                   const esHoy = m._day === hoy.getDate() && m._month === mesActual;
                   return (
                     <div key={m.id} style={{
@@ -17802,17 +17905,17 @@ function Cumpleanos({ members }) {
                       gap: 12,
                       padding: "10px 14px",
                       borderRadius: 10,
-                      background: esHoy ? C.primary + "0d" : C.light,
-                      border: `1px solid ${esHoy ? C.primary + "40" : C.border}`,
-                      transition: "all 0.15s",
+                      background: esHoy ? C.primary + "0d" : C.white,
+                      border: `1px solid ${esHoy ? C.primary + "50" : C.border}`,
+                      transition: "box-shadow 0.15s",
                     }}>
                       {/* Avatar */}
                       <div style={{
-                        width: 38,
-                        height: 38,
+                        width: 40,
+                        height: 40,
                         borderRadius: "50%",
-                        background: cuerdaColor + "22",
-                        border: `2px solid ${cuerdaColor}40`,
+                        background: cuerdaColor + "20",
+                        border: `2px solid ${cuerdaColor}45`,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -17829,25 +17932,32 @@ function Cumpleanos({ members }) {
 
                       {/* Info */}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: C.dark }}>{m.nombre}</span>
-                          {esHoy && <span style={{ fontSize: 12 }}>🎉</span>}
+                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: C.dark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {m.nombre}
+                          </span>
+                          {esHoy && <span style={{ fontSize: 13 }}>🎉</span>}
                         </div>
                         <div style={{ fontSize: 11, color: C.gray, marginTop: 1 }}>
                           {rolFullLabel(m) || m.cuerda}
                         </div>
                       </div>
 
-                      {/* Date badge */}
+                      {/* Date pill */}
                       <div style={{
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: esHoy ? C.primary : C.dark,
                         flexShrink: 0,
-                        minWidth: 40,
-                        textAlign: "right",
+                        background: esHoy ? C.primary : C.light,
+                        border: `1px solid ${esHoy ? C.primary : C.border}`,
+                        borderRadius: 20,
+                        padding: "3px 12px",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: esHoy ? "white" : C.dark,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
                       }}>
-                        {String(m._day).padStart(2, "0")} 🎂
+                        {String(m._day).padStart(2, "0")} {esHoy ? "🎂" : "·"} {MESES[mes-1].slice(0,3)}
                       </div>
                     </div>
                   );
