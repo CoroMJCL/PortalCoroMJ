@@ -311,6 +311,7 @@ const NAV = [
   { id: "cancionero",  icon: "♫",  label: "Canto Digital" },
   { id: "documentos",  icon: "⬇",  label: "Descargas Misas" },
   { id: "integrantes", icon: "◎",  label: "Integrantes" },
+  { id: "cumpleanos",  icon: "🎂", label: "Cumpleaños" },
   { id: "musica",      icon: "♪",  label: "Música" },
   { id: "oraciones",   icon: "✦",  label: "Oraciones" },
   { id: "pauta_misa",  icon: "🎼", label: "Pauta de Misa" },
@@ -2026,6 +2027,7 @@ export default function App() {
                 <QandA preguntas={preguntas} user={user} onReload={loadData} />
               )}
               {section === "integrantes" && <Integrantes members={members} setSection={setSection} setPreParaId={setPreParaId} user={user} />}
+              {section === "cumpleanos" && <Cumpleanos members={members} />}
               {section === "biblioteca" && (
                 <Biblioteca
                   biblioteca={biblioteca}
@@ -17625,6 +17627,241 @@ export function InfoGastos({ user, members }) {
               </FinCard>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  COMPONENTE CUMPLEAÑOS
+// ══════════════════════════════════════════════════════════════════════
+function Cumpleanos({ members }) {
+  const MESES = [
+    "Enero","Febrero","Marzo","Abril","Mayo","Junio",
+    "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"
+  ];
+
+  // Parse DD/MM or DD/MM/YYYY  →  { day, month } (month 1-12)
+  function parseCumple(str) {
+    if (!str) return null;
+    const parts = str.split("/");
+    if (parts.length < 2) return null;
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    if (!day || !month || month < 1 || month > 12) return null;
+    return { day, month };
+  }
+
+  const hoy = new Date();
+  const mesActual = hoy.getMonth() + 1; // 1-12
+
+  // Group members by month
+  const byMonth = {};
+  for (let i = 1; i <= 12; i++) byMonth[i] = [];
+  members.forEach((m) => {
+    const p = parseCumple(m.cumpleanos);
+    if (p) byMonth[p.month].push({ ...m, _day: p.day, _month: p.month });
+  });
+  // Sort each month by day
+  for (let i = 1; i <= 12; i++) {
+    byMonth[i].sort((a, b) => a._day - b._day);
+  }
+
+  // Months in fixed order: January to December
+  const orderedMonths = [1,2,3,4,5,6,7,8,9,10,11,12];
+
+  // Export to Excel using SheetJS (loaded via CDN if available, else CSV fallback)
+  function exportarExcel() {
+    // Build flat array
+    const rows = [];
+    for (let i = 1; i <= 12; i++) {
+      byMonth[i].forEach((m) => {
+        rows.push({
+          Mes: MESES[i - 1],
+          Nombre: m.nombre || "",
+          Cumpleaños: m.cumpleanos || "",
+          Cuerda: m.cuerda || "",
+          Email: m.email || "",
+        });
+      });
+    }
+
+    // Try SheetJS (xlsx) if available globally
+    if (typeof window !== "undefined" && window.XLSX) {
+      const ws = window.XLSX.utils.json_to_sheet(rows);
+      const wb = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(wb, ws, "Cumpleaños");
+      window.XLSX.writeFile(wb, "cumpleanos_coro.xlsx");
+      return;
+    }
+
+    // Fallback: CSV download
+    const header = ["Mes","Nombre","Cumpleaños","Cuerda","Email"].join(",");
+    const csvRows = rows.map((r) =>
+      [r.Mes, r.Nombre, r.Cumpleaños, r.Cuerda, r.Email]
+        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+        .join(",")
+    );
+    const csv = [header, ...csvRows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "cumpleanos_coro.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Load SheetJS dynamically
+  const [xlsxReady, setXlsxReady] = useState(false);
+  useEffect(() => {
+    if (window.XLSX) { setXlsxReady(true); return; }
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    script.onload = () => setXlsxReady(true);
+    document.head.appendChild(script);
+  }, []);
+
+  const totalConCumple = members.filter((m) => parseCumple(m.cumpleanos)).length;
+
+  return (
+    <div style={{ maxWidth: 700, margin: "0 auto" }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 24 }}>
+        <div>
+          <h2 style={{ fontSize: 20, fontFamily: "'Poppins',sans-serif", fontWeight: 600, color: C.dark, marginBottom: 2 }}>
+            🎂 Cumpleaños del Coro
+          </h2>
+          <p style={{ fontSize: 13, color: C.gray }}>
+            {totalConCumple} integrante{totalConCumple !== 1 ? "s" : ""} con fecha registrada
+          </p>
+        </div>
+        <Btn onClick={exportarExcel} style={{ gap: 6 }}>
+          📥 Exportar {xlsxReady ? "Excel" : "CSV"}
+        </Btn>
+      </div>
+
+      {/* Month groups */}
+      {orderedMonths.map((mes) => {
+        const lista = byMonth[mes];
+        const esActual = mes === mesActual;
+        return (
+          <div key={mes} style={{ marginBottom: 20 }}>
+            {/* Month header */}
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginBottom: 10,
+              paddingBottom: 8,
+              borderBottom: `2px solid ${esActual ? C.primary : C.border}`,
+            }}>
+              <span style={{
+                fontSize: 13,
+                fontWeight: 700,
+                fontFamily: "'Poppins',sans-serif",
+                color: esActual ? C.primary : C.gray,
+                textTransform: "uppercase",
+                letterSpacing: 1,
+              }}>
+                {MESES[mes - 1]}
+              </span>
+              {esActual && (
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: "2px 8px",
+                  borderRadius: 20,
+                  background: C.primary + "18",
+                  color: C.primary,
+                }}>
+                  Mes actual
+                </span>
+              )}
+              <span style={{ fontSize: 12, color: C.gray, marginLeft: "auto" }}>
+                {lista.length} persona{lista.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+
+            {/* Members list */}
+            {lista.length === 0 ? (
+              <div style={{ fontSize: 12, color: C.gray, fontStyle: "italic", padding: "8px 0" }}>
+                Sin cumpleaños registrados este mes.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {lista.map((m) => {
+                  const cuerdaColor = CUERDAS[m.cuerda] || C.gray;
+                  // Check if birthday is today
+                  const esHoy = m._day === hoy.getDate() && m._month === mesActual;
+                  return (
+                    <div key={m.id} style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                      background: esHoy ? C.primary + "0d" : C.light,
+                      border: `1px solid ${esHoy ? C.primary + "40" : C.border}`,
+                      transition: "all 0.15s",
+                    }}>
+                      {/* Avatar */}
+                      <div style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: "50%",
+                        background: cuerdaColor + "22",
+                        border: `2px solid ${cuerdaColor}40`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: cuerdaColor,
+                        flexShrink: 0,
+                        overflow: "hidden",
+                      }}>
+                        {m.foto_url
+                          ? <img src={m.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          : ini(m.nombre || "?")}
+                      </div>
+
+                      {/* Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: C.dark }}>{m.nombre}</span>
+                          {esHoy && <span style={{ fontSize: 12 }}>🎉</span>}
+                        </div>
+                        <div style={{ fontSize: 11, color: C.gray, marginTop: 1 }}>
+                          {rolFullLabel(m) || m.cuerda}
+                        </div>
+                      </div>
+
+                      {/* Date badge */}
+                      <div style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: esHoy ? C.primary : C.dark,
+                        flexShrink: 0,
+                        minWidth: 40,
+                        textAlign: "right",
+                      }}>
+                        {String(m._day).padStart(2, "0")} 🎂
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {totalConCumple === 0 && (
+        <div style={{ textAlign: "center", padding: "40px 0", color: C.gray }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🎂</div>
+          <div style={{ fontSize: 14 }}>Ningún integrante ha registrado su fecha de cumpleaños aún.</div>
         </div>
       )}
     </div>
