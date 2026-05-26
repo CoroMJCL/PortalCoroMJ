@@ -331,9 +331,13 @@ const CUERDAS = {
   Tenor: "#3b82f6",
   Bajo: "#1D9E75",
   Admin: "#6b7280",
-  Contadora: "#f59e0b",
+  "Contador/a Coro": "#f59e0b",
 };
-const rolLabel = (r) => (r === "Admin" ? "Encargado de Coro" : r || "");
+const rolLabel = (r, genero) => {
+  if (r === "Admin") return "Encargado de Coro";
+  if (r === "Contador/a Coro") return genero === "F" ? "Contadora Coro" : "Contador Coro";
+  return r || "";
+};
 const rolFullLabel = (m) => {
   if (!m) return "";
   const cargo = m.cargo?.trim() || "";
@@ -341,7 +345,7 @@ const rolFullLabel = (m) => {
   const cuerdaVocal = m.cuerda === "Admin" && m.cuerda_vocal?.trim()
     ? m.cuerda_vocal.trim()
     : "";
-  const cuerdaBase = rolLabel(m.cuerda);
+  const cuerdaBase = rolLabel(m.cuerda, m.genero);
   // Parte izquierda: cargo personalizado o rol base
   const left = cargo || cuerdaBase;
   // Parte derecha: cuerda vocal (solo si es Admin con cuerda_vocal)
@@ -586,7 +590,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
           </button>
         </div>
         {NAV.filter(
-          (item) => (item.id !== "admin" || user?.cuerda === "Admin") && (item.id !== "finanzas" || user?.cuerda === "Admin" || user?.cuerda === "Contadora")
+          (item) => (item.id !== "admin" || user?.cuerda === "Admin") && (item.id !== "finanzas" || user?.cuerda === "Admin" || user?.cuerda === "Contador/a Coro")
         ).map((item) => (
           <button
             key={item.id}
@@ -1590,7 +1594,7 @@ export default function App() {
         </div>
         <nav style={{ flex: 1, overflowY: "auto", padding: "8px 6px" }}>
           {NAV.filter(
-            (item) => (item.id !== "admin" || user?.cuerda === "Admin") && (item.id !== "finanzas" || user?.cuerda === "Admin" || user?.cuerda === "Contadora")
+            (item) => (item.id !== "admin" || user?.cuerda === "Admin") && (item.id !== "finanzas" || user?.cuerda === "Admin" || user?.cuerda === "Contador/a Coro")
           ).map((item) => (
             <button
               key={item.id}
@@ -2079,7 +2083,7 @@ export default function App() {
                   </div>
                 </div>
               )}
-              {section === "finanzas" && (user?.cuerda === "Admin" || user?.cuerda === "Contadora") && (
+              {section === "finanzas" && (user?.cuerda === "Admin" || user?.cuerda === "Contador/a Coro") && (
                 <ModuloFinanzas user={user} members={members} onReload={loadData} />
               )}
               {section === "info_gastos" && (
@@ -2494,7 +2498,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
                     onChange={(e) => setRegCuerda(e.target.value)}
                     style={inp}
                   >
-                    {["Soprano", "Contralto", "Tenor", "Bajo", "Contadora"].map((c) => (
+                    {["Soprano", "Contralto", "Tenor", "Bajo", "Contador/a Coro"].map((c) => (
                       <option key={c}>{c}</option>
                     ))}
                   </select>
@@ -9099,7 +9103,7 @@ function AdminIntegrantes({ members, onReload }) {
                         }
                         style={inputS}
                       >
-                        {["Soprano", "Contralto", "Tenor", "Bajo"].map((c) => (
+                        {["Soprano", "Contralto", "Tenor", "Bajo", "Contador/a Coro"].map((c) => (
                           <option key={c}>{c}</option>
                         ))}
                       </select>
@@ -9127,6 +9131,19 @@ function AdminIntegrantes({ members, onReload }) {
                         }
                         style={inputS}
                       />
+                    </td>
+                    <td style={{ padding: "8px 12px" }}>
+                      <select
+                        value={editData.genero !== undefined ? editData.genero : (m.genero || "")}
+                        onChange={(e) =>
+                          setEditData((p) => ({ ...p, genero: e.target.value }))
+                        }
+                        style={inputS}
+                      >
+                        <option value="">Género...</option>
+                        <option value="M">Masculino</option>
+                        <option value="F">Femenino</option>
+                      </select>
                     </td>
                     <td style={{ padding: "8px 12px" }}>
                       <input
@@ -16063,6 +16080,7 @@ const FIN_MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Ago
 function finMesLabel(iso) { const [y, m] = iso.split("-"); return `${FIN_MESES[parseInt(m) - 1]} ${y}`; }
 function finCurrentMesIso() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
 const finIni = (n) => (n || "?").charAt(0).toUpperCase();
+const finCuerdaLabel = (c) => c === "Admin" ? "Encargado Coro" : c === "Contador/a Coro" ? "Contador/a Coro" : (c || "");
 
 // ── Micro componentes ──────────────────────────────────────────────────
 function FinCard({ children, style = {} }) {
@@ -16347,6 +16365,13 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
     ? Math.round((pagaron.size / miembrosActivos.length) * 100)
     : 0;
 
+  // No mostrar morosos si el mes aún no ha comenzado
+  const hoy = new Date();
+  const [mesAnio, mesMes] = mesSeleccionado.split("-").map(Number);
+  // Moroso solo si ya venció el último día del mes de pago
+  const ultimoDiaMes = new Date(mesAnio, mesMes, 0); // día 0 del mes siguiente = último día del mes
+  const mesVencido = hoy > ultimoDiaMes;
+
   return (
     <div>
       {/* Selector de mes y valor de cuota */}
@@ -16386,7 +16411,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 12, marginBottom: 20 }}>
         <StatCard icon="👥" label="En sistema" value={miembrosActivos.length} color="#3b82f6" />
         <StatCard icon="✅" label="Pagaron" value={pagaron.size} color={C.primary} sub={`${pctPago}%`} />
-        <StatCard icon="⚠️" label="Morosos" value={miembrosActivos.length - pagaron.size} color="#ef4444" />
+        <StatCard icon="⚠️" label="Morosos" value={mesVencido ? miembrosActivos.length - pagaron.size : "—"} color="#ef4444" />
         <StatCard icon="💰" label="Recaudado" value={finFmtCLP(totalRecaudado)} color="#8b5cf6" sub={`de ${finFmtCLP(totalEsperado)}`} />
       </div>
 
@@ -16435,7 +16460,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
                 <Avatar nombre={m.nombre} foto_url={m.foto_url} size={36} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, color: C.dark, fontSize: 14 }}>{m.nombre}</div>
-                  <div style={{ fontSize: 11, color: C.gray }}>{m.cuerda}</div>
+                  <div style={{ fontSize: 11, color: C.gray }}>{finCuerdaLabel(m.cuerda)}</div>
                 </div>
                 {pagado && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -16968,8 +16993,11 @@ function TabReporte({ members, cuotas, pagos, miembrosEnCuotas }) {
 
   const alDia = miembrosActivos.filter((m) => pagaron.has(m.id));
   const morosos = miembrosActivos.filter((m) => !pagaron.has(m.id));
-
-  function exportCSV() {
+  const hoyR = new Date();
+  const [rAnio, rMes] = mesReporte.split("-").map(Number);
+  // Moroso solo si ya venció el último día del mes de pago
+  const ultimoDiaMesR = new Date(rAnio, rMes, 0);
+  const mesVencidoR = hoyR > ultimoDiaMesR;
     const rows = [
       ["Nombre", "Estado", "Mes", "Valor cuota"],
       ...alDia.map((m) => [m.nombre, "PAGADO", finMesLabel(mesReporte), cuotaMes?.valor || ""]),
@@ -17024,9 +17052,11 @@ function TabReporte({ members, cuotas, pagos, miembrosEnCuotas }) {
         {/* Morosos */}
         <FinCard>
           <div style={{ fontWeight: 700, color: "#ef4444", fontSize: 14, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-            ⚠️ Morosos ({morosos.length})
+            ⚠️ Morosos ({mesVencidoR ? morosos.length : "—"})
           </div>
-          {morosos.length === 0 ? (
+          {!mesVencidoR ? (
+            <div style={{ fontSize: 12, color: C.gray }}>El plazo de pago aún no ha vencido.</div>
+          ) : morosos.length === 0 ? (
             <div style={{ fontSize: 12, color: C.gray }}>¡Todos han pagado! 🎉</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -17089,7 +17119,7 @@ function TabParticipantes({ members, miembrosEnCuotas, reload }) {
             <Avatar nombre={m.nombre} foto_url={m.foto_url} size={32} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>{m.nombre}</div>
-              <div style={{ fontSize: 11, color: C.gray }}>{m.cuerda}</div>
+              <div style={{ fontSize: 11, color: C.gray }}>{finCuerdaLabel(m.cuerda)}</div>
             </div>
             <FinBtn variant="ghost" onClick={() => toggleMiembro(m)} disabled={saving === m.id} style={{ fontSize: 11, padding: "5px 10px" }}>
               {saving === m.id ? "..." : "Quitar"}
@@ -17111,7 +17141,7 @@ function TabParticipantes({ members, miembrosEnCuotas, reload }) {
             <Avatar nombre={m.nombre} foto_url={m.foto_url} size={32} color={C.gray} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>{m.nombre}</div>
-              <div style={{ fontSize: 11, color: C.gray }}>{m.cuerda}</div>
+              <div style={{ fontSize: 11, color: C.gray }}>{finCuerdaLabel(m.cuerda)}</div>
             </div>
             <FinBtn onClick={() => toggleMiembro(m)} disabled={saving === m.id} style={{ fontSize: 11, padding: "5px 10px" }}>
               {saving === m.id ? "..." : "+ Incluir"}
@@ -17140,7 +17170,7 @@ const inputS = {
 
 export function ModuloFinanzas({ user, members }) {
   const isAdmin = user?.cuerda === "Admin";
-  const isContadora = user?.cuerda === "Contadora";
+  const isContadora = user?.cuerda === "Contador/a Coro";
   const tieneAcceso = isAdmin || isContadora;
 
   const { cuotas, pagos, actividades, gastos, miembrosEnCuotas, loading, reload } =
@@ -17166,7 +17196,7 @@ export function ModuloFinanzas({ user, members }) {
         <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
         <div style={{ fontWeight: 600, fontSize: 16 }}>Acceso restringido</div>
         <div style={{ fontSize: 13, marginTop: 6 }}>
-          Solo el Administrador y la Contadora pueden acceder a este módulo.
+          Solo el Administrador y el/la Contador/a pueden acceder a este módulo.
         </div>
       </div>
     );
@@ -17574,10 +17604,10 @@ CREATE POLICY "Acceso total" ON fin_miembros_cuotas FOR ALL USING (true) WITH CH
 //  INTEGRACIÓN EN App.jsx — qué cambiar:
 // ══════════════════════════════════════════════════════════════════════
 /*
-  1. AGREGAR "Contadora" a CUERDAS:
-     Contadora: "#f59e0b",
+  1. AGREGAR "Contador/a Coro" a CUERDAS:
+     "Contador/a Coro": "#f59e0b",
 
-  2. AGREGAR al registrar usuario (en authSignUp) la opción de cuerda "Contadora"
+  2. AGREGAR al registrar usuario (en authSignUp) la opción de cuerda "Contador/a Coro"
 
   3. NAV — agregar estas dos rutas:
      { id: "finanzas",    icon: "💼", label: "Finanzas" },         ← solo Admin/Contadora
@@ -17589,10 +17619,10 @@ CREATE POLICY "Acceso total" ON fin_miembros_cuotas FOR ALL USING (true) WITH CH
      Por:
        (item) =>
          (item.id !== "admin" || user?.cuerda === "Admin") &&
-         (item.id !== "finanzas" || user?.cuerda === "Admin" || user?.cuerda === "Contadora")
+         (item.id !== "finanzas" || user?.cuerda === "Admin" || user?.cuerda === "Contador/a Coro")
 
   5. SECCIONES — agregar en el bloque de render:
-     {section === "finanzas" && (user?.cuerda === "Admin" || user?.cuerda === "Contadora") && (
+     {section === "finanzas" && (user?.cuerda === "Admin" || user?.cuerda === "Contador/a Coro") && (
        <ModuloFinanzas user={user} members={members} onReload={loadData} />
      )}
      {section === "info_gastos" && (
