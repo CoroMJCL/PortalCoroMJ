@@ -16012,123 +16012,60 @@ function Admin({
 // ══════════════════════════════════════════════════════════════════════
 
 
-// ── Re‑usar config global (ya definida en App.jsx) ───────────────────
-const SUPABASE_URL = "https://ttbipbhfswcwwgcwaist.supabase.co";
-const SUPABASE_KEY = "sb_publishable_mz6TyeuTP3TA6XQPOunXFQ_ad0Cp9fg";
 
-// ── Colores (mismos que App.jsx) ──────────────────────────────────────
-const C = {
-  primary: "#1D9E75",
-  primaryDark: "#157a5a",
-  bg: "#f8fafc",
-  white: "#ffffff",
-  border: "#e2e8f0",
-  dark: "#1e293b",
-  gray: "#64748b",
-  light: "#f1f5f9",
-};
-
-// ── Helpers HTTP ──────────────────────────────────────────────────────
-function getToken() {
+// ── Helpers exclusivos del módulo Finanzas ────────────────────────────
+function finGetToken() {
   return localStorage.getItem("sb_access_token") || SUPABASE_KEY;
 }
-
-async function dbGet(table, filters = "") {
+async function finDbGet(table, filters = "") {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/${table}?select=*${filters}&order=created_at.desc`,
-    {
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${getToken()}`,
-      },
-    }
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${finGetToken()}` } }
   );
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
-
-async function dbPost(table, body) {
+async function finDbPost(table, body) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: "POST",
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${getToken()}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-    },
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${finGetToken()}`, "Content-Type": "application/json", Prefer: "return=representation" },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
-
-async function dbPatch(table, id, body) {
+async function finDbPatch(table, id, body) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
     method: "PATCH",
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${getToken()}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-    },
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${finGetToken()}`, "Content-Type": "application/json", Prefer: "return=representation" },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await res.text());
 }
-
-async function dbDelete(table, id) {
+async function finDbDelete(table, id) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
     method: "DELETE",
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${getToken()}`,
-    },
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${finGetToken()}` },
   });
   if (!res.ok) throw new Error(await res.text());
 }
-
-async function uploadFile(bucket, path, file) {
-  const res = await fetch(
-    `${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`,
-    {
-      method: "POST",
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${getToken()}`,
-        "Content-Type": file.type,
-      },
-      body: file,
-    }
-  );
+async function finUploadFile(bucket, path, file) {
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${finGetToken()}`, "Content-Type": file.type },
+    body: file,
+  });
   if (!res.ok) throw new Error(await res.text());
   return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
 }
-
-// ── Utilidades ─────────────────────────────────────────────────────────
-const fmtCLP = (n) =>
-  new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(
-    n || 0
-  );
-
-const MESES = [
-  "Enero","Febrero","Marzo","Abril","Mayo","Junio",
-  "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
-];
-
-function mesLabel(iso) {
-  const [y, m] = iso.split("-");
-  return `${MESES[parseInt(m) - 1]} ${y}`;
-}
-
-function currentMesIso() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-const ini = (n) => (n || "?").charAt(0).toUpperCase();
+const finFmtCLP = (n) => new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(n || 0);
+const FIN_MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+function finMesLabel(iso) { const [y, m] = iso.split("-"); return `${FIN_MESES[parseInt(m) - 1]} ${y}`; }
+function finCurrentMesIso() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
+const finIni = (n) => (n || "?").charAt(0).toUpperCase();
 
 // ── Micro componentes ──────────────────────────────────────────────────
-function Card({ children, style = {} }) {
+function FinCard({ children, style = {} }) {
   return (
     <div
       style={{
@@ -16145,7 +16082,7 @@ function Card({ children, style = {} }) {
   );
 }
 
-function Btn({ children, onClick, variant = "primary", disabled = false, style = {} }) {
+function FinBtn({ children, onClick, variant = "primary", disabled = false, style = {} }) {
   const bg =
     variant === "primary"
       ? C.primary
@@ -16240,13 +16177,13 @@ function Avatar({ nombre, foto_url, size = 32, color = C.primary }) {
       {foto_url ? (
         <img src={foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       ) : (
-        ini(nombre)
+        finIni(nombre)
       )}
     </div>
   );
 }
 
-function Spinner() {
+function FinSpinner() {
   return (
     <div style={{ padding: "30px 0", textAlign: "center", color: C.gray, fontSize: 13 }}>
       ⏳ Cargando...
@@ -16292,11 +16229,11 @@ function useFinanzasData() {
     setLoading(true);
     try {
       const [c, p, a, g, mc] = await Promise.all([
-        dbGet("fin_cuotas"),
-        dbGet("fin_pagos"),
-        dbGet("fin_actividades"),
-        dbGet("fin_gastos"),
-        dbGet("fin_miembros_cuotas"),
+        finDbGet("fin_cuotas"),
+        finDbGet("fin_pagos"),
+        finDbGet("fin_actividades"),
+        finDbGet("fin_gastos"),
+        finDbGet("fin_miembros_cuotas"),
       ]);
       setCuotas(c || []);
       setPagos(p || []);
@@ -16319,7 +16256,7 @@ function useFinanzasData() {
 // ══════════════════════════════════════════════════════════════════════
 
 function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
-  const [mesSeleccionado, setMesSeleccionado] = useState(currentMesIso());
+  const [mesSeleccionado, setMesSeleccionado] = useState(finCurrentMesIso());
   const [valorCuota, setValorCuota] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState(null);
@@ -16349,9 +16286,9 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
     setSaving(true);
     try {
       if (cuotaMes) {
-        await dbPatch("fin_cuotas", cuotaMes.id, { valor: parseFloat(valorCuota) });
+        await finDbPatch("fin_cuotas", cuotaMes.id, { valor: parseFloat(valorCuota) });
       } else {
-        await dbPost("fin_cuotas", { mes: mesSeleccionado, valor: parseFloat(valorCuota) });
+        await finDbPost("fin_cuotas", { mes: mesSeleccionado, valor: parseFloat(valorCuota) });
       }
       setValorCuota("");
       await reload();
@@ -16367,7 +16304,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
       const pago = pagosMes.find((p) => p.integrante_id === miembro.id);
       if (!pago) return;
       try {
-        await dbDelete("fin_pagos", pago.id);
+        await finDbDelete("fin_pagos", pago.id);
         await reload();
       } catch (e) {
         alert("Error: " + e.message);
@@ -16375,7 +16312,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
     } else {
       // Marcar como pagado
       try {
-        await dbPost("fin_pagos", {
+        await finDbPost("fin_pagos", {
           integrante_id: miembro.id,
           mes: mesSeleccionado,
           monto: cuotaMes?.valor || 0,
@@ -16398,8 +16335,8 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
         return;
       }
       const path = `comprobantes/${mesSeleccionado}/${miembro.id}_${Date.now()}.${file.name.split(".").pop()}`;
-      const url = await uploadFile("finanzas", path, file);
-      await dbPatch("fin_pagos", pago.id, { comprobante_url: url });
+      const url = await finUploadFile("finanzas", path, file);
+      await finDbPatch("fin_pagos", pago.id, { comprobante_url: url });
       await reload();
     } catch (e) {
       alert("Error subiendo comprobante: " + e.message);
@@ -16423,13 +16360,13 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
             style={inputS}
           >
             {mesesDisponibles.map((m) => (
-              <option key={m} value={m}>{mesLabel(m)}</option>
+              <option key={m} value={m}>{finMesLabel(m)}</option>
             ))}
           </select>
         </div>
         <div>
           <div style={{ fontSize: 11, color: C.gray, marginBottom: 4 }}>
-            Valor cuota {cuotaMes ? `(actual: ${fmtCLP(cuotaMes.valor)})` : "(sin definir)"}
+            Valor cuota {cuotaMes ? `(actual: ${finFmtCLP(cuotaMes.valor)})` : "(sin definir)"}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <input
@@ -16439,9 +16376,9 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
               onChange={(e) => setValorCuota(e.target.value)}
               style={{ ...inputS, width: 130 }}
             />
-            <Btn onClick={guardarValorCuota} disabled={saving}>
+            <FinBtn onClick={guardarValorCuota} disabled={saving}>
               {saving ? "Guardando..." : "Fijar cuota"}
-            </Btn>
+            </FinBtn>
           </div>
         </div>
       </div>
@@ -16451,7 +16388,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
         <StatCard icon="👥" label="En sistema" value={miembrosActivos.length} color="#3b82f6" />
         <StatCard icon="✅" label="Pagaron" value={pagaron.size} color={C.primary} sub={`${pctPago}%`} />
         <StatCard icon="⚠️" label="Morosos" value={miembrosActivos.length - pagaron.size} color="#ef4444" />
-        <StatCard icon="💰" label="Recaudado" value={fmtCLP(totalRecaudado)} color="#8b5cf6" sub={`de ${fmtCLP(totalEsperado)}`} />
+        <StatCard icon="💰" label="Recaudado" value={finFmtCLP(totalRecaudado)} color="#8b5cf6" sub={`de ${finFmtCLP(totalEsperado)}`} />
       </div>
 
       {/* Barra de progreso */}
@@ -16468,7 +16405,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
           />
         </div>
         <div style={{ fontSize: 11, color: C.gray, marginTop: 4 }}>
-          {pagaron.size} de {miembrosActivos.length} integrantes han pagado en {mesLabel(mesSeleccionado)}
+          {pagaron.size} de {miembrosActivos.length} integrantes han pagado en {finMesLabel(mesSeleccionado)}
         </div>
       </div>
 
@@ -16521,14 +16458,14 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
                           ref={(el) => (fileRefs.current[m.id] = el)}
                           onChange={(e) => e.target.files[0] && subirComprobante(m, e.target.files[0])}
                         />
-                        <Btn
+                        <FinBtn
                           variant="ghost"
                           onClick={() => fileRefs.current[m.id]?.click()}
                           disabled={uploadingId === m.id}
                           style={{ fontSize: 11, padding: "5px 10px" }}
                         >
                           {uploadingId === m.id ? "Subiendo..." : "📎 Comprobante"}
-                        </Btn>
+                        </FinBtn>
                       </div>
                     )}
                   </div>
@@ -16581,7 +16518,7 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
     if (!form.nombre.trim()) return;
     setSaving(true);
     try {
-      await dbPost("fin_actividades", { ...form });
+      await finDbPost("fin_actividades", { ...form });
       setForm({ nombre: "", fecha: "", descripcion: "" });
       setShowForm(false);
       await reload();
@@ -16592,7 +16529,7 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
   async function eliminarActividad(id) {
     if (!window.confirm("¿Eliminar esta actividad?")) return;
     try {
-      await dbDelete("fin_actividades", id);
+      await finDbDelete("fin_actividades", id);
       if (actSeleccionada?.id === id) setActSeleccionada(null);
       await reload();
     } catch (e) { alert("Error: " + e.message); }
@@ -16606,8 +16543,8 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
     setUploadingGasto(true);
     try {
       const path = `boletas/${actSeleccionada.id}/${Date.now()}.${file.name.split(".").pop()}`;
-      const url = await uploadFile("finanzas", path, file);
-      await dbPost("fin_gastos", {
+      const url = await finUploadFile("finanzas", path, file);
+      await finDbPost("fin_gastos", {
         actividad_id: actSeleccionada.id,
         descripcion: gastoForm.descripcion,
         monto: parseFloat(gastoForm.monto),
@@ -16623,7 +16560,7 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
     if (!actSeleccionada || !gastoForm.descripcion || !gastoForm.monto) return;
     setSaving(true);
     try {
-      await dbPost("fin_gastos", {
+      await finDbPost("fin_gastos", {
         actividad_id: actSeleccionada.id,
         descripcion: gastoForm.descripcion,
         monto: parseFloat(gastoForm.monto),
@@ -16638,13 +16575,13 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
     if (!pagoExtraForm.integrante_id || !pagoExtraForm.monto) return;
     setSaving(true);
     try {
-      await dbPost("fin_pagos", {
+      await finDbPost("fin_pagos", {
         integrante_id: pagoExtraForm.integrante_id,
         actividad_id: actSeleccionada?.id || null,
         monto: parseFloat(pagoExtraForm.monto),
         descripcion: pagoExtraForm.descripcion,
         tipo: "actividad",
-        mes: currentMesIso(),
+        mes: finCurrentMesIso(),
       });
       setPagoExtraForm({ integrante_id: "", monto: "", descripcion: "" });
       setShowPagoExtra(false);
@@ -16668,12 +16605,12 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>Actividades</span>
-          <Btn onClick={() => setShowForm(!showForm)} style={{ fontSize: 12, padding: "5px 10px" }}>
+          <FinBtn onClick={() => setShowForm(!showForm)} style={{ fontSize: 12, padding: "5px 10px" }}>
             + Nueva
-          </Btn>
+          </FinBtn>
         </div>
         {showForm && (
-          <Card style={{ marginBottom: 10, padding: 14 }}>
+          <FinCard style={{ marginBottom: 10, padding: 14 }}>
             <input
               placeholder="Nombre de la actividad *"
               value={form.nombre}
@@ -16693,10 +16630,10 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
               rows={2}
               style={{ ...inputS, resize: "vertical", marginBottom: 8 }}
             />
-            <Btn onClick={crearActividad} disabled={saving}>
+            <FinBtn onClick={crearActividad} disabled={saving}>
               {saving ? "Guardando..." : "Crear actividad"}
-            </Btn>
-          </Card>
+            </FinBtn>
+          </FinCard>
         )}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {actividades.length === 0 && (
@@ -16738,7 +16675,7 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
       {/* Detalle de actividad seleccionada */}
       {actSeleccionada ? (
         <div>
-          <Card style={{ marginBottom: 14 }}>
+          <FinCard style={{ marginBottom: 14 }}>
             <div style={{ fontWeight: 700, fontSize: 16, color: C.dark, marginBottom: 4 }}>
               {actSeleccionada.nombre}
             </div>
@@ -16746,13 +16683,13 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
               <div style={{ fontSize: 13, color: C.gray, marginBottom: 8 }}>{actSeleccionada.descripcion}</div>
             )}
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <StatCard icon="💸" label="Total gastos" value={fmtCLP(totalGastosAct)} color="#ef4444" />
-              <StatCard icon="💵" label="Ingresos actividad" value={fmtCLP(totalPagosAct)} color={C.primary} />
+              <StatCard icon="💸" label="Total gastos" value={finFmtCLP(totalGastosAct)} color="#ef4444" />
+              <StatCard icon="💵" label="Ingresos actividad" value={finFmtCLP(totalPagosAct)} color={C.primary} />
             </div>
-          </Card>
+          </FinCard>
 
           {/* Registrar gasto / boleta */}
-          <Card style={{ marginBottom: 14 }}>
+          <FinCard style={{ marginBottom: 14 }}>
             <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12, color: C.dark }}>
               📋 Registrar gasto
             </div>
@@ -16779,17 +16716,17 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
                 style={{ display: "none" }}
                 onChange={(e) => e.target.files[0] && subirBoleta(e.target.files[0])}
               />
-              <Btn onClick={() => fileRef.current?.click()} disabled={uploadingGasto}>
+              <FinBtn onClick={() => fileRef.current?.click()} disabled={uploadingGasto}>
                 {uploadingGasto ? "Subiendo..." : "📎 Con boleta"}
-              </Btn>
-              <Btn variant="ghost" onClick={agregarGastoSinBoleta} disabled={saving}>
+              </FinBtn>
+              <FinBtn variant="ghost" onClick={agregarGastoSinBoleta} disabled={saving}>
                 Sin boleta
-              </Btn>
+              </FinBtn>
             </div>
-          </Card>
+          </FinCard>
 
           {/* Lista de gastos */}
-          <Card style={{ marginBottom: 14 }}>
+          <FinCard style={{ marginBottom: 14 }}>
             <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10, color: C.dark }}>
               🧾 Boletas / Gastos ({gastosAct.length})
             </div>
@@ -16813,14 +16750,14 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
                       <div style={{ fontSize: 13, fontWeight: 500, color: C.dark }}>{g.descripcion}</div>
                       <div style={{ fontSize: 11, color: C.gray }}>{g.created_at?.split("T")[0]}</div>
                     </div>
-                    <div style={{ fontWeight: 700, color: "#ef4444", fontSize: 13 }}>{fmtCLP(g.monto)}</div>
+                    <div style={{ fontWeight: 700, color: "#ef4444", fontSize: 13 }}>{finFmtCLP(g.monto)}</div>
                     {g.boleta_url && (
                       <a href={g.boleta_url} target="_blank" rel="noreferrer" style={{ fontSize: 18 }} title="Ver boleta">
                         📎
                       </a>
                     )}
                     <button
-                      onClick={async () => { await dbDelete("fin_gastos", g.id); reload(); }}
+                      onClick={async () => { await finDbDelete("fin_gastos", g.id); reload(); }}
                       style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 14 }}
                     >
                       🗑
@@ -16829,17 +16766,17 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
                 ))}
               </div>
             )}
-          </Card>
+          </FinCard>
 
           {/* Pagos recibidos en actividad */}
-          <Card>
+          <FinCard>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontWeight: 600, fontSize: 14, color: C.dark }}>
                 💵 Pagos recibidos en esta actividad
               </div>
-              <Btn style={{ fontSize: 12, padding: "5px 10px" }} onClick={() => setShowPagoExtra(!showPagoExtra)}>
+              <FinBtn style={{ fontSize: 12, padding: "5px 10px" }} onClick={() => setShowPagoExtra(!showPagoExtra)}>
                 + Agregar
-              </Btn>
+              </FinBtn>
             </div>
             {showPagoExtra && (
               <div style={{ marginBottom: 12, padding: 12, background: C.bg, borderRadius: 8 }}>
@@ -16868,9 +16805,9 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
                   onChange={(e) => setPagoExtraForm({ ...pagoExtraForm, descripcion: e.target.value })}
                   style={{ ...inputS, marginBottom: 8 }}
                 />
-                <Btn onClick={registrarPagoExtra} disabled={saving}>
+                <FinBtn onClick={registrarPagoExtra} disabled={saving}>
                   {saving ? "Guardando..." : "Registrar pago"}
-                </Btn>
+                </FinBtn>
               </div>
             )}
             {pagosAct.length === 0 ? (
@@ -16883,13 +16820,13 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
                     <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: C.bg, borderRadius: 8 }}>
                       <Avatar nombre={m?.nombre || "?"} foto_url={m?.foto_url} size={28} />
                       <div style={{ flex: 1, fontSize: 13, color: C.dark }}>{m?.nombre || "Desconocido"}</div>
-                      <div style={{ fontWeight: 700, color: C.primary, fontSize: 13 }}>{fmtCLP(p.monto)}</div>
+                      <div style={{ fontWeight: 700, color: C.primary, fontSize: 13 }}>{finFmtCLP(p.monto)}</div>
                     </div>
                   );
                 })}
               </div>
             )}
-          </Card>
+          </FinCard>
         </div>
       ) : (
         <div style={{ padding: "40px 20px", textAlign: "center", color: C.gray, fontSize: 13 }}>
@@ -16934,16 +16871,16 @@ function TabResumen({ cuotas, pagos, gastos, actividades }) {
             marginBottom: 16,
           }}
         >
-          {fmtCLP(saldo)}
+          {finFmtCLP(saldo)}
         </div>
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: 11, opacity: 0.75 }}>Total ingresado</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{fmtCLP(totalIngresado)}</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>{finFmtCLP(totalIngresado)}</div>
           </div>
           <div>
             <div style={{ fontSize: 11, opacity: 0.75 }}>Total gastado</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{fmtCLP(totalGastado)}</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>{finFmtCLP(totalGastado)}</div>
           </div>
         </div>
       </div>
@@ -16961,20 +16898,20 @@ function TabResumen({ cuotas, pagos, gastos, actividades }) {
             const cuota = cuotas.find((c) => c.mes === mes);
             const pagadosMes = pagos.filter((p) => p.mes === mes && p.tipo === "cuota").length;
             return (
-              <Card key={mes} style={{ padding: "12px 16px" }}>
+              <FinCard key={mes} style={{ padding: "12px 16px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: C.dark }}>{mesLabel(mes)}</div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: C.dark }}>{finMesLabel(mes)}</div>
                     <div style={{ fontSize: 11, color: C.gray }}>
                       {pagadosMes} pago{pagadosMes !== 1 ? "s" : ""} de cuota
-                      {cuota ? ` · ${fmtCLP(cuota.valor)} c/u` : ""}
+                      {cuota ? ` · ${finFmtCLP(cuota.valor)} c/u` : ""}
                     </div>
                   </div>
                   <div style={{ fontWeight: 700, color: C.primary, fontSize: 15 }}>
-                    {fmtCLP(ingresosMes)}
+                    {finFmtCLP(ingresosMes)}
                   </div>
                 </div>
-              </Card>
+              </FinCard>
             );
           })}
         </div>
@@ -16992,17 +16929,17 @@ function TabResumen({ cuotas, pagos, gastos, actividades }) {
               const totalA = gastosA.reduce((s, g) => s + (g.monto || 0), 0);
               if (totalA === 0) return null;
               return (
-                <Card key={a.id} style={{ padding: "12px 16px" }}>
+                <FinCard key={a.id} style={{ padding: "12px 16px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 14, color: C.dark }}>{a.nombre}</div>
                       <div style={{ fontSize: 11, color: C.gray }}>{gastosA.length} gasto(s)</div>
                     </div>
                     <div style={{ fontWeight: 700, color: "#ef4444", fontSize: 15 }}>
-                      {fmtCLP(totalA)}
+                      {finFmtCLP(totalA)}
                     </div>
                   </div>
-                </Card>
+                </FinCard>
               );
             })}
           </div>
@@ -17017,7 +16954,7 @@ function TabResumen({ cuotas, pagos, gastos, actividades }) {
 // ══════════════════════════════════════════════════════════════════════
 
 function TabReporte({ members, cuotas, pagos, miembrosEnCuotas }) {
-  const [mesReporte, setMesReporte] = useState(currentMesIso());
+  const [mesReporte, setMesReporte] = useState(finCurrentMesIso());
 
   const mesesDisponibles = Array.from({ length: 12 }, (_, i) => {
     const d = new Date();
@@ -17037,8 +16974,8 @@ function TabReporte({ members, cuotas, pagos, miembrosEnCuotas }) {
   function exportCSV() {
     const rows = [
       ["Nombre", "Estado", "Mes", "Valor cuota"],
-      ...alDia.map((m) => [m.nombre, "PAGADO", mesLabel(mesReporte), cuotaMes?.valor || ""]),
-      ...morosos.map((m) => [m.nombre, "MOROSO", mesLabel(mesReporte), cuotaMes?.valor || ""]),
+      ...alDia.map((m) => [m.nombre, "PAGADO", finMesLabel(mesReporte), cuotaMes?.valor || ""]),
+      ...morosos.map((m) => [m.nombre, "MOROSO", finMesLabel(mesReporte), cuotaMes?.valor || ""]),
     ];
     const csv = rows.map((r) => r.join(",")).join("\n");
     const a = document.createElement("a");
@@ -17052,17 +16989,17 @@ function TabReporte({ members, cuotas, pagos, miembrosEnCuotas }) {
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 20, flexWrap: "wrap" }}>
         <select value={mesReporte} onChange={(e) => setMesReporte(e.target.value)} style={inputS}>
           {mesesDisponibles.map((m) => (
-            <option key={m} value={m}>{mesLabel(m)}</option>
+            <option key={m} value={m}>{finMesLabel(m)}</option>
           ))}
         </select>
-        <Btn variant="ghost" onClick={exportCSV}>
+        <FinBtn variant="ghost" onClick={exportCSV}>
           📥 Exportar CSV
-        </Btn>
+        </FinBtn>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         {/* Al día */}
-        <Card>
+        <FinCard>
           <div style={{ fontWeight: 700, color: C.primary, fontSize: 14, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
             ✅ Al día ({alDia.length})
           </div>
@@ -17084,10 +17021,10 @@ function TabReporte({ members, cuotas, pagos, miembrosEnCuotas }) {
               })}
             </div>
           )}
-        </Card>
+        </FinCard>
 
         {/* Morosos */}
-        <Card>
+        <FinCard>
           <div style={{ fontWeight: 700, color: "#ef4444", fontSize: 14, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
             ⚠️ Morosos ({morosos.length})
           </div>
@@ -17103,7 +17040,7 @@ function TabReporte({ members, cuotas, pagos, miembrosEnCuotas }) {
               ))}
             </div>
           )}
-        </Card>
+        </FinCard>
       </div>
     </div>
   );
@@ -17123,9 +17060,9 @@ function TabParticipantes({ members, miembrosEnCuotas, reload }) {
     try {
       if (enSistema.has(miembro.id)) {
         const reg = miembrosEnCuotas.find((m) => m.integrante_id === miembro.id);
-        await dbDelete("fin_miembros_cuotas", reg.id);
+        await finDbDelete("fin_miembros_cuotas", reg.id);
       } else {
-        await dbPost("fin_miembros_cuotas", { integrante_id: miembro.id });
+        await finDbPost("fin_miembros_cuotas", { integrante_id: miembro.id });
       }
       await reload();
     } catch (e) { alert("Error: " + e.message); }
@@ -17157,9 +17094,9 @@ function TabParticipantes({ members, miembrosEnCuotas, reload }) {
               <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>{m.nombre}</div>
               <div style={{ fontSize: 11, color: C.gray }}>{m.cuerda}</div>
             </div>
-            <Btn variant="ghost" onClick={() => toggleMiembro(m)} disabled={saving === m.id} style={{ fontSize: 11, padding: "5px 10px" }}>
+            <FinBtn variant="ghost" onClick={() => toggleMiembro(m)} disabled={saving === m.id} style={{ fontSize: 11, padding: "5px 10px" }}>
               {saving === m.id ? "..." : "Quitar"}
-            </Btn>
+            </FinBtn>
           </div>
         ))}
       </div>
@@ -17179,9 +17116,9 @@ function TabParticipantes({ members, miembrosEnCuotas, reload }) {
               <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>{m.nombre}</div>
               <div style={{ fontSize: 11, color: C.gray }}>{m.cuerda}</div>
             </div>
-            <Btn onClick={() => toggleMiembro(m)} disabled={saving === m.id} style={{ fontSize: 11, padding: "5px 10px" }}>
+            <FinBtn onClick={() => toggleMiembro(m)} disabled={saving === m.id} style={{ fontSize: 11, padding: "5px 10px" }}>
               {saving === m.id ? "..." : "+ Incluir"}
-            </Btn>
+            </FinBtn>
           </div>
         ))}
       </div>
@@ -17277,8 +17214,8 @@ export function ModuloFinanzas({ user, members }) {
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {[
-            { label: "Saldo disponible", val: fmtCLP(saldo) },
-            { label: "Total gastado", val: fmtCLP(totalGastado) },
+            { label: "Saldo disponible", val: finFmtCLP(saldo) },
+            { label: "Total gastado", val: finFmtCLP(totalGastado) },
           ].map((s, i) => (
             <div
               key={i}
@@ -17304,9 +17241,9 @@ export function ModuloFinanzas({ user, members }) {
       </div>
 
       {/* Contenido */}
-      <Card>
+      <FinCard>
         {loading ? (
-          <Spinner />
+          <FinSpinner />
         ) : (
           <>
             {tab === "cuotas" && (
@@ -17352,7 +17289,7 @@ export function ModuloFinanzas({ user, members }) {
             )}
           </>
         )}
-      </Card>
+      </FinCard>
     </div>
   );
 }
@@ -17375,11 +17312,11 @@ export function InfoGastos({ user, members }) {
     (async () => {
       try {
         const [p, g, a, c, mc] = await Promise.all([
-          dbGet("fin_pagos"),
-          dbGet("fin_gastos"),
-          dbGet("fin_actividades"),
-          dbGet("fin_cuotas"),
-          dbGet("fin_miembros_cuotas"),
+          finDbGet("fin_pagos"),
+          finDbGet("fin_gastos"),
+          finDbGet("fin_actividades"),
+          finDbGet("fin_cuotas"),
+          finDbGet("fin_miembros_cuotas"),
         ]);
         setPagos(p || []);
         setGastos(g || []);
@@ -17395,7 +17332,7 @@ export function InfoGastos({ user, members }) {
   const totalGastado = gastos.reduce((s, g) => s + (g.monto || 0), 0);
   const saldo = totalIngresado - totalGastado;
 
-  const mesActual = currentMesIso();
+  const mesActual = finCurrentMesIso();
   const pagosMesActual = pagos.filter((p) => p.mes === mesActual);
   const miembrosIds = new Set(miembrosEnCuotas.map((m) => m.integrante_id));
   const miembrosActivos = members.filter((m) => miembrosIds.has(m.id));
@@ -17404,7 +17341,7 @@ export function InfoGastos({ user, members }) {
   const morosos = miembrosActivos.filter((m) => !pagaron.has(m.id));
   const cuotaMesActual = cuotas.find((c) => c.mes === mesActual);
 
-  if (loading) return <Spinner />;
+  if (loading) return <FinSpinner />;
 
   const TABS_PUB = [
     { id: "estado", label: "💰 Estado financiero" },
@@ -17434,9 +17371,9 @@ export function InfoGastos({ user, members }) {
 
       {/* Resumen rápido */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 12, marginBottom: 20 }}>
-        <StatCard icon="💰" label="Saldo disponible" value={fmtCLP(saldo)} color={saldo >= 0 ? C.primary : "#ef4444"} />
-        <StatCard icon="📥" label="Total ingresado" value={fmtCLP(totalIngresado)} color="#3b82f6" />
-        <StatCard icon="📤" label="Total gastado" value={fmtCLP(totalGastado)} color="#f59e0b" />
+        <StatCard icon="💰" label="Saldo disponible" value={finFmtCLP(saldo)} color={saldo >= 0 ? C.primary : "#ef4444"} />
+        <StatCard icon="📥" label="Total ingresado" value={finFmtCLP(totalIngresado)} color="#3b82f6" />
+        <StatCard icon="📤" label="Total gastado" value={finFmtCLP(totalGastado)} color="#f59e0b" />
       </div>
 
       {/* Tabs */}
@@ -17448,7 +17385,7 @@ export function InfoGastos({ user, members }) {
 
       {/* Estado financiero */}
       {tabActiva === "estado" && (
-        <Card>
+        <FinCard>
           <div style={{ fontWeight: 600, fontSize: 15, color: C.dark, marginBottom: 14 }}>
             Movimientos por mes
           </div>
@@ -17459,27 +17396,27 @@ export function InfoGastos({ user, members }) {
             return (
               <div key={mes} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${C.border}` }}>
                 <div>
-                  <div style={{ fontWeight: 600, color: C.dark, fontSize: 14 }}>{mesLabel(mes)}</div>
+                  <div style={{ fontWeight: 600, color: C.dark, fontSize: 14 }}>{finMesLabel(mes)}</div>
                   <div style={{ fontSize: 11, color: C.gray }}>
                     {cant} pago{cant !== 1 ? "s" : ""}
-                    {cuota ? ` · ${fmtCLP(cuota.valor)} c/u` : ""}
+                    {cuota ? ` · ${finFmtCLP(cuota.valor)} c/u` : ""}
                   </div>
                 </div>
-                <div style={{ fontWeight: 700, color: C.primary }}>{fmtCLP(ing)}</div>
+                <div style={{ fontWeight: 700, color: C.primary }}>{finFmtCLP(ing)}</div>
               </div>
             );
           })}
           {pagos.length === 0 && <div style={{ fontSize: 13, color: C.gray }}>Sin movimientos registrados.</div>}
-        </Card>
+        </FinCard>
       )}
 
       {/* Estado de cuotas */}
       {tabActiva === "cuotas" && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <Card>
+          <FinCard>
             <div style={{ fontWeight: 700, color: C.primary, fontSize: 14, marginBottom: 12 }}>
-              ✅ Al día — {mesLabel(mesActual)}
-              {cuotaMesActual && <span style={{ fontSize: 11, fontWeight: 400, color: C.gray }}> · {fmtCLP(cuotaMesActual.valor)}</span>}
+              ✅ Al día — {finMesLabel(mesActual)}
+              {cuotaMesActual && <span style={{ fontSize: 11, fontWeight: 400, color: C.gray }}> · {finFmtCLP(cuotaMesActual.valor)}</span>}
             </div>
             {alDia.length === 0 ? (
               <div style={{ fontSize: 12, color: C.gray }}>Ninguno ha pagado aún.</div>
@@ -17489,10 +17426,10 @@ export function InfoGastos({ user, members }) {
                 <span style={{ fontSize: 13 }}>{m.nombre}</span>
               </div>
             ))}
-          </Card>
-          <Card>
+          </FinCard>
+          <FinCard>
             <div style={{ fontWeight: 700, color: "#ef4444", fontSize: 14, marginBottom: 12 }}>
-              ⚠️ Pendientes — {mesLabel(mesActual)}
+              ⚠️ Pendientes — {finMesLabel(mesActual)}
             </div>
             {morosos.length === 0 ? (
               <div style={{ fontSize: 12, color: C.gray }}>¡Todos han pagado! 🎉</div>
@@ -17502,7 +17439,7 @@ export function InfoGastos({ user, members }) {
                 <span style={{ fontSize: 13 }}>{m.nombre}</span>
               </div>
             ))}
-          </Card>
+          </FinCard>
         </div>
       )}
 
@@ -17517,7 +17454,7 @@ export function InfoGastos({ user, members }) {
             const totalA = gastosA.reduce((s, g) => s + (g.monto || 0), 0);
             const expanded = actExpandida === a.id;
             return (
-              <Card key={a.id} style={{ padding: 0, overflow: "hidden" }}>
+              <FinCard key={a.id} style={{ padding: 0, overflow: "hidden" }}>
                 <div
                   onClick={() => setActExpandida(expanded ? null : a.id)}
                   style={{
@@ -17534,7 +17471,7 @@ export function InfoGastos({ user, members }) {
                     {a.fecha && <div style={{ fontSize: 11, color: C.gray }}>{a.fecha}</div>}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ fontWeight: 700, color: "#ef4444" }}>{fmtCLP(totalA)}</div>
+                    <div style={{ fontWeight: 700, color: "#ef4444" }}>{finFmtCLP(totalA)}</div>
                     <span style={{ color: C.gray }}>{expanded ? "▲" : "▼"}</span>
                   </div>
                 </div>
@@ -17546,7 +17483,7 @@ export function InfoGastos({ user, members }) {
                           <div style={{ fontSize: 13, color: C.dark }}>{g.descripcion}</div>
                           <div style={{ fontSize: 11, color: C.gray }}>{g.created_at?.split("T")[0]}</div>
                         </div>
-                        <div style={{ fontWeight: 600, color: "#ef4444", fontSize: 13 }}>{fmtCLP(g.monto)}</div>
+                        <div style={{ fontWeight: 600, color: "#ef4444", fontSize: 13 }}>{finFmtCLP(g.monto)}</div>
                         {g.boleta_url && (
                           <a href={g.boleta_url} target="_blank" rel="noreferrer" style={{ color: C.primary, fontSize: 13, textDecoration: "none" }}>
                             📎 Ver boleta
@@ -17559,7 +17496,7 @@ export function InfoGastos({ user, members }) {
                 {expanded && gastosA.length === 0 && (
                   <div style={{ padding: "8px 18px 14px", fontSize: 12, color: C.gray }}>Sin gastos registrados.</div>
                 )}
-              </Card>
+              </FinCard>
             );
           })}
         </div>
