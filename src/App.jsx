@@ -16256,7 +16256,7 @@ function useFinanzasData() {
 // ══════════════════════════════════════════════════════════════════════
 
 function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
-  const [mesSeleccionado, setMesSeleccionado] = useState(finCurrentMesIso());
+  const [mesSeleccionado, setMesSeleccionado] = useState("2026-06");
   const [valorCuota, setValorCuota] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState(null);
@@ -16275,9 +16275,8 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
   const totalRecaudado = pagosMes.reduce((s, p) => s + (p.monto || 0), 0);
 
   // Meses disponibles (generar últimos 12 + próximo)
-  const mesesDisponibles = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 12 + i);
+  const mesesDisponibles = Array.from({ length: 55 }, (_, i) => {
+    const d = new Date(2026, 5 + i); // Junio 2026 → Diciembre 2030
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
 
@@ -16954,11 +16953,10 @@ function TabResumen({ cuotas, pagos, gastos, actividades }) {
 // ══════════════════════════════════════════════════════════════════════
 
 function TabReporte({ members, cuotas, pagos, miembrosEnCuotas }) {
-  const [mesReporte, setMesReporte] = useState(finCurrentMesIso());
+  const [mesReporte, setMesReporte] = useState("2026-06");
 
-  const mesesDisponibles = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 11 + i);
+  const mesesDisponibles = Array.from({ length: 55 }, (_, i) => {
+    const d = new Date(2026, 5 + i); // Junio 2026 → Diciembre 2030
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   }).reverse();
 
@@ -17069,9 +17067,8 @@ function TabParticipantes({ members, miembrosEnCuotas, reload }) {
     setSaving(null);
   }
 
-  const noAdmins = members.filter((m) => m.cuerda !== "Admin");
-  const activos = noAdmins.filter((m) => enSistema.has(m.id));
-  const noActivos = noAdmins.filter((m) => !enSistema.has(m.id));
+  const activos = members.filter((m) => enSistema.has(m.id));
+  const noActivos = members.filter((m) => !enSistema.has(m.id));
 
   return (
     <div>
