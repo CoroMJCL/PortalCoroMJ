@@ -334,15 +334,15 @@ const CUERDAS = {
   "Contador/a Coro": "#f59e0b",
 };
 const rolLabel = (r, genero) => {
-  if (r === "Admin") return "Encargado de Coro";
+  if (r === "Admin") return genero === "F" ? "Encargada de Coro" : "Encargado de Coro";
   if (r === "Contador/a Coro") return genero === "F" ? "Contadora Coro" : "Contador Coro";
   return r || "";
 };
 const rolFullLabel = (m) => {
   if (!m) return "";
   const cargo = m.cargo?.trim() || "";
-  // Si es Admin y tiene cuerda_vocal, muestra "Encargado de Coro | Tenor"
-  const cuerdaVocal = m.cuerda === "Admin" && m.cuerda_vocal?.trim()
+  // Si es Admin o Contador/a Coro y tiene cuerda_vocal, muestra "Encargado/a de Coro | Tenor"
+  const cuerdaVocal = (m.cuerda === "Admin" || m.cuerda === "Contador/a Coro") && m.cuerda_vocal?.trim()
     ? m.cuerda_vocal.trim()
     : "";
   const cuerdaBase = rolLabel(m.cuerda, m.genero);
@@ -4899,6 +4899,9 @@ function Perfil({ user, members, setUser }) {
   const telSinPrefijo = (user?.telefono || "").replace(/^\+56\s?/, "");
   const [newTel, setNewTel] = useState(telSinPrefijo);
   const [savingTel, setSavingTel] = useState(false);
+  const [editGenero, setEditGenero] = useState(false);
+  const [newGenero, setNewGenero] = useState(user?.genero || "");
+  const [savingGenero, setSavingGenero] = useState(false);
   const fileRef = useRef(null);
 
   async function handlePhoto(e) {
@@ -5021,6 +5024,21 @@ function Perfil({ user, members, setUser }) {
       setMsg("Error: " + e.message);
     }
     setSavingTel(false);
+  }
+
+  async function saveGenero() {
+    if (newGenero === (user?.genero || "")) { setEditGenero(false); return; }
+    setSavingGenero(true);
+    setMsg("");
+    try {
+      await updateRecord("integrantes", user.id, { genero: newGenero });
+      setUser((p) => ({ ...p, genero: newGenero }));
+      setEditGenero(false);
+      setMsg("✅ Género actualizado.");
+    } catch (e) {
+      setMsg("Error: " + e.message);
+    }
+    setSavingGenero(false);
   }
 
   const fotoUrl = user?.foto_url;
@@ -5287,6 +5305,98 @@ function Perfil({ user, members, setUser }) {
                       setEditCumple(true);
                       setNewCumple(user?.cumpleanos || "");
                     }}
+                    style={{
+                      fontSize: 11,
+                      background: "none",
+                      border: "none",
+                      color: C.primary,
+                      cursor: "pointer",
+                      padding: 0,
+                      textDecoration: "underline",
+                      flexShrink: 0,
+                    }}
+                  >
+                    Editar
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Género editable */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: "10px 14px",
+              background: C.light,
+              borderRadius: 8,
+              marginBottom: 10,
+              border: `1px solid ${C.border}`,
+            }}
+          >
+            <span style={{ fontSize: 18, flexShrink: 0 }}>⚧</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: C.gray, marginBottom: 1 }}>
+                Género
+              </div>
+              {editGenero ? (
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  <select
+                    value={newGenero}
+                    onChange={(e) => setNewGenero(e.target.value)}
+                    style={{
+                      flex: 1,
+                      padding: "5px 8px",
+                      borderRadius: 6,
+                      border: `1px solid ${C.border}`,
+                      fontSize: 13,
+                      outline: "none",
+                      background: "white",
+                    }}
+                  >
+                    <option value="">Sin especificar</option>
+                    <option value="M">Masculino</option>
+                    <option value="F">Femenino</option>
+                  </select>
+                  <button
+                    onClick={saveGenero}
+                    disabled={savingGenero}
+                    style={{
+                      padding: "5px 10px",
+                      background: C.primary,
+                      color: "white",
+                      border: "none",
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {savingGenero ? "..." : "✓"}
+                  </button>
+                  <button
+                    onClick={() => { setEditGenero(false); setNewGenero(user?.genero || ""); }}
+                    style={{
+                      padding: "5px 8px",
+                      background: C.light,
+                      color: C.gray,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      fontSize: 12,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 13, color: user?.genero ? C.dark : "#9ca3af", fontWeight: 500 }}>
+                    {user?.genero === "F" ? "Femenino" : user?.genero === "M" ? "Masculino" : "Sin especificar"}
+                  </span>
+                  <button
+                    onClick={() => { setEditGenero(true); setNewGenero(user?.genero || ""); }}
                     style={{
                       fontSize: 11,
                       background: "none",
@@ -6467,7 +6577,7 @@ function Integrantes({ members, setSection, setPreParaId, user }) {
                     >
                       {m.nombre}
                     </div>
-                    <Chip label="Encargado de Coro" color={cc} />
+                    <Chip label={rolFullLabel(m) || "Encargado de Coro"} color={cc} />
                     {m.cumpleanos && (
                       <div
                         style={{ fontSize: 11, color: C.gray, marginTop: 6 }}
@@ -6587,7 +6697,7 @@ function Integrantes({ members, setSection, setPreParaId, user }) {
                     >
                       {m.nombre}
                     </div>
-                    <Chip label={cuerda} color={cc} />
+                    <Chip label={m.cuerda === "Contador/a Coro" ? rolFullLabel(m) || rolLabel(m.cuerda, m.genero) : cuerda} color={cc} />
                     {m.cumpleanos && (
                       <div
                         style={{ fontSize: 11, color: C.gray, marginTop: 7 }}
@@ -9107,7 +9217,7 @@ function AdminIntegrantes({ members, onReload }) {
                           <option key={c}>{c}</option>
                         ))}
                       </select>
-                      {(editData.cuerda || m.cuerda) === "Admin" && (
+                      {["Admin", "Contador/a Coro"].includes(editData.cuerda || m.cuerda) && (
                         <select
                           value={editData.cuerda_vocal !== undefined ? editData.cuerda_vocal : (m.cuerda_vocal || "")}
                           onChange={(e) =>
@@ -16080,7 +16190,7 @@ const FIN_MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Ago
 function finMesLabel(iso) { const [y, m] = iso.split("-"); return `${FIN_MESES[parseInt(m) - 1]} ${y}`; }
 function finCurrentMesIso() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
 const finIni = (n) => (n || "?").charAt(0).toUpperCase();
-const finCuerdaLabel = (c) => c === "Admin" ? "Encargado Coro" : c === "Contador/a Coro" ? "Contador/a Coro" : (c || "");
+const finCuerdaLabel = (c, genero) => c === "Admin" ? rolLabel("Admin", genero) : c === "Contador/a Coro" ? rolLabel("Contador/a Coro", genero) : (c || "");
 
 // ── Micro componentes ──────────────────────────────────────────────────
 function FinCard({ children, style = {} }) {
