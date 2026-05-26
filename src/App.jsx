@@ -9334,7 +9334,7 @@ function AdminIntegrantes({ members, onReload }) {
                     </td>
                     <td style={{ padding: "10px 12px" }}>
                       <Chip
-                        label={rolFullLabel(m)}
+                        label={rolLabel(m.cuerda, m.genero) + (m.cuerda_vocal ? ` · ${m.cuerda_vocal}` : "")}
                         color={CUERDAS[m.cuerda] || C.gray}
                       />
                     </td>
