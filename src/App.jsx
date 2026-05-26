@@ -6482,246 +6482,134 @@ function QandA({ preguntas, user, onReload }) {
 //  INTEGRANTES
 // ══════════════════════════════════════════
 function Integrantes({ members, setSection, setPreParaId, user }) {
-  const cuerdas = ["Soprano", "Contralto", "Tenor", "Bajo", "Admin"];
-  // Agrupar por cuerda, excluyendo Admin de las voces
+  const cuerdas = ["Soprano", "Contralto", "Tenor", "Bajo"];
+
+  // Para agrupar por cuerda vocal: Admin y Contador/a Coro aparecen en su cuerda_vocal
+  const getCuerdaVocal = (m) => {
+    if ((m.cuerda === "Admin" || m.cuerda === "Contador/a Coro") && m.cuerda_vocal?.trim())
+      return m.cuerda_vocal.trim();
+    return null; // no aparece en grupos de voces
+  };
+
   const grupos = cuerdas
-    .filter((c) => c !== "Admin")
     .map((c) => ({
       cuerda: c,
-      lista: members.filter((m) => m.cuerda === c && m.activo !== false),
+      lista: members.filter((m) => m.activo !== false && (
+        m.cuerda === c || getCuerdaVocal(m) === c
+      )),
     }))
     .filter((g) => g.lista.length > 0);
-  const admins = members.filter((m) => m.cuerda === "Admin");
+
+  const admins = members.filter((m) => m.cuerda === "Admin" && m.activo !== false);
+  const contadores = members.filter((m) => m.cuerda === "Contador/a Coro" && m.activo !== false);
+  const encargados = [...admins, ...contadores];
+
+  // Mini avatar circular
+  const MiniAvatar = ({ m, cc, size = 40 }) => (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: m.foto_url ? "transparent" : cc,
+      border: `2px solid ${cc}40`, overflow: "hidden",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      color: "white", fontSize: size * 0.35, fontWeight: 700,
+    }}>
+      {m.foto_url
+        ? <img src={m.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        : ini(m.nombre)}
+    </div>
+  );
+
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 900 }}>
       <SectionTitle
         title="Integrantes del Coro"
-        subtitle={`${
-          members.filter((m) => m.cuerda !== "Admin").length
-        } voces · Familia MJ`}
+        subtitle={`${members.filter((m) => m.cuerda !== "Admin").length} voces · Familia MJ`}
       />
 
-      {/* Encargados */}
-      {admins.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: C.gray,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              marginBottom: 12,
-            }}
-          >
+      {/* Encargados y Contadores */}
+      {encargados.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.gray, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
             ⚙ Encargados del Coro
           </div>
-          <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-            {admins.map((m) => {
-              const cc = CUERDAS["Admin"];
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {encargados.map((m) => {
+              const cc = CUERDAS[m.cuerda] || C.primary;
               return (
-                <Card
-                  key={m.id}
-                  hover
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
-                    padding: "14px 18px",
-                    flex: "0 1 340px",
-                    border: `1px solid ${cc}20`,
-                    background: `linear-gradient(135deg,#f9fafb,#fff)`,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: "50%",
-                      flexShrink: 0,
-                      background: cc,
-                      border: `3px solid ${cc}30`,
-                      overflow: "hidden",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "white",
-                      fontSize: 18,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {m.foto_url ? (
-                      <img
-                        src={m.foto_url}
-                        alt=""
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          display: "block",
-                        }}
-                      />
-                    ) : (
-                      ini(m.nombre)
-                    )}
-                  </div>
+                <div key={m.id} style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  padding: "10px 16px", borderRadius: 12,
+                  background: "white", border: `1px solid ${cc}25`,
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                  flex: "0 1 300px",
+                }}>
+                  <MiniAvatar m={m} cc={cc} size={44} />
                   <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontFamily: "'Poppins',sans-serif",
-                        fontSize: 14,
-                        fontWeight: 700,
-                        color: C.dark,
-                        marginBottom: 3,
-                      }}
-                    >
-                      {m.nombre}
-                    </div>
-                    <Chip label={rolFullLabel(m) || "Encargado de Coro"} color={cc} />
-                    {m.cumpleanos && (
-                      <div
-                        style={{ fontSize: 11, color: C.gray, marginTop: 6 }}
-                      >
-                        🎂 {m.cumpleanos}
-                      </div>
-                    )}
+                    <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 13, fontWeight: 700, color: C.dark }}>{m.nombre}</div>
+                    <Chip label={rolFullLabel(m)} color={cc} />
+                    {m.cumpleanos && <div style={{ fontSize: 10, color: C.gray, marginTop: 3 }}>🎂 {m.cumpleanos}</div>}
                   </div>
-                </Card>
+                </div>
               );
             })}
           </div>
         </div>
       )}
 
-      {/* Voces agrupadas */}
+      {/* Voces agrupadas — diseño compacto de filas */}
       {grupos.map(({ cuerda, lista }) => {
         const cc = CUERDAS[cuerda];
         return (
-          <div key={cuerda} style={{ marginBottom: 24 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                marginBottom: 12,
-              }}
-            >
-              <div
-                style={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: "50%",
-                  background: cc,
-                  flexShrink: 0,
-                }}
-              />
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: cc,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                }}
-              >
-                {cuerda}s — {lista.length}{" "}
-                {lista.length === 1 ? "voz" : "voces"}
+          <div key={cuerda} style={{ marginBottom: 20 }}>
+            {/* Header grupo */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div style={{ width: 10, height: 10, borderRadius: "50%", background: cc, flexShrink: 0 }} />
+              <div style={{ fontSize: 11, fontWeight: 700, color: cc, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                {cuerda}s — {lista.length} {lista.length === 1 ? "voz" : "voces"}
               </div>
             </div>
-            <div
-              className="grid-3"
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3,1fr)",
-                gap: 14,
-              }}
-            >
-              {lista.map((m) => (
-                <Card
-                  key={m.id}
-                  hover
-                  style={{
-                    padding: 0,
-                    overflow: "hidden",
-                    border: `1px solid ${cc}20`,
-                  }}
-                >
-                  {/* Foto grande arriba */}
-                  <div
-                    style={{
-                      width: "100%",
-                      height: 120,
-                      background: m.foto_url
-                        ? `url(${m.foto_url}) center/cover no-repeat`
-                        : cc,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      position: "relative",
-                    }}
-                  >
-                    {!m.foto_url && (
-                      <span
-                        style={{
-                          fontSize: 36,
-                          fontWeight: 700,
-                          color: "white",
-                          opacity: 0.9,
-                        }}
-                      >
-                        {ini(m.nombre)}
-                      </span>
-                    )}
-                    <div
-                      style={{
-                        position: "absolute",
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        height: 40,
-                        background:
-                          "linear-gradient(to top,rgba(0,0,0,0.35),transparent)",
-                      }}
-                    />
-                  </div>
-                  {/* Info abajo */}
-                  <div style={{ padding: "12px 14px" }}>
-                    <div
-                      style={{
-                        fontFamily: "'Poppins',sans-serif",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: C.dark,
-                        marginBottom: 5,
-                      }}
-                    >
-                      {m.nombre}
+            {/* Filas compactas */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {lista.map((m) => {
+                const esRolEspecial = m.cuerda === "Admin" || m.cuerda === "Contador/a Coro";
+                const chipLabel = esRolEspecial
+                  ? rolLabel(m.cuerda, m.genero)
+                  : cuerda;
+                const chipColor = esRolEspecial ? (CUERDAS[m.cuerda] || cc) : cc;
+                return (
+                  <div key={m.id} style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "8px 14px", borderRadius: 10,
+                    background: "white", border: `1px solid ${C.border}`,
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                  }}>
+                    <MiniAvatar m={m} cc={esRolEspecial ? (CUERDAS[m.cuerda] || cc) : cc} size={36} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.dark, fontFamily: "'Poppins',sans-serif" }}>{m.nombre}</div>
+                      {esRolEspecial && (
+                        <div style={{ fontSize: 10, color: C.gray }}>{chipLabel}</div>
+                      )}
                     </div>
-                    <Chip label={m.cuerda === "Contador/a Coro" ? rolFullLabel(m) || rolLabel(m.cuerda, m.genero) : cuerda} color={cc} />
                     {m.cumpleanos && (
-                      <div
-                        style={{ fontSize: 11, color: C.gray, marginTop: 7 }}
-                      >
-                        🎂 {m.cumpleanos}
-                      </div>
+                      <div style={{ fontSize: 11, color: C.gray, flexShrink: 0 }}>🎂 {m.cumpleanos}</div>
                     )}
                     {setSection && user && m.id !== user?.id && (
                       <button
                         onClick={() => { setPreParaId(m.id); setSection("reconoceme"); }}
                         style={{
-                          marginTop: 10, width: "100%", padding: "6px 0",
+                          padding: "4px 10px", flexShrink: 0,
                           background: C.primaryLight, color: C.primaryDark,
-                          border: `1px solid ${C.primary}40`, borderRadius: 8,
-                          fontSize: 11, fontWeight: 700, cursor: "pointer",
-                          display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+                          border: `1px solid ${C.primary}40`, borderRadius: 6,
+                          fontSize: 10, fontWeight: 700, cursor: "pointer",
+                          whiteSpace: "nowrap",
                         }}
                       >
                         🌟 Reconocer
                       </button>
                     )}
                   </div>
-                </Card>
-              ))}
+                );
+              })}
             </div>
           </div>
         );
@@ -9160,7 +9048,9 @@ function AdminIntegrantes({ members, onReload }) {
                 "Nombre",
                 "Email",
                 "Cuerda",
-                "Cargo",
+                "V. Vocal",
+                "Cargo extra",
+                "Género",
                 "Cumpleaños",
                 "Activo",
                 "Acciones",
@@ -9217,24 +9107,28 @@ function AdminIntegrantes({ members, onReload }) {
                           <option key={c}>{c}</option>
                         ))}
                       </select>
-                      {["Admin", "Contador/a Coro"].includes(editData.cuerda || m.cuerda) && (
+                    </td>
+                    <td style={{ padding: "8px 12px" }}>
+                      {["Admin", "Contador/a Coro"].includes(editData.cuerda || m.cuerda) ? (
                         <select
                           value={editData.cuerda_vocal !== undefined ? editData.cuerda_vocal : (m.cuerda_vocal || "")}
                           onChange={(e) =>
                             setEditData((p) => ({ ...p, cuerda_vocal: e.target.value }))
                           }
-                          style={{ ...inputS, marginTop: 4 }}
+                          style={inputS}
                         >
-                          <option value="">Cuerda vocal...</option>
+                          <option value="">—</option>
                           {["Soprano", "Contralto", "Tenor", "Bajo"].map((c) => (
                             <option key={c}>{c}</option>
                           ))}
                         </select>
+                      ) : (
+                        <span style={{ color: C.border, fontSize: 12 }}>—</span>
                       )}
                     </td>
                     <td style={{ padding: "8px 12px" }}>
                       <input
-                        placeholder="Cargo (opcional)"
+                        placeholder="Ej: Redes Sociales"
                         value={editData.cargo !== undefined ? editData.cargo : (m.cargo || "")}
                         onChange={(e) =>
                           setEditData((p) => ({ ...p, cargo: e.target.value }))
@@ -9250,9 +9144,9 @@ function AdminIntegrantes({ members, onReload }) {
                         }
                         style={inputS}
                       >
-                        <option value="">Género...</option>
-                        <option value="M">Masculino</option>
-                        <option value="F">Femenino</option>
+                        <option value="">—</option>
+                        <option value="M">M</option>
+                        <option value="F">F</option>
                       </select>
                     </td>
                     <td style={{ padding: "8px 12px" }}>
@@ -9334,12 +9228,18 @@ function AdminIntegrantes({ members, onReload }) {
                     </td>
                     <td style={{ padding: "10px 12px" }}>
                       <Chip
-                        label={rolLabel(m.cuerda, m.genero) + (m.cuerda_vocal ? ` · ${m.cuerda_vocal}` : "")}
+                        label={rolLabel(m.cuerda, m.genero)}
                         color={CUERDAS[m.cuerda] || C.gray}
                       />
                     </td>
                     <td style={{ padding: "10px 12px", color: C.gray, fontSize: 12 }}>
+                      {m.cuerda_vocal || <span style={{ color: C.border }}>—</span>}
+                    </td>
+                    <td style={{ padding: "10px 12px", color: C.gray, fontSize: 12 }}>
                       {m.cargo || <span style={{ color: C.border }}>—</span>}
+                    </td>
+                    <td style={{ padding: "10px 12px", color: C.gray, fontSize: 12 }}>
+                      {m.genero === "F" ? "F" : m.genero === "M" ? "M" : <span style={{ color: C.border }}>—</span>}
                     </td>
                     <td style={{ padding: "10px 12px", color: C.gray }}>
                       {m.cumpleanos || "-"}
