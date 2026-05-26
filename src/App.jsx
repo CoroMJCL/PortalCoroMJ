@@ -341,17 +341,24 @@ const rolLabel = (r, genero) => {
 const rolFullLabel = (m) => {
   if (!m) return "";
   const cargo = m.cargo?.trim() || "";
-  // Si es Admin o Contador/a Coro y tiene cuerda_vocal, muestra "Encargado/a de Coro | Tenor"
-  const cuerdaVocal = (m.cuerda === "Admin" || m.cuerda === "Contador/a Coro") && m.cuerda_vocal?.trim()
-    ? m.cuerda_vocal.trim()
-    : "";
-  const cuerdaBase = rolLabel(m.cuerda, m.genero);
-  // Parte izquierda: cargo personalizado o rol base
-  const left = cargo || cuerdaBase;
-  // Parte derecha: cuerda vocal (solo si es Admin con cuerda_vocal)
-  const right = cuerdaVocal;
-  if (left && right) return `${left} | ${right}`;
-  return left || right;
+  // Cuerda vocal real: para Admin/Contador usa cuerda_vocal, para el resto usa la cuerda directa
+  const cuerdaVocal = (m.cuerda === "Admin" || m.cuerda === "Contador/a Coro")
+    ? (m.cuerda_vocal?.trim() || "")
+    : (m.cuerda?.trim() || "");
+  const rolBase = rolLabel(m.cuerda, m.genero); // "Encargado de Coro", "Soprano", etc.
+
+  if (m.cuerda === "Admin" || m.cuerda === "Contador/a Coro") {
+    // Ej: "Encargado de Coro | Tenor"  o si tiene cargo extra: "Redes Sociales | Tenor"
+    const left = cargo || rolBase;
+    const right = cuerdaVocal;
+    if (left && right) return `${left} | ${right}`;
+    return left || right;
+  }
+
+  // Miembro normal con cargo extra: "Redes Sociales | Soprano"
+  if (cargo && cuerdaVocal) return `${cargo} | ${cuerdaVocal}`;
+  // Sin cargo extra: solo la cuerda
+  return rolBase;
 };
 const ini = (n) =>
   n
@@ -6504,6 +6511,11 @@ function Integrantes({ members, setSection, setPreParaId, user }) {
   const contadores = members.filter((m) => m.cuerda === "Contador/a Coro" && m.activo !== false);
   const encargados = [...admins, ...contadores];
 
+  // Cuenta solo voces "normales" (excluye Admin, Contador sin cuerda_vocal propia)
+  const totalVoces = members.filter((m) =>
+    m.activo !== false && m.cuerda !== "Admin" && m.cuerda !== "Contador/a Coro"
+  ).length + contadores.filter((m) => m.cuerda_vocal?.trim()).length;
+
   // Mini avatar circular
   const MiniAvatar = ({ m, cc, size = 40 }) => (
     <div style={{
@@ -6523,7 +6535,7 @@ function Integrantes({ members, setSection, setPreParaId, user }) {
     <div style={{ maxWidth: 900 }}>
       <SectionTitle
         title="Integrantes del Coro"
-        subtitle={`${members.filter((m) => m.cuerda !== "Admin").length} voces · Familia MJ`}
+        subtitle={`${totalVoces} voces · Familia MJ`}
       />
 
       {/* Encargados y Contadores */}
@@ -6572,10 +6584,10 @@ function Integrantes({ members, setSection, setPreParaId, user }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {lista.map((m) => {
                 const esRolEspecial = m.cuerda === "Admin" || m.cuerda === "Contador/a Coro";
-                const chipLabel = esRolEspecial
-                  ? rolLabel(m.cuerda, m.genero)
-                  : cuerda;
-                const chipColor = esRolEspecial ? (CUERDAS[m.cuerda] || cc) : cc;
+                const avatarColor = esRolEspecial ? (CUERDAS[m.cuerda] || cc) : cc;
+                const subtitulo = esRolEspecial
+                  ? rolLabel(m.cuerda, m.genero)   // "Encargado de Coro" / "Contadora Coro"
+                  : m.cargo?.trim() || "";           // "Redes Sociales" o vacío
                 return (
                   <div key={m.id} style={{
                     display: "flex", alignItems: "center", gap: 12,
@@ -6583,11 +6595,13 @@ function Integrantes({ members, setSection, setPreParaId, user }) {
                     background: "white", border: `1px solid ${C.border}`,
                     boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
                   }}>
-                    <MiniAvatar m={m} cc={esRolEspecial ? (CUERDAS[m.cuerda] || cc) : cc} size={36} />
+                    <MiniAvatar m={m} cc={avatarColor} size={36} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: C.dark, fontFamily: "'Poppins',sans-serif" }}>{m.nombre}</div>
-                      {esRolEspecial && (
-                        <div style={{ fontSize: 10, color: C.gray }}>{chipLabel}</div>
+                      {subtitulo && (
+                        <div style={{ fontSize: 10, color: esRolEspecial ? CUERDAS[m.cuerda] || C.gray : C.gray }}>
+                          {subtitulo}
+                        </div>
                       )}
                     </div>
                     {m.cumpleanos && (
@@ -16089,6 +16103,8 @@ const finFmtCLP = (n) => new Intl.NumberFormat("es-CL", { style: "currency", cur
 const FIN_MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 function finMesLabel(iso) { const [y, m] = iso.split("-"); return `${FIN_MESES[parseInt(m) - 1]} ${y}`; }
 function finCurrentMesIso() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
+const CUOTAS_MES_INICIO = "2026-06"; // Las cuotas empiezan en Junio 2026
+function finMesVigente() { return finCurrentMesIso() >= CUOTAS_MES_INICIO; }
 const finIni = (n) => (n || "?").charAt(0).toUpperCase();
 const finCuerdaLabel = (c, genero) => c === "Admin" ? rolLabel("Admin", genero) : c === "Contador/a Coro" ? rolLabel("Contador/a Coro", genero) : (c || "");
 
@@ -17372,12 +17388,13 @@ export function InfoGastos({ user, members }) {
   const saldo = totalIngresado - totalGastado;
 
   const mesActual = finCurrentMesIso();
+  const cuotasActivas = mesActual >= CUOTAS_MES_INICIO;
   const pagosMesActual = pagos.filter((p) => p.mes === mesActual);
   const miembrosIds = new Set(miembrosEnCuotas.map((m) => m.integrante_id));
   const miembrosActivos = members.filter((m) => miembrosIds.has(m.id));
   const pagaron = new Set(pagosMesActual.map((p) => p.integrante_id));
-  const alDia = miembrosActivos.filter((m) => pagaron.has(m.id));
-  const morosos = miembrosActivos.filter((m) => !pagaron.has(m.id));
+  const alDia = cuotasActivas ? miembrosActivos.filter((m) => pagaron.has(m.id)) : [];
+  const morosos = cuotasActivas ? miembrosActivos.filter((m) => !pagaron.has(m.id)) : [];
   const cuotaMesActual = cuotas.find((c) => c.mes === mesActual);
 
   if (loading) return <FinSpinner />;
@@ -17451,6 +17468,15 @@ export function InfoGastos({ user, members }) {
 
       {/* Estado de cuotas */}
       {tabActiva === "cuotas" && (
+        !cuotasActivas ? (
+          <FinCard>
+            <div style={{ textAlign: "center", padding: "20px 0", color: C.gray, fontSize: 13 }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>📅</div>
+              <div style={{ fontWeight: 600, color: C.dark, marginBottom: 4 }}>Las cuotas aún no han comenzado</div>
+              <div>El sistema de cuotas se activa a partir de <strong>Junio 2026</strong>.</div>
+            </div>
+          </FinCard>
+        ) : (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <FinCard>
             <div style={{ fontWeight: 700, color: C.primary, fontSize: 14, marginBottom: 12 }}>
@@ -17480,6 +17506,7 @@ export function InfoGastos({ user, members }) {
             ))}
           </FinCard>
         </div>
+        )
       )}
 
       {/* Gastos por actividad */}
