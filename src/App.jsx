@@ -10,6 +10,10 @@ const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 // Código secreto para registrarse como Admin
 const SECRET_ADMIN_CODE = "CoroCJM2026!";
 
+// URL pública del banner (imagen de Jesús) — se sube una vez al bucket "publico"
+// Para subir: ve a Supabase > Storage > publico > Upload > sube canalymj.jpg
+const BANNER_URL = `${SUPABASE_URL}/storage/v1/object/public/publico/canalymj.jpg`;
+
 // ── Google Calendar API (pública, solo lectura) ───────────────────────
 const GCAL_CALENDAR_ID = "coromisionerosdjesuscl@gmail.com";
 const GCAL_API_KEY = "AIzaSyAFSJguKkIY1shCYA1HIFwv9OtaYGnu45k";
