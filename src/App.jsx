@@ -141,7 +141,7 @@ async function supabase(table, options = {}) {
 setInterval(() => {
   if (_refreshToken) refreshSession();
 }, 50 * 60 * 1000);
-async function authSignUp(email, password, nombre, cuerda, cumpleanos) {
+async function authSignUp(email, password, nombre, cuerda, cumpleanos, genero) {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
     method: "POST",
     headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
@@ -173,6 +173,7 @@ async function authSignUp(email, password, nombre, cuerda, cumpleanos) {
       email,
       cuerda: cuerda || "Soprano",
       cumpleanos: cumpleanos || "",
+      genero: genero || "",
       auth_id: uid,
     }),
   });
@@ -1440,7 +1441,8 @@ export default function App() {
     nombre,
     cuerda,
     cumpleanos,
-    adminCode
+    adminCode,
+    genero
   ) {
     // Si el código secreto es correcto, registrar como Admin
     const finalCuerda =
@@ -1450,7 +1452,8 @@ export default function App() {
       password,
       nombre,
       finalCuerda,
-      cumpleanos
+      cumpleanos,
+      genero
     );
     const perfil = await supabase("integrantes", {
       filters: `&email=eq.${encodeURIComponent(email)}`,
@@ -2168,6 +2171,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
   const [regNombre, setRegNombre] = useState("");
   const [regCuerda, setRegCuerda] = useState("Soprano");
   const [regCumple, setRegCumple] = useState("");
+  const [regGenero, setRegGenero] = useState("");
   const [regAdminCode, setRegAdminCode] = useState("");
 
   // Recuperar
@@ -2220,6 +2224,10 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
       setError("Ingresa tu nombre completo.");
       return;
     }
+    if (!regGenero) {
+      setError("Selecciona tu género.");
+      return;
+    }
     setLoading(true);
     try {
       await onSignUp(
@@ -2228,7 +2236,8 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
         regNombre.trim(),
         regCuerda,
         regCumple,
-        regAdminCode
+        regAdminCode,
+        regGenero
       );
     } catch (err) {
       if (err.message.includes("confirma")) {
@@ -2520,6 +2529,18 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
                     style={inp}
                   />
                 </div>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={lbl}>Género</label>
+                <select
+                  value={regGenero}
+                  onChange={(e) => setRegGenero(e.target.value)}
+                  style={inp}
+                >
+                  <option value="">Selecciona...</option>
+                  <option value="F">Femenino</option>
+                  <option value="M">Masculino</option>
+                </select>
               </div>
               <div style={{ marginBottom: 12 }}>
                 <label style={lbl}>Contraseña * (mín. 6 caracteres)</label>
@@ -8761,6 +8782,7 @@ function AdminIntegrantes({ members, onReload }) {
   const [form, setForm] = useState({
     nombre: "",
     email: "",
+    password: "",
     cuerda: "Soprano",
     cargo: "",
     cumpleanos: "",
@@ -8774,17 +8796,46 @@ function AdminIntegrantes({ members, onReload }) {
 
   async function submit() {
     if (!form.nombre || !form.email) return;
+    if (!form.password || form.password.length < 6) {
+      alert("Ingresa una contraseña de al menos 6 caracteres.");
+      return;
+    }
     setSaving(true);
     try {
-      await supabase("integrantes", { method: "POST", body: form });
-      setForm({
-        nombre: "",
-        email: "",
-        cuerda: "Soprano",
-        cargo: "",
-        cumpleanos: "",
-        foto_url: "",
+      // 1. Crear usuario en Supabase Auth con service_role
+      const authRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+          email_confirm: true,
+          user_metadata: { nombre: form.nombre, cuerda: form.cuerda },
+        }),
       });
+      const authData = await authRes.json();
+      if (!authRes.ok) throw new Error(authData.msg || authData.message || "Error al crear cuenta Auth");
+      const auth_id = authData.id;
+
+      // 2. Insertar en tabla integrantes con auth_id
+      await supabase("integrantes", {
+        method: "POST",
+        body: {
+          nombre: form.nombre,
+          email: form.email,
+          cuerda: form.cuerda,
+          cargo: form.cargo,
+          cumpleanos: form.cumpleanos,
+          foto_url: form.foto_url,
+          auth_id,
+        },
+      });
+
+      setForm({ nombre: "", email: "", password: "", cuerda: "Soprano", cargo: "", cumpleanos: "", foto_url: "" });
       setShowForm(false);
       onReload();
     } catch (e) {
@@ -8992,6 +9043,15 @@ function AdminIntegrantes({ members, onReload }) {
               }
               style={inputS}
             />
+            <input
+              placeholder="Contraseña temporal * (mín. 6 caracteres)"
+              type="password"
+              value={form.password}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, password: e.target.value }))
+              }
+              style={{ ...inputS, gridColumn: "1 / -1", borderColor: C.primary + "60" }}
+            />
             <select
               value={form.cuerda}
               onChange={(e) =>
@@ -8999,12 +9059,12 @@ function AdminIntegrantes({ members, onReload }) {
               }
               style={inputS}
             >
-              {["Soprano", "Contralto", "Tenor", "Bajo", "Admin"].map((c) => (
+              {["Soprano", "Contralto", "Tenor", "Bajo", "Admin", "Contador/a Coro"].map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </select>
             <input
-              placeholder="Cargo (ej: Encargado de coro)"
+              placeholder="Cargo extra (opcional)"
               value={form.cargo}
               onChange={(e) =>
                 setForm((p) => ({ ...p, cargo: e.target.value }))
