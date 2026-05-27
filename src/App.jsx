@@ -890,6 +890,7 @@ export default function App() {
   })();
   const [view, setView] = useState(_initialView); // "login" | "register" | "recover" | "reset" | "app"
   const [showPushModal, setShowPushModal] = useState(false);
+  const [pushBloqueado, setPushBloqueado] = useState(false);
   const [user, setUser] = useState(null);
   const [authToken, setAuthToken] = useState(null);
   const [section, setSection] = useState("dashboard");
@@ -1561,8 +1562,10 @@ export default function App() {
     setUser(p);
     setView("app");
     registrarVisita(p, data.access_token);
-    // Mostrar modal explicativo antes del popup nativo
-    setTimeout(() => { setShowPushModal(true); }, 2500);
+    // Mostrar modal solo si no tiene permiso aún
+    setTimeout(() => {
+      if (Notification.permission !== "granted") setShowPushModal(true);
+    }, 2500);
   }
 
   async function handleSignUp(
@@ -1594,8 +1597,10 @@ export default function App() {
     setUser(p);
     setView("app");
     registrarVisita(p, data.access_token);
-    // Mostrar modal explicativo antes del popup nativo
-    setTimeout(() => { setShowPushModal(true); }, 2500);
+    // Mostrar modal solo si no tiene permiso aún
+    setTimeout(() => {
+      if (Notification.permission !== "granted") setShowPushModal(true);
+    }, 2500);
   }
 
   async function handleSignOut() {
@@ -1678,6 +1683,12 @@ export default function App() {
     );
 
   async function activarNotificaciones(userId) {
+    // Si el permiso ya fue bloqueado en el navegador, no se puede pedir — cerrar y avisar
+    if (Notification.permission === "denied") {
+      setShowPushModal(false);
+      setPushBloqueado(true);
+      return;
+    }
     try {
       await window.OneSignalDeferred?.push(async (os) => {
         if (userId) await os.login(String(userId));
@@ -1697,6 +1708,26 @@ export default function App() {
       }}
     >
       <style>{G}</style>
+
+      {/* ── Banner permiso bloqueado ── */}
+      {pushBloqueado && (
+        <div style={{
+          position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)",
+          zIndex: 9999, background: "#1e293b", color: "white",
+          borderRadius: 14, padding: "14px 20px", maxWidth: 420, width: "calc(100% - 40px)",
+          boxShadow: "0 8px 30px rgba(0,0,0,0.4)", display: "flex", gap: 12, alignItems: "flex-start",
+        }}>
+          <div style={{ fontSize: 22, flexShrink: 0 }}>🔕</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>Notificaciones bloqueadas en este navegador</div>
+            <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.6 }}>
+              Para activarlas: haz click en el <strong style={{color:"white"}}>🔒 candado</strong> en la barra de dirección → <strong style={{color:"white"}}>Notificaciones</strong> → <strong style={{color:"white"}}>Permitir</strong> → recarga la página.
+            </div>
+          </div>
+          <button onClick={() => setPushBloqueado(false)}
+            style={{ background: "none", border: "none", color: "#94a3b8", fontSize: 18, cursor: "pointer", flexShrink: 0, padding: 0 }}>×</button>
+        </div>
+      )}
 
       {/* ── Modal explicativo notificaciones push ── */}
       {showPushModal && (
@@ -10329,6 +10360,28 @@ function AdminOraciones({ oraciones, onReload }) {
   );
 }
 
+function ImageField({ preview, setPreview, formSetter, uploading, fileRef, labelPrefix, onUpload }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>🖼️ {labelPrefix} (opcional, máx. 5 MB)</div>
+      <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }}
+        onChange={(e) => onUpload(e.target.files[0], formSetter, setPreview)} />
+      {preview ? (
+        <div style={{ position: "relative", display: "inline-block" }}>
+          <img src={preview} alt="Preview" style={{ width: 200, height: 120, objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb", display: "block" }} />
+          <button onClick={() => { setPreview(null); formSetter((p) => ({ ...p, imagen_url: "" })); }}
+            style={{ position: "absolute", top: 4, right: 4, width: 24, height: 24, borderRadius: "50%", background: "rgba(0,0,0,0.6)", border: "none", color: "white", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>×</button>
+        </div>
+      ) : (
+        <button onClick={() => fileRef.current?.click()} disabled={uploading}
+          style={{ padding: "8px 16px", borderRadius: 8, border: "1px dashed #e5e7eb", background: "white", cursor: "pointer", fontSize: 12, color: "#6b7280", display: "flex", alignItems: "center", gap: 8 }}>
+          {uploading ? "⏳ Subiendo..." : "📷 Subir afiche / imagen"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function AvisoFormFields({ f, setF, inputStyle }) {
   return (
     <>
@@ -10434,29 +10487,6 @@ function AdminNoticias({ noticias, onReload }) {
     catch (e) { alert("Error: " + e.message); }
   }
 
-  // Sub-componente compartido para el formulario de imagen
-  function ImageField({ preview, setPreview, formSetter, uploading, fileRef, labelPrefix }) {
-    return (
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 11, color: C.gray, marginBottom: 6 }}>🖼️ {labelPrefix} (opcional, máx. 5 MB)</div>
-        <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }}
-          onChange={(e) => uploadImage(e.target.files[0], labelPrefix === "Afiche o imagen" ? setUploadingImg : setEditUploadingImg, formSetter, setPreview)} />
-        {preview ? (
-          <div style={{ position: "relative", display: "inline-block" }}>
-            <img src={preview} alt="Preview" style={{ width: 200, height: 120, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.border}`, display: "block" }} />
-            <button onClick={() => { setPreview(null); formSetter((p) => ({ ...p, imagen_url: "" })); }}
-              style={{ position: "absolute", top: 4, right: 4, width: 24, height: 24, borderRadius: "50%", background: "rgba(0,0,0,0.6)", border: "none", color: "white", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>×</button>
-          </div>
-        ) : (
-          <button onClick={() => fileRef.current?.click()} disabled={uploading}
-            style={{ padding: "8px 16px", borderRadius: 8, border: `1px dashed ${C.border}`, background: "white", cursor: "pointer", fontSize: 12, color: C.gray, display: "flex", alignItems: "center", gap: 8 }}>
-            {uploading ? "⏳ Subiendo..." : "📷 Subir afiche / imagen"}
-          </button>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -10469,7 +10499,7 @@ function AdminNoticias({ noticias, onReload }) {
         <Card style={{ marginBottom: 16, border: `1px solid ${C.primary}40`, background: C.primaryLight }}>
           <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 14, fontWeight: 600, color: C.dark, marginBottom: 14 }}>📢 Nuevo aviso del coro</div>
           <AvisoFormFields f={form} setF={setForm} inputStyle={inputS} />
-          <ImageField preview={imgPreview} setPreview={setImgPreview} formSetter={setForm} uploading={uploadingImg} fileRef={imgRef} labelPrefix="Afiche o imagen" />
+          <ImageField preview={imgPreview} setPreview={setImgPreview} formSetter={setForm} uploading={uploadingImg} fileRef={imgRef} labelPrefix="Afiche o imagen" onUpload={(file, setter, setPrev) => uploadImage(file, setUploadingImg, setter, setPrev)} />
           <div style={{ display: "flex", gap: 8 }}>
             <Btn onClick={submit} disabled={saving || uploadingImg}>{saving ? "Guardando..." : "Publicar aviso"}</Btn>
             <Btn variant="ghost" onClick={() => { setShowForm(false); setImgPreview(null); setForm(emptyForm); }}>Cancelar</Btn>
@@ -10512,7 +10542,7 @@ function AdminNoticias({ noticias, onReload }) {
             <Card style={{ marginBottom: 10, border: `1px solid ${C.primary}60`, borderTop: "none", borderTopLeftRadius: 0, borderTopRightRadius: 0, background: "#f0f7ff" }}>
               <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 13, fontWeight: 600, color: C.primary, marginBottom: 12 }}>✏️ Editando aviso</div>
               <AvisoFormFields f={editForm} setF={setEditForm} inputStyle={inputS} />
-              <ImageField preview={editImgPreview} setPreview={setEditImgPreview} formSetter={setEditForm} uploading={editUploadingImg} fileRef={editImgRef} labelPrefix="Cambiar imagen" />
+              <ImageField preview={editImgPreview} setPreview={setEditImgPreview} formSetter={setEditForm} uploading={editUploadingImg} fileRef={editImgRef} labelPrefix="Cambiar imagen" onUpload={(file, setter, setPrev) => uploadImage(file, setEditUploadingImg, setter, setPrev)} />
               <div style={{ display: "flex", gap: 8 }}>
                 <Btn onClick={saveEdit} disabled={editSaving || editUploadingImg}>{editSaving ? "Guardando..." : "💾 Guardar cambios"}</Btn>
                 <Btn variant="ghost" onClick={() => { setEditId(null); setEditForm(emptyForm); setEditImgPreview(null); }}>Cancelar</Btn>
