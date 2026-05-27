@@ -3474,6 +3474,7 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
   const [editing, setEditing] = useState(false);
   const [inputVal, setInputVal] = useState("");
   const [saved, setSaved] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     getConfig(FOTO_MISA_KEY).then((val) => {
@@ -3487,6 +3488,7 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
   async function saveUrl() {
     const v = inputVal.trim();
     setSavedUrl(v);
+    setImgError(false);
     await setConfig(FOTO_MISA_KEY, v);
     setEditing(false);
     setSaved(true);
@@ -3497,127 +3499,234 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
   if (!savedUrl && !isAdmin) return null;
 
   return (
-    <Card style={{ marginBottom: 14 }}>
-      {/* Cabecera */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-        <div style={{
-          width: 32, height: 32,
-          background: "linear-gradient(135deg,#f59e0b,#fb923c)",
-          borderRadius: 8,
-          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-        }}>
-          <span style={{ fontSize: 15, color: "white" }}>📸</span>
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 14, fontWeight: 700, color: C.dark }}>
-            Fotografía Destacada
-          </div>
-          <div style={{ fontSize: 11, color: C.gray }}>
-            {savedUrl ? "Imagen promocional de la misa" : "Sin imagen asignada aún"}
-          </div>
-        </div>
-        {isAdmin && (
-          <button
-            onClick={editing ? cancelEdit : openEdit}
-            style={{
-              background: editing ? "#f3f4f6" : C.primaryLight,
-              border: `1px solid ${editing ? C.border : C.primary + "50"}`,
-              borderRadius: 8, padding: "5px 12px",
-              fontSize: 11, fontWeight: 600,
-              color: editing ? C.gray : C.primary,
-              cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
-            }}
-          >
-            {editing ? "✕ Cancelar" : "✏️ " + (savedUrl ? "Cambiar imagen" : "Asignar imagen")}
-          </button>
-        )}
-        {saved && !editing && (
-          <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600 }}>✅ Guardado</span>
-        )}
-      </div>
+    <div style={{ marginBottom: 20 }}>
+      <style>{`
+        @keyframes afiche-shine {
+          0%   { transform: translateX(-100%) skewX(-15deg); opacity: 0; }
+          40%  { opacity: 0.35; }
+          100% { transform: translateX(260%) skewX(-15deg); opacity: 0; }
+        }
+        @keyframes afiche-in {
+          from { opacity: 0; transform: translateY(14px) scale(0.98); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes afiche-pulse {
+          0%,100% { box-shadow: 0 0 0 0 rgba(250,204,21,0); }
+          50%      { box-shadow: 0 0 0 6px rgba(250,204,21,0.18); }
+        }
+        .afiche-wrap { animation: afiche-in 0.55s cubic-bezier(0.22,1,0.36,1) both; }
+        .afiche-img-wrap:hover .afiche-shine { animation: afiche-shine 1.1s ease forwards; }
+        .afiche-edit-btn:hover { transform: scale(1.04); background: rgba(255,255,255,0.18) !important; }
+      `}</style>
 
-      {/* Formulario de edición (solo Admin) */}
-      {editing && (
-        <div style={{
-          background: "#fff7ed", border: "1px solid #fb923c40",
-          borderRadius: 10, padding: "12px 14px", marginBottom: 12,
+      {/* ── AFICHE PRINCIPAL ── */}
+      {savedUrl && !imgError ? (
+        <div className="afiche-wrap" style={{
+          position: "relative", borderRadius: 22, overflow: "hidden",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.32), 0 4px 16px rgba(0,0,0,0.18)",
+          background: "#0c0c14",
+          animation: "afiche-pulse 3s ease infinite",
         }}>
-          <div style={{ fontSize: 11, color: "#c2410c", fontWeight: 600, marginBottom: 6 }}>
-            🔗 Pega la URL de la imagen (JPG, PNG, WebP o URL pública)
-          </div>
-          <input
-            value={inputVal}
-            onChange={(e) => setInputVal(e.target.value)}
-            placeholder="https://ejemplo.com/foto-misa.jpg"
-            onKeyDown={(e) => { if (e.key === "Enter") saveUrl(); if (e.key === "Escape") cancelEdit(); }}
-            autoFocus
-            style={{
-              width: "100%", boxSizing: "border-box",
-              padding: "8px 12px", borderRadius: 8,
-              border: `1px solid ${C.border}`, fontSize: 12,
-              outline: "none", marginBottom: 8, fontFamily: "Inter,sans-serif",
-            }}
-          />
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <Btn onClick={saveUrl} style={{ fontSize: 12, padding: "6px 14px", background: "#f59e0b", color: "white", border: "none" }}>
-              💾 Guardar
-            </Btn>
-            {savedUrl && (
-              <Btn
-                variant="ghost"
-                style={{ fontSize: 12, padding: "6px 14px", color: "#dc2626", border: "1px solid #fca5a5" }}
-                onClick={async () => { setSavedUrl(""); await setConfig(FOTO_MISA_KEY, ""); setEditing(false); }}
-              >
-                🗑 Quitar imagen
-              </Btn>
-            )}
-            <span style={{ fontSize: 10, color: C.gray, marginLeft: "auto" }}>
-              Funciona con cualquier URL pública de imagen
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Imagen */}
-      {savedUrl ? (
-        <div style={{
-          borderRadius: 12, overflow: "hidden",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
-          background: "#f9fafb",
-        }}>
-          <img
-            src={savedUrl}
-            alt="Fotografía destacada de la misa"
-            style={{ width: "100%", maxHeight: 340, objectFit: "cover", display: "block" }}
-            onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }}
-          />
-          <div style={{
-            display: "none", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            gap: 8, padding: "36px 20px", minHeight: 140,
-            background: "#f9fafb",
-          }}>
-            <div style={{ fontSize: 36, opacity: 0.25 }}>🖼️</div>
-            <div style={{ fontSize: 12, color: C.gray, textAlign: "center" }}>
-              No se pudo cargar la imagen. Verifica que la URL sea pública y válida.
+          {/* Imagen de fondo */}
+          <div className="afiche-img-wrap" style={{ position: "relative" }}>
+            <img
+              src={savedUrl}
+              alt="Afiche de la misa"
+              style={{
+                width: "100%", maxHeight: 420,
+                objectFit: "cover", display: "block",
+                filter: "brightness(0.88) contrast(1.05)",
+              }}
+              onError={() => setImgError(true)}
+            />
+            {/* Efecto brillo al hover */}
+            <div className="afiche-shine" style={{
+              position: "absolute", inset: 0,
+              background: "linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.55) 50%,transparent 60%)",
+              pointerEvents: "none",
+            }} />
+            {/* Gradiente overlay inferior */}
+            <div style={{
+              position: "absolute", bottom: 0, left: 0, right: 0, height: "55%",
+              background: "linear-gradient(to top, rgba(8,8,20,0.92) 0%, rgba(8,8,20,0.5) 55%, transparent 100%)",
+              pointerEvents: "none",
+            }} />
+            {/* Gradiente overlay superior sutil */}
+            <div style={{
+              position: "absolute", top: 0, left: 0, right: 0, height: "30%",
+              background: "linear-gradient(to bottom, rgba(8,8,20,0.45) 0%, transparent 100%)",
+              pointerEvents: "none",
+            }} />
+            {/* Línea dorada superior */}
+            <div style={{
+              position: "absolute", top: 0, left: 0, right: 0, height: 3,
+              background: "linear-gradient(90deg, transparent, #fbbf24, #f59e0b, #fbbf24, transparent)",
+            }} />
+            {/* Badge "Próxima Celebración" */}
+            <div style={{
+              position: "absolute", top: 16, left: 18,
+              background: "linear-gradient(135deg,#92400e,#d97706)",
+              borderRadius: 20, padding: "4px 14px",
+              display: "flex", alignItems: "center", gap: 6,
+              boxShadow: "0 2px 12px rgba(217,119,6,0.45)",
+            }}>
+              <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fef3c7", flexShrink: 0 }} />
+              <span style={{
+                fontSize: 10, fontWeight: 800, color: "#fef3c7",
+                letterSpacing: "0.12em", textTransform: "uppercase",
+                fontFamily: "'Poppins',sans-serif",
+              }}>Próxima Celebración</span>
             </div>
+            {/* Botón editar (solo admin) — flotante sobre la imagen */}
+            {isAdmin && (
+              <button
+                className="afiche-edit-btn"
+                onClick={editing ? cancelEdit : openEdit}
+                style={{
+                  position: "absolute", top: 14, right: 14,
+                  background: editing ? "rgba(239,68,68,0.85)" : "rgba(0,0,0,0.55)",
+                  backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  borderRadius: 10, padding: "6px 14px",
+                  fontSize: 11, fontWeight: 700, color: "white",
+                  cursor: "pointer", transition: "all 0.18s",
+                  display: "flex", alignItems: "center", gap: 6,
+                }}
+              >
+                {editing ? "✕ Cancelar" : "✏️ Cambiar imagen"}
+              </button>
+            )}
+            {/* Ícono cruz decorativo */}
+            <div style={{
+              position: "absolute", bottom: 20, right: 20,
+              fontSize: 28, opacity: 0.55,
+              filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.6))",
+            }}>✝️</div>
+            {/* Indicador guardado */}
+            {saved && (
+              <div style={{
+                position: "absolute", bottom: 18, left: 18,
+                background: "rgba(22,163,74,0.9)", backdropFilter: "blur(8px)",
+                borderRadius: 20, padding: "5px 14px",
+                fontSize: 11, fontWeight: 700, color: "white",
+              }}>✅ Imagen guardada</div>
+            )}
           </div>
+
+          {/* Formulario edición inline */}
+          {editing && (
+            <div style={{
+              background: "rgba(8,8,20,0.97)",
+              borderTop: "1px solid rgba(251,191,36,0.25)",
+              padding: "16px 18px",
+            }}>
+              <div style={{ fontSize: 11, color: "#fbbf24", fontWeight: 700, marginBottom: 8, letterSpacing: "0.06em" }}>
+                🔗 URL de la imagen (JPG, PNG, WebP)
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  value={inputVal}
+                  onChange={(e) => setInputVal(e.target.value)}
+                  placeholder="https://ejemplo.com/afiche-misa.jpg"
+                  onKeyDown={(e) => { if (e.key === "Enter") saveUrl(); if (e.key === "Escape") cancelEdit(); }}
+                  autoFocus
+                  style={{
+                    flex: 1, padding: "9px 14px", borderRadius: 10,
+                    background: "rgba(255,255,255,0.08)", border: "1px solid rgba(251,191,36,0.3)",
+                    color: "white", fontSize: 12, outline: "none",
+                    fontFamily: "Inter,sans-serif",
+                  }}
+                />
+                <button onClick={saveUrl} style={{
+                  padding: "9px 18px", borderRadius: 10, border: "none",
+                  background: "linear-gradient(135deg,#d97706,#f59e0b)",
+                  color: "white", fontWeight: 800, fontSize: 12, cursor: "pointer",
+                  flexShrink: 0,
+                }}>💾 Guardar</button>
+                {savedUrl && (
+                  <button
+                    onClick={async () => { setSavedUrl(""); await setConfig(FOTO_MISA_KEY, ""); setEditing(false); }}
+                    style={{
+                      padding: "9px 14px", borderRadius: 10, border: "1px solid rgba(239,68,68,0.4)",
+                      background: "rgba(239,68,68,0.15)", color: "#f87171",
+                      fontWeight: 700, fontSize: 12, cursor: "pointer", flexShrink: 0,
+                    }}>🗑</button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
+
       ) : (
+        /* ── ESTADO VACÍO (solo visible para Admin) ── */
         <div style={{
-          borderRadius: 12, background: "#fff7ed",
-          border: "2px dashed #fb923c50",
-          display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
-          gap: 8, padding: "36px 20px", minHeight: 140,
+          borderRadius: 22, overflow: "hidden",
+          border: "2px dashed rgba(251,191,36,0.35)",
+          background: "linear-gradient(135deg,#0c0c14,#1a1a2e)",
+          minHeight: 200,
         }}>
-          <div style={{ fontSize: 36, opacity: 0.25 }}>📸</div>
-          <div style={{ fontSize: 12, color: C.gray, textAlign: "center" }}>
-            Haz clic en <strong>"Asignar imagen"</strong> para mostrar una fotografía de la misa
-          </div>
+          {/* Formulario si está editando */}
+          {editing ? (
+            <div style={{ padding: "24px 22px" }}>
+              <div style={{ fontSize: 13, color: "#fbbf24", fontWeight: 700, marginBottom: 10 }}>
+                🔗 URL de la imagen del afiche
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  value={inputVal}
+                  onChange={(e) => setInputVal(e.target.value)}
+                  placeholder="https://ejemplo.com/afiche-misa.jpg"
+                  onKeyDown={(e) => { if (e.key === "Enter") saveUrl(); if (e.key === "Escape") cancelEdit(); }}
+                  autoFocus
+                  style={{
+                    flex: 1, padding: "10px 14px", borderRadius: 10,
+                    background: "rgba(255,255,255,0.07)", border: "1px solid rgba(251,191,36,0.3)",
+                    color: "white", fontSize: 12, outline: "none",
+                  }}
+                />
+                <button onClick={saveUrl} style={{
+                  padding: "10px 20px", borderRadius: 10, border: "none",
+                  background: "linear-gradient(135deg,#d97706,#f59e0b)",
+                  color: "white", fontWeight: 800, fontSize: 12, cursor: "pointer",
+                }}>💾 Guardar</button>
+                <button onClick={cancelEdit} style={{
+                  padding: "10px 14px", borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  background: "transparent", color: "rgba(255,255,255,0.5)",
+                  fontSize: 12, cursor: "pointer",
+                }}>✕</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center",
+              gap: 12, padding: "48px 24px", textAlign: "center",
+            }}>
+              <div style={{ fontSize: 44, opacity: 0.2 }}>🖼️</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.4)" }}>
+                Sin afiche asignado
+              </div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", maxWidth: 260 }}>
+                Agrega una imagen para promocionar la próxima misa
+              </div>
+              {isAdmin && (
+                <button
+                  onClick={openEdit}
+                  style={{
+                    marginTop: 6, padding: "9px 22px", borderRadius: 10,
+                    background: "linear-gradient(135deg,#92400e,#d97706)",
+                    border: "none", color: "#fef3c7",
+                    fontWeight: 700, fontSize: 12, cursor: "pointer",
+                    boxShadow: "0 4px 16px rgba(217,119,6,0.35)",
+                  }}
+                >📸 Asignar imagen del afiche</button>
+              )}
+            </div>
+          )}
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -6465,39 +6574,82 @@ function Perfil({ user, members, setUser }) {
         </Card>
 
         {/* ── Notificaciones Push ── */}
-        <Card style={{ marginTop: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <Card style={{ marginTop: 14, padding: 0, overflow: "hidden" }}>
+          <div style={{
+            background: pushEnabled
+              ? "linear-gradient(135deg,#f0fdf4,#dcfce7)"
+              : "linear-gradient(135deg,#f8fafc,#f1f5f9)",
+            borderBottom: `1px solid ${pushEnabled ? "#bbf7d0" : C.border}`,
+            padding: "16px 18px",
+            display: "flex", alignItems: "center", gap: 14,
+          }}>
+            {/* Icono */}
             <div style={{
-              width: 42, height: 42, borderRadius: 10, flexShrink: 0,
-              background: pushEnabled ? "#dcfce7" : C.light,
-              border: `1.5px solid ${pushEnabled ? "#86efac" : C.border}`,
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+              width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+              background: pushEnabled
+                ? "linear-gradient(135deg,#16a34a,#22c55e)"
+                : "linear-gradient(135deg,#64748b,#94a3b8)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 22,
+              boxShadow: pushEnabled ? "0 4px 14px rgba(22,163,74,0.3)" : "0 2px 8px rgba(0,0,0,0.1)",
             }}>
-              {pushEnabled ? "🔔" : "🔕"}
+              {pushLoading ? "⏳" : pushEnabled ? "🔔" : "🔕"}
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.dark }}>Notificaciones</div>
-              <div style={{ fontSize: 11, color: C.gray, marginTop: 1 }}>
-                {!pushSupported
-                  ? "Tu navegador no soporta notificaciones push."
-                  : pushEnabled
-                  ? "Recibirás notificaciones de nuevos avisos, eventos y documentos."
-                  : "Activa las notificaciones para enterarte al instante de novedades del coro."}
+            {/* Texto */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.dark, marginBottom: 2 }}>
+                Notificaciones push
               </div>
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 5,
+                background: pushEnabled ? "#dcfce7" : "#f1f5f9",
+                border: `1px solid ${pushEnabled ? "#86efac" : C.border}`,
+                borderRadius: 20, padding: "2px 10px",
+              }}>
+                <div style={{
+                  width: 6, height: 6, borderRadius: "50%",
+                  background: pushEnabled ? "#16a34a" : "#94a3b8",
+                  flexShrink: 0,
+                }} />
+                <span style={{ fontSize: 11, fontWeight: 600, color: pushEnabled ? "#15803d" : "#64748b" }}>
+                  {pushLoading ? "Procesando…" : pushEnabled ? "Activas" : "Inactivas"}
+                </span>
+              </div>
+            </div>
+          </div>
+          {/* Descripción + botón */}
+          <div style={{ padding: "14px 18px" }}>
+            <div style={{ fontSize: 12, color: C.gray, lineHeight: 1.7, marginBottom: 14 }}>
+              {!pushSupported
+                ? "⚠️ Tu navegador no soporta notificaciones push. Prueba con Chrome o Firefox."
+                : pushEnabled
+                ? "✅ Recibirás un aviso al instante cuando se publiquen nuevos avisos, ensayos, misas o documentos."
+                : "Actívalas para enterarte al instante de novedades del coro, aunque no tengas el portal abierto."}
             </div>
             {pushSupported && (
               <button
                 onClick={togglePush}
                 disabled={pushLoading}
                 style={{
-                  padding: "8px 16px", borderRadius: 20, border: "none", cursor: "pointer",
-                  fontWeight: 700, fontSize: 12, flexShrink: 0,
-                  background: pushEnabled ? "#fee2e2" : C.primary,
+                  width: "100%",
+                  padding: "10px 0",
+                  borderRadius: 10,
+                  border: pushEnabled ? "1.5px solid #fca5a5" : "none",
+                  cursor: pushLoading ? "not-allowed" : "pointer",
+                  fontWeight: 700, fontSize: 13,
+                  background: pushEnabled ? "#fff1f2" : `linear-gradient(135deg,${C.primary},#0284c7)`,
                   color: pushEnabled ? "#dc2626" : "white",
                   opacity: pushLoading ? 0.6 : 1,
+                  transition: "all 0.18s",
+                  boxShadow: pushEnabled ? "none" : "0 4px 14px rgba(14,165,233,0.3)",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 }}
               >
-                {pushLoading ? "..." : pushEnabled ? "Desactivar" : "Activar"}
+                {pushLoading
+                  ? "⏳ Procesando…"
+                  : pushEnabled
+                  ? "🔕 Desactivar notificaciones"
+                  : "🔔 Activar notificaciones"}
               </button>
             )}
           </div>
@@ -10615,6 +10767,25 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
 
   return (
     <div>
+      {/* ── AFICHE DE MISA (widget del perfil Invitado) ── */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
+          paddingBottom: 12, borderBottom: `2px solid ${C.border}`,
+        }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+            background: "linear-gradient(135deg,#92400e,#d97706)",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
+          }}>🖼️</div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.dark }}>Afiche de Misa</div>
+            <div style={{ fontSize: 11, color: C.gray }}>Imagen promocional visible en el inicio del perfil Invitado</div>
+          </div>
+        </div>
+        <FotoDestacadaMisaWidget isAdmin={true} />
+      </div>
+
       {/* Header explicativo */}
       <div style={{
         background: "linear-gradient(135deg,#0c1a2e,#0ea5e9)",
