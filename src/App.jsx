@@ -927,6 +927,7 @@ export default function App() {
   const [comunidades, setComunidades] = useState([]);
   const [pautas, setPautas] = useState([]);
   const [reconocimientos, setReconocimientos] = useState([]);
+  const [materialEnsayo, setMaterialEnsayo] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
 
   const [evangelio, setEvangelio] = useState(null);
@@ -947,7 +948,7 @@ export default function App() {
   async function loadData() {
     setDbLoading(true);
     try {
-      const [m, ev, d, or, n, p, lk, bib, pod, pau, asis, gal, com, reco] = await Promise.all([
+      const [m, ev, d, or, n, p, lk, bib, pod, pau, asis, gal, com, reco, mat] = await Promise.all([
         supabase("integrantes", { order: "&order=nombre.asc" }),
         supabase("eventos", { order: "&order=fecha.asc" }),
         supabase("documentos", { order: "&order=created_at.desc" }),
@@ -968,6 +969,7 @@ export default function App() {
             "Content-Type": "application/json",
           },
         }).then(r => r.ok ? r.json() : []).catch(() => []),
+        supabase("material_ensayo", { order: "&order=created_at.desc" }).catch(() => []),
       ]);
       setMembers(m || []);
       setEventos(ev || []);
@@ -983,6 +985,7 @@ export default function App() {
       setFotos(gal || []);
       setComunidades(com || []);
       setReconocimientos(reco || []);
+      setMaterialEnsayo(mat || []);
       // Cargar eventos desde Google Calendar para el Dashboard
       fetchGoogleCalendarEvents().then((gcal) => setGcalEventos(gcal));
     } catch (e) {
@@ -12221,9 +12224,9 @@ const TITULO_CELEBRACION_OPTIONS = [
 function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const isAdmin = user?.cuerda === "Admin";
   const isVisita = user?.cuerda === "Visita";
-  // Usuario Visita solo ve pautas de tipo parroquial
+  // Usuario Visita solo ve pautas que el Admin marcó explícitamente como visibles
   const pautasFiltradas = isVisita
-    ? (pautas || []).filter((p) => p.publicada && p.tipo === "parroquial")
+    ? (pautas || []).filter((p) => p.publicada && p.visible_visita)
     : pautas;
   const [selected, setSelected] = useState(null); // pauta activa
   const [mode, setMode] = useState(null); // null=lista | "new" | "edit" | "view"
@@ -12405,6 +12408,16 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       }
     } catch (e) {
       setMsg("Error: " + e.message);
+    }
+  }
+
+  async function toggleVisita(pauta, e) {
+    e.stopPropagation();
+    try {
+      await updateRecord("pautas_misa", pauta.id, { visible_visita: !pauta.visible_visita });
+      await onReload();
+    } catch (err) {
+      setMsg("Error: " + err.message);
     }
   }
 
@@ -13720,8 +13733,34 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                         ⛪ Parroquial
                       </span>
                     )}
+                    {p.visible_visita && (
+                      <span style={{ background:"#dcfce7", color:"#166534", borderRadius:10, padding:"1px 8px", fontWeight:700, fontSize:10 }}>
+                        👁 Visible Invitado
+                      </span>
+                    )}
                   </div>
                 </div>
+                {isAdmin && (
+                  <button
+                    onClick={(e) => toggleVisita(p, e)}
+                    title={p.visible_visita ? "Ocultar a Invitado" : "Mostrar a Invitado"}
+                    style={{
+                      flexShrink: 0,
+                      background: p.visible_visita ? "#dcfce7" : "#f1f5f9",
+                      border: `1px solid ${p.visible_visita ? "#86efac" : "#e2e8f0"}`,
+                      borderRadius: 8,
+                      padding: "5px 10px",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: p.visible_visita ? "#166534" : "#64748b",
+                      whiteSpace: "nowrap",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {p.visible_visita ? "👁 Invitado: ON" : "🙈 Invitado: OFF"}
+                  </button>
+                )}
                 <span style={{ fontSize: 12, color: C.gray }}>Ver pauta →</span>
               </Card>
             );
@@ -14108,7 +14147,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: 15, color: C.dark }}>{user?.nombre?.split(" ")[0]}</div>
-              <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>{rolFullLabel(user)}</div>
+              {user?.cuerda !== "Visita" && <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>{rolFullLabel(user)}</div>}
             </div>
           </div>
           {msgPct && <div style={{ fontSize: 12, color: colPct, fontWeight: 600, marginBottom: 10, display: "flex", alignItems: "center", gap: 4 }}>{msgPct}{tieneEstrella && <span style={{ fontSize: 16 }}>⭐</span>}</div>}
