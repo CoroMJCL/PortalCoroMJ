@@ -3471,10 +3471,11 @@ const FOTO_MISA_KEY = "visita_foto_destacada_url";
 function FotoDestacadaMisaWidget({ isAdmin }) {
   const [savedUrl, setSavedUrl] = useState("");
   const [loadedFromDB, setLoadedFromDB] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [inputVal, setInputVal] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     getConfig(FOTO_MISA_KEY).then((val) => {
@@ -3483,16 +3484,63 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
     });
   }, []);
 
-  function openEdit() { setInputVal(savedUrl); setEditing(true); setSaved(false); }
-  function cancelEdit() { setInputVal(""); setEditing(false); setSaved(false); }
-  async function saveUrl() {
-    const v = inputVal.trim();
-    setSavedUrl(v);
+  async function uploadImage(file) {
+    if (!file) return;
+    const allowed = ["image/jpeg","image/png","image/webp","image/gif"];
+    if (!allowed.includes(file.type)) {
+      alert("Solo se permiten imágenes JPG, PNG, WebP o GIF.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      alert("La imagen no puede superar 8 MB.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop().toLowerCase();
+      const path = `afiche_misa_${Date.now()}.${ext}`;
+      const res = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/publico/${path}`,
+        {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+            "Content-Type": file.type,
+            "x-upsert": "true",
+          },
+          body: file,
+        }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      const url = `${SUPABASE_URL}/storage/v1/object/public/publico/${path}`;
+      setSavedUrl(url);
+      setImgError(false);
+      await setConfig(FOTO_MISA_KEY, url);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 4000);
+    } catch (e) {
+      alert("Error al subir imagen: " + e.message);
+    }
+    setUploading(false);
+  }
+
+  async function handleFileInput(e) {
+    await uploadImage(e.target.files[0]);
+    e.target.value = "";
+  }
+
+  async function handleDrop(e) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) await uploadImage(file);
+  }
+
+  async function removeImage() {
+    setSavedUrl("");
     setImgError(false);
-    await setConfig(FOTO_MISA_KEY, v);
-    setEditing(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    await setConfig(FOTO_MISA_KEY, "");
   }
 
   if (!loadedFromDB) return null;
@@ -3511,23 +3559,23 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
         @keyframes afiche-pulse {
-          0%,100% { box-shadow: 0 0 0 0 rgba(250,204,21,0); }
-          50%      { box-shadow: 0 0 0 6px rgba(250,204,21,0.18); }
+          0%,100% { box-shadow: 0 24px 64px rgba(0,0,0,0.32), 0 0 0 0 rgba(250,204,21,0); }
+          50%     { box-shadow: 0 24px 64px rgba(0,0,0,0.32), 0 0 0 6px rgba(250,204,21,0.12); }
         }
+        @keyframes afiche-spin { to { transform: rotate(360deg); } }
         .afiche-wrap { animation: afiche-in 0.55s cubic-bezier(0.22,1,0.36,1) both; }
         .afiche-img-wrap:hover .afiche-shine { animation: afiche-shine 1.1s ease forwards; }
-        .afiche-edit-btn:hover { transform: scale(1.04); background: rgba(255,255,255,0.18) !important; }
+        .afiche-upload-zone:hover { border-color: rgba(251,191,36,0.7) !important; background: rgba(251,191,36,0.06) !important; }
       `}</style>
 
-      {/* ── AFICHE PRINCIPAL ── */}
+      {/* ── CON IMAGEN ── */}
       {savedUrl && !imgError ? (
         <div className="afiche-wrap" style={{
           position: "relative", borderRadius: 22, overflow: "hidden",
           boxShadow: "0 24px 64px rgba(0,0,0,0.32), 0 4px 16px rgba(0,0,0,0.18)",
           background: "#0c0c14",
-          animation: "afiche-pulse 3s ease infinite",
+          animation: "afiche-pulse 3.5s ease infinite",
         }}>
-          {/* Imagen de fondo */}
           <div className="afiche-img-wrap" style={{ position: "relative" }}>
             <img
               src={savedUrl}
@@ -3539,30 +3587,30 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
               }}
               onError={() => setImgError(true)}
             />
-            {/* Efecto brillo al hover */}
+            {/* Shine hover */}
             <div className="afiche-shine" style={{
               position: "absolute", inset: 0,
               background: "linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.55) 50%,transparent 60%)",
               pointerEvents: "none",
             }} />
-            {/* Gradiente overlay inferior */}
+            {/* Overlay gradiente inferior */}
             <div style={{
-              position: "absolute", bottom: 0, left: 0, right: 0, height: "55%",
-              background: "linear-gradient(to top, rgba(8,8,20,0.92) 0%, rgba(8,8,20,0.5) 55%, transparent 100%)",
+              position: "absolute", bottom: 0, left: 0, right: 0, height: "50%",
+              background: "linear-gradient(to top,rgba(8,8,20,0.88) 0%,rgba(8,8,20,0.4) 55%,transparent 100%)",
               pointerEvents: "none",
             }} />
-            {/* Gradiente overlay superior sutil */}
+            {/* Overlay gradiente superior */}
             <div style={{
-              position: "absolute", top: 0, left: 0, right: 0, height: "30%",
-              background: "linear-gradient(to bottom, rgba(8,8,20,0.45) 0%, transparent 100%)",
+              position: "absolute", top: 0, left: 0, right: 0, height: "28%",
+              background: "linear-gradient(to bottom,rgba(8,8,20,0.42) 0%,transparent 100%)",
               pointerEvents: "none",
             }} />
             {/* Línea dorada superior */}
             <div style={{
               position: "absolute", top: 0, left: 0, right: 0, height: 3,
-              background: "linear-gradient(90deg, transparent, #fbbf24, #f59e0b, #fbbf24, transparent)",
+              background: "linear-gradient(90deg,transparent,#fbbf24,#f59e0b,#fbbf24,transparent)",
             }} />
-            {/* Badge "Próxima Celebración" */}
+            {/* Badge */}
             <div style={{
               position: "absolute", top: 16, left: 18,
               background: "linear-gradient(135deg,#92400e,#d97706)",
@@ -3570,160 +3618,113 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
               display: "flex", alignItems: "center", gap: 6,
               boxShadow: "0 2px 12px rgba(217,119,6,0.45)",
             }}>
-              <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fef3c7", flexShrink: 0 }} />
+              <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fef3c7" }} />
               <span style={{
                 fontSize: 10, fontWeight: 800, color: "#fef3c7",
                 letterSpacing: "0.12em", textTransform: "uppercase",
                 fontFamily: "'Poppins',sans-serif",
               }}>Próxima Celebración</span>
             </div>
-            {/* Botón editar (solo admin) — flotante sobre la imagen */}
-            {isAdmin && (
-              <button
-                className="afiche-edit-btn"
-                onClick={editing ? cancelEdit : openEdit}
-                style={{
-                  position: "absolute", top: 14, right: 14,
-                  background: editing ? "rgba(239,68,68,0.85)" : "rgba(0,0,0,0.55)",
-                  backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(255,255,255,0.2)",
-                  borderRadius: 10, padding: "6px 14px",
-                  fontSize: 11, fontWeight: 700, color: "white",
-                  cursor: "pointer", transition: "all 0.18s",
-                  display: "flex", alignItems: "center", gap: 6,
-                }}
-              >
-                {editing ? "✕ Cancelar" : "✏️ Cambiar imagen"}
-              </button>
-            )}
-            {/* Ícono cruz decorativo */}
+            {/* Cruz decorativa */}
             <div style={{
               position: "absolute", bottom: 20, right: 20,
-              fontSize: 28, opacity: 0.55,
+              fontSize: 28, opacity: 0.5,
               filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.6))",
             }}>✝️</div>
-            {/* Indicador guardado */}
+            {/* Badge guardado */}
             {saved && (
               <div style={{
                 position: "absolute", bottom: 18, left: 18,
-                background: "rgba(22,163,74,0.9)", backdropFilter: "blur(8px)",
+                background: "rgba(22,163,74,0.92)", backdropFilter: "blur(8px)",
                 borderRadius: 20, padding: "5px 14px",
                 fontSize: 11, fontWeight: 700, color: "white",
               }}>✅ Imagen guardada</div>
             )}
-          </div>
-
-          {/* Formulario edición inline */}
-          {editing && (
-            <div style={{
-              background: "rgba(8,8,20,0.97)",
-              borderTop: "1px solid rgba(251,191,36,0.25)",
-              padding: "16px 18px",
-            }}>
-              <div style={{ fontSize: 11, color: "#fbbf24", fontWeight: 700, marginBottom: 8, letterSpacing: "0.06em" }}>
-                🔗 URL de la imagen (JPG, PNG, WebP)
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  value={inputVal}
-                  onChange={(e) => setInputVal(e.target.value)}
-                  placeholder="https://ejemplo.com/afiche-misa.jpg"
-                  onKeyDown={(e) => { if (e.key === "Enter") saveUrl(); if (e.key === "Escape") cancelEdit(); }}
-                  autoFocus
+            {/* Botones admin flotantes */}
+            {isAdmin && (
+              <div style={{
+                position: "absolute", top: 14, right: 14,
+                display: "flex", gap: 8,
+              }}>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
                   style={{
-                    flex: 1, padding: "9px 14px", borderRadius: 10,
-                    background: "rgba(255,255,255,0.08)", border: "1px solid rgba(251,191,36,0.3)",
-                    color: "white", fontSize: 12, outline: "none",
-                    fontFamily: "Inter,sans-serif",
+                    background: uploading ? "rgba(0,0,0,0.7)" : "rgba(0,0,0,0.55)",
+                    backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(255,255,255,0.25)",
+                    borderRadius: 10, padding: "7px 14px",
+                    fontSize: 11, fontWeight: 700, color: "white",
+                    cursor: uploading ? "not-allowed" : "pointer",
+                    display: "flex", alignItems: "center", gap: 6,
                   }}
-                />
-                <button onClick={saveUrl} style={{
-                  padding: "9px 18px", borderRadius: 10, border: "none",
-                  background: "linear-gradient(135deg,#d97706,#f59e0b)",
-                  color: "white", fontWeight: 800, fontSize: 12, cursor: "pointer",
-                  flexShrink: 0,
-                }}>💾 Guardar</button>
-                {savedUrl && (
-                  <button
-                    onClick={async () => { setSavedUrl(""); await setConfig(FOTO_MISA_KEY, ""); setEditing(false); }}
-                    style={{
-                      padding: "9px 14px", borderRadius: 10, border: "1px solid rgba(239,68,68,0.4)",
-                      background: "rgba(239,68,68,0.15)", color: "#f87171",
-                      fontWeight: 700, fontSize: 12, cursor: "pointer", flexShrink: 0,
-                    }}>🗑</button>
-                )}
+                >
+                  {uploading
+                    ? <><span style={{ display:"inline-block", animation:"afiche-spin 0.8s linear infinite" }}>⏳</span> Subiendo…</>
+                    : "📤 Cambiar imagen"}
+                </button>
+                <button
+                  onClick={removeImage}
+                  style={{
+                    background: "rgba(220,38,38,0.7)", backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    borderRadius: 10, padding: "7px 12px",
+                    fontSize: 12, fontWeight: 700, color: "white",
+                    cursor: "pointer",
+                  }}
+                >🗑</button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileInput} style={{ display:"none" }} />
         </div>
 
       ) : (
-        /* ── ESTADO VACÍO (solo visible para Admin) ── */
-        <div style={{
-          borderRadius: 22, overflow: "hidden",
-          border: "2px dashed rgba(251,191,36,0.35)",
-          background: "linear-gradient(135deg,#0c0c14,#1a1a2e)",
-          minHeight: 200,
-        }}>
-          {/* Formulario si está editando */}
-          {editing ? (
-            <div style={{ padding: "24px 22px" }}>
-              <div style={{ fontSize: 13, color: "#fbbf24", fontWeight: 700, marginBottom: 10 }}>
-                🔗 URL de la imagen del afiche
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  value={inputVal}
-                  onChange={(e) => setInputVal(e.target.value)}
-                  placeholder="https://ejemplo.com/afiche-misa.jpg"
-                  onKeyDown={(e) => { if (e.key === "Enter") saveUrl(); if (e.key === "Escape") cancelEdit(); }}
-                  autoFocus
-                  style={{
-                    flex: 1, padding: "10px 14px", borderRadius: 10,
-                    background: "rgba(255,255,255,0.07)", border: "1px solid rgba(251,191,36,0.3)",
-                    color: "white", fontSize: 12, outline: "none",
-                  }}
-                />
-                <button onClick={saveUrl} style={{
-                  padding: "10px 20px", borderRadius: 10, border: "none",
-                  background: "linear-gradient(135deg,#d97706,#f59e0b)",
-                  color: "white", fontWeight: 800, fontSize: 12, cursor: "pointer",
-                }}>💾 Guardar</button>
-                <button onClick={cancelEdit} style={{
-                  padding: "10px 14px", borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  background: "transparent", color: "rgba(255,255,255,0.5)",
-                  fontSize: 12, cursor: "pointer",
-                }}>✕</button>
-              </div>
-            </div>
+        /* ── SIN IMAGEN (solo Admin) ── */
+        <div
+          className="afiche-upload-zone"
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => !uploading && fileInputRef.current?.click()}
+          style={{
+            borderRadius: 22,
+            border: `2px dashed ${dragOver ? "rgba(251,191,36,0.8)" : "rgba(251,191,36,0.3)"}`,
+            background: dragOver ? "rgba(251,191,36,0.07)" : "linear-gradient(135deg,#0c0c14,#1a1a2e)",
+            minHeight: 220,
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            gap: 14, padding: "40px 24px", textAlign: "center",
+            cursor: uploading ? "not-allowed" : "pointer",
+            transition: "all 0.2s",
+          }}
+        >
+          {uploading ? (
+            <>
+              <div style={{ fontSize: 40, animation: "afiche-spin 1s linear infinite" }}>⏳</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>Subiendo imagen…</div>
+            </>
           ) : (
-            <div style={{
-              display: "flex", flexDirection: "column",
-              alignItems: "center", justifyContent: "center",
-              gap: 12, padding: "48px 24px", textAlign: "center",
-            }}>
-              <div style={{ fontSize: 44, opacity: 0.2 }}>🖼️</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.4)" }}>
-                Sin afiche asignado
+            <>
+              <div style={{
+                width: 64, height: 64, borderRadius: 18,
+                background: "linear-gradient(135deg,#92400e,#d97706)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 28,
+                boxShadow: "0 8px 24px rgba(217,119,6,0.35)",
+              }}>📤</div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
+                  Subir afiche de la misa
+                </div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
+                  Haz clic o arrastra una imagen aquí<br />
+                  <span style={{ fontSize: 11 }}>JPG, PNG, WebP — máx. 8 MB</span>
+                </div>
               </div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", maxWidth: 260 }}>
-                Agrega una imagen para promocionar la próxima misa
-              </div>
-              {isAdmin && (
-                <button
-                  onClick={openEdit}
-                  style={{
-                    marginTop: 6, padding: "9px 22px", borderRadius: 10,
-                    background: "linear-gradient(135deg,#92400e,#d97706)",
-                    border: "none", color: "#fef3c7",
-                    fontWeight: 700, fontSize: 12, cursor: "pointer",
-                    boxShadow: "0 4px 16px rgba(217,119,6,0.35)",
-                  }}
-                >📸 Asignar imagen del afiche</button>
-              )}
-            </div>
+            </>
           )}
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileInput} style={{ display:"none" }} />
         </div>
       )}
     </div>
@@ -3839,7 +3840,7 @@ function GaleriaWidget({ fotos, setSection, isAdmin }) {
 // ══════════════════════════════════════════════════════════════════════
 //  DASHBOARD VISITA — Pantalla de bienvenida premium para usuario invitado
 // ══════════════════════════════════════════════════════════════════════
-function DashboardVisita({ user, pautas, setSection, isAdmin }) {
+function DashboardVisita({ user, pautas, setSection, isAdmin, evangelio, comunidades }) {
   const hoyInicio = new Date();
   hoyInicio.setHours(0, 0, 0, 0);
   const pautasParroquiales = (pautas || [])
@@ -3937,6 +3938,9 @@ function DashboardVisita({ user, pautas, setSection, isAdmin }) {
         </div>
       </div>
 
+      {/* ── Foto Destacada de Misa (inmediatamente después del saludo) ── */}
+      <FotoDestacadaMisaWidget isAdmin={isAdmin} />
+
       {/* ── Próxima pauta parroquial destacada ── */}
       {proxima ? (
         <div
@@ -4033,11 +4037,101 @@ function DashboardVisita({ user, pautas, setSection, isAdmin }) {
         </div>
       </div>
 
-      {/* ── Foto Destacada de Misa (exclusivo Invitado) ── */}
-      <FotoDestacadaMisaWidget isAdmin={isAdmin} />
-
       {/* ── Video Destacado (exclusivo Invitado) ── */}
       <VideoDestacadoWidget isAdmin={isAdmin} />
+
+      {/* ── Evangelio del Domingo ── */}
+      {evangelio && (
+        <div className="visita-card" style={{ marginBottom: 20 }}>
+          <div style={{
+            background: "white", borderRadius: 18, padding: "22px 26px",
+            border: "1px solid #e5e7eb",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <span style={{ fontSize: 18 }}>📖</span>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontFamily: "'Poppins',sans-serif", fontSize: 14, fontWeight: 600, color: "#1e293b" }}>
+                  Evangelio del Domingo
+                </span>
+                {evangelio.domingo && (
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 1, fontStyle: "italic" }}>
+                    {evangelio.domingo}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#d97706", marginBottom: 8 }}>
+              {evangelio.referencia}
+            </div>
+            <p style={{ fontSize: 13, lineHeight: 1.75, color: "#374151", marginBottom: 12, borderLeft: "3px solid #e5e7eb", paddingLeft: 12 }}>
+              {evangelio.texto}
+            </p>
+            {evangelio.reflexion && (
+              <div style={{ background: "#f0fdf4", borderRadius: 8, padding: "10px 14px", borderLeft: "3px solid #1D9E75", marginBottom: 10 }}>
+                <p style={{ margin: 0, fontSize: 12, color: "#166534", lineHeight: 1.6, fontWeight: 500 }}>
+                  {evangelio.reflexion}
+                </p>
+              </div>
+            )}
+            {evangelio.oracion && (
+              <div style={{ background: "#fffbeb", borderRadius: 8, padding: "10px 14px", borderLeft: "3px solid #d97706", marginBottom: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#d97706", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>
+                  🙏 Oración antes de la misa
+                </div>
+                <p style={{ margin: 0, fontSize: 12, color: "#374151", lineHeight: 1.6, fontStyle: "italic" }}>
+                  {evangelio.oracion}
+                </p>
+              </div>
+            )}
+            {evangelio.fuente && (
+              <div style={{ marginTop: 8, fontSize: 10, color: "#94a3b8", textAlign: "right" }}>
+                Fuente: {evangelio.fuente}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Playlist ── */}
+      <div className="visita-card" style={{ marginBottom: 20 }}>
+        <div style={{
+          background: "white", borderRadius: 18, padding: "18px 22px",
+          border: "1px solid #e5e7eb",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 18 }}>🎵</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#1e293b" }}>Playlist Litúrgica</span>
+          </div>
+          <iframe
+            src="https://open.spotify.com/embed/playlist/3ssNSNlljyYlw2La83mXZE?utm_source=generator&theme=0"
+            width="100%"
+            height="152"
+            frameBorder="0"
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            loading="lazy"
+            style={{ borderRadius: 12, display: "block" }}
+          />
+          <a
+            href="https://open.spotify.com/playlist/3ssNSNlljyYlw2La83mXZE"
+            target="_blank"
+            rel="noopener"
+            style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, textDecoration: "none" }}
+          >
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: "#1DB954", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 13, flexShrink: 0 }}>▶</div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#1e293b" }}>Playlist Coro MJ</div>
+              <div style={{ fontSize: 11, color: "#64748b" }}>Abrir en Spotify</div>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      {/* ── Comunidades ── */}
+      <div className="visita-card" style={{ marginBottom: 20 }}>
+        <ComunidadesWidget comunidades={comunidades} isAdmin={isAdmin} setSection={setSection} />
+      </div>
 
       {/* ── Footer informativo ── */}
       <div className="visita-card" style={{
@@ -4272,7 +4366,7 @@ function Dashboard({
     <div style={{ maxWidth: 1100 }}>
       {/* ═══ MODO VISITA — Dashboard especial ═══ */}
       {isVisita && (
-        <DashboardVisita user={user} pautas={pautas} setSection={setSection} isAdmin={isAdmin} />
+        <DashboardVisita user={user} pautas={pautas} setSection={setSection} isAdmin={isAdmin} evangelio={evangelio} comunidades={comunidades} />
       )}
       {isVisita ? null : (<>
       {/* ── Aviso pauta en borrador (solo Admin) ── */}
