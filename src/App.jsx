@@ -2047,22 +2047,27 @@ export default function App() {
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
-                background: C.light,
+                background: esVisita(user) ? "#f1f5f9" : C.light,
                 borderRadius: 8,
                 padding: "7px 12px",
                 border: `1px solid ${C.border}`,
+                opacity: esVisita(user) ? 0.55 : 1,
+                cursor: esVisita(user) ? "not-allowed" : "text",
               }}
+              title={esVisita(user) ? "El buscador no está disponible para usuarios Invitado" : undefined}
             >
               <span style={{ color: C.gray, fontSize: 14 }}>🔍</span>
               <input
-                value={searchQ}
+                value={esVisita(user) ? "" : searchQ}
                 onChange={(e) => {
+                  if (esVisita(user)) return;
                   setSearchQ(e.target.value);
                   setShowSearch(true);
                 }}
-                onFocus={() => setShowSearch(true)}
+                onFocus={() => { if (!esVisita(user)) setShowSearch(true); }}
                 onBlur={() => setTimeout(() => setShowSearch(false), 150)}
-                placeholder="Buscar integrantes, descargas..."
+                placeholder={esVisita(user) ? "Búsqueda no disponible" : "Buscar integrantes, descargas..."}
+                disabled={esVisita(user)}
                 style={{
                   background: "none",
                   border: "none",
@@ -2070,6 +2075,7 @@ export default function App() {
                   fontSize: 13,
                   width: "100%",
                   color: C.dark,
+                  cursor: esVisita(user) ? "not-allowed" : "text",
                 }}
               />
             </div>
@@ -2337,6 +2343,7 @@ export default function App() {
                   asistencia={asistencia}
                   fotos={fotos}
                   comunidades={comunidades}
+                  materialEnsayo={materialEnsayo}
                   onReload={loadData}
                   user={user}
                 />
@@ -2363,7 +2370,7 @@ export default function App() {
                 <InfoGastos user={user} members={members} />
               )}
               {section === "material_ensayo" && esVisita(user) && (
-                <MaterialEnsayo docs={docs} user={user} />
+                <MaterialEnsayo docs={materialEnsayo} user={user} />
               )}
             </>
           )}
@@ -3457,6 +3464,164 @@ function VocalizacionWidget({ isAdmin }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  WIDGET FOTOGRAFÍA DESTACADA DE MISA (exclusivo perfil Invitado)
+// ═══════════════════════════════════════════════════════════════
+const FOTO_MISA_KEY = "visita_foto_destacada_url";
+
+function FotoDestacadaMisaWidget({ isAdmin }) {
+  const [savedUrl, setSavedUrl] = useState("");
+  const [loadedFromDB, setLoadedFromDB] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [inputVal, setInputVal] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    getConfig(FOTO_MISA_KEY).then((val) => {
+      if (val !== null) setSavedUrl(val);
+      setLoadedFromDB(true);
+    });
+  }, []);
+
+  function openEdit() { setInputVal(savedUrl); setEditing(true); setSaved(false); }
+  function cancelEdit() { setInputVal(""); setEditing(false); setSaved(false); }
+  async function saveUrl() {
+    const v = inputVal.trim();
+    setSavedUrl(v);
+    await setConfig(FOTO_MISA_KEY, v);
+    setEditing(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  }
+
+  if (!loadedFromDB) return null;
+  if (!savedUrl && !isAdmin) return null;
+
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      {/* Cabecera */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <div style={{
+          width: 32, height: 32,
+          background: "linear-gradient(135deg,#f59e0b,#fb923c)",
+          borderRadius: 8,
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 15, color: "white" }}>📸</span>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 14, fontWeight: 700, color: C.dark }}>
+            Fotografía Destacada
+          </div>
+          <div style={{ fontSize: 11, color: C.gray }}>
+            {savedUrl ? "Imagen promocional de la misa" : "Sin imagen asignada aún"}
+          </div>
+        </div>
+        {isAdmin && (
+          <button
+            onClick={editing ? cancelEdit : openEdit}
+            style={{
+              background: editing ? "#f3f4f6" : C.primaryLight,
+              border: `1px solid ${editing ? C.border : C.primary + "50"}`,
+              borderRadius: 8, padding: "5px 12px",
+              fontSize: 11, fontWeight: 600,
+              color: editing ? C.gray : C.primary,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+            }}
+          >
+            {editing ? "✕ Cancelar" : "✏️ " + (savedUrl ? "Cambiar imagen" : "Asignar imagen")}
+          </button>
+        )}
+        {saved && !editing && (
+          <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600 }}>✅ Guardado</span>
+        )}
+      </div>
+
+      {/* Formulario de edición (solo Admin) */}
+      {editing && (
+        <div style={{
+          background: "#fff7ed", border: "1px solid #fb923c40",
+          borderRadius: 10, padding: "12px 14px", marginBottom: 12,
+        }}>
+          <div style={{ fontSize: 11, color: "#c2410c", fontWeight: 600, marginBottom: 6 }}>
+            🔗 Pega la URL de la imagen (JPG, PNG, WebP o URL pública)
+          </div>
+          <input
+            value={inputVal}
+            onChange={(e) => setInputVal(e.target.value)}
+            placeholder="https://ejemplo.com/foto-misa.jpg"
+            onKeyDown={(e) => { if (e.key === "Enter") saveUrl(); if (e.key === "Escape") cancelEdit(); }}
+            autoFocus
+            style={{
+              width: "100%", boxSizing: "border-box",
+              padding: "8px 12px", borderRadius: 8,
+              border: `1px solid ${C.border}`, fontSize: 12,
+              outline: "none", marginBottom: 8, fontFamily: "Inter,sans-serif",
+            }}
+          />
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <Btn onClick={saveUrl} style={{ fontSize: 12, padding: "6px 14px", background: "#f59e0b", color: "white", border: "none" }}>
+              💾 Guardar
+            </Btn>
+            {savedUrl && (
+              <Btn
+                variant="ghost"
+                style={{ fontSize: 12, padding: "6px 14px", color: "#dc2626", border: "1px solid #fca5a5" }}
+                onClick={async () => { setSavedUrl(""); await setConfig(FOTO_MISA_KEY, ""); setEditing(false); }}
+              >
+                🗑 Quitar imagen
+              </Btn>
+            )}
+            <span style={{ fontSize: 10, color: C.gray, marginLeft: "auto" }}>
+              Funciona con cualquier URL pública de imagen
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Imagen */}
+      {savedUrl ? (
+        <div style={{
+          borderRadius: 12, overflow: "hidden",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
+          background: "#f9fafb",
+        }}>
+          <img
+            src={savedUrl}
+            alt="Fotografía destacada de la misa"
+            style={{ width: "100%", maxHeight: 340, objectFit: "cover", display: "block" }}
+            onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }}
+          />
+          <div style={{
+            display: "none", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            gap: 8, padding: "36px 20px", minHeight: 140,
+            background: "#f9fafb",
+          }}>
+            <div style={{ fontSize: 36, opacity: 0.25 }}>🖼️</div>
+            <div style={{ fontSize: 12, color: C.gray, textAlign: "center" }}>
+              No se pudo cargar la imagen. Verifica que la URL sea pública y válida.
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          borderRadius: 12, background: "#fff7ed",
+          border: "2px dashed #fb923c50",
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          gap: 8, padding: "36px 20px", minHeight: 140,
+        }}>
+          <div style={{ fontSize: 36, opacity: 0.25 }}>📸</div>
+          <div style={{ fontSize: 12, color: C.gray, textAlign: "center" }}>
+            Haz clic en <strong>"Asignar imagen"</strong> para mostrar una fotografía de la misa
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  WIDGET GALERÍA DE FOTOS
 // ═══════════════════════════════════════════════════════════════
 function GaleriaWidget({ fotos, setSection, isAdmin }) {
@@ -3565,7 +3730,7 @@ function GaleriaWidget({ fotos, setSection, isAdmin }) {
 // ══════════════════════════════════════════════════════════════════════
 //  DASHBOARD VISITA — Pantalla de bienvenida premium para usuario invitado
 // ══════════════════════════════════════════════════════════════════════
-function DashboardVisita({ user, pautas, setSection }) {
+function DashboardVisita({ user, pautas, setSection, isAdmin }) {
   const hoyInicio = new Date();
   hoyInicio.setHours(0, 0, 0, 0);
   const pautasParroquiales = (pautas || [])
@@ -3759,6 +3924,12 @@ function DashboardVisita({ user, pautas, setSection }) {
         </div>
       </div>
 
+      {/* ── Foto Destacada de Misa (exclusivo Invitado) ── */}
+      <FotoDestacadaMisaWidget isAdmin={isAdmin} />
+
+      {/* ── Video Destacado (exclusivo Invitado) ── */}
+      <VideoDestacadoWidget isAdmin={isAdmin} />
+
       {/* ── Footer informativo ── */}
       <div className="visita-card" style={{
         background:"#f8fafc", borderRadius:16, padding:"16px 22px",
@@ -3768,10 +3939,10 @@ function DashboardVisita({ user, pautas, setSection }) {
         <span style={{ fontSize:24, flexShrink:0 }}>⛪</span>
         <div>
           <div style={{ fontSize:13, fontWeight:600, color:"#1e293b", marginBottom:2 }}>
-            Portal de Gestión Litúrgica
+            Portal de Gestión de Coro
           </div>
           <div style={{ fontSize:11, color:"#64748b", lineHeight:1.6 }}>
-            Este portal es administrado por el Coro Misioneros de Jesús. Para consultas, contacta al encargado de liturgia.
+            Este portal es administrado por Máximo Henríquez, encargado de Coro Misioneros de Jesús.
           </div>
         </div>
       </div>
@@ -3992,7 +4163,7 @@ function Dashboard({
     <div style={{ maxWidth: 1100 }}>
       {/* ═══ MODO VISITA — Dashboard especial ═══ */}
       {isVisita && (
-        <DashboardVisita user={user} pautas={pautas} setSection={setSection} />
+        <DashboardVisita user={user} pautas={pautas} setSection={setSection} isAdmin={isAdmin} />
       )}
       {isVisita ? null : (<>
       {/* ── Aviso pauta en borrador (solo Admin) ── */}
@@ -9317,6 +9488,7 @@ const ADMIN_TABS = [
   { id: "integrantes", label: "👥 Integrantes" },
   { id: "asistencia", label: "✅ Asistencia" },
   { id: "documentos", label: "📄 Descargas Misas" },
+  { id: "material_ensayo_admin", label: "📥 Material Ensayo (Invitado)" },
   { id: "oraciones", label: "✦ Oraciones" },
   { id: "noticias", label: "📢 Avisos" },
   { id: "preguntas", label: "❓ Preguntas" },
@@ -10382,6 +10554,195 @@ function AdminDocumentos({ docs, onReload }) {
           )}
         </Card>
       ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ADMIN — MATERIAL DE ENSAYO (exclusivo Invitado/Coro Provisorio)
+// ═══════════════════════════════════════════════════════════════
+function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
+  const CATS = ["Repertorio", "Partituras", "Letras", "Audio", "Video", "Comunicados", "Otro"];
+  const [form, setForm] = useState({ nombre: "", url: "", categoria: "Repertorio", descripcion: "", size: "" });
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+
+  const inp = {
+    padding: "7px 10px", borderRadius: 7,
+    border: `1px solid ${C.border}`, fontSize: 12,
+    outline: "none", boxSizing: "border-box", width: "100%",
+  };
+
+  async function submit() {
+    if (!form.nombre || !form.url) return;
+    setSaving(true);
+    try {
+      await supabase("material_ensayo", { method: "POST", body: form });
+      setForm({ nombre: "", url: "", categoria: "Repertorio", descripcion: "", size: "" });
+      setShowForm(false);
+      onReload();
+    } catch (e) { alert("Error: " + e.message); }
+    setSaving(false);
+  }
+
+  async function saveEdit(id) {
+    setEditSaving(true);
+    try {
+      await updateRecord("material_ensayo", id, editForm);
+      setEditId(null);
+      onReload();
+    } catch (e) { alert("Error: " + e.message); }
+    setEditSaving(false);
+  }
+
+  function startEdit(d) {
+    setEditId(d.id);
+    setEditForm({ nombre: d.nombre || "", url: d.url || "", categoria: d.categoria || "Repertorio", descripcion: d.descripcion || "", size: d.size || "" });
+  }
+
+  const iconCat = (cat) => {
+    const c = (cat || "").toLowerCase();
+    if (c.includes("letra")) return "📝";
+    if (c.includes("partitura")) return "🎵";
+    if (c.includes("audio")) return "🎧";
+    if (c.includes("pdf")) return "📄";
+    if (c.includes("video")) return "🎬";
+    return "📥";
+  };
+
+  return (
+    <div>
+      {/* Header explicativo */}
+      <div style={{
+        background: "linear-gradient(135deg,#0c1a2e,#0ea5e9)",
+        borderRadius: 14, padding: "18px 20px", marginBottom: 18,
+        display: "flex", alignItems: "center", gap: 14,
+      }}>
+        <div style={{ fontSize: 32 }}>📥</div>
+        <div>
+          <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 15, fontWeight: 700, color: "white", marginBottom: 3 }}>
+            Material de Ensayo — Acceso Invitado
+          </div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.72)", lineHeight: 1.6 }}>
+            Archivos publicados <strong style={{ color: "white" }}>exclusivamente</strong> para el perfil Invitado / Coro Provisorio.
+            Son independientes de "Descargas Misas" del coro propio.
+          </div>
+        </div>
+      </div>
+
+      {/* Botón agregar */}
+      <div style={{ marginBottom: 14 }}>
+        <Btn onClick={() => setShowForm(!showForm)}>
+          {showForm ? "✕ Cancelar" : "＋ Agregar material"}
+        </Btn>
+      </div>
+
+      {/* Formulario nuevo */}
+      {showForm && (
+        <Card style={{ marginBottom: 16, background: C.primaryLight, border: `1px solid ${C.primary}40` }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.primaryDark, marginBottom: 12 }}>
+            Nuevo material para Invitado
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Nombre *</label>
+              <input value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))}
+                placeholder="Ej: Cantos Misa Pentecostés" style={inp} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>URL del archivo *</label>
+              <input value={form.url} onChange={e => setForm(p => ({ ...p, url: e.target.value }))}
+                placeholder="https://..." style={inp} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Categoría</label>
+              <select value={form.categoria} onChange={e => setForm(p => ({ ...p, categoria: e.target.value }))} style={inp}>
+                {CATS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Tamaño (opcional)</label>
+              <input value={form.size} onChange={e => setForm(p => ({ ...p, size: e.target.value }))}
+                placeholder="Ej: 2.4 MB" style={inp} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Descripción (opcional)</label>
+            <input value={form.descripcion} onChange={e => setForm(p => ({ ...p, descripcion: e.target.value }))}
+              placeholder="Descripción breve del material" style={inp} />
+          </div>
+          <Btn onClick={submit} disabled={saving || !form.nombre || !form.url}>
+            {saving ? "Guardando…" : "💾 Guardar material"}
+          </Btn>
+        </Card>
+      )}
+
+      {/* Lista */}
+      {(!materialEnsayo || materialEnsayo.length === 0) ? (
+        <div style={{ textAlign: "center", padding: "40px 20px", color: C.gray }}>
+          <div style={{ fontSize: 40, marginBottom: 10, opacity: 0.3 }}>📦</div>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Sin material publicado</div>
+          <div style={{ fontSize: 12 }}>Agrega archivos para que los usuarios Invitado puedan descargarlos.</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {(materialEnsayo || []).map(d => (
+            <Card key={d.id} style={{ padding: "12px 14px" }}>
+              {editId === d.id ? (
+                <div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                    <input value={editForm.nombre} onChange={e => setEditForm(p => ({ ...p, nombre: e.target.value }))} style={inp} placeholder="Nombre" />
+                    <input value={editForm.url} onChange={e => setEditForm(p => ({ ...p, url: e.target.value }))} style={inp} placeholder="URL" />
+                    <select value={editForm.categoria} onChange={e => setEditForm(p => ({ ...p, categoria: e.target.value }))} style={inp}>
+                      {CATS.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <input value={editForm.size} onChange={e => setEditForm(p => ({ ...p, size: e.target.value }))} style={inp} placeholder="Tamaño" />
+                  </div>
+                  <input value={editForm.descripcion} onChange={e => setEditForm(p => ({ ...p, descripcion: e.target.value }))} style={{ ...inp, marginBottom: 10 }} placeholder="Descripción" />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Btn onClick={() => saveEdit(d.id)} disabled={editSaving}>{editSaving ? "…" : "💾 Guardar"}</Btn>
+                    <Btn variant="ghost" onClick={() => setEditId(null)}>Cancelar</Btn>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                    background: "linear-gradient(135deg,#0c1a2e,#0ea5e9)",
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+                  }}>
+                    {iconCat(d.categoria)}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {d.nombre}
+                    </div>
+                    <div style={{ fontSize: 11, color: C.gray }}>
+                      <Badge>{d.categoria}</Badge>
+                      {d.size ? " · " + d.size : ""}
+                      {d.descripcion ? " · " + d.descripcion : ""}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    <Btn variant="ghost" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => startEdit(d)}>✏️ Editar</Btn>
+                    <a href={d.url} target="_blank" rel="noopener noreferrer">
+                      <Btn variant="ghost" style={{ fontSize: 11, padding: "4px 10px" }}>🔗 Abrir</Btn>
+                    </a>
+                    <ConfirmBtn onConfirm={async () => { await deleteRecord("material_ensayo", d.id); onReload(); }} />
+                  </div>
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <div style={{ marginTop: 16, textAlign: "center", fontSize: 11, color: C.gray }}>
+        {(materialEnsayo || []).length} {(materialEnsayo || []).length !== 1 ? "archivos disponibles" : "archivo disponible"} para Invitado
+      </div>
     </div>
   );
 }
@@ -12711,19 +13072,24 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             {/* ── Tipo de pauta (grupo / parroquial) ── */}
             <div>
               <label style={{ display:"block", fontSize:11, fontWeight:500, color:C.gray, marginBottom:4 }}>
-                Tipo de pauta
+                Publicar para
               </label>
               <select
                 value={form.tipo || "grupo"}
                 onChange={(e) => setForm((p) => ({ ...p, tipo: e.target.value }))}
                 style={{ ...inp, borderColor: form.tipo === "parroquial" ? "#0ea5e9" : C.border }}
               >
-                <option value="grupo">🎵 Grupo (solo integrantes del coro)</option>
-                <option value="parroquial">⛪ Parroquial (visible para invitados)</option>
+                <option value="grupo">🎵 Coro MJ (solo integrantes del coro)</option>
+                <option value="parroquial">👥 Coro Provisorio / Invitado (visible para perfiles Invitado)</option>
               </select>
               {form.tipo === "parroquial" && (
                 <div style={{ fontSize:10, color:"#0ea5e9", marginTop:4, fontWeight:600 }}>
-                  ✅ Esta pauta será visible para usuarios de tipo Visita
+                  ✅ Esta pauta será visible para los usuarios de tipo Invitado / Coro Provisorio
+                </div>
+              )}
+              {(!form.tipo || form.tipo === "grupo") && (
+                <div style={{ fontSize:10, color:C.gray, marginTop:4 }}>
+                  Solo los integrantes del Coro MJ podrán ver esta pauta
                 </div>
               )}
             </div>
@@ -16488,6 +16854,7 @@ function Admin({
   asistencia,
   fotos,
   comunidades,
+  materialEnsayo,
   onReload,
   user,
 }) {
@@ -16612,6 +16979,9 @@ function Admin({
         )}
         {tab === "documentos" && (
           <AdminDocumentos docs={docs} onReload={onReload} />
+        )}
+        {tab === "material_ensayo_admin" && (
+          <AdminMaterialEnsayo materialEnsayo={materialEnsayo} onReload={onReload} />
         )}
         {tab === "oraciones" && (
           <AdminOraciones oraciones={oraciones} onReload={onReload} />
