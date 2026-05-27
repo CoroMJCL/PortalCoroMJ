@@ -950,13 +950,11 @@ export default function App() {
         const token = _authToken || SUPABASE_KEY;
         (async () => {
           try {
-            // 1. Obtener todos los registros actuales
             const resGet = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?select=*`, {
               headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` },
             });
             if (!resGet.ok) throw new Error("No se pudo leer asistencia");
             const registros = await resGet.json();
-            // 2. Guardar en historial con el año anterior
             if (registros.length > 0) {
               await fetch(`${SUPABASE_URL}/rest/v1/asistencia_historial`, {
                 method: "POST",
@@ -964,7 +962,6 @@ export default function App() {
                 body: JSON.stringify({ ano: anoAnterior, datos: registros }),
               });
             }
-            // 3. Borrar tabla asistencia
             await fetch(`${SUPABASE_URL}/rest/v1/asistencia`, {
               method: "DELETE",
               headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -978,6 +975,43 @@ export default function App() {
       }
     }
   }, [view]);
+
+  // ── Heartbeat de presencia online (cada 25s) ──────────────────────
+  useEffect(() => {
+    if (view !== "app" || !user) return;
+    async function ping() {
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/presencia_online`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates,return=minimal",
+          },
+          body: JSON.stringify({
+            integrante_id: user.id || null,
+            nombre: user.nombre || "?",
+            email: user.email || null,
+            cuerda: user.cuerda || null,
+            ultimo_ping: new Date().toISOString(),
+          }),
+        });
+      } catch (e) { /* silencioso */ }
+    }
+    ping(); // ping inmediato al entrar
+    const iv = setInterval(ping, 25000);
+    // Al cerrar/salir la pestaña, marcar offline
+    const offline = () => {
+      if (!user?.id) return;
+      navigator.sendBeacon(
+        `${SUPABASE_URL}/rest/v1/presencia_online?integrante_id=eq.${user.id}`,
+        new Blob([JSON.stringify({ ultimo_ping: new Date(0).toISOString() })], { type: "application/json" })
+      );
+    };
+    window.addEventListener("beforeunload", offline);
+    return () => { clearInterval(iv); window.removeEventListener("beforeunload", offline); };
+  }, [view, user]);
 
   // Auto-refresh: solo integrantes cada 3 minutos, sin interrumpir formularios
   useEffect(() => {
@@ -1438,6 +1472,7 @@ export default function App() {
     setAuthToken(data.access_token);
     setUser(p);
     setView("app");
+    registrarVisita(p, data.access_token);
   }
 
   async function handleSignUp(
@@ -1468,9 +1503,25 @@ export default function App() {
     setAuthToken(data.access_token);
     setUser(p);
     setView("app");
+    registrarVisita(p, data.access_token);
   }
 
   async function handleSignOut() {
+    // Marcar offline antes de cerrar sesión
+    if (user?.id) {
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/presencia_online?integrante_id=eq.${user.id}`, {
+          method: "PATCH",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({ ultimo_ping: new Date(0).toISOString() }),
+        });
+      } catch (e) { /* silencioso */ }
+    }
     await authSignOut();
     setUser(null);
     setAuthToken(null);
@@ -3817,7 +3868,7 @@ function Dashboard({
             >
               {avisos
                 .filter((a) => a.imagen_url)
-                .slice(0, 5)
+                .slice(0, 6)
                 .map((n) => (
                   <div
                     key={n.id}
@@ -6035,6 +6086,7 @@ function Noticias({ noticias, onReload }) {
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))",
               gap: 16,
+              alignItems: "start",
             }}
           >
             {afiches.map((n) => (
@@ -6116,6 +6168,7 @@ function Noticias({ noticias, onReload }) {
                         fontSize: 12,
                         color: "#374151",
                         lineHeight: 1.6,
+                        textAlign: "justify",
                         ...(!expandedIds.has(n.id)
                           ? {
                               overflow: "hidden",
@@ -6250,6 +6303,7 @@ function Noticias({ noticias, onReload }) {
                       color: "#374151",
                       lineHeight: 1.6,
                       marginBottom: 6,
+                      textAlign: "justify",
                       ...(!expandedIds.has(n.id)
                         ? {
                             overflow: "hidden",
@@ -8596,6 +8650,7 @@ const ADMIN_TABS = [
   { id: "cuentas", label: "🔐 Cuentas" },
   { id: "historial", label: "📅 Historial Asistencia" },
   { id: "cuenta_bancaria", label: "🏦 Cuenta Bancaria" },
+  { id: "visitas", label: "📊 Visitas" },
 ];
 
 function AdminTab({ label, active, onClick }) {
@@ -10058,18 +10113,22 @@ function AdminOraciones({ oraciones, onReload }) {
 }
 
 function AdminNoticias({ noticias, onReload }) {
-  const [form, setForm] = useState({
-    titulo: "",
-    fuente: "",
-    url: "",
-    descripcion: "",
-    imagen_url: "",
-  });
+  const emptyForm = { titulo: "", fuente: "", url: "", descripcion: "", imagen_url: "" };
+  const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadingImg, setUploadingImg] = useState(false);
   const [imgPreview, setImgPreview] = useState(null);
+  // Edición
+  const [editId, setEditId] = useState(null);
+  const [editForm, setEditForm] = useState(emptyForm);
+  const [editImgPreview, setEditImgPreview] = useState(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editUploadingImg, setEditUploadingImg] = useState(false);
+
   const imgRef = useRef(null);
+  const editImgRef = useRef(null);
+
   const inputS = {
     padding: "7px 10px",
     borderRadius: 7,
@@ -10079,369 +10138,170 @@ function AdminNoticias({ noticias, onReload }) {
     boxSizing: "border-box",
   };
 
-  async function handleImageUpload(file) {
+  async function uploadImage(file, setUploading, setFormFn, setPreview) {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert("La imagen no puede superar 5 MB.");
-      return;
-    }
-    setUploadingImg(true);
+    if (file.size > 5 * 1024 * 1024) { alert("La imagen no puede superar 5 MB."); return; }
+    setUploading(true);
     try {
       const ext = file.name.split(".").pop();
       const path = `aviso_${Date.now()}.${ext}`;
-      const res = await fetch(
-        `${SUPABASE_URL}/storage/v1/object/avisos/${path}`,
-        {
-          method: "POST",
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${_authToken}`,
-            "Content-Type": file.type,
-            "x-upsert": "true",
-          },
-          body: file,
-        }
-      );
+      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/avisos/${path}`, {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken}`, "Content-Type": file.type, "x-upsert": "true" },
+        body: file,
+      });
       if (!res.ok) throw new Error(await res.text());
       const imagen_url = `${SUPABASE_URL}/storage/v1/object/public/avisos/${path}`;
-      setForm((p) => ({ ...p, imagen_url }));
-      setImgPreview(URL.createObjectURL(file));
-    } catch (e) {
-      alert("Error subiendo imagen: " + e.message);
-    }
-    setUploadingImg(false);
+      setFormFn((p) => ({ ...p, imagen_url }));
+      setPreview(URL.createObjectURL(file));
+    } catch (e) { alert("Error subiendo imagen: " + e.message); }
+    setUploading(false);
   }
 
   async function submit() {
     if (!form.titulo) return;
     setSaving(true);
     try {
-      await supabase("noticias", {
-        method: "POST",
-        body: {
-          titulo: form.titulo,
-          fuente: form.fuente,
-          url: form.url,
-          descripcion: form.descripcion,
-          imagen_url: form.imagen_url,
-        },
-      });
-      setForm({
-        titulo: "",
-        fuente: "",
-        url: "",
-        descripcion: "",
-        imagen_url: "",
-      });
-      setImgPreview(null);
-      setShowForm(false);
-      onReload();
-    } catch (e) {
-      alert("Error: " + e.message);
-    }
+      await supabase("noticias", { method: "POST", body: { titulo: form.titulo, fuente: form.fuente, url: form.url, descripcion: form.descripcion, imagen_url: form.imagen_url } });
+      setForm(emptyForm); setImgPreview(null); setShowForm(false); onReload();
+    } catch (e) { alert("Error: " + e.message); }
     setSaving(false);
   }
 
-  async function del(id) {
+  async function saveEdit() {
+    if (!editForm.titulo) return;
+    setEditSaving(true);
     try {
-      await deleteRecord("noticias", id);
-      onReload();
-    } catch (e) {
-      alert("Error: " + e.message);
-    }
+      await updateRecord("noticias", editId, { titulo: editForm.titulo, fuente: editForm.fuente, url: editForm.url, descripcion: editForm.descripcion, imagen_url: editForm.imagen_url });
+      setEditId(null); setEditForm(emptyForm); setEditImgPreview(null); onReload();
+    } catch (e) { alert("Error al guardar: " + e.message); }
+    setEditSaving(false);
+  }
+
+  function openEdit(n) {
+    setEditId(n.id);
+    setEditForm({ titulo: n.titulo || "", fuente: n.fuente || "", url: n.url || "", descripcion: n.descripcion || "", imagen_url: n.imagen_url || "" });
+    setEditImgPreview(n.imagen_url || null);
+    setShowForm(false);
+  }
+
+  async function del(id) {
+    try { await deleteRecord("noticias", id); onReload(); }
+    catch (e) { alert("Error: " + e.message); }
+  }
+
+  // Sub-componente compartido para el formulario de imagen
+  function ImageField({ preview, setPreview, formSetter, uploading, fileRef, labelPrefix }) {
+    return (
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: C.gray, marginBottom: 6 }}>🖼️ {labelPrefix} (opcional, máx. 5 MB)</div>
+        <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }}
+          onChange={(e) => uploadImage(e.target.files[0], labelPrefix === "Afiche o imagen" ? setUploadingImg : setEditUploadingImg, formSetter, setPreview)} />
+        {preview ? (
+          <div style={{ position: "relative", display: "inline-block" }}>
+            <img src={preview} alt="Preview" style={{ width: 200, height: 120, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.border}`, display: "block" }} />
+            <button onClick={() => { setPreview(null); formSetter((p) => ({ ...p, imagen_url: "" })); }}
+              style={{ position: "absolute", top: 4, right: 4, width: 24, height: 24, borderRadius: "50%", background: "rgba(0,0,0,0.6)", border: "none", color: "white", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>×</button>
+          </div>
+        ) : (
+          <button onClick={() => fileRef.current?.click()} disabled={uploading}
+            style={{ padding: "8px 16px", borderRadius: 8, border: `1px dashed ${C.border}`, background: "white", cursor: "pointer", fontSize: 12, color: C.gray, display: "flex", alignItems: "center", gap: 8 }}>
+            {uploading ? "⏳ Subiendo..." : "📷 Subir afiche / imagen"}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  function AvisoFormFields({ f, setF, inputStyle }) {
+    return (
+      <>
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: C.gray, marginBottom: 4 }}>Título *</div>
+          <input placeholder="Ej: Ensayo extra este sábado" value={f.titulo} onChange={(e) => setF((p) => ({ ...p, titulo: e.target.value }))} style={{ ...inputStyle, width: "100%" }} />
+        </div>
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: C.gray, marginBottom: 4 }}>Descripción (opcional)</div>
+          <textarea placeholder="Detalles del aviso..." value={f.descripcion} onChange={(e) => setF((p) => ({ ...p, descripcion: e.target.value }))} rows={3}
+            style={{ ...inputStyle, width: "100%", resize: "vertical", fontFamily: "Inter,sans-serif", lineHeight: 1.6 }} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, color: C.gray, marginBottom: 4 }}>Categoría</div>
+            <input placeholder="Ej: Ensayo, Misa, General" value={f.fuente} onChange={(e) => setF((p) => ({ ...p, fuente: e.target.value }))} style={{ ...inputStyle, width: "100%" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: C.gray, marginBottom: 4 }}>URL (enlace externo)</div>
+            <input placeholder="https://..." value={f.url} onChange={(e) => setF((p) => ({ ...p, url: e.target.value }))} style={{ ...inputStyle, width: "100%" }} />
+          </div>
+        </div>
+      </>
+    );
   }
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 14,
-        }}
-      >
-        <span style={{ fontSize: 13, color: C.gray }}>
-          {noticias.length} avisos publicados
-        </span>
-        <Btn onClick={() => setShowForm((p) => !p)}>+ Nuevo aviso</Btn>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <span style={{ fontSize: 13, color: C.gray }}>{noticias.length} avisos publicados</span>
+        <Btn onClick={() => { setShowForm((p) => !p); setEditId(null); }}>+ Nuevo aviso</Btn>
       </div>
 
+      {/* ── Formulario NUEVO aviso ── */}
       {showForm && (
-        <Card
-          style={{
-            marginBottom: 16,
-            border: `1px solid ${C.primary}40`,
-            background: C.primaryLight,
-          }}
-        >
-          <div
-            style={{
-              fontFamily: "'Poppins',sans-serif",
-              fontSize: 14,
-              fontWeight: 600,
-              color: C.dark,
-              marginBottom: 14,
-            }}
-          >
-            📢 Nuevo aviso del coro
-          </div>
-
-          {/* Título */}
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 11, color: C.gray, marginBottom: 4 }}>
-              Título *
-            </div>
-            <input
-              placeholder="Ej: Ensayo extra este sábado"
-              value={form.titulo}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, titulo: e.target.value }))
-              }
-              style={{ ...inputS, width: "100%" }}
-            />
-          </div>
-
-          {/* Descripción */}
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 11, color: C.gray, marginBottom: 4 }}>
-              Descripción (opcional)
-            </div>
-            <textarea
-              placeholder="Detalles del aviso..."
-              value={form.descripcion}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, descripcion: e.target.value }))
-              }
-              rows={3}
-              style={{
-                ...inputS,
-                width: "100%",
-                resize: "vertical",
-                fontFamily: "Inter,sans-serif",
-                lineHeight: 1.6,
-              }}
-            />
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 10,
-              marginBottom: 12,
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 11, color: C.gray, marginBottom: 4 }}>
-                Categoría
-              </div>
-              <input
-                placeholder="Ej: Ensayo, Misa, General"
-                value={form.fuente}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, fuente: e.target.value }))
-                }
-                style={{ ...inputS, width: "100%" }}
-              />
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: C.gray, marginBottom: 4 }}>
-                URL (enlace externo)
-              </div>
-              <input
-                placeholder="https://..."
-                value={form.url}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, url: e.target.value }))
-                }
-                style={{ ...inputS, width: "100%" }}
-              />
-            </div>
-          </div>
-
-          {/* Subida de imagen / afiche */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, color: C.gray, marginBottom: 6 }}>
-              🖼️ Afiche o imagen (opcional, máx. 5 MB)
-            </div>
-            <input
-              ref={imgRef}
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={(e) => handleImageUpload(e.target.files[0])}
-            />
-            {imgPreview ? (
-              <div style={{ position: "relative", display: "inline-block" }}>
-                <img
-                  src={imgPreview}
-                  alt="Preview"
-                  style={{
-                    width: 200,
-                    height: 120,
-                    objectFit: "cover",
-                    borderRadius: 8,
-                    border: `1px solid ${C.border}`,
-                    display: "block",
-                  }}
-                />
-                <button
-                  onClick={() => {
-                    setImgPreview(null);
-                    setForm((p) => ({ ...p, imagen_url: "" }));
-                  }}
-                  style={{
-                    position: "absolute",
-                    top: 4,
-                    right: 4,
-                    width: 24,
-                    height: 24,
-                    borderRadius: "50%",
-                    background: "rgba(0,0,0,0.6)",
-                    border: "none",
-                    color: "white",
-                    fontSize: 14,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: 0,
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => imgRef.current?.click()}
-                disabled={uploadingImg}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: 8,
-                  border: `1px dashed ${C.border}`,
-                  background: "white",
-                  cursor: "pointer",
-                  fontSize: 12,
-                  color: C.gray,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                {uploadingImg ? "⏳ Subiendo..." : "📷 Subir afiche / imagen"}
-              </button>
-            )}
-            {form.imagen_url && !imgPreview && (
-              <div style={{ fontSize: 11, color: C.primary, marginTop: 4 }}>
-                ✅ Imagen guardada
-              </div>
-            )}
-          </div>
-
+        <Card style={{ marginBottom: 16, border: `1px solid ${C.primary}40`, background: C.primaryLight }}>
+          <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 14, fontWeight: 600, color: C.dark, marginBottom: 14 }}>📢 Nuevo aviso del coro</div>
+          <AvisoFormFields f={form} setF={setForm} inputStyle={inputS} />
+          <ImageField preview={imgPreview} setPreview={setImgPreview} formSetter={setForm} uploading={uploadingImg} fileRef={imgRef} labelPrefix="Afiche o imagen" />
           <div style={{ display: "flex", gap: 8 }}>
-            <Btn onClick={submit} disabled={saving || uploadingImg}>
-              {saving ? "Guardando..." : "Publicar aviso"}
-            </Btn>
-            <Btn
-              variant="ghost"
-              onClick={() => {
-                setShowForm(false);
-                setImgPreview(null);
-                setForm({
-                  titulo: "",
-                  fuente: "",
-                  url: "",
-                  descripcion: "",
-                  imagen_url: "",
-                });
-              }}
-            >
-              Cancelar
-            </Btn>
+            <Btn onClick={submit} disabled={saving || uploadingImg}>{saving ? "Guardando..." : "Publicar aviso"}</Btn>
+            <Btn variant="ghost" onClick={() => { setShowForm(false); setImgPreview(null); setForm(emptyForm); }}>Cancelar</Btn>
           </div>
         </Card>
       )}
 
+      {/* ── Lista de avisos ── */}
       {noticias.map((n) => (
-        <Card
-          key={n.id}
-          style={{
-            display: "flex",
-            gap: 12,
-            alignItems: "flex-start",
-            marginBottom: 10,
-            flexWrap: "wrap",
-          }}
-        >
-          {n.imagen_url && (
-            <img
-              src={n.imagen_url}
-              alt=""
-              style={{
-                width: 70,
-                height: 50,
-                objectFit: "cover",
-                borderRadius: 8,
-                flexShrink: 0,
-                border: `1px solid ${C.border}`,
-              }}
-            />
-          )}
-          {!n.imagen_url && (
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                background: C.primaryLight,
-                borderRadius: 9,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 20,
-                flexShrink: 0,
-              }}
-            >
-              📢
-            </div>
-          )}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>
-              {n.titulo}
-            </div>
-            {n.descripcion && (
-              <div
-                style={{
-                  fontSize: 11,
-                  color: C.gray,
-                  marginTop: 2,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  maxWidth: 300,
-                }}
-              >
-                {n.descripcion}
-              </div>
+        <div key={n.id}>
+          <Card style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: editId === n.id ? 0 : 10, flexWrap: "wrap", borderBottomLeftRadius: editId === n.id ? 0 : undefined, borderBottomRightRadius: editId === n.id ? 0 : undefined }}>
+            {n.imagen_url ? (
+              <img src={n.imagen_url} alt="" style={{ width: 70, height: 50, objectFit: "cover", borderRadius: 8, flexShrink: 0, border: `1px solid ${C.border}` }} />
+            ) : (
+              <div style={{ width: 44, height: 44, background: C.primaryLight, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>📢</div>
             )}
-            <div
-              style={{
-                fontSize: 11,
-                color: C.gray,
-                marginTop: 3,
-                display: "flex",
-                gap: 6,
-                flexWrap: "wrap",
-                alignItems: "center",
-              }}
-            >
-              {n.fuente && <Badge>{n.fuente}</Badge>}
-              {n.imagen_url && <Badge color={C.purple}>🖼️ Con imagen</Badge>}
-              <span>{new Date(n.created_at).toLocaleDateString("es-CL")}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>{n.titulo}</div>
+              {n.descripcion && (
+                <div style={{ fontSize: 11, color: C.gray, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 300 }}>{n.descripcion}</div>
+              )}
+              <div style={{ fontSize: 11, color: C.gray, marginTop: 3, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                {n.fuente && <Badge>{n.fuente}</Badge>}
+                {n.imagen_url && <Badge color={C.purple}>🖼️ Con imagen</Badge>}
+                <span>{new Date(n.created_at).toLocaleDateString("es-CL")}</span>
+              </div>
             </div>
-          </div>
-          <ConfirmBtn onConfirm={() => del(n.id)} />
-        </Card>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <button
+                onClick={() => editId === n.id ? setEditId(null) : openEdit(n)}
+                style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${editId === n.id ? C.primary : C.border}`, background: editId === n.id ? C.primaryLight : "white", color: editId === n.id ? C.primary : C.gray, fontSize: 12, cursor: "pointer", fontWeight: editId === n.id ? 600 : 400 }}>
+                {editId === n.id ? "▲ Cerrar" : "✏️ Editar"}
+              </button>
+              <ConfirmBtn onConfirm={() => del(n.id)} />
+            </div>
+          </Card>
+
+          {/* ── Panel de edición inline ── */}
+          {editId === n.id && (
+            <Card style={{ marginBottom: 10, border: `1px solid ${C.primary}60`, borderTop: "none", borderTopLeftRadius: 0, borderTopRightRadius: 0, background: "#f0f7ff" }}>
+              <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 13, fontWeight: 600, color: C.primary, marginBottom: 12 }}>✏️ Editando aviso</div>
+              <AvisoFormFields f={editForm} setF={setEditForm} inputStyle={inputS} />
+              <ImageField preview={editImgPreview} setPreview={setEditImgPreview} formSetter={setEditForm} uploading={editUploadingImg} fileRef={editImgRef} labelPrefix="Cambiar imagen" />
+              <div style={{ display: "flex", gap: 8 }}>
+                <Btn onClick={saveEdit} disabled={editSaving || editUploadingImg}>{editSaving ? "Guardando..." : "💾 Guardar cambios"}</Btn>
+                <Btn variant="ghost" onClick={() => { setEditId(null); setEditForm(emptyForm); setEditImgPreview(null); }}>Cancelar</Btn>
+              </div>
+            </Card>
+          )}
+        </div>
       ))}
 
       {noticias.length === 0 && !showForm && (
@@ -16017,6 +15877,7 @@ function Admin({
         {tab === "cuentas" && <AdminCuentas members={members} onReload={onReload} />}
         {tab === "historial" && <AdminHistorialAsistencia members={members} />}
         {tab === "cuenta_bancaria" && <AdminCuentaBancaria />}
+        {tab === "visitas" && <AdminVisitas />}
       </Card>
 
       <SqlSetupBlock />
@@ -16044,6 +15905,28 @@ function Admin({
 // ── Helpers exclusivos del módulo Finanzas ────────────────────────────
 function finGetToken() {
   return localStorage.getItem("sb_access_token") || SUPABASE_KEY;
+}
+async function registrarVisita(user, token) {
+  if (!user) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/visitas_sitio`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${token || SUPABASE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        integrante_id: user.id || null,
+        nombre: user.nombre || "Desconocido",
+        email: user.email || null,
+        cuerda: user.cuerda || null,
+      }),
+    });
+  } catch (e) {
+    // Silencioso — no afecta el flujo de login
+  }
 }
 async function finDbGet(table, filters = "") {
   const res = await fetch(
@@ -17339,6 +17222,292 @@ export function ModuloFinanzas({ user, members }) {
 // ══════════════════════════════════════════════════════════════════════
 //  SECCIÓN PÚBLICA: INFORMACIÓN DE GASTOS (visible para todos)
 // ══════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════
+//  PANEL DE VISITAS (Admin)
+// ══════════════════════════════════════════════════════════════════════
+function AdminVisitas() {
+  const [visitas, setVisitas] = useState([]);
+  const [online, setOnline] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filtro, setFiltro] = useState("todo");
+  const [busqueda, setBusqueda] = useState("");
+
+  useEffect(() => {
+    cargar();
+    cargarOnline();
+    const iv = setInterval(cargarOnline, 20000); // refrescar online cada 20s
+    return () => clearInterval(iv);
+  }, []);
+
+  async function cargar() {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/visitas_sitio?select=*&order=created_at.desc&limit=500`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` } }
+      );
+      const data = await res.json();
+      setVisitas(Array.isArray(data) ? data : []);
+    } catch (e) { setVisitas([]); }
+    setLoading(false);
+  }
+
+  async function cargarOnline() {
+    try {
+      // Considerar online: último ping hace menos de 60 segundos
+      const umbral = new Date(Date.now() - 60000).toISOString();
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/presencia_online?select=*&ultimo_ping=gte.${umbral}&order=nombre.asc`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` } }
+      );
+      const data = await res.json();
+      setOnline(Array.isArray(data) ? data : []);
+    } catch (e) { /* silencioso */ }
+  }
+
+  // Agrupar por integrante
+  const porIntegrante = visitas.reduce((acc, v) => {
+    const key = v.email || v.nombre;
+    if (!acc[key]) acc[key] = { nombre: v.nombre, email: v.email, cuerda: v.cuerda, visitas: [] };
+    acc[key].visitas.push(v);
+    return acc;
+  }, {});
+
+  const ranking = Object.values(porIntegrante)
+    .map(p => ({ ...p, total: p.visitas.length, ultima: p.visitas[0]?.created_at }))
+    .sort((a, b) => b.total - a.total);
+
+  // Estadísticas
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const hace7 = new Date(hoy); hace7.setDate(hace7.getDate() - 7);
+  const hace30 = new Date(hoy); hace30.setDate(hace30.getDate() - 30);
+  const visitasHoy = visitas.filter(v => new Date(v.created_at) >= hoy).length;
+  const visitas7d = visitas.filter(v => new Date(v.created_at) >= hace7).length;
+  const visitas30d = visitas.filter(v => new Date(v.created_at) >= hace30).length;
+  const unicosTotal = ranking.length;
+
+  // Filtro de tiempo
+  const ahora = new Date();
+  const visitasFiltradas = visitas.filter(v => {
+    const d = new Date(v.created_at);
+    if (filtro === "hoy") return d >= hoy;
+    if (filtro === "7d") return d >= hace7;
+    if (filtro === "30d") return d >= hace30;
+    return true;
+  }).filter(v =>
+    !busqueda || v.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
+    v.email?.toLowerCase().includes(busqueda.toLowerCase())
+  );
+
+  const statBox = (icon, label, value, color) => (
+    <div style={{
+      background: color + "12", border: `1px solid ${color}30`,
+      borderRadius: 12, padding: "14px 18px", flex: 1, minWidth: 120,
+    }}>
+      <div style={{ fontSize: 22 }}>{icon}</div>
+      <div style={{ fontSize: 24, fontWeight: 800, color, marginTop: 4 }}>{value}</div>
+      <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>{label}</div>
+    </div>
+  );
+
+  const cuerdaColor = { Soprano: "#ec4899", Contralto: "#8b5cf6", Tenor: "#3b82f6", Bajo: "#f59e0b", Admin: "#10b981" };
+
+  if (loading) return <FinSpinner />;
+
+  return (
+    <div>
+      <div style={{ fontWeight: 700, fontSize: 16, color: C.dark, marginBottom: 4 }}>📊 Registro de Visitas</div>
+      <div style={{ fontSize: 12, color: C.gray, marginBottom: 20 }}>Cuántas veces y quiénes ingresan al sitio.</div>
+
+      {/* Stats */}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
+        {statBox("📅", "Hoy", visitasHoy, C.primary)}
+        {statBox("📆", "Últimos 7 días", visitas7d, "#3b82f6")}
+        {statBox("🗓️", "Últimos 30 días", visitas30d, "#8b5cf6")}
+        {statBox("♾️", "Total histórico", visitas.length, "#f59e0b")}
+        {statBox("👥", "Integrantes únicos", unicosTotal, "#ec4899")}
+      </div>
+
+      {/* Online ahora */}
+      <div style={{
+        background: "linear-gradient(135deg,#f0fdf4,#dcfce7)",
+        border: "1.5px solid #86efac",
+        borderRadius: 14, padding: "16px 20px", marginBottom: 28,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <span style={{
+            display: "inline-block", width: 10, height: 10, borderRadius: "50%",
+            background: "#22c55e",
+            boxShadow: "0 0 0 3px #86efac",
+            animation: "pulse 2s infinite",
+          }} />
+          <span style={{ fontWeight: 700, fontSize: 14, color: "#15803d" }}>
+            En línea ahora — {online.length} {online.length === 1 ? "integrante" : "integrantes"}
+          </span>
+          <button onClick={cargarOnline} style={{
+            marginLeft: "auto", fontSize: 11, padding: "3px 10px", borderRadius: 20,
+            border: "1px solid #86efac", background: "white", color: "#15803d", cursor: "pointer",
+          }}>🔄 Actualizar</button>
+        </div>
+        {online.length === 0 ? (
+          <div style={{ fontSize: 12, color: "#16a34a", fontStyle: "italic" }}>No hay integrantes conectados en este momento.</div>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {online.map((u) => (
+              <div key={u.integrante_id || u.email} style={{
+                display: "flex", alignItems: "center", gap: 8,
+                background: "white", borderRadius: 30, padding: "6px 12px 6px 6px",
+                border: "1px solid #bbf7d0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+              }}>
+                <div style={{
+                  width: 30, height: 30, borderRadius: "50%",
+                  background: cuerdaColor[u.cuerda] || C.primary,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "white", fontWeight: 800, fontSize: 12, flexShrink: 0,
+                }}>
+                  {(u.nombre || "?")[0].toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.dark, lineHeight: 1.2 }}>{u.nombre}</div>
+                  {u.cuerda && <div style={{ fontSize: 10, color: cuerdaColor[u.cuerda] || C.gray, fontWeight: 600 }}>{u.cuerda}</div>}
+                </div>
+                <span style={{
+                  width: 8, height: 8, borderRadius: "50%", background: "#22c55e",
+                  flexShrink: 0, marginLeft: 2,
+                }} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Ranking */}
+      <div style={{ fontWeight: 700, fontSize: 13, color: C.dark, marginBottom: 10 }}>🏆 Ranking de visitas por integrante</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 28 }}>
+        {ranking.slice(0, 10).map((r, i) => (
+          <div key={r.email} style={{
+            display: "flex", alignItems: "center", gap: 12,
+            background: i === 0 ? "#fef9c3" : i === 1 ? "#f1f5f9" : i === 2 ? "#fef3e2" : C.white,
+            border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px",
+          }}>
+            <div style={{ fontWeight: 800, fontSize: 16, width: 24, textAlign: "center", color: i < 3 ? ["#f59e0b","#94a3b8","#cd7c2f"][i] : C.gray }}>
+              {i < 3 ? ["🥇","🥈","🥉"][i] : `${i+1}`}
+            </div>
+            <div style={{
+              width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
+              background: cuerdaColor[r.cuerda] || C.primary,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "white", fontWeight: 700, fontSize: 13,
+            }}>
+              {(r.nombre || "?")[0].toUpperCase()}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, color: C.dark }}>{r.nombre}</div>
+              <div style={{ fontSize: 11, color: C.gray }}>{r.email}</div>
+            </div>
+            {r.cuerda && (
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20,
+                background: (cuerdaColor[r.cuerda] || C.primary) + "20",
+                color: cuerdaColor[r.cuerda] || C.primary,
+              }}>{r.cuerda}</span>
+            )}
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontWeight: 800, fontSize: 18, color: C.primary }}>{r.total}</div>
+              <div style={{ fontSize: 10, color: C.gray }}>visitas</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Log de visitas */}
+      <div style={{ fontWeight: 700, fontSize: 13, color: C.dark, marginBottom: 10 }}>📋 Registro detallado</div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+        {[["todo","Todo"],["hoy","Hoy"],["7d","7 días"],["30d","30 días"]].map(([k,l]) => (
+          <button key={k} onClick={() => setFiltro(k)} style={{
+            fontSize: 12, padding: "5px 12px", borderRadius: 20, cursor: "pointer", border: "1px solid",
+            fontWeight: 600,
+            background: filtro === k ? C.primary : "white",
+            color: filtro === k ? "white" : C.gray,
+            borderColor: filtro === k ? C.primary : C.border,
+          }}>{l}</button>
+        ))}
+        <input
+          value={busqueda} onChange={e => setBusqueda(e.target.value)}
+          placeholder="🔍 Buscar nombre o correo..."
+          style={{
+            fontSize: 12, padding: "5px 12px", borderRadius: 20, border: `1px solid ${C.border}`,
+            outline: "none", minWidth: 200, color: C.dark,
+          }}
+        />
+        <button onClick={cargar} style={{ fontSize: 11, padding: "5px 12px", borderRadius: 20, border: `1px solid ${C.border}`, cursor: "pointer", background: "white", color: C.gray }}>
+          🔄 Actualizar
+        </button>
+      </div>
+
+      <div style={{ maxHeight: 380, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 10 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: C.light, position: "sticky", top: 0 }}>
+              {["Fecha y hora","Nombre","Correo","Cuerda"].map(h => (
+                <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: C.gray, fontSize: 11, borderBottom: `1px solid ${C.border}` }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {visitasFiltradas.length === 0 ? (
+              <tr><td colSpan={4} style={{ padding: 24, textAlign: "center", color: C.gray }}>Sin registros</td></tr>
+            ) : visitasFiltradas.map((v, i) => (
+              <tr key={v.id || i} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? "white" : C.light + "80" }}>
+                <td style={{ padding: "7px 12px", color: C.gray, whiteSpace: "nowrap" }}>
+                  {new Date(v.created_at).toLocaleString("es-CL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </td>
+                <td style={{ padding: "7px 12px", fontWeight: 600, color: C.dark }}>{v.nombre}</td>
+                <td style={{ padding: "7px 12px", color: C.gray }}>{v.email}</td>
+                <td style={{ padding: "7px 12px" }}>
+                  {v.cuerda && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20,
+                      background: (cuerdaColor[v.cuerda] || C.primary) + "20",
+                      color: cuerdaColor[v.cuerda] || C.primary,
+                    }}>{v.cuerda}</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* SQL */}
+      <div style={{ marginTop: 20, background: "#f1f5f9", borderRadius: 10, padding: "12px 16px", fontSize: 11, color: C.gray, fontFamily: "monospace" }}>
+        <div style={{ fontWeight: 700, marginBottom: 4, color: C.dark }}>SQL requerido en Supabase:</div>
+        <pre style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{`CREATE TABLE IF NOT EXISTS visitas_sitio (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  integrante_id UUID REFERENCES integrantes(id) ON DELETE SET NULL,
+  nombre TEXT,
+  email TEXT,
+  cuerda TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE visitas_sitio ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Insertar visitas" ON visitas_sitio FOR INSERT WITH CHECK (true);
+CREATE POLICY "Admin lee visitas" ON visitas_sitio FOR SELECT USING (true);
+
+CREATE TABLE IF NOT EXISTS presencia_online (
+  integrante_id UUID PRIMARY KEY,
+  nombre TEXT,
+  email TEXT,
+  cuerda TEXT,
+  ultimo_ping TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE presencia_online ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Upsert presencia" ON presencia_online FOR ALL USING (true) WITH CHECK (true);`}</pre>
+      </div>
+    </div>
+  );
+}
 
 // ══════════════════════════════════════════════════════════════════════
 //  MANTENEDOR CUENTA BANCARIA (Admin)
