@@ -10,6 +10,9 @@ const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 // Código secreto para registrarse como Admin
 const SECRET_ADMIN_CODE = "CoroCJM2026!";
 
+// Detecta usuario Invitado: no es integrante del coro, no tiene cuerda asignada
+const esVisita = (u) => !u?.cuerda || u.cuerda.trim() === "";
+
 // URL pública del banner (imagen de Jesús) — se sube una vez al bucket "publico"
 // Para subir: ve a Supabase > Storage > publico > Upload > sube canalymj.jpg
 const BANNER_URL = `${SUPABASE_URL}/storage/v1/object/public/publico/canalymj.jpg`;
@@ -411,14 +414,11 @@ const CUERDAS = {
 const rolLabel = (r, genero) => {
   if (r === "Admin") return genero === "F" ? "Encargada de Coro" : "Encargado de Coro";
   if (r === "Contador/a Coro") return genero === "F" ? "Contadora Coro" : "Contador Coro";
-  if ((r || "").trim().toLowerCase() === "visita") return "Invitado/a";
   return r || "";
 };
-// Helper robusto: detecta usuario Invitado sin importar mayúsculas/espacios en BD
-const esVisita = (u) => (u?.cuerda || "").trim().toLowerCase() === "visita";
+// Detecta usuario Invitado por cargo (no toca la cuerda vocal)
 const rolFullLabel = (m) => {
   if (!m) return "";
-  // Usuario Visita no muestra rol
   if (esVisita(m)) return "";
   const cargo = m.cargo?.trim() || "";
   // Cuerda vocal real: para Admin/Contador usa cuerda_vocal, para el resto usa la cuerda directa
