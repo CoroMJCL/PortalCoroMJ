@@ -411,11 +411,15 @@ const CUERDAS = {
 const rolLabel = (r, genero) => {
   if (r === "Admin") return genero === "F" ? "Encargada de Coro" : "Encargado de Coro";
   if (r === "Contador/a Coro") return genero === "F" ? "Contadora Coro" : "Contador Coro";
-  if (r === "Visita") return "Invitado/a";
+  if ((r || "").trim().toLowerCase() === "visita") return "Invitado/a";
   return r || "";
 };
+// Helper robusto: detecta usuario Invitado sin importar mayúsculas/espacios en BD
+const esVisita = (u) => (u?.cuerda || "").trim().toLowerCase() === "visita";
 const rolFullLabel = (m) => {
   if (!m) return "";
+  // Usuario Visita no muestra rol
+  if (esVisita(m)) return "";
   const cargo = m.cargo?.trim() || "";
   // Cuerda vocal real: para Admin/Contador usa cuerda_vocal, para el resto usa la cuerda directa
   const cuerdaVocal = (m.cuerda === "Admin" || m.cuerda === "Contador/a Coro")
@@ -673,7 +677,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
           </button>
         </div>
         {NAV.filter((item) => {
-          const isVisita = user?.cuerda === "Visita";
+          const isVisita = esVisita(user);
           if (isVisita) {
             return ["dashboard", "pauta_misa", "material_ensayo"].includes(item.id);
           }
@@ -1579,7 +1583,7 @@ export default function App() {
     registrarVisita(p, data.access_token);
     // Mostrar modal solo si no tiene permiso aún y no es usuario Visita
     setTimeout(() => {
-      if (Notification.permission !== "granted" && p?.cuerda !== "Visita") setShowPushModal(true);
+      if (Notification.permission !== "granted" && !esVisita(p)) setShowPushModal(true);
     }, 2500);
   }
 
@@ -1614,7 +1618,7 @@ export default function App() {
     registrarVisita(p, data.access_token);
     // Mostrar modal solo si no tiene permiso aún y no es usuario Visita
     setTimeout(() => {
-      if (Notification.permission !== "granted" && p?.cuerda !== "Visita") setShowPushModal(true);
+      if (Notification.permission !== "granted" && !esVisita(p)) setShowPushModal(true);
     }, 2500);
   }
 
@@ -1852,7 +1856,7 @@ export default function App() {
         </div>
         <nav style={{ flex: 1, overflowY: "auto", padding: "8px 6px" }}>
           {NAV.filter((item) => {
-            const isVisita = user?.cuerda === "Visita";
+            const isVisita = esVisita(user);
             if (isVisita) {
               return ["dashboard", "pauta_misa", "material_ensayo"].includes(item.id);
             }
@@ -1958,7 +1962,7 @@ export default function App() {
                 >
                   {user?.nombre}
                 </div>
-                {user?.cuerda !== "Visita" && (
+                {!esVisita(user) && (
                   <div style={{ fontSize: 10, color: C.primary }}>
                     {rolFullLabel(user)}
                   </div>
@@ -2358,7 +2362,7 @@ export default function App() {
               {section === "info_gastos" && (
                 <InfoGastos user={user} members={members} />
               )}
-              {section === "material_ensayo" && user?.cuerda === "Visita" && (
+              {section === "material_ensayo" && esVisita(user) && (
                 <MaterialEnsayo docs={docs} user={user} />
               )}
             </>
@@ -3951,7 +3955,7 @@ function Dashboard({
     .filter((e) => new Date(e.fecha + "T00:00:00") >= new Date())
     .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
   const isAdmin = user?.cuerda === "Admin";
-  const isVisita = user?.cuerda === "Visita";
+  const isVisita = esVisita(user);
   const pautasBorrador = (pautas || []).filter((p) => !p.publicada);
   const hoyInicio = new Date();
   hoyInicio.setHours(0, 0, 0, 0);
@@ -4278,7 +4282,7 @@ function Dashboard({
               {user?.nombre?.split(" ")[0]}
             </div>
             <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>
-              {user?.cuerda !== "Visita" ? rolFullLabel(user) : ""}
+              {!esVisita(user) ? rolFullLabel(user) : ""}
             </div>
             {pctAsistencia !== null ? (
               <div style={{ fontSize: 11, color: pctAsistencia >= 75 ? C.primary : pctAsistencia >= 50 ? "#f59e0b" : "#ef4444", fontWeight: 600, marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
@@ -5792,7 +5796,7 @@ function Perfil({ user, members, setUser }) {
           >
             {user?.nombre}
           </div>
-          {user?.cuerda !== "Visita" && <Chip label={rolFullLabel(user)} color={cc} />}
+          {!esVisita(user) && <Chip label={rolFullLabel(user)} color={cc} />}
           <p
             style={{
               color: C.gray,
@@ -5820,7 +5824,7 @@ function Perfil({ user, members, setUser }) {
           </div>
           {[
             { label: "Nombre", value: user?.nombre, icon: "👤" },
-            ...(user?.cuerda !== "Visita" ? [{ label: "Rol en el Coro", value: rolFullLabel(user), icon: "🎵" }] : []),
+            ...(!esVisita(user) ? [{ label: "Rol en el Coro", value: rolFullLabel(user), icon: "🎵" }] : []),
           ].map((f, i) => (
             <div
               key={i}
@@ -12223,7 +12227,7 @@ const TITULO_CELEBRACION_OPTIONS = [
 
 function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const isAdmin = user?.cuerda === "Admin";
-  const isVisita = user?.cuerda === "Visita";
+  const isVisita = esVisita(user);
   // Usuario Visita solo ve pautas que el Admin marcó explícitamente como visibles
   const pautasFiltradas = isVisita
     ? (pautas || []).filter((p) => p.publicada && p.visible_visita)
@@ -14147,7 +14151,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: 15, color: C.dark }}>{user?.nombre?.split(" ")[0]}</div>
-              {user?.cuerda !== "Visita" && <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>{rolFullLabel(user)}</div>}
+              {!esVisita(user) && <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>{rolFullLabel(user)}</div>}
             </div>
           </div>
           {msgPct && <div style={{ fontSize: 12, color: colPct, fontWeight: 600, marginBottom: 10, display: "flex", alignItems: "center", gap: 4 }}>{msgPct}{tieneEstrella && <span style={{ fontSize: 16 }}>⭐</span>}</div>}
