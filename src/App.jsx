@@ -3817,7 +3817,7 @@ function Dashboard({
             >
               {avisos
                 .filter((a) => a.imagen_url)
-                .slice(0, 4)
+                .slice(0, 5)
                 .map((n) => (
                   <div
                     key={n.id}
@@ -14421,7 +14421,7 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
   const _ahora = Date.now();
   const recientes = (reconocimientos || [])
     .filter(r => (_ahora - new Date(r.created_at).getTime()) < 7 * 24 * 60 * 60 * 1000)
-    .slice(0, 6);
+    .slice(0, 9);
   const total = (reconocimientos || []).length;
 
   return (
@@ -17550,22 +17550,7 @@ function AdminCuentaBancaria() {
         </div>
       )}
 
-      {/* SQL helper */}
-      <div style={{ marginTop: 28, background: "#f1f5f9", borderRadius: 10, padding: "12px 16px", fontSize: 11, color: C.gray, fontFamily: "monospace" }}>
-        <div style={{ fontWeight: 700, marginBottom: 4, color: C.dark }}>SQL requerido en Supabase:</div>
-        <pre style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{`CREATE TABLE IF NOT EXISTS fin_cuenta_bancaria (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  nombre TEXT NOT NULL,
-  rut TEXT NOT NULL,
-  banco TEXT NOT NULL,
-  tipo_cuenta TEXT DEFAULT 'Cuenta Vista',
-  numero_cuenta TEXT NOT NULL,
-  correo TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE fin_cuenta_bancaria ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Acceso total" ON fin_cuenta_bancaria FOR ALL USING (true) WITH CHECK (true);`}</pre>
-      </div>
+
     </div>
   );
 }
