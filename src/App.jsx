@@ -8595,6 +8595,7 @@ const ADMIN_TABS = [
   { id: "comunidades", label: "⛪ Comunidades" },
   { id: "cuentas", label: "🔐 Cuentas" },
   { id: "historial", label: "📅 Historial Asistencia" },
+  { id: "cuenta_bancaria", label: "🏦 Cuenta Bancaria" },
 ];
 
 function AdminTab({ label, active, onClick }) {
@@ -16015,6 +16016,7 @@ function Admin({
         {tab === "comunidades" && <AdminComunidades comunidades={comunidades} onReload={onReload} />}
         {tab === "cuentas" && <AdminCuentas members={members} onReload={onReload} />}
         {tab === "historial" && <AdminHistorialAsistencia members={members} />}
+        {tab === "cuenta_bancaria" && <AdminCuentaBancaria />}
       </Card>
 
       <SqlSetupBlock />
@@ -17338,12 +17340,243 @@ export function ModuloFinanzas({ user, members }) {
 //  SECCIÓN PÚBLICA: INFORMACIÓN DE GASTOS (visible para todos)
 // ══════════════════════════════════════════════════════════════════════
 
+// ══════════════════════════════════════════════════════════════════════
+//  MANTENEDOR CUENTA BANCARIA (Admin)
+// ══════════════════════════════════════════════════════════════════════
+function AdminCuentaBancaria() {
+  const EMPTY = { nombre: "", rut: "", banco: "", tipo_cuenta: "Cuenta Vista", numero_cuenta: "", correo: "" };
+  const [cuenta, setCuenta] = useState(null);
+  const [form, setForm] = useState(EMPTY);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+
+  useEffect(() => { loadCuenta(); }, []);
+
+  async function loadCuenta() {
+    setLoading(true);
+    try {
+      const data = await finDbGet("fin_cuenta_bancaria");
+      if (data && data.length > 0) {
+        setCuenta(data[0]);
+        setForm(data[0]);
+      } else {
+        setCuenta(null);
+        setForm(EMPTY);
+      }
+    } catch (e) { setMsg({ type: "error", text: "Error cargando datos: " + e.message }); }
+    setLoading(false);
+  }
+
+  const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  async function handleSave() {
+    if (!form.nombre || !form.rut || !form.banco || !form.numero_cuenta || !form.correo) {
+      setMsg({ type: "error", text: "Por favor completa todos los campos obligatorios." });
+      return;
+    }
+    setSaving(true);
+    setMsg(null);
+    try {
+      const body = { nombre: form.nombre, rut: form.rut, banco: form.banco, tipo_cuenta: form.tipo_cuenta, numero_cuenta: form.numero_cuenta, correo: form.correo };
+      if (cuenta?.id) {
+        await finDbPatch("fin_cuenta_bancaria", cuenta.id, body);
+      } else {
+        await finDbPost("fin_cuenta_bancaria", body);
+      }
+      setMsg({ type: "ok", text: "✅ Cuenta bancaria guardada correctamente." });
+      setEditMode(false);
+      await loadCuenta();
+    } catch (e) { setMsg({ type: "error", text: "Error al guardar: " + e.message }); }
+    setSaving(false);
+  }
+
+  async function handleDelete() {
+    if (!cuenta?.id) return;
+    if (!window.confirm("¿Eliminar los datos de cuenta bancaria?")) return;
+    setSaving(true);
+    try {
+      await finDbDelete("fin_cuenta_bancaria", cuenta.id);
+      setCuenta(null);
+      setForm(EMPTY);
+      setEditMode(false);
+      setMsg({ type: "ok", text: "Cuenta bancaria eliminada." });
+    } catch (e) { setMsg({ type: "error", text: e.message }); }
+    setSaving(false);
+  }
+
+  const inputStyle = {
+    width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${C.border}`,
+    fontSize: 13, color: C.dark, background: C.white, boxSizing: "border-box", outline: "none",
+  };
+  const labelStyle = { fontSize: 12, fontWeight: 600, color: C.gray, marginBottom: 4, display: "block" };
+  const fieldWrap = { display: "flex", flexDirection: "column", gap: 0 };
+
+  if (loading) return <FinSpinner />;
+
+  return (
+    <div style={{ maxWidth: 600 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 16, color: C.dark }}>🏦 Cuenta Bancaria para Cuotas</div>
+          <div style={{ fontSize: 12, color: C.gray, marginTop: 2 }}>Esta información se mostrará a todos los integrantes en "Info. Gastos".</div>
+        </div>
+        {cuenta && !editMode && (
+          <div style={{ display: "flex", gap: 8 }}>
+            <FinBtn variant="secondary" onClick={() => { setEditMode(true); setMsg(null); }}>✏️ Editar</FinBtn>
+            <FinBtn variant="danger" onClick={handleDelete} disabled={saving}>🗑 Eliminar</FinBtn>
+          </div>
+        )}
+      </div>
+
+      {msg && (
+        <div style={{
+          padding: "10px 14px", borderRadius: 8, marginBottom: 14, fontSize: 13,
+          background: msg.type === "ok" ? "#d1fae5" : "#fee2e2",
+          color: msg.type === "ok" ? "#065f46" : "#991b1b",
+          border: `1px solid ${msg.type === "ok" ? "#6ee7b7" : "#fca5a5"}`,
+        }}>{msg.text}</div>
+      )}
+
+      {/* Vista de solo lectura */}
+      {cuenta && !editMode && (
+        <div style={{
+          background: "linear-gradient(135deg,#f0fdf8,#e6f7f1)",
+          border: `1px solid ${C.primary}30`,
+          borderRadius: 14, padding: "20px 24px",
+        }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px" }}>
+            {[
+              ["👤 Nombre", cuenta.nombre],
+              ["🪪 RUT", cuenta.rut],
+              ["🏦 Banco", cuenta.banco],
+              ["💳 Tipo de cuenta", cuenta.tipo_cuenta],
+              ["🔢 Número de cuenta", cuenta.numero_cuenta],
+              ["📧 Correo", cuenta.correo],
+            ].map(([lbl, val]) => (
+              <div key={lbl}>
+                <div style={{ fontSize: 11, color: C.gray, fontWeight: 600 }}>{lbl}</div>
+                <div style={{ fontSize: 14, color: C.dark, fontWeight: 500, marginTop: 2 }}>{val}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sin datos */}
+      {!cuenta && !editMode && (
+        <div style={{ textAlign: "center", padding: "32px 0", color: C.gray }}>
+          <div style={{ fontSize: 36, marginBottom: 10 }}>🏦</div>
+          <div style={{ fontSize: 14, marginBottom: 16 }}>No hay cuenta bancaria registrada aún.</div>
+          <FinBtn onClick={() => { setEditMode(true); setMsg(null); }}>+ Agregar cuenta bancaria</FinBtn>
+        </div>
+      )}
+
+      {/* Formulario */}
+      {editMode && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={fieldWrap}>
+              <label style={labelStyle}>Nombre titular *</label>
+              <input style={inputStyle} value={form.nombre} onChange={(e) => setF("nombre", e.target.value)} placeholder="Ej: Juan Pérez González" />
+            </div>
+            <div style={fieldWrap}>
+              <label style={labelStyle}>RUT *</label>
+              <input style={inputStyle} value={form.rut} onChange={(e) => setF("rut", e.target.value)} placeholder="Ej: 12.345.678-9" />
+            </div>
+            <div style={fieldWrap}>
+              <label style={labelStyle}>Banco *</label>
+              <select style={inputStyle} value={form.banco} onChange={(e) => setF("banco", e.target.value)}>
+                <option value="">— Selecciona el banco —</option>
+                <option>ABN AMRO BANK (CHILE)</option>
+                <option>BANCO BICE</option>
+                <option>BANCO BCI/MACHBANK</option>
+                <option>BANCO CONSORCIO</option>
+                <option>BANCO DE CHILE</option>
+                <option>BANCO DEL DESARROLLO</option>
+                <option>BANCO DEL ESTADO DE CHILE</option>
+                <option>BANCO FALABELLA</option>
+                <option>BANCO INTERNACIONAL</option>
+                <option>BANCO ITAU</option>
+                <option>BANCO PARIS</option>
+                <option>BANCO RIPLEY</option>
+                <option>BANCO SANTANDER-SANTIAGO</option>
+                <option>BANCO SECURITY</option>
+                <option>CITIBANK N.A.</option>
+                <option>COOPEUCH/DALE</option>
+                <option>COPEC PAY</option>
+                <option>CORPBANCA</option>
+                <option>FINTUAL</option>
+                <option>GLOBAL66</option>
+                <option>HSBC BANK CHILE</option>
+                <option>JP MORGAN</option>
+                <option>LA POLAR PREPAGO</option>
+                <option>MERCADO PAGO EMISORA S.A</option>
+                <option>METROMUV</option>
+                <option>PREPAGO LOS HEROES.</option>
+                <option>PREX</option>
+                <option>RABOBANK</option>
+                <option>SCOTIABANK</option>
+                <option>SUMUP</option>
+                <option>TANNER</option>
+                <option>TAPP CAJA LOS ANDES</option>
+                <option>TENPO PREPAGO</option>
+                <option>TRICOT PREPAGO</option>
+              </select>
+            </div>
+            <div style={fieldWrap}>
+              <label style={labelStyle}>Tipo de cuenta *</label>
+              <select style={inputStyle} value={form.tipo_cuenta} onChange={(e) => setF("tipo_cuenta", e.target.value)}>
+                <option value="Cuenta Vista">Cuenta Vista</option>
+                <option value="Cuenta Corriente">Cuenta Corriente</option>
+                <option value="Cuenta de Ahorro">Cuenta de Ahorro</option>
+                <option value="Cuenta RUT">Cuenta RUT</option>
+              </select>
+            </div>
+            <div style={fieldWrap}>
+              <label style={labelStyle}>Número de cuenta *</label>
+              <input style={inputStyle} value={form.numero_cuenta} onChange={(e) => setF("numero_cuenta", e.target.value)} placeholder="Ej: 00012345678" />
+            </div>
+            <div style={fieldWrap}>
+              <label style={labelStyle}>Correo electrónico *</label>
+              <input style={inputStyle} type="email" value={form.correo} onChange={(e) => setF("correo", e.target.value)} placeholder="Ej: tesorero@coro.cl" />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+            <FinBtn onClick={handleSave} disabled={saving}>{saving ? "Guardando…" : "💾 Guardar"}</FinBtn>
+            <FinBtn variant="ghost" onClick={() => { setEditMode(false); setForm(cuenta || EMPTY); setMsg(null); }}>Cancelar</FinBtn>
+          </div>
+        </div>
+      )}
+
+      {/* SQL helper */}
+      <div style={{ marginTop: 28, background: "#f1f5f9", borderRadius: 10, padding: "12px 16px", fontSize: 11, color: C.gray, fontFamily: "monospace" }}>
+        <div style={{ fontWeight: 700, marginBottom: 4, color: C.dark }}>SQL requerido en Supabase:</div>
+        <pre style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{`CREATE TABLE IF NOT EXISTS fin_cuenta_bancaria (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre TEXT NOT NULL,
+  rut TEXT NOT NULL,
+  banco TEXT NOT NULL,
+  tipo_cuenta TEXT DEFAULT 'Cuenta Vista',
+  numero_cuenta TEXT NOT NULL,
+  correo TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE fin_cuenta_bancaria ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Acceso total" ON fin_cuenta_bancaria FOR ALL USING (true) WITH CHECK (true);`}</pre>
+      </div>
+    </div>
+  );
+}
+
 export function InfoGastos({ user, members }) {
   const [pagos, setPagos] = useState([]);
   const [gastos, setGastos] = useState([]);
   const [actividades, setActividades] = useState([]);
   const [cuotas, setCuotas] = useState([]);
   const [miembrosEnCuotas, setMiembrosEnCuotas] = useState([]);
+  const [cuentaBancaria, setCuentaBancaria] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tabActiva, setTabActiva] = useState("estado");
   const [actExpandida, setActExpandida] = useState(null);
@@ -17351,18 +17584,20 @@ export function InfoGastos({ user, members }) {
   useEffect(() => {
     (async () => {
       try {
-        const [p, g, a, c, mc] = await Promise.all([
+        const [p, g, a, c, mc, cb] = await Promise.all([
           finDbGet("fin_pagos"),
           finDbGet("fin_gastos"),
           finDbGet("fin_actividades"),
           finDbGet("fin_cuotas"),
           finDbGet("fin_miembros_cuotas"),
+          finDbGet("fin_cuenta_bancaria").catch(() => []),
         ]);
         setPagos(p || []);
         setGastos(g || []);
         setActividades(a || []);
         setCuotas(c || []);
         setMiembrosEnCuotas(mc || []);
+        setCuentaBancaria(cb && cb.length > 0 ? cb[0] : null);
       } catch (e) { console.error(e); }
       setLoading(false);
     })();
@@ -17552,13 +17787,80 @@ export function InfoGastos({ user, members }) {
           })}
         </div>
       )}
+
+      {/* ── Datos de transferencia ── */}
+      {cuentaBancaria && (
+        <div style={{ marginTop: 24 }}>
+          <FinCard style={{
+            background: "linear-gradient(135deg,#f0fdf8,#e6f7f1)",
+            border: `1.5px solid ${C.primary}40`,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <span style={{ fontSize: 22 }}>🏦</span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: C.dark }}>Datos para transferencia de cuotas</div>
+                <div style={{ fontSize: 11, color: C.gray }}>Usa estos datos para pagar tu cuota mensual</div>
+              </div>
+            </div>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+              gap: "10px 20px",
+            }}>
+              {[
+                ["👤 Nombre", cuentaBancaria.nombre],
+                ["🪪 RUT", cuentaBancaria.rut],
+                ["🏦 Banco", cuentaBancaria.banco],
+                ["💳 Tipo de cuenta", cuentaBancaria.tipo_cuenta],
+                ["🔢 Número de cuenta", cuentaBancaria.numero_cuenta],
+                ["📧 Correo", cuentaBancaria.correo],
+              ].map(([lbl, val]) => (
+                <div key={lbl} style={{
+                  background: "white",
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                  border: `1px solid ${C.border}`,
+                }}>
+                  <div style={{ fontSize: 11, color: C.gray, fontWeight: 600, marginBottom: 3 }}>{lbl}</div>
+                  <div style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: C.dark,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}>
+                    {val}
+                    <button
+                      title="Copiar"
+                      onClick={() => navigator.clipboard.writeText(val).catch(() => {})}
+                      style={{
+                        background: "none", border: "none", cursor: "pointer",
+                        padding: "1px 4px", borderRadius: 4, fontSize: 12,
+                        color: C.gray, opacity: 0.7,
+                      }}
+                    >📋</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{
+              marginTop: 12,
+              padding: "8px 14px",
+              background: C.primary + "12",
+              borderRadius: 8,
+              fontSize: 12,
+              color: C.primary,
+              fontWeight: 500,
+            }}>
+              💡 Recuerda indicar tu nombre completo en el comentario de la transferencia y enviar el comprobante al tesorero.
+            </div>
+          </FinCard>
+        </div>
+      )}
     </div>
   );
 }
-
-// ══════════════════════════════════════════════════════════════════════
-//  WIDGET CUMPLEAÑOS HOY (solo aparece el día del cumpleaños)
-// ══════════════════════════════════════════════════════════════════════
 function CumpleanosHoyWidget({ cumple }) {
   return (
     <div
