@@ -369,25 +369,26 @@ const G = `
 `;
 
 const NAV = [
-  { id: "dashboard",   icon: "⊞",  label: "Inicio" },
-  { id: "perfil",      icon: "◎",  label: "Mi Perfil" },
-  { id: "admin",       icon: "⚙",  label: "Administración" },
-  { id: "finanzas",    icon: "💼", label: "Finanzas" },
-  { id: "info_gastos", icon: "📊", label: "Info. Gastos" },
-  { id: "agenda",      icon: "◫",  label: "Agenda" },
-  { id: "asistencia",  icon: "✅", label: "Asistencia" },
-  { id: "reconoceme",  icon: "🌟", label: "Reconóceme" },
-  { id: "noticias",    icon: "◈",  label: "Avisos" },
-  { id: "biblioteca",  icon: "▤",  label: "Biblioteca" },
-  { id: "cancionero",  icon: "♫",  label: "Canto Digital" },
-  { id: "documentos",  icon: "⬇",  label: "Descargas Misas" },
-  { id: "integrantes", icon: "◎",  label: "Integrantes" },
-  { id: "cumpleanos",  icon: "🎂", label: "Cumpleaños" },
-  { id: "musica",      icon: "♪",  label: "Música" },
-  { id: "oraciones",   icon: "✦",  label: "Oraciones" },
-  { id: "pauta_misa",  icon: "🎼", label: "Pauta de Misa" },
-  { id: "podcast",     icon: "◉",  label: "Podcast" },
-  { id: "qanda",       icon: "?",  label: "Preguntas" },
+  { id: "dashboard",        icon: "⊞",  label: "Inicio" },
+  { id: "perfil",           icon: "◎",  label: "Mi Perfil" },
+  { id: "admin",            icon: "⚙",  label: "Administración" },
+  { id: "finanzas",         icon: "💼", label: "Finanzas" },
+  { id: "info_gastos",      icon: "📊", label: "Info. Gastos" },
+  { id: "agenda",           icon: "◫",  label: "Agenda" },
+  { id: "asistencia",       icon: "✅", label: "Asistencia" },
+  { id: "reconoceme",       icon: "🌟", label: "Reconóceme" },
+  { id: "noticias",         icon: "◈",  label: "Avisos" },
+  { id: "biblioteca",       icon: "▤",  label: "Biblioteca" },
+  { id: "cancionero",       icon: "♫",  label: "Canto Digital" },
+  { id: "documentos",       icon: "⬇",  label: "Descargas Misas" },
+  { id: "integrantes",      icon: "◎",  label: "Integrantes" },
+  { id: "cumpleanos",       icon: "🎂", label: "Cumpleaños" },
+  { id: "musica",           icon: "♪",  label: "Música" },
+  { id: "oraciones",        icon: "✦",  label: "Oraciones" },
+  { id: "pauta_misa",       icon: "🎼", label: "Pauta de Misa" },
+  { id: "podcast",          icon: "◉",  label: "Podcast" },
+  { id: "qanda",            icon: "?",  label: "Preguntas" },
+  { id: "material_ensayo",  icon: "📥", label: "Material de Ensayo" },
 ];
 
 const BOTTOM_NAV = [
@@ -405,10 +406,12 @@ const CUERDAS = {
   Bajo: "#1D9E75",
   Admin: "#6b7280",
   "Contador/a Coro": "#f59e0b",
+  Visita: "#0ea5e9",
 };
 const rolLabel = (r, genero) => {
   if (r === "Admin") return genero === "F" ? "Encargada de Coro" : "Encargado de Coro";
   if (r === "Contador/a Coro") return genero === "F" ? "Contadora Coro" : "Contador Coro";
+  if (r === "Visita") return "Invitado/a";
   return r || "";
 };
 const rolFullLabel = (m) => {
@@ -669,9 +672,18 @@ function MobileMenu({ section, setSection, onClose, user }) {
             ×
           </button>
         </div>
-        {NAV.filter(
-          (item) => (item.id !== "admin" || user?.cuerda === "Admin") && (item.id !== "finanzas" || user?.cuerda === "Admin" || user?.cuerda === "Contador/a Coro")
-        ).map((item) => (
+        {NAV.filter((item) => {
+          const isVisita = user?.cuerda === "Visita";
+          if (isVisita) {
+            return ["dashboard", "pauta_misa", "material_ensayo"].includes(item.id);
+          }
+          if (item.id === "material_ensayo") return false;
+          if (item.id !== "admin" || user?.cuerda === "Admin") {
+            if (item.id !== "finanzas" || user?.cuerda === "Admin" || user?.cuerda === "Contador/a Coro") return true;
+            return false;
+          }
+          return false;
+        }).map((item) => (
           <button
             key={item.id}
             onClick={() => {
@@ -1562,9 +1574,9 @@ export default function App() {
     setUser(p);
     setView("app");
     registrarVisita(p, data.access_token);
-    // Mostrar modal solo si no tiene permiso aún
+    // Mostrar modal solo si no tiene permiso aún y no es usuario Visita
     setTimeout(() => {
-      if (Notification.permission !== "granted") setShowPushModal(true);
+      if (Notification.permission !== "granted" && p?.cuerda !== "Visita") setShowPushModal(true);
     }, 2500);
   }
 
@@ -1597,9 +1609,9 @@ export default function App() {
     setUser(p);
     setView("app");
     registrarVisita(p, data.access_token);
-    // Mostrar modal solo si no tiene permiso aún
+    // Mostrar modal solo si no tiene permiso aún y no es usuario Visita
     setTimeout(() => {
-      if (Notification.permission !== "granted") setShowPushModal(true);
+      if (Notification.permission !== "granted" && p?.cuerda !== "Visita") setShowPushModal(true);
     }, 2500);
   }
 
@@ -1836,9 +1848,17 @@ export default function App() {
           )}
         </div>
         <nav style={{ flex: 1, overflowY: "auto", padding: "8px 6px" }}>
-          {NAV.filter(
-            (item) => (item.id !== "admin" || user?.cuerda === "Admin") && (item.id !== "finanzas" || user?.cuerda === "Admin" || user?.cuerda === "Contador/a Coro")
-          ).map((item) => (
+          {NAV.filter((item) => {
+            const isVisita = user?.cuerda === "Visita";
+            if (isVisita) {
+              return ["dashboard", "pauta_misa", "material_ensayo"].includes(item.id);
+            }
+            // Ocultar material_ensayo para no-visitas
+            if (item.id === "material_ensayo") return false;
+            if (item.id === "admin" && user?.cuerda !== "Admin") return false;
+            if (item.id === "finanzas" && user?.cuerda !== "Admin" && user?.cuerda !== "Contador/a Coro") return false;
+            return true;
+          }).map((item) => (
             <button
               key={item.id}
               onClick={() => setSection(item.id)}
@@ -1935,9 +1955,11 @@ export default function App() {
                 >
                   {user?.nombre}
                 </div>
-                <div style={{ fontSize: 10, color: C.primary }}>
-                  {rolFullLabel(user)}
-                </div>
+                {user?.cuerda !== "Visita" && (
+                  <div style={{ fontSize: 10, color: C.primary }}>
+                    {rolFullLabel(user)}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2332,6 +2354,9 @@ export default function App() {
               )}
               {section === "info_gastos" && (
                 <InfoGastos user={user} members={members} />
+              )}
+              {section === "material_ensayo" && user?.cuerda === "Visita" && (
+                <MaterialEnsayo docs={docs} user={user} />
               )}
             </>
           )}
@@ -3164,11 +3189,13 @@ async function getConfig(key) {
   try {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/config?select=value&key=eq.${encodeURIComponent(key)}&limit=1`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` } }
     );
     if (!res.ok) return null;
     const data = await res.json();
-    return data?.[0]?.value ?? null;
+    // Si el array está vacío, la clave no existe aún — retornar null sin error
+    if (!Array.isArray(data) || data.length === 0) return null;
+    return data[0]?.value ?? null;
   } catch { return null; }
 }
 
@@ -3192,6 +3219,7 @@ function VideoDestacadoWidget({ isAdmin }) {
   const [loadedFromDB, setLoadedFromDB] = useState(false);
   const [editing, setEditing] = useState(false);
   const [inputVal, setInputVal] = useState("");
+  const [saved, setSaved] = useState(false);
 
   // Cargar desde Supabase al montar (funciona en todos los dispositivos)
   useEffect(() => {
@@ -3203,13 +3231,24 @@ function VideoDestacadoWidget({ isAdmin }) {
 
   const videoId = extractYTId(savedUrl);
 
-  function openEdit() { setInputVal(savedUrl); setEditing(true); }
-  function cancelEdit() { setInputVal(""); setEditing(false); }
+  function openEdit() { setInputVal(savedUrl); setEditing(true); setSaved(false); }
+  function cancelEdit() { setInputVal(""); setEditing(false); setSaved(false); }
   async function saveUrl() {
     const v = inputVal.trim();
+    const esNuevo = !!extractYTId(v) && v !== savedUrl;
     setSavedUrl(v);
     await setConfig(VD_STORAGE_KEY, v);
     setEditing(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+    // Notificación push al cambiar video
+    if (esNuevo) {
+      sendPushToAll(
+        "🎬 Nuevo Video Destacado",
+        "Se publicó un nuevo video en el portal del Coro MJ",
+        "/"
+      );
+    }
   }
 
   // Si no hay video y no es admin, no mostrar nada
@@ -3247,6 +3286,9 @@ function VideoDestacadoWidget({ isAdmin }) {
           >
             {editing ? "✕ Cancelar" : "✏️ " + (videoId ? "Cambiar video" : "Asignar video")}
           </button>
+        )}
+        {saved && !editing && (
+          <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600 }}>✅ Guardado</span>
         )}
       </div>
 
@@ -3337,19 +3379,31 @@ function VocalizacionWidget({ isAdmin }) {
   const [savedUrl, setSavedUrl] = useState("");
   const [editing, setEditing] = useState(false);
   const [inputVal, setInputVal] = useState("");
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     getConfig(VOC_STORAGE_KEY).then((val) => { if (val !== null) setSavedUrl(val); });
   }, []);
 
   const videoId = extractYTId(savedUrl);
-  function openEdit() { setInputVal(savedUrl); setEditing(true); }
-  function cancelEdit() { setEditing(false); }
+  function openEdit() { setInputVal(savedUrl); setEditing(true); setSaved(false); }
+  function cancelEdit() { setEditing(false); setSaved(false); }
   async function saveUrl() {
     const v = inputVal.trim();
+    const esNuevo = !!extractYTId(v) && v !== savedUrl;
     setSavedUrl(v);
     await setConfig(VOC_STORAGE_KEY, v);
     setEditing(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+    // Notificación push al cambiar video de vocalización
+    if (esNuevo) {
+      sendPushToAll(
+        "🎤 Nueva Vocalización",
+        "El encargado publicó un nuevo video de vocalización para el ensayo",
+        "/"
+      );
+    }
   }
   if (!videoId && !isAdmin) return null;
   return (
@@ -3366,6 +3420,9 @@ function VocalizacionWidget({ isAdmin }) {
           <button onClick={editing ? cancelEdit : openEdit} style={{ background: editing ? "#f3f4f6" : "#f5f3ff", border: `1px solid ${editing ? C.border : "#a855f760"}`, borderRadius: 8, padding: "5px 12px", fontSize: 11, fontWeight: 600, color: editing ? C.gray : "#7c3aed", cursor: "pointer" }}>
             {editing ? "✕ Cancelar" : "✏️ " + (videoId ? "Cambiar video" : "Asignar video")}
           </button>
+        )}
+        {saved && !editing && (
+          <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600, marginLeft: 4 }}>✅ Guardado</span>
         )}
       </div>
       {editing && (
@@ -3498,6 +3555,372 @@ function GaleriaWidget({ fotos, setSection, isAdmin }) {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════
+//  DASHBOARD VISITA — Pantalla de bienvenida premium para usuario invitado
+// ══════════════════════════════════════════════════════════════════════
+function DashboardVisita({ user, pautas, setSection }) {
+  const hoyInicio = new Date();
+  hoyInicio.setHours(0, 0, 0, 0);
+  const pautasParroquiales = (pautas || [])
+    .filter((p) => p.publicada && p.tipo === "parroquial" && new Date(p.fecha + "T00:00:00") >= hoyInicio)
+    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+  const proxima = pautasParroquiales[0];
+
+  const now = new Date();
+  const hora = now.getHours();
+  const saludo = hora < 12 ? "Buenos días" : hora < 19 ? "Buenas tardes" : "Buenas noches";
+  const primerNombre = user?.nombre?.split(" ")[0] || "Visitante";
+
+  return (
+    <div style={{ maxWidth: 860, margin: "0 auto" }}>
+      <style>{`
+        @keyframes visita-fade { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes visita-glow { 0%,100%{box-shadow:0 0 32px rgba(14,165,233,0.18)} 50%{box-shadow:0 0 56px rgba(14,165,233,0.38)} }
+        @keyframes visita-float { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-8px)} }
+        .visita-card { animation: visita-fade 0.6s ease both; }
+        .visita-card:nth-child(2){ animation-delay:0.12s; }
+        .visita-card:nth-child(3){ animation-delay:0.22s; }
+        .visita-card:nth-child(4){ animation-delay:0.32s; }
+        .visita-icon-float { animation: visita-float 3.5s ease-in-out infinite; }
+        .visita-btn:hover { transform: translateY(-2px) !important; box-shadow: 0 8px 28px rgba(14,165,233,0.38) !important; }
+        .visita-pauta-card:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(14,165,233,0.25) !important; }
+      `}</style>
+
+      {/* ── Hero bienvenida ── */}
+      <div className="visita-card" style={{
+        background: "linear-gradient(135deg, #0c1a2e 0%, #0f3460 40%, #0ea5e9 100%)",
+        borderRadius: 22,
+        padding: "40px 36px",
+        marginBottom: 20,
+        position: "relative",
+        overflow: "hidden",
+        boxShadow: "0 20px 60px rgba(14,165,233,0.25)",
+      }}>
+        {/* Decoración de fondo */}
+        <div style={{ position:"absolute", top:-40, right:-40, width:220, height:220, borderRadius:"50%", background:"rgba(255,255,255,0.04)" }} />
+        <div style={{ position:"absolute", bottom:-60, left:-30, width:280, height:280, borderRadius:"50%", background:"rgba(255,255,255,0.03)" }} />
+        <div style={{ position:"absolute", top:20, right:36, opacity:0.12, fontSize:120, lineHeight:1, userSelect:"none" }}>🎼</div>
+
+        <div style={{ position:"relative", zIndex:1 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:20 }}>
+            <div className="visita-icon-float" style={{
+              width:64, height:64, borderRadius:18,
+              background:"linear-gradient(135deg,rgba(255,255,255,0.18),rgba(255,255,255,0.06))",
+              border:"1.5px solid rgba(255,255,255,0.2)",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:32, flexShrink:0,
+              backdropFilter:"blur(8px)",
+            }}>🎵</div>
+            <div>
+              <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.55)", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:4 }}>
+                Portal Litúrgico · Acceso Invitado
+              </div>
+              <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:26, fontWeight:800, color:"white", lineHeight:1.1 }}>
+                {saludo},<br/>{primerNombre} 👋
+              </div>
+            </div>
+          </div>
+
+          <p style={{ fontSize:14, color:"rgba(255,255,255,0.78)", lineHeight:1.8, marginBottom:24, maxWidth:520 }}>
+            Bienvenido/a al portal de gestión litúrgica. Aquí encontrarás las <strong style={{color:"white"}}>pautas de misa parroquiales</strong> publicadas y el <strong style={{color:"white"}}>material de ensayo</strong> disponible para esta celebración.
+          </p>
+
+          <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
+            <button
+              className="visita-btn"
+              onClick={() => setSection("pauta_misa")}
+              style={{
+                background:"white", color:"#0c1a2e",
+                border:"none", borderRadius:12, padding:"12px 24px",
+                fontSize:13, fontWeight:700, cursor:"pointer",
+                display:"flex", alignItems:"center", gap:8,
+                transition:"all 0.2s",
+                boxShadow:"0 4px 16px rgba(14,165,233,0.2)",
+              }}>
+              🎼 Ver Pauta de Misa
+            </button>
+            <button
+              className="visita-btn"
+              onClick={() => setSection("material_ensayo")}
+              style={{
+                background:"rgba(255,255,255,0.12)", color:"white",
+                border:"1.5px solid rgba(255,255,255,0.25)", borderRadius:12, padding:"12px 24px",
+                fontSize:13, fontWeight:700, cursor:"pointer",
+                display:"flex", alignItems:"center", gap:8,
+                transition:"all 0.2s",
+                backdropFilter:"blur(8px)",
+              }}>
+              📥 Material de Ensayo
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Próxima pauta parroquial destacada ── */}
+      {proxima ? (
+        <div
+          className="visita-card visita-pauta-card"
+          onClick={() => setSection("pauta_misa")}
+          style={{
+            background:"linear-gradient(135deg,#f0fdf4,#dcfce7)",
+            borderRadius:18, padding:"22px 26px", marginBottom:20,
+            border:"2px solid #1D9E7530", cursor:"pointer",
+            boxShadow:"0 6px 24px rgba(29,158,117,0.14)",
+            transition:"all 0.25s",
+            display:"flex", alignItems:"center", gap:18,
+          }}>
+          <div style={{
+            width:56, height:56, borderRadius:15,
+            background:"linear-gradient(135deg,#1a3a2a,#1D9E75)",
+            display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+            flexShrink:0, boxShadow:"0 4px 14px rgba(29,158,117,0.35)",
+          }}>
+            <div style={{ fontSize:18, fontWeight:800, color:"white", lineHeight:1 }}>
+              {new Date(proxima.fecha+"T00:00:00").getDate()}
+            </div>
+            <div style={{ fontSize:9, color:"rgba(255,255,255,0.8)", textTransform:"uppercase" }}>
+              {new Date(proxima.fecha+"T00:00:00").toLocaleDateString("es-CL",{month:"short"})}
+            </div>
+          </div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:10, fontWeight:700, color:"#1D9E75", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:3 }}>
+              🎼 Próxima Misa Parroquial
+            </div>
+            <div style={{ fontSize:16, fontWeight:700, color:"#1a3a2a", marginBottom:3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+              {proxima.titulo}
+            </div>
+            <div style={{ fontSize:12, color:"#4b7a62" }}>
+              {new Date(proxima.fecha+"T00:00:00").toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"})}
+              {proxima.hora ? ` · ${proxima.hora} Hrs` : ""}
+              {proxima.lugar ? ` · ${proxima.lugar}` : ""}
+            </div>
+          </div>
+          <span style={{ fontSize:13, color:"#1D9E75", fontWeight:700, flexShrink:0 }}>Ver →</span>
+        </div>
+      ) : (
+        <div className="visita-card" style={{
+          background:"#f8fafc", borderRadius:18, padding:"22px 26px", marginBottom:20,
+          border:"1px dashed #cbd5e1", textAlign:"center",
+        }}>
+          <div style={{ fontSize:36, marginBottom:8, opacity:0.4 }}>🎼</div>
+          <div style={{ fontSize:13, color:"#64748b" }}>No hay pautas parroquiales publicadas aún.</div>
+        </div>
+      )}
+
+      {/* ── Info cards ── */}
+      <div className="visita-card" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:20 }}>
+        <div style={{
+          background:"linear-gradient(135deg,#fef3c7,#fffbeb)",
+          borderRadius:16, padding:"20px 22px",
+          border:"1px solid #fbbf2430",
+          boxShadow:"0 4px 16px rgba(251,191,36,0.08)",
+        }}>
+          <div style={{ fontSize:28, marginBottom:10 }}>📥</div>
+          <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:14, fontWeight:700, color:"#92400e", marginBottom:6 }}>
+            Material de Ensayo
+          </div>
+          <div style={{ fontSize:12, color:"#b45309", lineHeight:1.6, marginBottom:14 }}>
+            Accede a las letras, partituras y audios para preparar la liturgia.
+          </div>
+          <button onClick={() => setSection("material_ensayo")} style={{
+            background:"#f59e0b", color:"white", border:"none", borderRadius:8,
+            padding:"8px 16px", fontSize:12, fontWeight:700, cursor:"pointer",
+          }}>
+            Ver material →
+          </button>
+        </div>
+
+        <div style={{
+          background:"linear-gradient(135deg,#f0f9ff,#e0f2fe)",
+          borderRadius:16, padding:"20px 22px",
+          border:"1px solid #7dd3fc30",
+          boxShadow:"0 4px 16px rgba(14,165,233,0.08)",
+        }}>
+          <div style={{ fontSize:28, marginBottom:10 }}>🎼</div>
+          <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:14, fontWeight:700, color:"#0c4a6e", marginBottom:6 }}>
+            Pauta de Misa
+          </div>
+          <div style={{ fontSize:12, color:"#075985", lineHeight:1.6, marginBottom:14 }}>
+            Consulta el orden y canciones de las misas parroquiales publicadas.
+          </div>
+          <button onClick={() => setSection("pauta_misa")} style={{
+            background:"#0ea5e9", color:"white", border:"none", borderRadius:8,
+            padding:"8px 16px", fontSize:12, fontWeight:700, cursor:"pointer",
+          }}>
+            Ver pautas →
+          </button>
+        </div>
+      </div>
+
+      {/* ── Footer informativo ── */}
+      <div className="visita-card" style={{
+        background:"#f8fafc", borderRadius:16, padding:"16px 22px",
+        border:"1px solid #e2e8f0",
+        display:"flex", alignItems:"center", gap:14,
+      }}>
+        <span style={{ fontSize:24, flexShrink:0 }}>⛪</span>
+        <div>
+          <div style={{ fontSize:13, fontWeight:600, color:"#1e293b", marginBottom:2 }}>
+            Portal de Gestión Litúrgica
+          </div>
+          <div style={{ fontSize:11, color:"#64748b", lineHeight:1.6 }}>
+            Este portal es administrado por el Coro Misioneros de Jesús. Para consultas, contacta al encargado de liturgia.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  MATERIAL DE ENSAYO — Sección exclusiva para usuario Visita
+// ══════════════════════════════════════════════════════════════════════
+function MaterialEnsayo({ docs, user }) {
+  const [search, setSearch] = useState("");
+  const [catFiltro, setCatFiltro] = useState("Todos");
+
+  // Mostrar todos los documentos disponibles (el admin decide qué subir)
+  const lista = (docs || []).filter((d) => {
+    const matchSearch = !search || d.nombre?.toLowerCase().includes(search.toLowerCase());
+    const matchCat = catFiltro === "Todos" || d.categoria === catFiltro;
+    return matchSearch && matchCat;
+  });
+
+  const categorias = ["Todos", ...Array.from(new Set((docs||[]).map(d => d.categoria).filter(Boolean)))];
+
+  const iconCat = (cat) => {
+    const c = (cat||"").toLowerCase();
+    if (c.includes("letra")) return "📝";
+    if (c.includes("partitura")) return "🎵";
+    if (c.includes("audio")) return "🎧";
+    if (c.includes("pdf")) return "📄";
+    if (c.includes("video")) return "🎬";
+    return "📥";
+  };
+
+  return (
+    <div style={{ maxWidth: 860 }}>
+      {/* Header */}
+      <div style={{
+        background:"linear-gradient(135deg,#0c1a2e,#0ea5e9)",
+        borderRadius:20, padding:"28px 32px", marginBottom:20,
+        boxShadow:"0 12px 40px rgba(14,165,233,0.22)",
+        position:"relative", overflow:"hidden",
+      }}>
+        <div style={{ position:"absolute", top:-30, right:-30, width:180, height:180, borderRadius:"50%", background:"rgba(255,255,255,0.05)" }} />
+        <div style={{ position:"relative", zIndex:1 }}>
+          <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.55)", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:6 }}>
+            Acceso Invitado
+          </div>
+          <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:22, fontWeight:800, color:"white", marginBottom:8 }}>
+            📥 Material de Ensayo
+          </div>
+          <div style={{ fontSize:13, color:"rgba(255,255,255,0.75)", lineHeight:1.7 }}>
+            Descarga aquí los recursos disponibles para preparar la liturgia: letras, partituras, audios y más.
+          </div>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap", alignItems:"center" }}>
+        <div style={{
+          display:"flex", alignItems:"center", gap:8,
+          background:"white", borderRadius:10, padding:"7px 14px",
+          border:"1px solid #e5e7eb", flex:1, maxWidth:320,
+        }}>
+          <span style={{ color:"#9ca3af", fontSize:14 }}>🔍</span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar material..."
+            style={{ background:"none", border:"none", outline:"none", fontSize:13, width:"100%", color:"#111827" }}
+          />
+          {search && (
+            <button onClick={() => setSearch("")} style={{ background:"none", border:"none", color:"#9ca3af", cursor:"pointer", fontSize:16, padding:0, lineHeight:1 }}>×</button>
+          )}
+        </div>
+        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+          {categorias.map(cat => (
+            <button key={cat} onClick={() => setCatFiltro(cat)} style={{
+              padding:"6px 14px", borderRadius:20, border:"none", cursor:"pointer",
+              fontSize:11, fontWeight:600,
+              background: catFiltro===cat ? "#0ea5e9" : "#f1f5f9",
+              color: catFiltro===cat ? "white" : "#475569",
+              transition:"all 0.15s",
+            }}>{iconCat(cat)} {cat}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Lista de documentos */}
+      {lista.length === 0 ? (
+        <div style={{ textAlign:"center", padding:"60px 20px", color:"#64748b" }}>
+          <div style={{ fontSize:52, marginBottom:14, opacity:0.35 }}>📦</div>
+          <div style={{ fontSize:15, fontWeight:600, marginBottom:6 }}>Sin material disponible</div>
+          <div style={{ fontSize:13 }}>
+            {search || catFiltro !== "Todos"
+              ? "No hay resultados para este filtro."
+              : "El encargado publicará material de ensayo próximamente."}
+          </div>
+        </div>
+      ) : (
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
+          {lista.map((doc) => (
+            <a
+              key={doc.id}
+              href={doc.url || doc.archivo_url || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration:"none" }}
+            >
+              <div style={{
+                background:"white", borderRadius:14, padding:"16px 18px",
+                border:"1px solid #e5e7eb",
+                boxShadow:"0 2px 8px rgba(0,0,0,0.04)",
+                transition:"all 0.2s",
+                display:"flex", alignItems:"center", gap:14,
+                cursor:"pointer",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow="0 8px 28px rgba(14,165,233,0.16)"; e.currentTarget.style.borderColor="#7dd3fc"; e.currentTarget.style.transform="translateY(-2px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor="#e5e7eb"; e.currentTarget.style.transform="translateY(0)"; }}
+              >
+                <div style={{
+                  width:44, height:44, borderRadius:12, flexShrink:0,
+                  background:"linear-gradient(135deg,#0c1a2e,#0ea5e9)",
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:20,
+                }}>
+                  {iconCat(doc.categoria)}
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:"#111827", marginBottom:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                    {doc.nombre}
+                  </div>
+                  {doc.categoria && (
+                    <div style={{ fontSize:11, color:"#0ea5e9", fontWeight:600 }}>{doc.categoria}</div>
+                  )}
+                  {doc.descripcion && (
+                    <div style={{ fontSize:11, color:"#6b7280", marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{doc.descripcion}</div>
+                  )}
+                </div>
+                <div style={{
+                  flexShrink:0, background:"#f0f9ff", borderRadius:8,
+                  padding:"5px 10px", fontSize:11, fontWeight:700, color:"#0ea5e9",
+                  border:"1px solid #bae6fd",
+                }}>⬇ Descargar</div>
+              </div>
+            </a>
+          ))}
+        </div>
+      )}
+
+      <div style={{ marginTop:24, textAlign:"center", fontSize:11, color:"#94a3b8" }}>
+        {lista.length} {lista.length!==1?"archivos disponibles":"archivo disponible"}
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({
   cumple,
   evangelio,
@@ -3525,6 +3948,7 @@ function Dashboard({
     .filter((e) => new Date(e.fecha + "T00:00:00") >= new Date())
     .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
   const isAdmin = user?.cuerda === "Admin";
+  const isVisita = user?.cuerda === "Visita";
   const pautasBorrador = (pautas || []).filter((p) => !p.publicada);
   const hoyInicio = new Date();
   hoyInicio.setHours(0, 0, 0, 0);
@@ -3559,6 +3983,11 @@ function Dashboard({
   };
   return (
     <div style={{ maxWidth: 1100 }}>
+      {/* ═══ MODO VISITA — Dashboard especial ═══ */}
+      {isVisita && (
+        <DashboardVisita user={user} pautas={pautas} setSection={setSection} />
+      )}
+      {isVisita ? null : (<>
       {/* ── Aviso pauta en borrador (solo Admin) ── */}
       {isAdmin && pautasBorrador.length > 0 && (
         <div
@@ -3846,7 +4275,7 @@ function Dashboard({
               {user?.nombre?.split(" ")[0]}
             </div>
             <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>
-              {rolFullLabel(user)}
+              {user?.cuerda !== "Visita" ? rolFullLabel(user) : ""}
             </div>
             {pctAsistencia !== null ? (
               <div style={{ fontSize: 11, color: pctAsistencia >= 75 ? C.primary : pctAsistencia >= 50 ? "#f59e0b" : "#ef4444", fontWeight: 600, marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
@@ -4925,6 +5354,7 @@ function Dashboard({
         );
       })()}
 
+      </>)}
     </div>
   );
 }
@@ -5359,7 +5789,7 @@ function Perfil({ user, members, setUser }) {
           >
             {user?.nombre}
           </div>
-          <Chip label={rolFullLabel(user)} color={cc} />
+          {user?.cuerda !== "Visita" && <Chip label={rolFullLabel(user)} color={cc} />}
           <p
             style={{
               color: C.gray,
@@ -5387,11 +5817,7 @@ function Perfil({ user, members, setUser }) {
           </div>
           {[
             { label: "Nombre", value: user?.nombre, icon: "👤" },
-            {
-              label: "Rol en el Coro",
-              value: rolFullLabel(user),
-              icon: "🎵",
-            },
+            ...(user?.cuerda !== "Visita" ? [{ label: "Rol en el Coro", value: rolFullLabel(user), icon: "🎵" }] : []),
           ].map((f, i) => (
             <div
               key={i}
@@ -5992,6 +6418,7 @@ function Documentos({ docs, onReload }) {
     setSaving(true);
     try {
       await supabase("documentos", { method: "POST", body: form });
+      sendPushToAll("📄 Nuevo documento en el Coro", form.nombre, "/");
       setForm({ nombre: "", url: "", categoria: "Repertorio", size: "" });
       setShowForm(false);
       onReload();
@@ -11793,6 +12220,11 @@ const TITULO_CELEBRACION_OPTIONS = [
 
 function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const isAdmin = user?.cuerda === "Admin";
+  const isVisita = user?.cuerda === "Visita";
+  // Usuario Visita solo ve pautas de tipo parroquial
+  const pautasFiltradas = isVisita
+    ? (pautas || []).filter((p) => p.publicada && p.tipo === "parroquial")
+    : pautas;
   const [selected, setSelected] = useState(null); // pauta activa
   const [mode, setMode] = useState(null); // null=lista | "new" | "edit" | "view"
   const [saving, setSaving] = useState(false);
@@ -11818,6 +12250,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     lugar: "",
     tipo_celebracion: "Misa Dominical",
     notas: "",
+    tipo: "grupo", // "grupo" | "parroquial"
   };
   const [form, setForm] = useState(emptyPauta);
   const [tituloMode, setTituloMode] = useState("select"); // "select" | "custom"
@@ -11884,6 +12317,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
         notas: form.notas.trim(),
         canciones: JSON.stringify(canciones),
         publicada: publish,
+        tipo: form.tipo || "grupo",
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/pautas_misa`, {
         method: "POST",
@@ -11905,6 +12339,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       if (publish) {
         setSelected(created);
         await notificarIntegrantes(created, members);
+        sendPushToAll("📋 Nueva pauta de misa publicada", `${created.titulo}${created.fecha ? " — " + created.fecha : ""}`, "/");
         setNotifStatus("✅ Notificación WhatsApp lista para enviar.");
       } else {
         setMsg("✅ Pauta guardada como borrador.");
@@ -11929,6 +12364,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
         notas: form.notas ?? pauta.notas,
         canciones: JSON.stringify(canciones),
         publicada,
+        tipo: form.tipo || pauta.tipo || "grupo",
       };
       await updateRecord("pautas_misa", pauta.id, body);
       await onReload();
@@ -11937,6 +12373,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       setMode("view");
       if (publish) {
         await notificarIntegrantes(updated, members);
+        sendPushToAll("📋 Pauta de misa publicada", `${updated.titulo}${updated.fecha ? " — " + updated.fecha : ""}`, "/");
         setNotifStatus("✅ Pauta publicada. Notificación WhatsApp lista.");
       } else {
         setMsg("✅ Pauta actualizada.");
@@ -11959,6 +12396,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
         setSelected(updated);
         setMode("view");
         await notificarIntegrantes(updated, members);
+        sendPushToAll("📋 Pauta de misa publicada", `${pauta.titulo}${pauta.fecha ? " — " + pauta.fecha : ""}`, "/");
         setNotifStatus("✅ Pauta publicada. Notificación WhatsApp lista.");
       } else {
         setSelected({ ...pauta, publicada: false });
@@ -12007,6 +12445,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       lugar: pauta.lugar || "",
       tipo_celebracion: pauta.tipo_celebracion || "Misa Dominical",
       notas: pauta.notas || "",
+      tipo: pauta.tipo || "grupo",
     });
     const inList = TITULO_CELEBRACION_OPTIONS.includes(pauta.titulo);
     setTituloMode(inList ? "select" : "custom");
@@ -12251,6 +12690,25 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   <option key={t}>{t}</option>
                 ))}
               </select>
+            </div>
+            {/* ── Tipo de pauta (grupo / parroquial) ── */}
+            <div>
+              <label style={{ display:"block", fontSize:11, fontWeight:500, color:C.gray, marginBottom:4 }}>
+                Tipo de pauta
+              </label>
+              <select
+                value={form.tipo || "grupo"}
+                onChange={(e) => setForm((p) => ({ ...p, tipo: e.target.value }))}
+                style={{ ...inp, borderColor: form.tipo === "parroquial" ? "#0ea5e9" : C.border }}
+              >
+                <option value="grupo">🎵 Grupo (solo integrantes del coro)</option>
+                <option value="parroquial">⛪ Parroquial (visible para invitados)</option>
+              </select>
+              {form.tipo === "parroquial" && (
+                <div style={{ fontSize:10, color:"#0ea5e9", marginTop:4, fontWeight:600 }}>
+                  ✅ Esta pauta será visible para usuarios de tipo Visita
+                </div>
+              )}
             </div>
           </div>
           <div
@@ -13108,14 +13566,14 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   }
 
   // ── Vista lista ────────────────────────────────────────────
-  const borradores = pautas.filter((p) => !p.publicada);
-  const publicadas = pautas.filter((p) => p.publicada);
+  const borradores = pautasFiltradas.filter((p) => !p.publicada);
+  const publicadas = pautasFiltradas.filter((p) => p.publicada);
 
   return (
     <div style={{ maxWidth: 1100 }}>
       <SectionTitle
         title="🎼 Pauta de Misa"
-        subtitle="Repertorio litúrgico para cada celebración del Coro MJ"
+        subtitle={isVisita ? "Pautas de misas parroquiales disponibles" : "Repertorio litúrgico para cada celebración del Coro MJ"}
         action={
           isAdmin && (
             <Btn
@@ -13132,7 +13590,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
         }
       />
 
-      {pautas.length === 0 && (
+      {pautasFiltradas.length === 0 && (
         <Card style={{ textAlign: "center", padding: "40px 24px" }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🎼</div>
           <div
@@ -13255,8 +13713,13 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   >
                     {fechaFmt} · {p.hora} Hrs{p.lugar ? ` · ${p.lugar}` : ""}
                   </div>
-                  <div style={{ fontSize: 11, color: C.primary, marginTop: 4 }}>
+                  <div style={{ fontSize: 11, color: C.primary, marginTop: 4, display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
                     {c.length} canciones · {p.tipo_celebracion}
+                    {p.tipo === "parroquial" && (
+                      <span style={{ background:"#e0f2fe", color:"#0369a1", borderRadius:10, padding:"1px 8px", fontWeight:700, fontSize:10 }}>
+                        ⛪ Parroquial
+                      </span>
+                    )}
                   </div>
                 </div>
                 <span style={{ fontSize: 12, color: C.gray }}>Ver pauta →</span>
@@ -13374,8 +13837,13 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   >
                     {fechaFmt} · {p.hora} Hrs
                   </div>
-                  <div style={{ fontSize: 11, color: "#b45309", marginTop: 4 }}>
+                  <div style={{ fontSize: 11, color: "#b45309", marginTop: 4, display:"flex", alignItems:"center", gap:8 }}>
                     {c.length} canciones
+                    {p.tipo === "parroquial" && (
+                      <span style={{ background:"#e0f2fe", color:"#0369a1", borderRadius:10, padding:"1px 8px", fontWeight:700, fontSize:10 }}>
+                        ⛪ Parroquial
+                      </span>
+                    )}
                   </div>
                 </div>
                 <span style={{ fontSize: 12, color: C.gray }}>Editar →</span>
@@ -18877,4 +19345,43 @@ CREATE POLICY "Acceso total" ON fin_miembros_cuotas FOR ALL USING (true) WITH CH
   7. IMPORTAR al inicio de App.jsx:
      import { ModuloFinanzas, InfoGastos } from "./FinanzasModulo";
      (o pegar el contenido directamente si usas un solo archivo)
+*/
+
+// ══════════════════════════════════════════════════════════════════════
+//  SQL — PERFIL VISITA: ejecutar en Supabase > SQL Editor
+// ══════════════════════════════════════════════════════════════════════
+/*
+-- 1. Agregar columna "tipo" a pautas_misa (si no existe)
+ALTER TABLE pautas_misa
+  ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'grupo';
+-- Valores: 'grupo' (solo coro) | 'parroquial' (visible para Visita)
+
+-- 2. Crear el usuario invitado en Supabase Auth
+-- Ve a Supabase > Authentication > Users > Add User:
+--   Email:    invitado@coromj.cl   (o el que prefieras)
+--   Password: (la que quieras compartir con los encargados de misa)
+--   Confirm email: ✓ (marcar como confirmado)
+
+-- 3. Insertar el perfil de integrante para el usuario invitado
+-- (reemplaza el auth_id con el UUID que aparece al crear el usuario en Supabase Auth)
+INSERT INTO integrantes (nombre, email, cuerda, auth_id)
+VALUES ('Invitado', 'invitado@coromj.cl', 'Visita', 'PEGA_AQUI_EL_UUID_DEL_USUARIO')
+ON CONFLICT (email) DO UPDATE SET cuerda = 'Visita';
+
+-- 4. (Opcional) Si quieres que varias personas usen la misma cuenta,
+--    simplemente comparte el email y contraseña del usuario invitado.
+--    La sesión se puede usar en múltiples dispositivos simultáneamente.
+
+-- 5. Marcar una pauta como parroquial (visible para Visita):
+UPDATE pautas_misa SET tipo = 'parroquial' WHERE id = 'ID_DE_LA_PAUTA';
+-- O hazlo directamente desde el formulario de edición en el portal (Admin).
+
+-- 6. TABLA CONFIG (para widgets Video Destacado y Vocalización)
+--    Si aún no tienes esta tabla, créala:
+CREATE TABLE IF NOT EXISTS config (
+  key   TEXT PRIMARY KEY,
+  value TEXT
+);
+ALTER TABLE config ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Acceso total" ON config FOR ALL USING (true) WITH CHECK (true);
 */
