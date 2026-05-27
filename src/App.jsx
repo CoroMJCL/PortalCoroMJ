@@ -889,6 +889,7 @@ export default function App() {
     return "login";
   })();
   const [view, setView] = useState(_initialView); // "login" | "register" | "recover" | "reset" | "app"
+  const [showPushModal, setShowPushModal] = useState(false);
   const [user, setUser] = useState(null);
   const [authToken, setAuthToken] = useState(null);
   const [section, setSection] = useState("dashboard");
@@ -1560,6 +1561,8 @@ export default function App() {
     setUser(p);
     setView("app");
     registrarVisita(p, data.access_token);
+    // Mostrar modal explicativo antes del popup nativo
+    setTimeout(() => { setShowPushModal(true); }, 2500);
   }
 
   async function handleSignUp(
@@ -1591,6 +1594,8 @@ export default function App() {
     setUser(p);
     setView("app");
     registrarVisita(p, data.access_token);
+    // Mostrar modal explicativo antes del popup nativo
+    setTimeout(() => { setShowPushModal(true); }, 2500);
   }
 
   async function handleSignOut() {
@@ -1672,6 +1677,16 @@ export default function App() {
       />
     );
 
+  async function activarNotificaciones(userId) {
+    try {
+      await window.OneSignalDeferred?.push(async (os) => {
+        if (userId) await os.login(String(userId));
+        await os.Notifications.requestPermission();
+      });
+    } catch(e) {}
+    setShowPushModal(false);
+  }
+
   return (
     <div
       style={{
@@ -1682,6 +1697,50 @@ export default function App() {
       }}
     >
       <style>{G}</style>
+
+      {/* ── Modal explicativo notificaciones push ── */}
+      {showPushModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 9999,
+          background: "rgba(0,0,0,0.55)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 20,
+        }}>
+          <div style={{
+            background: "white", borderRadius: 20, padding: "32px 28px",
+            maxWidth: 360, width: "100%", textAlign: "center",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+          }}>
+            <div style={{ fontSize: 52, marginBottom: 12 }}>🔔</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#111827", marginBottom: 10, fontFamily: "'Poppins',sans-serif" }}>
+              ¡Mantente al día con el Coro!
+            </div>
+            <div style={{ fontSize: 14, color: "#6b7280", lineHeight: 1.7, marginBottom: 24 }}>
+              Activa las notificaciones para enterarte al instante cuando se publiquen <strong>nuevos avisos, ensayos, misas o documentos</strong> — aunque no tengas el portal abierto.
+            </div>
+            <button
+              onClick={() => activarNotificaciones(user?.id)}
+              style={{
+                width: "100%", padding: "14px", borderRadius: 12, border: "none",
+                background: "#1D9E75", color: "white", fontSize: 15,
+                fontWeight: 700, cursor: "pointer", marginBottom: 10,
+                fontFamily: "'Inter',sans-serif",
+              }}>
+              ✅ Sí, activar notificaciones
+            </button>
+            <button
+              onClick={() => setShowPushModal(false)}
+              style={{
+                width: "100%", padding: "11px", borderRadius: 12, border: "1px solid #e5e7eb",
+                background: "white", color: "#6b7280", fontSize: 13,
+                cursor: "pointer", fontFamily: "'Inter',sans-serif",
+              }}>
+              Ahora no
+            </button>
+          </div>
+        </div>
+      )}
+
       {mobileMenu && (
         <MobileMenu
           section={section}
