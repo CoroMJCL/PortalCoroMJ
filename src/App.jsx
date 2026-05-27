@@ -3504,8 +3504,8 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
         {
           method: "POST",
           headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+            apikey: SUPABASE_SERVICE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
             "Content-Type": file.type,
             "x-upsert": "true",
           },
