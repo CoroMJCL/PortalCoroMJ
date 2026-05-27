@@ -14,6 +14,116 @@ const SECRET_ADMIN_CODE = "CoroCJM2026!";
 // Para subir: ve a Supabase > Storage > publico > Upload > sube canalymj.jpg
 const BANNER_URL = `${SUPABASE_URL}/storage/v1/object/public/publico/canalymj.jpg`;
 
+// ══════════════════════════════════════════════════════════════════════
+//  NOTIFICACIONES PUSH — Web Push API + Supabase
+// ══════════════════════════════════════════════════════════════════════
+// VAPID public key — genera el par en: https://web-push-codelab.glitch.me/
+// Luego reemplaza esta clave por tu VAPID_PUBLIC_KEY real.
+// La VAPID_PRIVATE_KEY va solo en el servidor (Supabase Edge Function).
+const VAPID_PUBLIC_KEY = "BN4AEwtCEyjLXAOpa-9Q-3At-rHiLVL-38ZufD6S1Sr4Q3fuY967GMokOt8D0FZVX_PTTi1r8nSVO61Y3lh8XGo";
+
+// Registra el Service Worker e inscribe al usuario para notificaciones push.
+// Guarda la suscripción en la tabla push_subscriptions de Supabase.
+async function registerPushNotifications(user) {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return false;
+  try {
+    // 1. Registrar Service Worker
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+
+    // 2. Pedir permiso
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return false;
+
+    // 3. Suscribirse al push
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) await existing.unsubscribe();
+
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+
+    // 4. Guardar en Supabase
+    await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates",
+      },
+      body: JSON.stringify({
+        integrante_id: user?.id || null,
+        nombre: user?.nombre || "",
+        email: user?.email || "",
+        cuerda: user?.cuerda || "",
+        subscription: JSON.stringify(sub),
+        updated_at: new Date().toISOString(),
+      }),
+    });
+    return true;
+  } catch (e) {
+    console.warn("Push registration error:", e);
+    return false;
+  }
+}
+
+async function unregisterPushNotifications(userId) {
+  try {
+    if ("serviceWorker" in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) await sub.unsubscribe();
+    }
+    if (userId) {
+      await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions?integrante_id=eq.${userId}`, {
+        method: "DELETE",
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` },
+      });
+    }
+  } catch (e) { console.warn("Unregister error:", e); }
+}
+
+async function checkPushSubscribed(userId) {
+  try {
+    if (!("serviceWorker" in navigator)) return false;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return false;
+    if (!userId) return true;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions?integrante_id=eq.${userId}&select=integrante_id`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` },
+    });
+    const data = await res.json();
+    return Array.isArray(data) && data.length > 0;
+  } catch { return false; }
+}
+
+// Envía notificación a todos los suscriptores via Supabase Edge Function
+// La Edge Function se llama "send-push" y recibe { title, body, url }
+async function sendPushToAll(title, body, url = "/") {
+  try {
+    await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+        apikey: SUPABASE_KEY,
+      },
+      body: JSON.stringify({ title, body, url }),
+    });
+  } catch (e) { console.warn("Error enviando push:", e); }
+}
+
+// Utilidad: convierte VAPID public key de base64 a Uint8Array
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
 // ── Google Calendar API (pública, solo lectura) ───────────────────────
 const GCAL_CALENDAR_ID = "coromisionerosdjesuscl@gmail.com";
 const GCAL_API_KEY = "AIzaSyAFSJguKkIY1shCYA1HIFwv9OtaYGnu45k";
@@ -4908,6 +5018,35 @@ function Perfil({ user, members, setUser }) {
   const [savingGenero, setSavingGenero] = useState(false);
   const fileRef = useRef(null);
 
+  // ── Notificaciones push ──
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+
+  useEffect(() => {
+    const supported = "serviceWorker" in navigator && "PushManager" in window;
+    setPushSupported(supported);
+    if (supported && user?.id) {
+      checkPushSubscribed(user.id).then(setPushEnabled);
+    }
+  }, [user?.id]);
+
+  async function togglePush() {
+    setPushLoading(true);
+    try {
+      if (pushEnabled) {
+        await unregisterPushNotifications(user?.id);
+        setPushEnabled(false);
+        setMsg("🔕 Notificaciones desactivadas.");
+      } else {
+        const ok = await registerPushNotifications(user);
+        if (ok) { setPushEnabled(true); setMsg("🔔 ¡Notificaciones activadas!"); }
+        else setMsg("No se pudo activar. Asegúrate de permitir notificaciones en tu navegador.");
+      }
+    } catch (e) { setMsg("Error: " + e.message); }
+    setPushLoading(false);
+  }
+
   async function handlePhoto(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -5651,6 +5790,45 @@ function Perfil({ user, members, setUser }) {
                 </div>
               )}
             </div>
+          </div>
+        </Card>
+
+        {/* ── Notificaciones Push ── */}
+        <Card style={{ marginTop: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{
+              width: 42, height: 42, borderRadius: 10, flexShrink: 0,
+              background: pushEnabled ? "#dcfce7" : C.light,
+              border: `1.5px solid ${pushEnabled ? "#86efac" : C.border}`,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+            }}>
+              {pushEnabled ? "🔔" : "🔕"}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.dark }}>Notificaciones</div>
+              <div style={{ fontSize: 11, color: C.gray, marginTop: 1 }}>
+                {!pushSupported
+                  ? "Tu navegador no soporta notificaciones push."
+                  : pushEnabled
+                  ? "Recibirás notificaciones de nuevos avisos, eventos y documentos."
+                  : "Activa las notificaciones para enterarte al instante de novedades del coro."}
+              </div>
+            </div>
+            {pushSupported && (
+              <button
+                onClick={togglePush}
+                disabled={pushLoading}
+                style={{
+                  padding: "8px 16px", borderRadius: 20, border: "none", cursor: "pointer",
+                  fontWeight: 700, fontSize: 12, flexShrink: 0,
+                  background: pushEnabled ? "#fee2e2" : C.primary,
+                  color: pushEnabled ? "#dc2626" : "white",
+                  opacity: pushLoading ? 0.6 : 1,
+                }}
+              >
+                {pushLoading ? "..." : pushEnabled ? "Desactivar" : "Activar"}
+              </button>
+            )}
           </div>
         </Card>
       </div>
@@ -8651,6 +8829,7 @@ const ADMIN_TABS = [
   { id: "historial", label: "📅 Historial Asistencia" },
   { id: "cuenta_bancaria", label: "🏦 Cuenta Bancaria" },
   { id: "visitas", label: "📊 Visitas" },
+  { id: "notificaciones", label: "🔔 Notificaciones" },
 ];
 
 function AdminTab({ label, active, onClick }) {
@@ -9385,6 +9564,7 @@ function AdminEventos({ eventos, onReload }) {
     setSaving(true);
     try {
       await supabase("eventos", { method: "POST", body: form });
+      sendPushToAll("📅 Nuevo evento del Coro", `${form.titulo}${form.fecha ? " — " + form.fecha : ""}`, "/");
       setForm({
         titulo: "",
         fecha: "",
@@ -9596,6 +9776,7 @@ function AdminDocumentos({ docs, onReload }) {
     setSaving(true);
     try {
       await supabase("documentos", { method: "POST", body: form });
+      sendPushToAll("📄 Nuevo documento en el Coro", form.nombre, "/");
       setForm({ nombre: "", url: "", categoria: "Repertorio", size: "" });
       setShowForm(false);
       onReload();
@@ -10163,6 +10344,7 @@ function AdminNoticias({ noticias, onReload }) {
     setSaving(true);
     try {
       await supabase("noticias", { method: "POST", body: { titulo: form.titulo, fuente: form.fuente, url: form.url, descripcion: form.descripcion, imagen_url: form.imagen_url } });
+      sendPushToAll("📢 Nuevo aviso del Coro", form.titulo, "/");
       setForm(emptyForm); setImgPreview(null); setShowForm(false); onReload();
     } catch (e) { alert("Error: " + e.message); }
     setSaving(false);
@@ -15878,9 +16060,185 @@ function Admin({
         {tab === "historial" && <AdminHistorialAsistencia members={members} />}
         {tab === "cuenta_bancaria" && <AdminCuentaBancaria />}
         {tab === "visitas" && <AdminVisitas />}
+        {tab === "notificaciones" && <AdminNotificaciones />}
       </Card>
 
       <SqlSetupBlock />
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  ADMINISTRACIÓN DE NOTIFICACIONES PUSH
+// ══════════════════════════════════════════════════════════════════════
+function AdminNotificaciones() {
+  const [subs, setSubs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [form, setForm] = useState({ titulo: "", cuerpo: "" });
+  const [msg, setMsg] = useState(null);
+
+  useEffect(() => { cargar(); }, []);
+
+  async function cargar() {
+    setLoading(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions?select=*&order=updated_at.desc`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` },
+      });
+      const data = await res.json();
+      setSubs(Array.isArray(data) ? data : []);
+    } catch (e) { setSubs([]); }
+    setLoading(false);
+  }
+
+  async function enviarNotificacion() {
+    if (!form.titulo) return;
+    setSending(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+          apikey: SUPABASE_KEY,
+        },
+        body: JSON.stringify({ title: form.titulo, body: form.cuerpo, url: "/" }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setMsg({ ok: true, text: `✅ Notificación enviada a ${subs.length} integrante(s).` });
+      setForm({ titulo: "", cuerpo: "" });
+    } catch (e) {
+      setMsg({ ok: false, text: "❌ Error: " + e.message });
+    }
+    setSending(false);
+  }
+
+  const cuerdaColor = { Soprano: "#ec4899", Contralto: "#8b5cf6", Tenor: "#3b82f6", Bajo: "#f59e0b", Admin: "#10b981" };
+  const inputS = { padding: "8px 10px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
+
+  return (
+    <div>
+      <div style={{ fontWeight: 700, fontSize: 16, color: C.dark, marginBottom: 4 }}>🔔 Notificaciones Push</div>
+      <div style={{ fontSize: 12, color: C.gray, marginBottom: 20 }}>Envía avisos instantáneos al teléfono de los integrantes suscritos.</div>
+
+      {/* Stats */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
+        <div style={{ background: C.primary + "12", border: `1px solid ${C.primary}30`, borderRadius: 12, padding: "14px 18px", flex: 1 }}>
+          <div style={{ fontSize: 24 }}>📱</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: C.primary, marginTop: 4 }}>{subs.length}</div>
+          <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>Dispositivos suscritos</div>
+        </div>
+      </div>
+
+      {/* Formulario envío manual */}
+      <div style={{ background: C.primaryLight, border: `1px solid ${C.primary}40`, borderRadius: 12, padding: "18px 20px", marginBottom: 24 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: C.dark, marginBottom: 14 }}>📤 Enviar notificación manual</div>
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: C.gray, marginBottom: 4 }}>Título *</div>
+          <input placeholder="Ej: Ensayo cancelado" value={form.titulo} onChange={e => setForm(p => ({ ...p, titulo: e.target.value }))} style={inputS} />
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: C.gray, marginBottom: 4 }}>Mensaje</div>
+          <textarea placeholder="Detalles de la notificación..." value={form.cuerpo} onChange={e => setForm(p => ({ ...p, cuerpo: e.target.value }))} rows={2}
+            style={{ ...inputS, resize: "vertical", fontFamily: "Inter,sans-serif" }} />
+        </div>
+        {msg && (
+          <div style={{ marginBottom: 10, padding: "8px 12px", borderRadius: 8, background: msg.ok ? "#dcfce7" : "#fee2e2", color: msg.ok ? "#15803d" : "#dc2626", fontSize: 12, fontWeight: 600 }}>
+            {msg.text}
+          </div>
+        )}
+        <Btn onClick={enviarNotificacion} disabled={sending || !form.titulo || subs.length === 0}>
+          {sending ? "Enviando..." : `🔔 Enviar a ${subs.length} dispositivo(s)`}
+        </Btn>
+        {subs.length === 0 && !loading && (
+          <div style={{ fontSize: 11, color: C.gray, marginTop: 8 }}>No hay integrantes suscritos aún. Deben activar las notificaciones desde su perfil.</div>
+        )}
+      </div>
+
+      {/* Lista de suscritos */}
+      <div style={{ fontWeight: 700, fontSize: 13, color: C.dark, marginBottom: 10 }}>👥 Integrantes suscritos</div>
+      {loading ? <FinSpinner /> : subs.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "32px 0", color: C.gray }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📵</div>
+          <div style={{ fontSize: 13 }}>Ningún integrante ha activado notificaciones.</div>
+          <div style={{ fontSize: 11, marginTop: 4 }}>Los integrantes pueden activarlas desde <strong>Mi Perfil → Notificaciones</strong>.</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {subs.map((s) => (
+            <div key={s.integrante_id || s.email} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 10, background: C.white, border: `1px solid ${C.border}` }}>
+              <div style={{ width: 34, height: 34, borderRadius: "50%", flexShrink: 0, background: (cuerdaColor[s.cuerda] || C.primary) + "20", border: `2px solid ${(cuerdaColor[s.cuerda] || C.primary)}40`, display: "flex", alignItems: "center", justifyContent: "center", color: cuerdaColor[s.cuerda] || C.primary, fontWeight: 800, fontSize: 13 }}>
+                {(s.nombre || "?")[0].toUpperCase()}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: C.dark }}>{s.nombre}</div>
+                <div style={{ fontSize: 11, color: C.gray }}>{s.email}</div>
+              </div>
+              {s.cuerda && (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: (cuerdaColor[s.cuerda] || C.primary) + "20", color: cuerdaColor[s.cuerda] || C.primary }}>{s.cuerda}</span>
+              )}
+              <span style={{ fontSize: 10, color: C.gray, whiteSpace: "nowrap" }}>
+                {s.updated_at ? new Date(s.updated_at).toLocaleDateString("es-CL") : ""}
+              </span>
+              <span style={{ fontSize: 18 }}>🔔</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Instrucciones de setup */}
+      <details style={{ marginTop: 24 }}>
+        <summary style={{ fontSize: 12, color: C.gray, cursor: "pointer", fontWeight: 600 }}>⚙️ Instrucciones de configuración (expandir)</summary>
+        <div style={{ marginTop: 12, background: "#f1f5f9", borderRadius: 10, padding: "14px 16px", fontSize: 11, color: C.gray, fontFamily: "monospace", lineHeight: 1.8 }}>
+          <strong style={{ color: C.dark }}>1. SQL en Supabase (SQL Editor):</strong>
+          <pre style={{ margin: "6px 0 12px", whiteSpace: "pre-wrap" }}>{`CREATE TABLE IF NOT EXISTS push_subscriptions (
+  integrante_id UUID PRIMARY KEY,
+  nombre TEXT, email TEXT, cuerda TEXT,
+  subscription TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Acceso total" ON push_subscriptions FOR ALL USING (true) WITH CHECK (true);`}</pre>
+          <strong style={{ color: C.dark }}>2. Service Worker — crea el archivo <code>public/sw.js</code>:</strong>
+          <pre style={{ margin: "6px 0 12px", whiteSpace: "pre-wrap" }}>{`self.addEventListener('push', e => {
+  const d = e.data?.json() || {};
+  e.waitUntil(self.registration.showNotification(d.title || 'Coro MJ', {
+    body: d.body || '',
+    icon: '/icon-192.png',
+    badge: '/badge-72.png',
+    data: { url: d.url || '/' }
+  }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(clients.openWindow(e.notification.data?.url || '/'));
+});`}</pre>
+          <strong style={{ color: C.dark }}>3. Edge Function en Supabase — <code>supabase/functions/send-push/index.ts</code>:</strong>
+          <pre style={{ margin: "6px 0 12px", whiteSpace: "pre-wrap" }}>{`import webpush from "npm:web-push";
+const VAPID_PUBLIC = Deno.env.get("VAPID_PUBLIC_KEY")!;
+const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+webpush.setVapidDetails("mailto:tu@email.com", VAPID_PUBLIC, VAPID_PRIVATE);
+
+Deno.serve(async (req) => {
+  const { title, body, url } = await req.json();
+  const res = await fetch(\`\${SUPABASE_URL}/rest/v1/push_subscriptions?select=subscription\`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: \`Bearer \${SUPABASE_KEY}\` }
+  });
+  const subs = await res.json();
+  await Promise.allSettled(subs.map(s =>
+    webpush.sendNotification(JSON.parse(s.subscription), JSON.stringify({ title, body, url }))
+  ));
+  return new Response(JSON.stringify({ sent: subs.length }), { headers: { "Content-Type": "application/json" } });
+});`}</pre>
+          <strong style={{ color: C.dark }}>4. Variables de entorno en Supabase (Project Settings → Edge Functions):</strong>
+          <pre style={{ margin: "6px 0", whiteSpace: "pre-wrap" }}>{`VAPID_PUBLIC_KEY = (tu clave pública generada en web-push-codelab.glitch.me)
+VAPID_PRIVATE_KEY = (tu clave privada — NUNCA la pongas en el frontend)`}</pre>
+        </div>
+      </details>
     </div>
   );
 }
@@ -17478,32 +17836,6 @@ function AdminVisitas() {
             ))}
           </tbody>
         </table>
-      </div>
-
-      {/* SQL */}
-      <div style={{ marginTop: 20, background: "#f1f5f9", borderRadius: 10, padding: "12px 16px", fontSize: 11, color: C.gray, fontFamily: "monospace" }}>
-        <div style={{ fontWeight: 700, marginBottom: 4, color: C.dark }}>SQL requerido en Supabase:</div>
-        <pre style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{`CREATE TABLE IF NOT EXISTS visitas_sitio (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  integrante_id UUID REFERENCES integrantes(id) ON DELETE SET NULL,
-  nombre TEXT,
-  email TEXT,
-  cuerda TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE visitas_sitio ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Insertar visitas" ON visitas_sitio FOR INSERT WITH CHECK (true);
-CREATE POLICY "Admin lee visitas" ON visitas_sitio FOR SELECT USING (true);
-
-CREATE TABLE IF NOT EXISTS presencia_online (
-  integrante_id UUID PRIMARY KEY,
-  nombre TEXT,
-  email TEXT,
-  cuerda TEXT,
-  ultimo_ping TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE presencia_online ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Upsert presencia" ON presencia_online FOR ALL USING (true) WITH CHECK (true);`}</pre>
       </div>
     </div>
   );
