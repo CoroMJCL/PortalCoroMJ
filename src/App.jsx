@@ -3466,20 +3466,31 @@ function VocalizacionWidget({ isAdmin }) {
 // ═══════════════════════════════════════════════════════════════
 //  WIDGET FOTOGRAFÍA DESTACADA DE MISA (exclusivo perfil Invitado)
 // ═══════════════════════════════════════════════════════════════
-const FOTO_MISA_KEY = "visita_foto_destacada_url";
+const FOTO_MISA_KEY      = "visita_foto_destacada_url";
+const FOTO_MISA_META_KEY = "visita_foto_destacada_meta"; // JSON: {titulo, fecha, lugar}
 
 function FotoDestacadaMisaWidget({ isAdmin }) {
-  const [savedUrl, setSavedUrl] = useState("");
+  const [savedUrl, setSavedUrl]       = useState("");
+  const [meta, setMeta]               = useState({ titulo: "", fecha: "", lugar: "" });
   const [loadedFromDB, setLoadedFromDB] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [imgError, setImgError] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading]     = useState(false);
+  const [saved, setSaved]             = useState(false);
+  const [imgError, setImgError]       = useState(false);
+  const [dragOver, setDragOver]       = useState(false);
+  const [editingMeta, setEditingMeta] = useState(false);
+  const [draftMeta, setDraftMeta]     = useState({ titulo: "", fecha: "", lugar: "" });
+  const [savingMeta, setSavingMeta]   = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    getConfig(FOTO_MISA_KEY).then((val) => {
-      if (val !== null) setSavedUrl(val);
+    Promise.all([
+      getConfig(FOTO_MISA_KEY),
+      getConfig(FOTO_MISA_META_KEY),
+    ]).then(([url, metaRaw]) => {
+      if (url) setSavedUrl(url);
+      if (metaRaw) {
+        try { setMeta(JSON.parse(metaRaw)); } catch {}
+      }
       setLoadedFromDB(true);
     });
   }, []);
@@ -3487,31 +3498,22 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
   async function uploadImage(file) {
     if (!file) return;
     const allowed = ["image/jpeg","image/png","image/webp","image/gif"];
-    if (!allowed.includes(file.type)) {
-      alert("Solo se permiten imágenes JPG, PNG, WebP o GIF.");
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      alert("La imagen no puede superar 8 MB.");
-      return;
-    }
+    if (!allowed.includes(file.type)) { alert("Solo se permiten imágenes JPG, PNG, WebP o GIF."); return; }
+    if (file.size > 8 * 1024 * 1024) { alert("La imagen no puede superar 8 MB."); return; }
     setUploading(true);
     try {
       const ext = file.name.split(".").pop().toLowerCase();
       const path = `afiche_misa_${Date.now()}.${ext}`;
-      const res = await fetch(
-        `${SUPABASE_URL}/storage/v1/object/publico/${path}`,
-        {
-          method: "POST",
-          headers: {
-            apikey: SUPABASE_SERVICE_KEY,
-            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-            "Content-Type": file.type,
-            "x-upsert": "true",
-          },
-          body: file,
-        }
-      );
+      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          "Content-Type": file.type,
+          "x-upsert": "true",
+        },
+        body: file,
+      });
       if (!res.ok) throw new Error(await res.text());
       const url = `${SUPABASE_URL}/storage/v1/object/public/publico/${path}`;
       setSavedUrl(url);
@@ -3519,22 +3521,17 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
       await setConfig(FOTO_MISA_KEY, url);
       setSaved(true);
       setTimeout(() => setSaved(false), 4000);
-    } catch (e) {
-      alert("Error al subir imagen: " + e.message);
-    }
+    } catch (e) { alert("Error al subir imagen: " + e.message); }
     setUploading(false);
   }
 
-  async function handleFileInput(e) {
-    await uploadImage(e.target.files[0]);
-    e.target.value = "";
-  }
-
-  async function handleDrop(e) {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) await uploadImage(file);
+  async function saveMeta() {
+    setSavingMeta(true);
+    const newMeta = { titulo: draftMeta.titulo.trim(), fecha: draftMeta.fecha.trim(), lugar: draftMeta.lugar.trim() };
+    await setConfig(FOTO_MISA_META_KEY, JSON.stringify(newMeta));
+    setMeta(newMeta);
+    setEditingMeta(false);
+    setSavingMeta(false);
   }
 
   async function removeImage() {
@@ -3543,8 +3540,20 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
     await setConfig(FOTO_MISA_KEY, "");
   }
 
+  // Formatea fecha ISO a texto legible en español
+  function fmtFecha(f) {
+    if (!f) return "";
+    try {
+      return new Date(f + "T00:00:00").toLocaleDateString("es-CL", {
+        weekday: "long", day: "numeric", month: "long", year: "numeric",
+      });
+    } catch { return f; }
+  }
+
   if (!loadedFromDB) return null;
   if (!savedUrl && !isAdmin) return null;
+
+  const hasMeta = meta.titulo || meta.fecha || meta.lugar;
 
   return (
     <div style={{ marginBottom: 20 }}>
@@ -3566,6 +3575,13 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
         .afiche-wrap { animation: afiche-in 0.55s cubic-bezier(0.22,1,0.36,1) both; }
         .afiche-img-wrap:hover .afiche-shine { animation: afiche-shine 1.1s ease forwards; }
         .afiche-upload-zone:hover { border-color: rgba(251,191,36,0.7) !important; background: rgba(251,191,36,0.06) !important; }
+        .afiche-meta-input {
+          width: 100%; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2);
+          borderRadius: 8px; padding: 8px 12px; fontSize: 13px; color: white;
+          outline: none; transition: border-color 0.15s;
+        }
+        .afiche-meta-input:focus { border-color: rgba(251,191,36,0.7) !important; }
+        .afiche-meta-input::placeholder { color: rgba(255,255,255,0.3); }
       `}</style>
 
       {/* ── CON IMAGEN ── */}
@@ -3580,124 +3596,169 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
             <img
               src={savedUrl}
               alt="Afiche de la misa"
-              style={{
-                width: "100%", maxHeight: 420,
-                objectFit: "cover", display: "block",
-                filter: "brightness(0.88) contrast(1.05)",
-              }}
+              style={{ width: "100%", maxHeight: 420, objectFit: "cover", display: "block", filter: "brightness(0.88) contrast(1.05)" }}
               onError={() => setImgError(true)}
             />
             {/* Shine hover */}
-            <div className="afiche-shine" style={{
-              position: "absolute", inset: 0,
-              background: "linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.55) 50%,transparent 60%)",
-              pointerEvents: "none",
-            }} />
-            {/* Overlay gradiente inferior */}
-            <div style={{
-              position: "absolute", bottom: 0, left: 0, right: 0, height: "50%",
-              background: "linear-gradient(to top,rgba(8,8,20,0.88) 0%,rgba(8,8,20,0.4) 55%,transparent 100%)",
-              pointerEvents: "none",
-            }} />
-            {/* Overlay gradiente superior */}
-            <div style={{
-              position: "absolute", top: 0, left: 0, right: 0, height: "28%",
-              background: "linear-gradient(to bottom,rgba(8,8,20,0.42) 0%,transparent 100%)",
-              pointerEvents: "none",
-            }} />
+            <div className="afiche-shine" style={{ position: "absolute", inset: 0, background: "linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.55) 50%,transparent 60%)", pointerEvents: "none" }} />
+            {/* Overlay inferior (más alto si hay meta) */}
+            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: hasMeta ? "65%" : "50%", background: "linear-gradient(to top,rgba(8,8,20,0.92) 0%,rgba(8,8,20,0.5) 55%,transparent 100%)", pointerEvents: "none" }} />
+            {/* Overlay superior */}
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "28%", background: "linear-gradient(to bottom,rgba(8,8,20,0.42) 0%,transparent 100%)", pointerEvents: "none" }} />
             {/* Línea dorada superior */}
-            <div style={{
-              position: "absolute", top: 0, left: 0, right: 0, height: 3,
-              background: "linear-gradient(90deg,transparent,#fbbf24,#f59e0b,#fbbf24,transparent)",
-            }} />
-            {/* Badge */}
-            <div style={{
-              position: "absolute", top: 16, left: 18,
-              background: "linear-gradient(135deg,#92400e,#d97706)",
-              borderRadius: 20, padding: "4px 14px",
-              display: "flex", alignItems: "center", gap: 6,
-              boxShadow: "0 2px 12px rgba(217,119,6,0.45)",
-            }}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "linear-gradient(90deg,transparent,#fbbf24,#f59e0b,#fbbf24,transparent)" }} />
+
+            {/* Badge "Próxima Celebración" */}
+            <div style={{ position: "absolute", top: 16, left: 18, background: "linear-gradient(135deg,#92400e,#d97706)", borderRadius: 20, padding: "4px 14px", display: "flex", alignItems: "center", gap: 6, boxShadow: "0 2px 12px rgba(217,119,6,0.45)" }}>
               <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fef3c7" }} />
-              <span style={{
-                fontSize: 10, fontWeight: 800, color: "#fef3c7",
-                letterSpacing: "0.12em", textTransform: "uppercase",
-                fontFamily: "'Poppins',sans-serif",
-              }}>Próxima Celebración</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: "#fef3c7", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "'Poppins',sans-serif" }}>Próxima Celebración</span>
             </div>
-            {/* Cruz decorativa */}
-            <div style={{
-              position: "absolute", bottom: 20, right: 20,
-              fontSize: 28, opacity: 0.5,
-              filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.6))",
-            }}>✝️</div>
+
+            {/* ── OVERLAY DE TEXTO (título, fecha, lugar) ── */}
+            {hasMeta && (
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "20px 22px 22px", pointerEvents: "none" }}>
+                {meta.titulo && (
+                  <div style={{
+                    fontFamily: "'Poppins',sans-serif",
+                    fontSize: 22, fontWeight: 800,
+                    color: "white",
+                    lineHeight: 1.2,
+                    marginBottom: 8,
+                    textShadow: "0 2px 12px rgba(0,0,0,0.7)",
+                    letterSpacing: "-0.01em",
+                  }}>
+                    {meta.titulo}
+                  </div>
+                )}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px" }}>
+                  {meta.fecha && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13, opacity: 0.8 }}>📅</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#fef3c7", textShadow: "0 1px 6px rgba(0,0,0,0.6)", textTransform: "capitalize" }}>
+                        {fmtFecha(meta.fecha)}
+                      </span>
+                    </div>
+                  )}
+                  {meta.lugar && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13, opacity: 0.8 }}>📍</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#fef3c7", textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>
+                        {meta.lugar}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Cruz decorativa (solo si no hay texto largo) */}
+            {!meta.titulo && (
+              <div style={{ position: "absolute", bottom: 20, right: 20, fontSize: 28, opacity: 0.5, filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.6))" }}>✝️</div>
+            )}
+
             {/* Badge guardado */}
             {saved && (
-              <div style={{
-                position: "absolute", bottom: 18, left: 18,
-                background: "rgba(22,163,74,0.92)", backdropFilter: "blur(8px)",
-                borderRadius: 20, padding: "5px 14px",
-                fontSize: 11, fontWeight: 700, color: "white",
-              }}>✅ Imagen guardada</div>
+              <div style={{ position: "absolute", bottom: 18, left: 18, background: "rgba(22,163,74,0.92)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "5px 14px", fontSize: 11, fontWeight: 700, color: "white" }}>✅ Imagen guardada</div>
             )}
+
             {/* Botones admin flotantes */}
             {isAdmin && (
-              <div style={{
-                position: "absolute", top: 14, right: 14,
-                display: "flex", gap: 8,
-              }}>
+              <div style={{ position: "absolute", top: 14, right: 14, display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => { setDraftMeta({ ...meta }); setEditingMeta(true); }}
+                  style={{ background: "rgba(14,165,233,0.75)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 10, padding: "7px 14px", fontSize: 11, fontWeight: 700, color: "white", cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}
+                >✏️ Texto</button>
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  style={{
-                    background: uploading ? "rgba(0,0,0,0.7)" : "rgba(0,0,0,0.55)",
-                    backdropFilter: "blur(8px)",
-                    border: "1px solid rgba(255,255,255,0.25)",
-                    borderRadius: 10, padding: "7px 14px",
-                    fontSize: 11, fontWeight: 700, color: "white",
-                    cursor: uploading ? "not-allowed" : "pointer",
-                    display: "flex", alignItems: "center", gap: 6,
-                  }}
+                  style={{ background: uploading ? "rgba(0,0,0,0.7)" : "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 10, padding: "7px 14px", fontSize: 11, fontWeight: 700, color: "white", cursor: uploading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6 }}
                 >
-                  {uploading
-                    ? <><span style={{ display:"inline-block", animation:"afiche-spin 0.8s linear infinite" }}>⏳</span> Subiendo…</>
-                    : "📤 Cambiar imagen"}
+                  {uploading ? <><span style={{ display:"inline-block", animation:"afiche-spin 0.8s linear infinite" }}>⏳</span> Subiendo…</> : "📤 Imagen"}
                 </button>
                 <button
                   onClick={removeImage}
-                  style={{
-                    background: "rgba(220,38,38,0.7)", backdropFilter: "blur(8px)",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    borderRadius: 10, padding: "7px 12px",
-                    fontSize: 12, fontWeight: 700, color: "white",
-                    cursor: "pointer",
-                  }}
+                  style={{ background: "rgba(220,38,38,0.7)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, padding: "7px 12px", fontSize: 12, fontWeight: 700, color: "white", cursor: "pointer" }}
                 >🗑</button>
               </div>
             )}
           </div>
-          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileInput} style={{ display:"none" }} />
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={async (e) => { await uploadImage(e.target.files[0]); e.target.value = ""; }} style={{ display:"none" }} />
+
+          {/* ── Panel edición de texto (solo Admin, sobre la imagen) ── */}
+          {isAdmin && editingMeta && (
+            <div style={{
+              position: "absolute", inset: 0,
+              background: "rgba(8,8,20,0.88)", backdropFilter: "blur(6px)",
+              borderRadius: 22, display: "flex", flexDirection: "column",
+              justifyContent: "center", alignItems: "center",
+              padding: "32px 28px", gap: 16, zIndex: 10,
+            }}>
+              <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 16, fontWeight: 700, color: "white", marginBottom: 4 }}>
+                ✏️ Información de la Celebración
+              </div>
+              <div style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Título */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 5 }}>Nombre de la celebración</div>
+                  <input
+                    className="afiche-meta-input"
+                    placeholder="Ej: Virgen del Carmen · Fiesta Patronal"
+                    value={draftMeta.titulo}
+                    onChange={(e) => setDraftMeta(d => ({ ...d, titulo: e.target.value }))}
+                    style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8, padding: "9px 13px", fontSize: 13, color: "white", outline: "none", boxSizing: "border-box" }}
+                  />
+                </div>
+                {/* Fecha */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 5 }}>Fecha</div>
+                  <input
+                    type="date"
+                    value={draftMeta.fecha}
+                    onChange={(e) => setDraftMeta(d => ({ ...d, fecha: e.target.value }))}
+                    style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8, padding: "9px 13px", fontSize: 13, color: "white", outline: "none", boxSizing: "border-box", colorScheme: "dark" }}
+                  />
+                </div>
+                {/* Lugar */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 5 }}>Lugar</div>
+                  <input
+                    className="afiche-meta-input"
+                    placeholder="Ej: Parroquia San Pedro · 11:00 Hrs"
+                    value={draftMeta.lugar}
+                    onChange={(e) => setDraftMeta(d => ({ ...d, lugar: e.target.value }))}
+                    style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8, padding: "9px 13px", fontSize: 13, color: "white", outline: "none", boxSizing: "border-box" }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+                <button
+                  onClick={saveMeta}
+                  disabled={savingMeta}
+                  style={{ background: "linear-gradient(135deg,#1D9E75,#16a34a)", border: "none", borderRadius: 10, padding: "10px 24px", fontSize: 13, fontWeight: 700, color: "white", cursor: savingMeta ? "not-allowed" : "pointer", opacity: savingMeta ? 0.7 : 1 }}
+                >{savingMeta ? "Guardando…" : "✅ Guardar"}</button>
+                <button
+                  onClick={() => setEditingMeta(false)}
+                  style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 600, color: "white", cursor: "pointer" }}
+                >Cancelar</button>
+                {hasMeta && (
+                  <button
+                    onClick={async () => { const empty = {titulo:"",fecha:"",lugar:""}; await setConfig(FOTO_MISA_META_KEY, JSON.stringify(empty)); setMeta(empty); setEditingMeta(false); }}
+                    style={{ background: "rgba(220,38,38,0.6)", border: "1px solid rgba(220,38,38,0.4)", borderRadius: 10, padding: "10px 14px", fontSize: 12, fontWeight: 600, color: "white", cursor: "pointer" }}
+                  >🗑 Quitar texto</button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
       ) : (
         /* ── SIN IMAGEN (solo Admin) ── */
         <div
-          className="afiche-upload-zone"
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
+          onDrop={async (e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) await uploadImage(f); }}
           onClick={() => !uploading && fileInputRef.current?.click()}
-          style={{
-            borderRadius: 22,
-            border: `2px dashed ${dragOver ? "rgba(251,191,36,0.8)" : "rgba(251,191,36,0.3)"}`,
-            background: dragOver ? "rgba(251,191,36,0.07)" : "linear-gradient(135deg,#0c0c14,#1a1a2e)",
-            minHeight: 220,
-            display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            gap: 14, padding: "40px 24px", textAlign: "center",
-            cursor: uploading ? "not-allowed" : "pointer",
-            transition: "all 0.2s",
-          }}
+          style={{ borderRadius: 22, border: `2px dashed ${dragOver ? "rgba(251,191,36,0.8)" : "rgba(251,191,36,0.3)"}`, background: dragOver ? "rgba(251,191,36,0.07)" : "linear-gradient(135deg,#0c0c14,#1a1a2e)", minHeight: 220, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: "40px 24px", textAlign: "center", cursor: uploading ? "not-allowed" : "pointer", transition: "all 0.2s" }}
         >
           {uploading ? (
             <>
@@ -3706,17 +3767,9 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
             </>
           ) : (
             <>
-              <div style={{
-                width: 64, height: 64, borderRadius: 18,
-                background: "linear-gradient(135deg,#92400e,#d97706)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 28,
-                boxShadow: "0 8px 24px rgba(217,119,6,0.35)",
-              }}>📤</div>
+              <div style={{ width: 64, height: 64, borderRadius: 18, background: "linear-gradient(135deg,#92400e,#d97706)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, boxShadow: "0 8px 24px rgba(217,119,6,0.35)" }}>📤</div>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
-                  Subir afiche de la misa
-                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>Subir afiche de la misa</div>
                 <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
                   Haz clic o arrastra una imagen aquí<br />
                   <span style={{ fontSize: 11 }}>JPG, PNG, WebP — máx. 8 MB</span>
@@ -3724,7 +3777,7 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
               </div>
             </>
           )}
-          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileInput} style={{ display:"none" }} />
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={async (e) => { await uploadImage(e.target.files[0]); e.target.value = ""; }} style={{ display:"none" }} />
         </div>
       )}
     </div>
