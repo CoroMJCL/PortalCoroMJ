@@ -17770,31 +17770,46 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
     setSaving(false);
   }
 
+  // ── Modales de confirmación de pago ──
+  const [confirmPagar, setConfirmPagar]       = useState(null); // { miembro }
+  const [confirmBorrar, setConfirmBorrar]     = useState(null); // { miembro, pago }
+  const [procesando, setProcesando]           = useState(false);
+
   async function togglePago(miembro) {
     if (pagaron.has(miembro.id)) {
-      // Desmarcar
+      // Desmarcar → siempre pedir confirmación
       const pago = pagosMes.find((p) => p.integrante_id === miembro.id);
       if (!pago) return;
-      try {
-        await finDbDelete("fin_pagos", pago.id);
-        await reload();
-      } catch (e) {
-        alert("Error: " + e.message);
-      }
+      setConfirmBorrar({ miembro, pago });
     } else {
-      // Marcar como pagado
-      try {
-        await finDbPost("fin_pagos", {
-          integrante_id: miembro.id,
-          mes: mesSeleccionado,
-          monto: cuotaMes?.valor || 0,
-          tipo: "cuota",
-        });
-        await reload();
-      } catch (e) {
-        alert("Error: " + e.message);
-      }
+      // Marcar → pedir confirmación antes de guardar
+      setConfirmPagar({ miembro });
     }
+  }
+
+  async function ejecutarPago(miembro) {
+    setProcesando(true);
+    try {
+      await finDbPost("fin_pagos", {
+        integrante_id: miembro.id,
+        mes: mesSeleccionado,
+        monto: cuotaMes?.valor || 0,
+        tipo: "cuota",
+      });
+      await reload();
+    } catch (e) { alert("Error: " + e.message); }
+    setConfirmPagar(null);
+    setProcesando(false);
+  }
+
+  async function ejecutarBorrarPago(pago) {
+    setProcesando(true);
+    try {
+      await finDbDelete("fin_pagos", pago.id);
+      await reload();
+    } catch (e) { alert("Error: " + e.message); }
+    setConfirmBorrar(null);
+    setProcesando(false);
   }
 
   async function subirComprobante(miembro, file) {
@@ -17829,6 +17844,82 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
 
   return (
     <div>
+
+      {/* ══ MODAL: Confirmar registro de pago ══ */}
+      {confirmPagar && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", borderRadius: 18, padding: "28px 30px", maxWidth: 380, width: "90%", boxShadow: "0 24px 60px rgba(0,0,0,0.25)" }}>
+            <div style={{ fontSize: 32, textAlign: "center", marginBottom: 10 }}>✅</div>
+            <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 16, fontWeight: 700, color: "#1e293b", textAlign: "center", marginBottom: 6 }}>
+              Confirmar pago
+            </div>
+            <div style={{ fontSize: 13, color: "#64748b", textAlign: "center", marginBottom: 18, lineHeight: 1.6 }}>
+              ¿Registrar el pago de cuota de <strong>{confirmPagar.miembro.nombre}</strong>?
+              <div style={{ marginTop: 10, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 12, color: "#166534" }}>📅 {mesSeleccionado}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#15803d" }}>{finFmtCLP(cuotaMes?.valor || 0)}</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => ejecutarPago(confirmPagar.miembro)}
+                disabled={procesando}
+                style={{ flex: 1, background: "linear-gradient(135deg,#1D9E75,#16a34a)", border: "none", borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 700, color: "white", cursor: procesando ? "not-allowed" : "pointer", opacity: procesando ? 0.7 : 1 }}
+              >{procesando ? "Registrando..." : "✅ Sí, registrar pago"}</button>
+              <button
+                onClick={() => setConfirmPagar(null)}
+                disabled={procesando}
+                style={{ flex: 1, background: "white", border: "1.5px solid #e2e8f0", borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 600, color: "#64748b", cursor: "pointer" }}
+              >Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL: Confirmar eliminación de pago ══ */}
+      {confirmBorrar && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", borderRadius: 18, padding: "28px 30px", maxWidth: 400, width: "90%", boxShadow: "0 24px 60px rgba(0,0,0,0.3)", border: "2px solid #fecaca" }}>
+            <div style={{ fontSize: 32, textAlign: "center", marginBottom: 10 }}>⚠️</div>
+            <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 16, fontWeight: 700, color: "#dc2626", textAlign: "center", marginBottom: 6 }}>
+              ¿Eliminar este pago?
+            </div>
+            <div style={{ fontSize: 13, color: "#64748b", textAlign: "center", marginBottom: 6, lineHeight: 1.6 }}>
+              Estás a punto de <strong>borrar el pago registrado</strong> de:
+            </div>
+            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "12px 16px", marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", marginBottom: 4 }}>{confirmBorrar.miembro.nombre}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b" }}>
+                <span>📅 {mesSeleccionado}</span>
+                <span style={{ fontWeight: 600, color: "#dc2626" }}>{finFmtCLP(confirmBorrar.pago.monto)}</span>
+              </div>
+              {confirmBorrar.pago.comprobante_url && (
+                <div style={{ marginTop: 8, padding: "6px 10px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 14 }}>📎</span>
+                  <span style={{ fontSize: 11, color: "#92400e", fontWeight: 600 }}>
+                    Este pago tiene comprobante adjunto. También se perderá.
+                  </span>
+                </div>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: "#94a3b8", textAlign: "center", marginBottom: 16 }}>
+              Esta acción no se puede deshacer.
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => setConfirmBorrar(null)}
+                disabled={procesando}
+                style={{ flex: 1, background: "white", border: "1.5px solid #e2e8f0", borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 700, color: "#475569", cursor: "pointer" }}
+              >← No, mantener pago</button>
+              <button
+                onClick={() => ejecutarBorrarPago(confirmBorrar.pago)}
+                disabled={procesando}
+                style={{ flex: 1, background: "linear-gradient(135deg,#dc2626,#b91c1c)", border: "none", borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 700, color: "white", cursor: procesando ? "not-allowed" : "pointer", opacity: procesando ? 0.7 : 1 }}
+              >{procesando ? "Eliminando..." : "🗑 Sí, eliminar pago"}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Selector de mes y valor de cuota */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20, alignItems: "flex-end" }}>
         <div>
