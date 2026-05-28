@@ -19168,7 +19168,21 @@ export function InfoGastos({ user, members }) {
   const totalGastado = gastos.reduce((s, g) => s + (g.monto || 0), 0);
   const saldo = totalIngresado - totalGastado;
 
-  const mesActual = finCurrentMesIso();
+  // Mes de cuota vigente:
+  // Si hoy < día 20: la cuota vigente es el mes actual (plazo = día 20 de este mes)
+  // Si hoy >= día 20: la cuota vigente es el mes siguiente (plazo = día 20 del próximo mes)
+  // Ejemplo: 28 mayo (>=20) → cuota JUNIO. 1 junio (<20) → cuota JUNIO. 20 junio (>=20) → cuota JULIO.
+  const _hoyIG = new Date();
+  const _diaHoyIG = _hoyIG.getDate();
+  const _mesVigenteDate = _diaHoyIG < 20
+    ? new Date(_hoyIG.getFullYear(), _hoyIG.getMonth())
+    : new Date(_hoyIG.getFullYear(), _hoyIG.getMonth() + 1);
+  const mesActual = `${_mesVigenteDate.getFullYear()}-${String(_mesVigenteDate.getMonth() + 1).padStart(2, "0")}`;
+  // El plazo de pago vence el día 20 del mes de la cuota
+  const [_igAnio, _igMes] = mesActual.split("-").map(Number);
+  const plazoVencimiento = new Date(_igAnio, _igMes - 1, 20);
+  const mesVencidoIG = _hoyIG > plazoVencimiento;
+
   const cuotasActivas = mesActual >= CUOTAS_MES_INICIO || pagos.some((p) => p.tipo === "cuota");
   const pagosMesActual = pagos.filter((p) => p.mes === mesActual);
   const miembrosIds = new Set(miembrosEnCuotas.map((m) => m.integrante_id));
@@ -19177,11 +19191,7 @@ export function InfoGastos({ user, members }) {
   const alDia = cuotasActivas ? miembrosActivos.filter((m) => pagaron.has(m.id)) : [];
   const pendientes = cuotasActivas ? miembrosActivos.filter((m) => !pagaron.has(m.id)) : [];
   const cuotaMesActual = cuotas.find((c) => c.mes === mesActual);
-  // El plazo de pago vence el día 20 del mes siguiente al mes de la cuota
-  const _hoyIG = new Date();
-  const [_igAnio, _igMes] = mesActual.split("-").map(Number);
-  const plazoVencimiento = new Date(_igAnio, _igMes, 20); // mes siguiente día 20 (month es 0-based, así que _igMes sin -1 = mes siguiente)
-  const mesVencidoIG = _hoyIG > plazoVencimiento;
+
 
   if (loading) return <FinSpinner />;
 
@@ -19301,7 +19311,7 @@ export function InfoGastos({ user, members }) {
             {!mesVencidoIG ? (
               <div style={{ fontSize: 12, color: C.gray, lineHeight: 1.6 }}>
                 <div style={{ marginBottom: 6 }}>El plazo de pago aún está abierto.</div>
-                <div>Cada integrante puede pagar hasta el <strong>día 20 de {finMesLabel(`${_igAnio}-${String(_igMes + 1).padStart(2, "0")}`)}</strong>.</div>
+                <div>Cada integrante puede pagar hasta el <strong>día 20 de {finMesLabel(mesActual)}</strong>.</div>
                 <div style={{ marginTop: 8, padding: "6px 10px", background: "#fef9c3", borderRadius: 8, color: "#92400e", fontSize: 11 }}>
                   💡 Quienes ya aparecen como &quot;Al día&quot; pagaron de forma anticipada.
                 </div>
