@@ -12941,6 +12941,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const [form, setForm] = useState(emptyPauta);
   const [tituloMode, setTituloMode] = useState("select"); // "select" | "custom"
   const [canciones, setCanciones] = useState([]); // filas de la pauta
+  const [showUrlCols, setShowUrlCols] = useState(false); // columnas URL ocultables
   const emptyCancion = {
     n: "",
     orden: "Entrada",
@@ -13504,8 +13505,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     "Canción",
                     "Autor",
                     "Intérprete",
-                    "URL Letra (PDF)",
-                    "URL Audio Ref.",
+                    ...(showUrlCols ? ["URL Letra (PDF)", "URL Audio Ref."] : []),
                     "⚠️",
                     "",
                   ].map((h, i) => (
@@ -13516,9 +13516,9 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                         width:
                           i === 0
                             ? "40px"
-                            : i === 7
+                            : (!showUrlCols && i === 5) || (showUrlCols && i === 7)
                             ? "50px"
-                            : i === 8
+                            : (!showUrlCols && i === 6) || (showUrlCols && i === 8)
                             ? "60px"
                             : "auto",
                       }}
@@ -13526,6 +13526,15 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       {h}
                     </th>
                   ))}
+                  <th style={{ ...thStyle, width: 50, textAlign: "center", padding: "4px 6px" }}>
+                    <button
+                      onClick={() => setShowUrlCols(v => !v)}
+                      title={showUrlCols ? "Ocultar columnas URL" : "Mostrar columnas URL (Letra y Audio)"}
+                      style={{ background: showUrlCols ? "#1D9E75" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 6, padding: "3px 8px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", letterSpacing: "0.02em" }}
+                    >
+                      {showUrlCols ? "🔗 ▲" : "🔗 ▼"}
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -13617,6 +13626,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                         style={{ ...inpTd, minWidth: 120 }}
                       />
                     </td>
+                    {showUrlCols && (<>
                     <td style={tdEditStyle}>
                       <input
                         value={c.url_letra}
@@ -13637,6 +13647,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                         style={{ ...inpTd, minWidth: 140 }}
                       />
                     </td>
+                    </>)}
                     <td style={{ ...tdEditStyle, textAlign: "center" }}>
                       <label
                         style={{
@@ -14038,8 +14049,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     "Canción",
                     "Autor",
                     "Intérprete",
-                    "Letra (PDF)",
-                    "Audio Referencial",
+                    ...(showUrlCols ? ["Letra (PDF)", "Audio Referencial"] : []),
                   ].map((h, i) => (
                     <th
                       key={i}
@@ -14052,6 +14062,15 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       {h}
                     </th>
                   ))}
+                  <th style={{ ...thStyle, width: 50, textAlign: "center", padding: "4px 6px" }}>
+                    <button
+                      onClick={() => setShowUrlCols(v => !v)}
+                      title={showUrlCols ? "Ocultar columnas URL" : "Mostrar columnas URL (Letra y Audio)"}
+                      style={{ background: showUrlCols ? "#1D9E75" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 6, padding: "3px 8px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+                    >
+                      {showUrlCols ? "🔗 ▲" : "🔗 ▼"}
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -14126,6 +14145,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       <td style={{ ...tdStyle, color: "#374151" }}>
                         {c.salmista || <span style={{ color: C.gray }}>—</span>}
                       </td>
+                      {showUrlCols && (<>
                       <td style={{ ...tdStyle }}>
                         {c.pendiente ? (
                           <span
@@ -14213,6 +14233,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                           <span style={{ color: C.gray, fontSize: 12 }}>—</span>
                         )}
                       </td>
+                      </>)}
                     </tr>
                   );
                 })}
