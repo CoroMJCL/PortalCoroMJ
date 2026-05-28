@@ -12941,7 +12941,8 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const [form, setForm] = useState(emptyPauta);
   const [tituloMode, setTituloMode] = useState("select"); // "select" | "custom"
   const [canciones, setCanciones] = useState([]); // filas de la pauta
-  const [showUrlCols, setShowUrlCols] = useState(false); // columnas URL ocultables
+  const [showColLetra, setShowColLetra] = useState(false);
+  const [showColAudio, setShowColAudio] = useState(false);
   const emptyCancion = {
     n: "",
     orden: "Entrada",
@@ -13505,35 +13506,26 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     "Canción",
                     "Autor",
                     "Intérprete",
-                    ...(showUrlCols ? ["URL Letra (PDF)", "URL Audio Ref."] : []),
+                    ...(showColLetra ? ["URL Letra (PDF)"] : []),
+                    ...(showColAudio ? ["URL Audio Ref."] : []),
                     "⚠️",
                     "",
                   ].map((h, i) => (
-                    <th
-                      key={i}
-                      style={{
-                        ...thStyle,
-                        width:
-                          i === 0
-                            ? "40px"
-                            : (!showUrlCols && i === 5) || (showUrlCols && i === 7)
-                            ? "50px"
-                            : (!showUrlCols && i === 6) || (showUrlCols && i === 8)
-                            ? "60px"
-                            : "auto",
-                      }}
-                    >
+                    <th key={i} style={{ ...thStyle, width: i === 0 ? "40px" : "auto" }}>
                       {h}
                     </th>
                   ))}
-                  <th style={{ ...thStyle, width: 50, textAlign: "center", padding: "4px 6px" }}>
+                  <th style={{ ...thStyle, padding: "4px 4px", whiteSpace: "nowrap" }}>
                     <button
-                      onClick={() => setShowUrlCols(v => !v)}
-                      title={showUrlCols ? "Ocultar columnas URL" : "Mostrar columnas URL (Letra y Audio)"}
-                      style={{ background: showUrlCols ? "#1D9E75" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 6, padding: "3px 8px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", letterSpacing: "0.02em" }}
-                    >
-                      {showUrlCols ? "🔗 ▲" : "🔗 ▼"}
-                    </button>
+                      onClick={() => setShowColLetra(v => !v)}
+                      title={showColLetra ? "Ocultar URL Letra" : "Mostrar URL Letra (PDF)"}
+                      style={{ background: showColLetra ? "#1D9E75" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer", marginRight: 3 }}
+                    >📄</button>
+                    <button
+                      onClick={() => setShowColAudio(v => !v)}
+                      title={showColAudio ? "Ocultar URL Audio" : "Mostrar URL Audio Ref."}
+                      style={{ background: showColAudio ? "#1D9E75" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer" }}
+                    >▶</button>
                   </th>
                 </tr>
               </thead>
@@ -13626,7 +13618,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                         style={{ ...inpTd, minWidth: 120 }}
                       />
                     </td>
-                    {showUrlCols && (<>
+                    {showColLetra && (
                     <td style={tdEditStyle}>
                       <input
                         value={c.url_letra}
@@ -13637,6 +13629,8 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                         style={{ ...inpTd, minWidth: 130 }}
                       />
                     </td>
+                    )}
+                    {showColAudio && (
                     <td style={tdEditStyle}>
                       <input
                         value={c.url_audio}
@@ -13647,7 +13641,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                         style={{ ...inpTd, minWidth: 140 }}
                       />
                     </td>
-                    </>)}
+                    )}
                     <td style={{ ...tdEditStyle, textAlign: "center" }}>
                       <label
                         style={{
@@ -14049,7 +14043,8 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     "Canción",
                     "Autor",
                     "Intérprete",
-                    ...(showUrlCols ? ["Letra (PDF)", "Audio Referencial"] : []),
+                    ...(showColLetra ? ["Letra (PDF)"] : []),
+                    ...(showColAudio ? ["Audio Referencial"] : []),
                   ].map((h, i) => (
                     <th
                       key={i}
@@ -14062,14 +14057,17 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       {h}
                     </th>
                   ))}
-                  <th style={{ ...thStyle, width: 50, textAlign: "center", padding: "4px 6px" }}>
+                  <th style={{ ...thStyle, padding: "4px 4px", whiteSpace: "nowrap" }}>
                     <button
-                      onClick={() => setShowUrlCols(v => !v)}
-                      title={showUrlCols ? "Ocultar columnas URL" : "Mostrar columnas URL (Letra y Audio)"}
-                      style={{ background: showUrlCols ? "#1D9E75" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 6, padding: "3px 8px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
-                    >
-                      {showUrlCols ? "🔗 ▲" : "🔗 ▼"}
-                    </button>
+                      onClick={() => setShowColLetra(v => !v)}
+                      title={showColLetra ? "Ocultar Letra (PDF)" : "Mostrar Letra (PDF)"}
+                      style={{ background: showColLetra ? "#1D9E75" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer", marginRight: 3 }}
+                    >📄</button>
+                    <button
+                      onClick={() => setShowColAudio(v => !v)}
+                      title={showColAudio ? "Ocultar Audio Ref." : "Mostrar Audio Ref."}
+                      style={{ background: showColAudio ? "#1D9E75" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer" }}
+                    >▶</button>
                   </th>
                 </tr>
               </thead>
@@ -14145,95 +14143,40 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       <td style={{ ...tdStyle, color: "#374151" }}>
                         {c.salmista || <span style={{ color: C.gray }}>—</span>}
                       </td>
-                      {showUrlCols && (<>
+                      {showColLetra && (
                       <td style={{ ...tdStyle }}>
                         {c.pendiente ? (
-                          <span
-                            style={{
-                              background: "#fef08a",
-                              color: "#713f12",
-                              fontWeight: 600,
-                              fontSize: 11,
-                              padding: "3px 10px",
-                              borderRadius: 6,
-                            }}
-                          >
+                          <span style={{ background: "#fef08a", color: "#713f12", fontWeight: 600, fontSize: 11, padding: "3px 10px", borderRadius: 6 }}>
                             Letra y Acordes (Pendiente)
                           </span>
                         ) : c.url_letra && c.url_letra.includes("http") ? (
-                          <a
-                            href={c.url_letra}
-                            target="_blank"
-                            rel="noopener"
-                            style={{
-                              color: C.primary,
-                              fontSize: 12,
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 4,
-                            }}
-                          >
+                          <a href={c.url_letra} target="_blank" rel="noopener" style={{ color: C.primary, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
                             <span>📄</span>
-                            {c.url_letra.split("/").pop()?.slice(0, 30) ||
-                              "Ver PDF"}
+                            {c.url_letra.split("/").pop()?.slice(0, 30) || "Ver PDF"}
                           </a>
                         ) : c.url_letra ? (
-                          <span style={{ fontSize: 12, color: "#374151" }}>
-                            {c.url_letra}
-                          </span>
+                          <span style={{ fontSize: 12, color: "#374151" }}>{c.url_letra}</span>
                         ) : (
                           <span style={{ color: C.gray, fontSize: 12 }}>—</span>
                         )}
                       </td>
+                      )}
+                      {showColAudio && (
                       <td style={{ ...tdStyle }}>
                         {c.url_audio && c.url_audio.includes("http") ? (
-                          <a
-                            href={c.url_audio}
-                            target="_blank"
-                            rel="noopener"
-                            style={{
-                              color: C.danger,
-                              fontSize: 12,
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 4,
-                            }}
-                          >
+                          <a href={c.url_audio} target="_blank" rel="noopener" style={{ color: C.danger, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
                             <span style={{ fontSize: 14 }}>▶</span>
-                            {c.url_audio.includes("youtube") ? (
-                              <span
-                                style={{
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                  maxWidth: 180,
-                                }}
-                              >
-                                {c.cancion || "Ver video"}
-                              </span>
-                            ) : (
-                              <span
-                                style={{
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                  maxWidth: 180,
-                                }}
-                              >
-                                {c.url_audio.split("/").pop()?.slice(0, 30) ||
-                                  "Escuchar"}
-                              </span>
-                            )}
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 }}>
+                              {c.url_audio.includes("youtube") ? (c.cancion || "Ver video") : (c.url_audio.split("/").pop()?.slice(0, 30) || "Escuchar")}
+                            </span>
                           </a>
                         ) : c.url_audio ? (
-                          <span style={{ fontSize: 12, color: "#374151" }}>
-                            {c.url_audio}
-                          </span>
+                          <span style={{ fontSize: 12, color: "#374151" }}>{c.url_audio}</span>
                         ) : (
                           <span style={{ color: C.gray, fontSize: 12 }}>—</span>
                         )}
                       </td>
-                      </>)}
+                      )}
                     </tr>
                   );
                 })}
