@@ -2544,7 +2544,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
     setError("");
     setLoading(true);
     try {
-      await onSignIn(loginEmail.trim(), loginPassword);
+      await onSignIn(loginEmail.trim().toLowerCase(), loginPassword);
     } catch (err) {
       setError(err.message);
     }
@@ -2574,7 +2574,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
     setLoading(true);
     try {
       await onSignUp(
-        regEmail.trim(),
+        regEmail.trim().toLowerCase(),
         regPassword,
         regNombre.trim(),
         regCuerda,
@@ -2597,7 +2597,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
     setError("");
     setLoading(true);
     try {
-      await authResetPassword(recEmail.trim());
+      await authResetPassword(recEmail.trim().toLowerCase());
       setSuccess(
         "Te enviamos un correo con el enlace para restablecer tu contraseña."
       );
@@ -19169,7 +19169,7 @@ export function InfoGastos({ user, members }) {
   const saldo = totalIngresado - totalGastado;
 
   const mesActual = finCurrentMesIso();
-  const cuotasActivas = mesActual >= CUOTAS_MES_INICIO;
+  const cuotasActivas = mesActual >= CUOTAS_MES_INICIO || pagos.some((p) => p.tipo === "cuota");
   const pagosMesActual = pagos.filter((p) => p.mes === mesActual);
   const miembrosIds = new Set(miembrosEnCuotas.map((m) => m.integrante_id));
   const miembrosActivos = members.filter((m) => miembrosIds.has(m.id));
