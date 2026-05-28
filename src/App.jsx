@@ -340,6 +340,14 @@ const G = `
   html, body { height: 100%; overflow: hidden; }
   body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; }
   ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: #f1f1f1; } ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 10px; }
+  @keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .perfil-hero { animation: fadeSlideUp 0.42s ease both; }
+  .perfil-card { animation: fadeSlideUp 0.42s ease both; }
+  .perfil-card:nth-child(2) { animation-delay: 0.07s; }
+  .perfil-card:nth-child(3) { animation-delay: 0.14s; }
   input, textarea, button { font-family: 'Inter', sans-serif; }
   a { text-decoration: none; }
   @media (max-width: 768px) {
@@ -392,6 +400,8 @@ const NAV = [
   { id: "podcast",          icon: "◉",  label: "Podcast" },
   { id: "qanda",            icon: "?",  label: "Preguntas" },
   { id: "material_ensayo",  icon: "📥", label: "Material de Ensayo" },
+  { id: "cantos_pdf",       icon: "📄", label: "Cantos PDF" },
+  { id: "audios",           icon: "🎧", label: "Audios" },
 ];
 
 const BOTTOM_NAV = [
@@ -679,15 +689,26 @@ function MobileMenu({ section, setSection, onClose, user }) {
         {NAV.filter((item) => {
           const isVisita = esVisita(user);
           if (isVisita) {
-            return ["dashboard", "pauta_misa", "material_ensayo"].includes(item.id);
+            return ["dashboard", "pauta_misa", "cantos_pdf", "audios"].includes(item.id);
           }
           if (item.id === "material_ensayo") return false;
+          if (item.id === "cantos_pdf" || item.id === "audios") return false;
           if (item.id !== "admin" || user?.cuerda === "Admin") {
             if (item.id !== "finanzas" || user?.cuerda === "Admin" || user?.cuerda === "Contador/a Coro") return true;
             return false;
           }
           return false;
-        }).map((item) => (
+        }).map((item) => {
+          const isVisita = esVisita(user);
+          const VISITA_STYLES = {
+            dashboard:  { bg:"#0f3460", color:"white",   icon:"🏠" },
+            pauta_misa: { bg:"#1D9E75", color:"white",   icon:"🎼" },
+            cantos_pdf: { bg:"#7c3aed", color:"white",   icon:"📄" },
+            audios:     { bg:"#d97706", color:"white",   icon:"🎧" },
+          };
+          const vs = isVisita ? VISITA_STYLES[item.id] : null;
+          const isActive = section === item.id;
+          return (
           <button
             key={item.id}
             onClick={() => {
@@ -698,32 +719,44 @@ function MobileMenu({ section, setSection, onClose, user }) {
               width: "100%",
               display: "flex",
               alignItems: "center",
-              gap: 12,
-              padding: "11px 12px",
-              borderRadius: 8,
-              background: section === item.id ? C.primaryLight : "transparent",
-              border: "none",
+              gap: vs ? 14 : 12,
+              padding: vs ? "13px 14px" : "11px 12px",
+              borderRadius: vs ? 12 : 8,
+              background: vs
+                ? (isActive ? vs.bg : `${vs.bg}18`)
+                : (isActive ? C.primaryLight : "transparent"),
+              border: vs ? `1.5px solid ${vs.bg}40` : "none",
               cursor: "pointer",
-              color: section === item.id ? C.primaryDark : C.gray,
-              marginBottom: 2,
-              fontSize: 14,
-              fontWeight: section === item.id ? 600 : 400,
+              color: vs
+                ? (isActive ? "white" : vs.bg)
+                : (isActive ? C.primaryDark : C.gray),
+              marginBottom: vs ? 8 : 2,
+              fontSize: vs ? 13 : 14,
+              fontWeight: (isActive || vs) ? 600 : 400,
               textAlign: "left",
+              transition: "all 0.15s",
+              boxShadow: vs && isActive ? `0 4px 14px ${vs.bg}40` : "none",
             }}
           >
-            <span
-              style={{
-                fontSize: 16,
-                width: 22,
-                textAlign: "center",
-                flexShrink: 0,
-              }}
-            >
-              {item.icon}
-            </span>
-            {item.label}
+            {vs ? (
+              <div style={{
+                width:36, height:36, borderRadius:10, flexShrink:0,
+                background: isActive ? "rgba(255,255,255,0.2)" : vs.bg,
+                display:"flex", alignItems:"center", justifyContent:"center",
+                fontSize:18,
+                boxShadow: isActive ? "none" : `0 2px 8px ${vs.bg}40`,
+              }}>
+                {vs.icon}
+              </div>
+            ) : (
+              <span style={{ fontSize: 16, width: 22, textAlign: "center", flexShrink: 0 }}>
+                {item.icon}
+              </span>
+            )}
+            <span style={{ fontSize: vs ? 14 : undefined }}>{item.label}</span>
           </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1858,14 +1891,25 @@ export default function App() {
           {NAV.filter((item) => {
             const isVisita = esVisita(user);
             if (isVisita) {
-              return ["dashboard", "pauta_misa", "material_ensayo"].includes(item.id);
+              return ["dashboard", "pauta_misa", "cantos_pdf", "audios"].includes(item.id);
             }
-            // Ocultar material_ensayo para no-visitas
+            // Ocultar material_ensayo, cantos_pdf, audios para no-visitas
             if (item.id === "material_ensayo") return false;
+            if (item.id === "cantos_pdf" || item.id === "audios") return false;
             if (item.id === "admin" && user?.cuerda !== "Admin") return false;
             if (item.id === "finanzas" && user?.cuerda !== "Admin" && user?.cuerda !== "Contador/a Coro") return false;
             return true;
-          }).map((item) => (
+          }).map((item) => {
+            const isVisita = esVisita(user);
+            const VISITA_STYLES = {
+              dashboard:  { bg:"#0f3460", icon:"🏠" },
+              pauta_misa: { bg:"#1D9E75", icon:"🎼" },
+              cantos_pdf: { bg:"#7c3aed", icon:"📄" },
+              audios:     { bg:"#d97706", icon:"🎧" },
+            };
+            const vs = isVisita ? VISITA_STYLES[item.id] : null;
+            const isActive = section === item.id;
+            return (
             <button
               key={item.id}
               onClick={() => setSection(item.id)}
@@ -1873,53 +1917,69 @@ export default function App() {
                 width: "100%",
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
-                padding: "9px 10px",
-                borderRadius: 8,
-                background:
-                  section === item.id ? C.primaryLight : "transparent",
-                border: "none",
+                gap: vs ? 10 : 10,
+                padding: vs ? "10px 10px" : "9px 10px",
+                borderRadius: vs ? 11 : 8,
+                background: vs
+                  ? (isActive ? vs.bg : `${vs.bg}15`)
+                  : (isActive ? C.primaryLight : "transparent"),
+                border: vs ? `1.5px solid ${vs.bg}35` : "none",
                 cursor: "pointer",
-                color: section === item.id ? C.primaryDark : C.gray,
-                marginBottom: 2,
+                color: vs
+                  ? (isActive ? "white" : vs.bg)
+                  : (isActive ? C.primaryDark : C.gray),
+                marginBottom: vs ? 7 : 2,
                 transition: "all 0.15s",
                 fontSize: 13,
-                fontWeight: section === item.id ? 600 : 400,
+                fontWeight: (isActive || vs) ? 600 : 400,
                 whiteSpace: "nowrap",
                 textAlign: "left",
+                boxShadow: vs && isActive ? `0 4px 12px ${vs.bg}45` : "none",
               }}
             >
-              <span
-                style={{
-                  fontSize: 16,
-                  flexShrink: 0,
-                  width: 20,
-                  textAlign: "center",
-                }}
-              >
-                {item.icon}
-              </span>
+              {vs ? (
+                <div style={{
+                  width:28, height:28, borderRadius:8, flexShrink:0,
+                  background: isActive ? "rgba(255,255,255,0.2)" : vs.bg,
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:15,
+                  boxShadow: isActive ? "none" : `0 2px 6px ${vs.bg}40`,
+                }}>
+                  {vs.icon}
+                </div>
+              ) : (
+                <span style={{ fontSize: 16, flexShrink: 0, width: 20, textAlign: "center" }}>
+                  {item.icon}
+                </span>
+              )}
               {sideOpen && item.label}
             </button>
-          ))}
+            );
+          })}
         </nav>
-        <div
-          style={{ padding: "10px 8px", borderTop: `1px solid ${C.border}` }}
-        >
+        <div style={{ padding: "10px 8px", borderTop: `1px solid ${C.border}` }}>
           <div
+            onClick={() => setSection("perfil")}
             style={{
               display: "flex",
               alignItems: "center",
               gap: 8,
-              padding: "8px",
-              borderRadius: 8,
-              background: C.light,
+              padding: sideOpen ? "10px 12px" : "8px",
+              borderRadius: 12,
+              background: section === "perfil"
+                ? (CUERDAS[user?.cuerda] || C.primary) + "18"
+                : "transparent",
+              border: `1px solid ${section === "perfil"
+                ? (CUERDAS[user?.cuerda] || C.primary) + "40"
+                : "transparent"}`,
+              cursor: "pointer",
+              transition: "all 0.2s",
             }}
           >
             <div
               style={{
-                width: 28,
-                height: 28,
+                width: sideOpen ? 36 : 28,
+                height: sideOpen ? 36 : 28,
                 borderRadius: "50%",
                 flexShrink: 0,
                 background: CUERDAS[user?.cuerda] || C.primary,
@@ -1927,47 +1987,41 @@ export default function App() {
                 alignItems: "center",
                 justifyContent: "center",
                 color: "white",
-                fontSize: 10,
+                fontSize: sideOpen ? 12 : 10,
                 fontWeight: 700,
                 overflow: "hidden",
+                border: `2.5px solid ${(CUERDAS[user?.cuerda] || C.primary)}44`,
+                boxShadow: `0 2px 8px ${(CUERDAS[user?.cuerda] || C.primary)}40`,
+                transition: "all 0.2s",
               }}
             >
-              {user?.foto_url ? (
-                <img
-                  src={user.foto_url}
-                  alt=""
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    objectPosition: "center",
-                    display: "block",
-                  }}
-                />
-              ) : (
-                ini(user?.nombre || "U")
-              )}
+              {user?.foto_url
+                ? <img src={user.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }} />
+                : ini(user?.nombre || "U")
+              }
             </div>
             {sideOpen && (
-              <div style={{ overflow: "hidden", flex: 1 }}>
-                <div
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: C.dark,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
+              <div style={{ overflow: "hidden", flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: 12, fontWeight: 700, color: C.dark,
+                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                }}>
                   {user?.nombre}
                 </div>
                 {!esVisita(user) && (
-                  <div style={{ fontSize: 10, color: C.primary }}>
-                    {rolFullLabel(user)}
+                  <div style={{
+                    fontSize: 10, fontWeight: 600,
+                    color: CUERDAS[user?.cuerda] || C.primary,
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    marginTop: 1,
+                  }}>
+                    {rolFullLabel(user) || user?.cuerda}
                   </div>
                 )}
               </div>
+            )}
+            {sideOpen && (
+              <div style={{ flexShrink: 0, fontSize: 10, color: C.gray, opacity: 0.5 }}>▶</div>
             )}
           </div>
         </div>
@@ -2371,6 +2425,12 @@ export default function App() {
               )}
               {section === "material_ensayo" && esVisita(user) && (
                 <MaterialEnsayo docs={materialEnsayo} user={user} />
+              )}
+              {section === "cantos_pdf" && esVisita(user) && (
+                <MaterialEnsayo docs={materialEnsayo} user={user} catFiltroInicial="PDF" />
+              )}
+              {section === "audios" && esVisita(user) && (
+                <MaterialEnsayo docs={materialEnsayo} user={user} catFiltroInicial="Audio" />
               )}
             </>
           )}
@@ -3596,7 +3656,7 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
             <img
               src={savedUrl}
               alt="Afiche de la misa"
-              style={{ width: "100%", maxHeight: 420, objectFit: "cover", display: "block", filter: "brightness(0.88) contrast(1.05)" }}
+              style={{ width: "100%", maxHeight: 260, objectFit: "cover", display: "block", filter: "brightness(0.88) contrast(1.05)" }}
               onError={() => setImgError(true)}
             />
             {/* Shine hover */}
@@ -3907,300 +3967,163 @@ function DashboardVisita({ user, pautas, setSection, isAdmin, evangelio, comunid
   const primerNombre = user?.nombre?.split(" ")[0] || "Visitante";
 
   return (
-    <div style={{ maxWidth: 860, margin: "0 auto" }}>
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
       <style>{`
-        @keyframes visita-fade { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes visita-glow { 0%,100%{box-shadow:0 0 32px rgba(14,165,233,0.18)} 50%{box-shadow:0 0 56px rgba(14,165,233,0.38)} }
-        @keyframes visita-float { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-8px)} }
-        .visita-card { animation: visita-fade 0.6s ease both; }
-        .visita-card:nth-child(2){ animation-delay:0.12s; }
-        .visita-card:nth-child(3){ animation-delay:0.22s; }
-        .visita-card:nth-child(4){ animation-delay:0.32s; }
-        .visita-icon-float { animation: visita-float 3.5s ease-in-out infinite; }
-        .visita-btn:hover { transform: translateY(-2px) !important; box-shadow: 0 8px 28px rgba(14,165,233,0.38) !important; }
-        .visita-pauta-card:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(14,165,233,0.25) !important; }
+        @keyframes vfade { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+        .vc { animation: vfade 0.5s ease both; }
+        .vc:nth-child(2){animation-delay:0.08s} .vc:nth-child(3){animation-delay:0.14s}
+        .vc:nth-child(4){animation-delay:0.2s}  .vc:nth-child(5){animation-delay:0.26s}
+        .vc:nth-child(6){animation-delay:0.32s}
+        .vpc:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(29,158,117,0.2) !important; }
       `}</style>
 
-      {/* ── Hero bienvenida ── */}
-      <div className="visita-card" style={{
-        background: "linear-gradient(135deg, #0c1a2e 0%, #0f3460 40%, #0ea5e9 100%)",
-        borderRadius: 22,
-        padding: "40px 36px",
-        marginBottom: 20,
-        position: "relative",
-        overflow: "hidden",
-        boxShadow: "0 20px 60px rgba(14,165,233,0.25)",
+      {/* ── Hero compacto ── */}
+      <div className="vc" style={{
+        background:"linear-gradient(120deg,#0c1a2e 0%,#0f3460 55%,#1a5276 100%)",
+        borderRadius:16, padding:"18px 22px", marginBottom:12,
+        position:"relative", overflow:"hidden",
+        boxShadow:"0 4px 24px rgba(14,165,233,0.18)",
       }}>
-        {/* Decoración de fondo */}
-        <div style={{ position:"absolute", top:-40, right:-40, width:220, height:220, borderRadius:"50%", background:"rgba(255,255,255,0.04)" }} />
-        <div style={{ position:"absolute", bottom:-60, left:-30, width:280, height:280, borderRadius:"50%", background:"rgba(255,255,255,0.03)" }} />
-        <div style={{ position:"absolute", top:20, right:36, opacity:0.12, fontSize:120, lineHeight:1, userSelect:"none" }}>🎼</div>
-
-        <div style={{ position:"relative", zIndex:1 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:20 }}>
-            <div className="visita-icon-float" style={{
-              width:64, height:64, borderRadius:18,
-              background:"linear-gradient(135deg,rgba(255,255,255,0.18),rgba(255,255,255,0.06))",
-              border:"1.5px solid rgba(255,255,255,0.2)",
-              display:"flex", alignItems:"center", justifyContent:"center",
-              fontSize:32, flexShrink:0,
-              backdropFilter:"blur(8px)",
-            }}>🎵</div>
-            <div>
-              <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.55)", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:4 }}>
-                Portal Litúrgico · Acceso Invitado
-              </div>
-              <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:26, fontWeight:800, color:"white", lineHeight:1.1 }}>
-                {saludo},<br/>{primerNombre} 👋
-              </div>
+        <div style={{ position:"absolute", top:-30, right:-30, width:160, height:160, borderRadius:"50%", background:"rgba(255,255,255,0.03)" }} />
+        <div style={{ position:"absolute", top:14, right:20, opacity:0.08, fontSize:72, lineHeight:1, userSelect:"none" }}>🎼</div>
+        <div style={{ position:"relative", zIndex:1, display:"flex", alignItems:"center", gap:14 }}>
+          <div style={{
+            width:42, height:42, borderRadius:12, flexShrink:0,
+            background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.18)",
+            display:"flex", alignItems:"center", justifyContent:"center", fontSize:20,
+          }}>🎵</div>
+          <div>
+            <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.45)", letterSpacing:"0.1em", textTransform:"uppercase" }}>
+              Portal Litúrgico · Acceso Invitado
             </div>
-          </div>
-
-          <p style={{ fontSize:14, color:"rgba(255,255,255,0.78)", lineHeight:1.8, marginBottom:24, maxWidth:520 }}>
-            Bienvenido/a al portal de gestión litúrgica. Aquí encontrarás las <strong style={{color:"white"}}>pautas de misa parroquiales</strong> publicadas y el <strong style={{color:"white"}}>material de ensayo</strong> disponible para esta celebración.
-          </p>
-
-          <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
-            <button
-              className="visita-btn"
-              onClick={() => setSection("pauta_misa")}
-              style={{
-                background:"white", color:"#0c1a2e",
-                border:"none", borderRadius:12, padding:"12px 24px",
-                fontSize:13, fontWeight:700, cursor:"pointer",
-                display:"flex", alignItems:"center", gap:8,
-                transition:"all 0.2s",
-                boxShadow:"0 4px 16px rgba(14,165,233,0.2)",
-              }}>
-              🎼 Ver Pauta de Misa
-            </button>
-            <button
-              className="visita-btn"
-              onClick={() => setSection("material_ensayo")}
-              style={{
-                background:"rgba(255,255,255,0.12)", color:"white",
-                border:"1.5px solid rgba(255,255,255,0.25)", borderRadius:12, padding:"12px 24px",
-                fontSize:13, fontWeight:700, cursor:"pointer",
-                display:"flex", alignItems:"center", gap:8,
-                transition:"all 0.2s",
-                backdropFilter:"blur(8px)",
-              }}>
-              📥 Material de Ensayo
-            </button>
+            <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:18, fontWeight:800, color:"white", lineHeight:1.2, marginTop:2 }}>
+              {saludo}, {primerNombre} 👋
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ── Foto Destacada de Misa (inmediatamente después del saludo) ── */}
-      <FotoDestacadaMisaWidget isAdmin={isAdmin} />
-
-      {/* ── Próxima pauta parroquial destacada ── */}
+      {/* ── Próxima pauta parroquial ── */}
       {proxima ? (
-        <div
-          className="visita-card visita-pauta-card"
-          onClick={() => setSection("pauta_misa")}
-          style={{
-            background:"linear-gradient(135deg,#f0fdf4,#dcfce7)",
-            borderRadius:18, padding:"22px 26px", marginBottom:20,
-            border:"2px solid #1D9E7530", cursor:"pointer",
-            boxShadow:"0 6px 24px rgba(29,158,117,0.14)",
-            transition:"all 0.25s",
-            display:"flex", alignItems:"center", gap:18,
-          }}>
+        <div className="vc vpc" onClick={() => setSection("pauta_misa")} style={{
+          background:"white", borderRadius:14, padding:"14px 18px", marginBottom:12,
+          border:"1.5px solid #1D9E7528", cursor:"pointer",
+          boxShadow:"0 2px 12px rgba(29,158,117,0.1)", transition:"all 0.2s",
+          display:"flex", alignItems:"center", gap:14,
+        }}>
           <div style={{
-            width:56, height:56, borderRadius:15,
+            width:44, height:44, borderRadius:12, flexShrink:0,
             background:"linear-gradient(135deg,#1a3a2a,#1D9E75)",
             display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
-            flexShrink:0, boxShadow:"0 4px 14px rgba(29,158,117,0.35)",
+            boxShadow:"0 2px 8px rgba(29,158,117,0.3)",
           }}>
-            <div style={{ fontSize:18, fontWeight:800, color:"white", lineHeight:1 }}>
+            <div style={{ fontSize:15, fontWeight:800, color:"white", lineHeight:1 }}>
               {new Date(proxima.fecha+"T00:00:00").getDate()}
             </div>
-            <div style={{ fontSize:9, color:"rgba(255,255,255,0.8)", textTransform:"uppercase" }}>
+            <div style={{ fontSize:8, color:"rgba(255,255,255,0.75)", textTransform:"uppercase" }}>
               {new Date(proxima.fecha+"T00:00:00").toLocaleDateString("es-CL",{month:"short"})}
             </div>
           </div>
           <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:10, fontWeight:700, color:"#1D9E75", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:3 }}>
+            <div style={{ fontSize:9, fontWeight:700, color:"#1D9E75", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:2 }}>
               🎼 Próxima Misa Parroquial
             </div>
-            <div style={{ fontSize:16, fontWeight:700, color:"#1a3a2a", marginBottom:3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+            <div style={{ fontSize:14, fontWeight:700, color:"#1a3a2a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
               {proxima.titulo}
             </div>
-            <div style={{ fontSize:12, color:"#4b7a62" }}>
+            <div style={{ fontSize:11, color:"#4b7a62", marginTop:1 }}>
               {new Date(proxima.fecha+"T00:00:00").toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"})}
-              {proxima.hora ? ` · ${proxima.hora} Hrs` : ""}
-              {proxima.lugar ? ` · ${proxima.lugar}` : ""}
+              {proxima.hora ? ` · ${proxima.hora}` : ""}{proxima.lugar ? ` · ${proxima.lugar}` : ""}
             </div>
           </div>
-          <span style={{ fontSize:13, color:"#1D9E75", fontWeight:700, flexShrink:0 }}>Ver →</span>
+          <span style={{ fontSize:12, color:"#1D9E75", fontWeight:700, flexShrink:0 }}>Ver →</span>
         </div>
       ) : (
-        <div className="visita-card" style={{
-          background:"#f8fafc", borderRadius:18, padding:"22px 26px", marginBottom:20,
-          border:"1px dashed #cbd5e1", textAlign:"center",
+        <div className="vc" style={{
+          background:"#f8fafc", borderRadius:14, padding:"14px 18px", marginBottom:12,
+          border:"1px dashed #cbd5e1", display:"flex", alignItems:"center", gap:10,
         }}>
-          <div style={{ fontSize:36, marginBottom:8, opacity:0.4 }}>🎼</div>
-          <div style={{ fontSize:13, color:"#64748b" }}>No hay pautas parroquiales publicadas aún.</div>
+          <span style={{ fontSize:20, opacity:0.35 }}>🎼</span>
+          <span style={{ fontSize:12, color:"#94a3b8" }}>No hay pautas parroquiales publicadas aún.</span>
         </div>
       )}
 
-      {/* ── Info cards ── */}
-      <div className="visita-card" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:20 }}>
-        <div style={{
-          background:"linear-gradient(135deg,#fef3c7,#fffbeb)",
-          borderRadius:16, padding:"20px 22px",
-          border:"1px solid #fbbf2430",
-          boxShadow:"0 4px 16px rgba(251,191,36,0.08)",
-        }}>
-          <div style={{ fontSize:28, marginBottom:10 }}>📥</div>
-          <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:14, fontWeight:700, color:"#92400e", marginBottom:6 }}>
-            Material de Ensayo
-          </div>
-          <div style={{ fontSize:12, color:"#b45309", lineHeight:1.6, marginBottom:14 }}>
-            Accede a las letras, partituras y audios para preparar la liturgia.
-          </div>
-          <button onClick={() => setSection("material_ensayo")} style={{
-            background:"#f59e0b", color:"white", border:"none", borderRadius:8,
-            padding:"8px 16px", fontSize:12, fontWeight:700, cursor:"pointer",
-          }}>
-            Ver material →
-          </button>
-        </div>
-
-        <div style={{
-          background:"linear-gradient(135deg,#f0f9ff,#e0f2fe)",
-          borderRadius:16, padding:"20px 22px",
-          border:"1px solid #7dd3fc30",
-          boxShadow:"0 4px 16px rgba(14,165,233,0.08)",
-        }}>
-          <div style={{ fontSize:28, marginBottom:10 }}>🎼</div>
-          <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:14, fontWeight:700, color:"#0c4a6e", marginBottom:6 }}>
-            Pauta de Misa
-          </div>
-          <div style={{ fontSize:12, color:"#075985", lineHeight:1.6, marginBottom:14 }}>
-            Consulta el orden y canciones de las misas parroquiales publicadas.
-          </div>
-          <button onClick={() => setSection("pauta_misa")} style={{
-            background:"#0ea5e9", color:"white", border:"none", borderRadius:8,
-            padding:"8px 16px", fontSize:12, fontWeight:700, cursor:"pointer",
-          }}>
-            Ver pautas →
-          </button>
-        </div>
+      {/* ── Foto Destacada ── */}
+      <div className="vc" style={{ marginBottom:12 }}>
+        <FotoDestacadaMisaWidget isAdmin={isAdmin} />
       </div>
 
-      {/* ── Video Destacado (exclusivo Invitado) ── */}
-      <VideoDestacadoWidget isAdmin={isAdmin} />
+      {/* ── Video Destacado ── */}
+      <div className="vc" style={{ marginBottom:12 }}>
+        <VideoDestacadoWidget isAdmin={isAdmin} />
+      </div>
 
       {/* ── Evangelio del Domingo ── */}
       {evangelio && (
-        <div className="visita-card" style={{ marginBottom: 20 }}>
-          <div style={{
-            background: "white", borderRadius: 18, padding: "22px 26px",
-            border: "1px solid #e5e7eb",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <span style={{ fontSize: 18 }}>📖</span>
-              <div style={{ flex: 1 }}>
-                <span style={{ fontFamily: "'Poppins',sans-serif", fontSize: 14, fontWeight: 600, color: "#1e293b" }}>
-                  Evangelio del Domingo
-                </span>
-                {evangelio.domingo && (
-                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 1, fontStyle: "italic" }}>
-                    {evangelio.domingo}
-                  </div>
-                )}
-              </div>
+        <div className="vc" style={{
+          background:"white", borderRadius:14, padding:"16px 18px", marginBottom:12,
+          border:"1px solid #e5e7eb", boxShadow:"0 2px 8px rgba(0,0,0,0.04)",
+        }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+            <span style={{ fontSize:15 }}>📖</span>
+            <div>
+              <div style={{ fontSize:13, fontWeight:600, color:"#1e293b" }}>Evangelio del Domingo</div>
+              {evangelio.domingo && <div style={{ fontSize:10, color:"#64748b", fontStyle:"italic" }}>{evangelio.domingo}</div>}
             </div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#d97706", marginBottom: 8 }}>
-              {evangelio.referencia}
-            </div>
-            <p style={{ fontSize: 13, lineHeight: 1.75, color: "#374151", marginBottom: 12, borderLeft: "3px solid #e5e7eb", paddingLeft: 12 }}>
-              {evangelio.texto}
-            </p>
-            {evangelio.reflexion && (
-              <div style={{ background: "#f0fdf4", borderRadius: 8, padding: "10px 14px", borderLeft: "3px solid #1D9E75", marginBottom: 10 }}>
-                <p style={{ margin: 0, fontSize: 12, color: "#166534", lineHeight: 1.6, fontWeight: 500 }}>
-                  {evangelio.reflexion}
-                </p>
-              </div>
-            )}
-            {evangelio.oracion && (
-              <div style={{ background: "#fffbeb", borderRadius: 8, padding: "10px 14px", borderLeft: "3px solid #d97706", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#d97706", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>
-                  🙏 Oración antes de la misa
-                </div>
-                <p style={{ margin: 0, fontSize: 12, color: "#374151", lineHeight: 1.6, fontStyle: "italic" }}>
-                  {evangelio.oracion}
-                </p>
-              </div>
-            )}
-            {evangelio.fuente && (
-              <div style={{ marginTop: 8, fontSize: 10, color: "#94a3b8", textAlign: "right" }}>
-                Fuente: {evangelio.fuente}
-              </div>
+            {evangelio.referencia && (
+              <span style={{ marginLeft:"auto", fontSize:11, fontWeight:600, color:"#d97706", background:"#fffbeb", padding:"2px 8px", borderRadius:6 }}>
+                {evangelio.referencia}
+              </span>
             )}
           </div>
+          <p style={{ fontSize:12, lineHeight:1.7, color:"#374151", margin:"0 0 10px", borderLeft:"3px solid #e5e7eb", paddingLeft:10 }}>
+            {evangelio.texto}
+          </p>
+          {evangelio.reflexion && (
+            <div style={{ background:"#f0fdf4", borderRadius:8, padding:"8px 12px", borderLeft:"3px solid #1D9E75", marginBottom:8 }}>
+              <p style={{ margin:0, fontSize:11, color:"#166534", lineHeight:1.6 }}>{evangelio.reflexion}</p>
+            </div>
+          )}
+          {evangelio.oracion && (
+            <div style={{ background:"#fffbeb", borderRadius:8, padding:"8px 12px", borderLeft:"3px solid #d97706" }}>
+              <div style={{ fontSize:9, fontWeight:700, color:"#d97706", letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:3 }}>🙏 Oración antes de la misa</div>
+              <p style={{ margin:0, fontSize:11, color:"#374151", lineHeight:1.6, fontStyle:"italic" }}>{evangelio.oracion}</p>
+            </div>
+          )}
+          {evangelio.fuente && <div style={{ marginTop:8, fontSize:9, color:"#94a3b8", textAlign:"right" }}>Fuente: {evangelio.fuente}</div>}
         </div>
       )}
 
-      {/* ── Playlist ── */}
-      <div className="visita-card" style={{ marginBottom: 20 }}>
-        <div style={{
-          background: "white", borderRadius: 18, padding: "18px 22px",
-          border: "1px solid #e5e7eb",
-          boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <span style={{ fontSize: 18 }}>🎵</span>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#1e293b" }}>Playlist Litúrgica</span>
-          </div>
-          <iframe
-            src="https://open.spotify.com/embed/playlist/3ssNSNlljyYlw2La83mXZE?utm_source=generator&theme=0"
-            width="100%"
-            height="152"
-            frameBorder="0"
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            loading="lazy"
-            style={{ borderRadius: 12, display: "block" }}
-          />
-          <a
-            href="https://open.spotify.com/playlist/3ssNSNlljyYlw2La83mXZE"
-            target="_blank"
-            rel="noopener"
-            style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, textDecoration: "none" }}
-          >
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: "#1DB954", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 13, flexShrink: 0 }}>▶</div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#1e293b" }}>Playlist Coro MJ</div>
-              <div style={{ fontSize: 11, color: "#64748b" }}>Abrir en Spotify</div>
-            </div>
-          </a>
+      {/* ── Playlist Litúrgica ── */}
+      <div className="vc" style={{
+        background:"white", borderRadius:14, padding:"14px 18px", marginBottom:12,
+        border:"1px solid #e5e7eb", boxShadow:"0 2px 8px rgba(0,0,0,0.04)",
+      }}>
+        <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:10 }}>
+          <span style={{ fontSize:14 }}>🎵</span>
+          <span style={{ fontSize:13, fontWeight:600, color:"#1e293b" }}>Playlist Litúrgica</span>
         </div>
+        <iframe
+          src="https://open.spotify.com/embed/playlist/3ssNSNlljyYlw2La83mXZE?utm_source=generator&theme=0"
+          width="100%" height="80" frameBorder="0"
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          loading="lazy" style={{ borderRadius:10, display:"block" }}
+        />
+        <a href="https://open.spotify.com/playlist/3ssNSNlljyYlw2La83mXZE" target="_blank" rel="noopener"
+          style={{ display:"flex", alignItems:"center", gap:6, marginTop:8, textDecoration:"none" }}>
+          <div style={{ width:22, height:22, borderRadius:5, background:"#1DB954", display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:10, flexShrink:0 }}>▶</div>
+          <span style={{ fontSize:11, color:"#64748b" }}>Abrir playlist completa en Spotify</span>
+        </a>
       </div>
 
       {/* ── Comunidades ── */}
-      <div className="visita-card" style={{ marginBottom: 20 }}>
+      <div className="vc" style={{ marginBottom:12 }}>
         <ComunidadesWidget comunidades={comunidades} isAdmin={isAdmin} setSection={setSection} />
       </div>
 
-      {/* ── Footer informativo ── */}
-      <div className="visita-card" style={{
-        background:"#f8fafc", borderRadius:16, padding:"16px 22px",
-        border:"1px solid #e2e8f0",
-        display:"flex", alignItems:"center", gap:14,
-      }}>
-        <span style={{ fontSize:24, flexShrink:0 }}>⛪</span>
-        <div>
-          <div style={{ fontSize:13, fontWeight:600, color:"#1e293b", marginBottom:2 }}>
-            Portal de Gestión de Coro
-          </div>
-          <div style={{ fontSize:11, color:"#64748b", lineHeight:1.6 }}>
-            Este portal es administrado por Máximo Henríquez, encargado de Coro Misioneros de Jesús.
-          </div>
-        </div>
+      {/* ── Footer ── */}
+      <div className="vc" style={{ textAlign:"center", padding:"10px 0 4px", borderTop:"1px solid #f1f5f9", marginTop:4 }}>
+        <span style={{ fontSize:10, color:"#cbd5e1" }}>⛪ Portal Coro Misioneros de Jesús</span>
       </div>
     </div>
   );
@@ -4209,14 +4132,14 @@ function DashboardVisita({ user, pautas, setSection, isAdmin, evangelio, comunid
 // ══════════════════════════════════════════════════════════════════════
 //  MATERIAL DE ENSAYO — Sección exclusiva para usuario Visita
 // ══════════════════════════════════════════════════════════════════════
-function MaterialEnsayo({ docs, user }) {
+function MaterialEnsayo({ docs, user, catFiltroInicial }) {
   const [search, setSearch] = useState("");
-  const [catFiltro, setCatFiltro] = useState("Todos");
+  const [catFiltro, setCatFiltro] = useState(catFiltroInicial || "Todos");
 
   // Mostrar todos los documentos disponibles (el admin decide qué subir)
   const lista = (docs || []).filter((d) => {
     const matchSearch = !search || d.nombre?.toLowerCase().includes(search.toLowerCase());
-    const matchCat = catFiltro === "Todos" || d.categoria === catFiltro;
+    const matchCat = catFiltro === "Todos" || (d.categoria||"").toLowerCase().includes(catFiltro.toLowerCase());
     return matchSearch && matchCat;
   });
 
@@ -5949,7 +5872,6 @@ function Perfil({ user, members, setUser }) {
   const [savingGenero, setSavingGenero] = useState(false);
   const fileRef = useRef(null);
 
-  // ── Notificaciones push ──
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
@@ -5957,9 +5879,7 @@ function Perfil({ user, members, setUser }) {
   useEffect(() => {
     const supported = "serviceWorker" in navigator && "PushManager" in window;
     setPushSupported(supported);
-    if (supported) {
-      checkPushSubscribed().then(setPushEnabled);
-    }
+    if (supported) checkPushSubscribed().then(setPushEnabled);
   }, [user?.id]);
 
   async function togglePush() {
@@ -5972,7 +5892,7 @@ function Perfil({ user, members, setUser }) {
       } else {
         const ok = await registerPushNotifications(user);
         if (ok) { setPushEnabled(true); setMsg("🔔 ¡Notificaciones activadas!"); }
-        else setMsg("No se pudo activar. Asegúrate de permitir notificaciones en tu navegador.");
+        else setMsg("No se pudo activar. Permite notificaciones en tu navegador.");
       }
     } catch (e) { setMsg("Error: " + e.message); }
     setPushLoading(false);
@@ -5981,830 +5901,517 @@ function Perfil({ user, members, setUser }) {
   async function handlePhoto(e) {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 3 * 1024 * 1024) {
-      setMsg("La foto no puede superar 3 MB.");
-      return;
-    }
-    setUploading(true);
-    setMsg("");
+    if (file.size > 3 * 1024 * 1024) { setMsg("La foto no puede superar 3 MB."); return; }
+    setUploading(true); setMsg("");
     try {
       const ext = file.name.split(".").pop();
       const path = `${user.id || user.auth_id || Date.now()}.${ext}`;
-      const res = await fetch(
-        `${SUPABASE_URL}/storage/v1/object/avatars/${path}`,
-        {
-          method: "POST",
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${_authToken}`,
-            "Content-Type": file.type,
-            "x-upsert": "true",
-          },
-          body: file,
-        }
-      );
+      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/avatars/${path}`, {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken}`, "Content-Type": file.type, "x-upsert": "true" },
+        body: file,
+      });
       if (!res.ok) throw new Error(await res.text());
       const foto_url = `${SUPABASE_URL}/storage/v1/object/public/avatars/${path}`;
       await updateRecord("integrantes", user.id, { foto_url });
       setUser((p) => ({ ...p, foto_url }));
       setMsg("✅ Foto actualizada.");
-    } catch (e) {
-      setMsg("Error: " + e.message);
-    }
+    } catch (e) { setMsg("Error: " + e.message); }
     setUploading(false);
   }
 
   async function saveEmail() {
-    if (!newEmail.trim() || newEmail === user.email) {
-      setEditEmail(false);
-      return;
-    }
-    setSavingEmail(true);
-    setMsg("");
+    if (!newEmail.trim() || newEmail === user.email) { setEditEmail(false); return; }
+    setSavingEmail(true); setMsg("");
     try {
-      // Actualizar email en Supabase Auth
       const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
         method: "PUT",
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${_authToken}`,
-          "Content-Type": "application/json",
-        },
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({ email: newEmail.trim() }),
       });
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.msg || d.message || "Error");
-      }
-      // Actualizar también en tabla integrantes
+      if (!res.ok) { const d = await res.json(); throw new Error(d.msg || d.message || "Error"); }
       await updateRecord("integrantes", user.id, { email: newEmail.trim() });
       setUser((p) => ({ ...p, email: newEmail.trim() }));
       setEditEmail(false);
-      setMsg(
-        "✅ Correo actualizado. Revisa tu nuevo correo para confirmar el cambio."
-      );
-    } catch (e) {
-      setMsg("Error: " + e.message);
-    }
+      setMsg("✅ Correo actualizado. Revisa tu nuevo correo para confirmar el cambio.");
+    } catch (e) { setMsg("Error: " + e.message); }
     setSavingEmail(false);
   }
 
   async function saveCumple() {
-    if (newCumple === user.cumpleanos) {
-      setEditCumple(false);
-      return;
-    }
-    // Validar formato DD/MM
-    if (newCumple && !/^\d{2}\/\d{2}$/.test(newCumple)) {
-      setMsg("Formato incorrecto. Usa DD/MM (ej: 25/12)");
-      return;
-    }
-    setSavingCumple(true);
-    setMsg("");
+    if (newCumple === user.cumpleanos) { setEditCumple(false); return; }
+    if (newCumple && !/^\d{2}\/\d{2}$/.test(newCumple)) { setMsg("Formato incorrecto. Usa DD/MM (ej: 25/12)"); return; }
+    setSavingCumple(true); setMsg("");
     try {
       await updateRecord("integrantes", user.id, { cumpleanos: newCumple });
       setUser((p) => ({ ...p, cumpleanos: newCumple }));
       setEditCumple(false);
       setMsg("✅ Cumpleaños actualizado.");
-    } catch (e) {
-      setMsg("Error: " + e.message);
-    }
+    } catch (e) { setMsg("Error: " + e.message); }
     setSavingCumple(false);
   }
 
   async function saveTelefono() {
     const digits = newTel.replace(/\D/g, "");
-    if (!digits) {
-      setMsg("Ingresa un número válido.");
-      return;
-    }
-    if (digits.length < 8 || digits.length > 9) {
-      setMsg("El número móvil debe tener 8 o 9 dígitos (ej: 912345678).");
-      return;
-    }
+    if (!digits) { setMsg("Ingresa un número válido."); return; }
+    if (digits.length < 8 || digits.length > 9) { setMsg("El número móvil debe tener 8 o 9 dígitos (ej: 912345678)."); return; }
     const telCompleto = "+56 " + digits;
-    if (telCompleto === user.telefono) {
-      setEditTel(false);
-      return;
-    }
-    setSavingTel(true);
-    setMsg("");
+    if (telCompleto === user.telefono) { setEditTel(false); return; }
+    setSavingTel(true); setMsg("");
     try {
       await updateRecord("integrantes", user.id, { telefono: telCompleto });
       setUser((p) => ({ ...p, telefono: telCompleto }));
       setEditTel(false);
       setMsg("✅ Teléfono actualizado.");
-    } catch (e) {
-      setMsg("Error: " + e.message);
-    }
+    } catch (e) { setMsg("Error: " + e.message); }
     setSavingTel(false);
   }
 
   async function saveGenero() {
     if (newGenero === (user?.genero || "")) { setEditGenero(false); return; }
-    setSavingGenero(true);
-    setMsg("");
+    setSavingGenero(true); setMsg("");
     try {
       await updateRecord("integrantes", user.id, { genero: newGenero });
       setUser((p) => ({ ...p, genero: newGenero }));
       setEditGenero(false);
       setMsg("✅ Género actualizado.");
-    } catch (e) {
-      setMsg("Error: " + e.message);
-    }
+    } catch (e) { setMsg("Error: " + e.message); }
     setSavingGenero(false);
   }
 
   const fotoUrl = user?.foto_url;
+
+  const fieldRow = (icon, label, content) => (
+    <div style={{
+      display: "flex", alignItems: "flex-start", gap: 14,
+      padding: "13px 16px", borderRadius: 12,
+      background: "rgba(255,255,255,0.7)",
+      border: `1px solid ${C.border}`,
+      marginBottom: 8,
+    }}>
+      <div style={{
+        width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+        background: cc + "15",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 17, border: `1px solid ${cc}25`,
+      }}>{icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, color: C.gray, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 3 }}>{label}</div>
+        {content}
+      </div>
+    </div>
+  );
+
+  const editInputStyle = {
+    width: "100%", padding: "7px 11px", borderRadius: 8,
+    border: `1.5px solid ${cc}60`, fontSize: 13, outline: "none",
+    background: "white", color: C.dark, fontFamily: "'Inter',sans-serif",
+    boxSizing: "border-box",
+  };
+
+  const saveBtnEl = (onClick, saving) => (
+    <button onClick={onClick} disabled={saving} style={{
+      padding: "6px 14px", borderRadius: 8, border: "none",
+      background: `linear-gradient(135deg, ${cc}, ${cc}bb)`,
+      color: "white", fontWeight: 700, fontSize: 12,
+      cursor: saving ? "not-allowed" : "pointer",
+      opacity: saving ? 0.6 : 1,
+      boxShadow: `0 3px 10px ${cc}35`,
+    }}>{saving ? "…" : "✓ Guardar"}</button>
+  );
+
+  const cancelBtnEl = (onClick) => (
+    <button onClick={onClick} style={{
+      padding: "6px 12px", borderRadius: 8,
+      border: `1px solid ${C.border}`, background: "white",
+      color: C.gray, fontSize: 12, cursor: "pointer",
+    }}>Cancelar</button>
+  );
+
+  const editLinkEl = (onClick) => (
+    <button onClick={onClick} style={{
+      fontSize: 11, background: "none", border: "none",
+      color: cc, cursor: "pointer", padding: 0, fontWeight: 600,
+    }}>Editar →</button>
+  );
+
   return (
-    <div style={{ maxWidth: 800 }}>
-      <SectionTitle title="Mi Perfil" subtitle="Tu información en el Coro MJ" />
+    <div style={{ maxWidth: 860 }}>
+
       {msg && (
-        <div
-          style={{
-            background: msg.startsWith("✅") ? "#d1fae5" : "#fee2e2",
-            color: msg.startsWith("✅") ? "#065f46" : "#b91c1c",
-            borderRadius: 8,
-            padding: "10px 14px",
-            fontSize: 13,
-            marginBottom: 14,
-            border: `1px solid ${msg.startsWith("✅") ? "#6ee7b7" : "#fca5a5"}`,
-          }}
-        >
+        <div style={{
+          background: msg.startsWith("✅") ? "#d1fae5" : "#fee2e2",
+          color: msg.startsWith("✅") ? "#065f46" : "#b91c1c",
+          borderRadius: 10, padding: "10px 16px", fontSize: 13,
+          marginBottom: 18,
+          border: `1px solid ${msg.startsWith("✅") ? "#6ee7b7" : "#fca5a5"}`,
+          display: "flex", alignItems: "center", gap: 8,
+        }}>
           {msg}
+          <button onClick={() => setMsg("")} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "inherit", fontSize: 16, lineHeight: 1 }}>×</button>
         </div>
       )}
-      <div
-        className="perfil-grid"
-        style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 16 }}
-      >
-        <Card style={{ textAlign: "center" }}>
-          <div
-            style={{
-              position: "relative",
-              width: 100,
-              height: 100,
-              margin: "0 auto 14px",
-            }}
-          >
+
+      {/* ── HERO: portada + avatar ── */}
+      <div className="perfil-hero" style={{
+        borderRadius: 20, overflow: "hidden",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.10)",
+        marginBottom: 20, border: `1px solid ${C.border}`,
+        background: C.white,
+      }}>
+        {/* Portada degradada */}
+        <div style={{
+          height: 140,
+          background: `linear-gradient(135deg, ${cc}cc 0%, ${cc}88 40%, ${cc}33 100%)`,
+          position: "relative", overflow: "hidden",
+        }}>
+          <svg style={{ position:"absolute", inset:0, width:"100%", height:"100%", opacity:0.12 }} viewBox="0 0 400 140" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <pattern id="prf-dots" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
+                <circle cx="14" cy="14" r="2" fill="white" />
+              </pattern>
+            </defs>
+            <rect width="400" height="140" fill="url(#prf-dots)" />
+          </svg>
+          <div style={{ position:"absolute", top:-30, right:-30, width:160, height:160, borderRadius:"50%", background:"rgba(255,255,255,0.08)", pointerEvents:"none" }} />
+          <div style={{ position:"absolute", bottom:-40, left:60, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,0.06)", pointerEvents:"none" }} />
+          {!esVisita(user) && (
+            <div style={{
+              position:"absolute", top:14, right:16,
+              background:"rgba(255,255,255,0.2)",
+              backdropFilter:"blur(8px)",
+              border:"1px solid rgba(255,255,255,0.35)",
+              borderRadius:20, padding:"4px 14px",
+              fontSize:11, fontWeight:700, color:"white", letterSpacing:"0.06em",
+            }}>
+              {user?.cuerda?.toUpperCase()}
+            </div>
+          )}
+        </div>
+
+        {/* Avatar + nombre */}
+        <div style={{ padding:"0 24px 22px", position:"relative" }}>
+          <div style={{ position:"relative", display:"inline-block", marginTop:-52 }}>
             <div
+              onClick={() => fileRef.current?.click()}
               style={{
-                width: 100,
-                height: 100,
-                borderRadius: "50%",
-                background: cc,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "white",
-                fontSize: 28,
-                fontWeight: 700,
-                border: `3px solid ${cc}40`,
-                overflow: "hidden",
-                flexShrink: 0,
+                width:96, height:96, borderRadius:"50%",
+                border:`4px solid ${C.white}`,
+                boxShadow:`0 0 0 3px ${cc}55, 0 6px 24px rgba(0,0,0,0.14)`,
+                background:cc,
+                display:"flex", alignItems:"center", justifyContent:"center",
+                color:"white", fontSize:28, fontWeight:700,
+                overflow:"hidden", cursor:"pointer",
               }}
             >
-              {fotoUrl ? (
-                <img
-                  src={fotoUrl}
-                  alt="Foto de perfil"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    objectPosition: "center",
-                    display: "block",
-                    borderRadius: "50%",
-                  }}
-                />
-              ) : (
-                ini(user?.nombre || "U")
-              )}
+              {fotoUrl
+                ? <img src={fotoUrl} alt="Foto de perfil" style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"center", display:"block", borderRadius:"50%" }} />
+                : ini(user?.nombre || "U")
+              }
             </div>
             <button
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
               style={{
-                position: "absolute",
-                bottom: 0,
-                right: 0,
-                width: 30,
-                height: 30,
-                borderRadius: "50%",
-                background: C.primary,
-                border: "2px solid white",
-                color: "white",
-                fontSize: 14,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 0,
+                position:"absolute", bottom:2, right:2,
+                width:28, height:28, borderRadius:"50%",
+                background:`linear-gradient(135deg, ${cc}, ${cc}bb)`,
+                border:"2.5px solid white", color:"white", fontSize:13,
+                cursor:uploading ? "wait" : "pointer",
+                display:"flex", alignItems:"center", justifyContent:"center",
+                boxShadow:`0 2px 8px ${cc}55`, padding:0,
               }}
-            >
-              {uploading ? "⏳" : "📷"}
-            </button>
+            >{uploading ? "⏳" : "📷"}</button>
           </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            style={{ display: "none" }}
-            onChange={handlePhoto}
-          />
-          <div
-            style={{
-              fontFamily: "'Poppins',sans-serif",
-              fontSize: 15,
-              fontWeight: 600,
-              color: C.dark,
-              marginBottom: 6,
-            }}
-          >
-            {user?.nombre}
+          <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }} onChange={handlePhoto} />
+          <div style={{ marginTop:10 }}>
+            <h2 style={{
+              fontSize:22, fontFamily:"'Poppins',sans-serif", fontWeight:700,
+              color:C.dark, marginBottom:4, lineHeight:1.2,
+            }}>{user?.nombre}</h2>
+            {!esVisita(user) && (
+              <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+                <span style={{
+                  fontSize:12, fontWeight:600, padding:"3px 12px", borderRadius:20,
+                  background:cc+"18", color:cc, border:`1px solid ${cc}30`,
+                }}>{rolFullLabel(user)}</span>
+                {user?.cumpleanos && user.cumpleanos === hoyDDMM() && (
+                  <span style={{ fontSize:13 }}>🎂 ¡Hoy es tu cumpleaños!</span>
+                )}
+              </div>
+            )}
           </div>
-          {!esVisita(user) && <Chip label={rolFullLabel(user)} color={cc} />}
-          <p
-            style={{
-              color: C.gray,
-              fontSize: 11,
-              marginTop: 10,
-              lineHeight: 1.5,
-            }}
-          >
-            Toca 📷 para cambiar tu foto
-            <br />
-            (máx. 3 MB)
-          </p>
-        </Card>
-        <Card>
-          <div
-            style={{
-              fontFamily: "'Poppins',sans-serif",
-              fontSize: 14,
-              fontWeight: 600,
-              color: C.dark,
-              marginBottom: 14,
-            }}
-          >
-            Información Personal
+        </div>
+      </div>
+
+      {/* ── GRID: Información + Contacto + Push ── */}
+      <div className="perfil-grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+
+        {/* Card Información Personal */}
+        <div className="perfil-card" style={{
+          background:C.white, borderRadius:18, border:`1px solid ${C.border}`,
+          padding:20, boxShadow:"0 2px 12px rgba(0,0,0,0.05)",
+        }}>
+          <div style={{
+            display:"flex", alignItems:"center", gap:8, marginBottom:16,
+            paddingBottom:12, borderBottom:`1px solid ${C.border}`,
+          }}>
+            <div style={{
+              width:32, height:32, borderRadius:9,
+              background:`linear-gradient(135deg, ${cc}22, ${cc}11)`,
+              border:`1px solid ${cc}25`,
+              display:"flex", alignItems:"center", justifyContent:"center", fontSize:16,
+            }}>👤</div>
+            <span style={{ fontFamily:"'Poppins',sans-serif", fontWeight:600, fontSize:14, color:C.dark }}>Información Personal</span>
           </div>
-          {[
-            { label: "Nombre", value: user?.nombre, icon: "👤" },
-            ...(!esVisita(user) ? [{ label: "Rol en el Coro", value: rolFullLabel(user), icon: "🎵" }] : []),
-          ].map((f, i) => (
-            <div
-              key={i}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "10px 14px",
-                background: C.light,
-                borderRadius: 8,
-                marginBottom: 10,
-                border: `1px solid ${C.border}`,
-              }}
-            >
-              <span style={{ fontSize: 18, flexShrink: 0 }}>{f.icon}</span>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: C.gray, marginBottom: 1 }}>
-                  {f.label}
+
+          {fieldRow("✨", "Nombre completo",
+            <div style={{ fontSize:14, fontWeight:600, color:C.dark }}>{user?.nombre || "—"}</div>
+          )}
+
+          {!esVisita(user) && fieldRow("🎵", "Rol en el Coro",
+            <div style={{ fontSize:14, fontWeight:600, color:cc }}>{rolFullLabel(user) || "—"}</div>
+          )}
+
+          {fieldRow("🎂", "Cumpleaños",
+            editCumple ? (
+              <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
+                <input
+                  value={newCumple}
+                  onChange={(e) => setNewCumple(e.target.value)}
+                  placeholder="DD/MM (ej: 25/12)"
+                  style={editInputStyle}
+                />
+                <div style={{ display:"flex", gap:6 }}>
+                  {saveBtnEl(saveCumple, savingCumple)}
+                  {cancelBtnEl(() => { setEditCumple(false); setNewCumple(user?.cumpleanos || ""); })}
                 </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    color: C.dark,
-                    fontWeight: 500,
-                    wordBreak: "break-all",
-                  }}
+              </div>
+            ) : (
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
+                <span style={{ fontSize:14, fontWeight:500, color:user?.cumpleanos ? C.dark : "#9ca3af" }}>
+                  {user?.cumpleanos || "Sin registrar"}
+                </span>
+                {editLinkEl(() => { setEditCumple(true); setNewCumple(user?.cumpleanos || ""); })}
+              </div>
+            )
+          )}
+
+          {fieldRow("⚧", "Género",
+            editGenero ? (
+              <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
+                <select
+                  value={newGenero}
+                  onChange={(e) => setNewGenero(e.target.value)}
+                  style={{ ...editInputStyle, cursor:"pointer" }}
                 >
-                  {f.value || "—"}
+                  <option value="">Sin especificar</option>
+                  <option value="M">Masculino</option>
+                  <option value="F">Femenino</option>
+                </select>
+                <div style={{ display:"flex", gap:6 }}>
+                  {saveBtnEl(saveGenero, savingGenero)}
+                  {cancelBtnEl(() => { setEditGenero(false); setNewGenero(user?.genero || ""); })}
                 </div>
               </div>
-            </div>
-          ))}
-          {/* Cumpleaños editable */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              padding: "10px 14px",
-              background: C.light,
-              borderRadius: 8,
-              marginBottom: 10,
-              border: `1px solid ${C.border}`,
-            }}
-          >
-            <span style={{ fontSize: 18, flexShrink: 0 }}>🎂</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 11, color: C.gray, marginBottom: 1 }}>
-                Cumpleaños
+            ) : (
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
+                <span style={{ fontSize:14, fontWeight:500, color:user?.genero ? C.dark : "#9ca3af" }}>
+                  {user?.genero === "F" ? "Femenino" : user?.genero === "M" ? "Masculino" : "Sin especificar"}
+                </span>
+                {editLinkEl(() => { setEditGenero(true); setNewGenero(user?.genero || ""); })}
               </div>
-              {editCumple ? (
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 6,
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <input
-                    value={newCumple}
-                    onChange={(e) => setNewCumple(e.target.value)}
-                    placeholder="DD/MM (ej: 25/12)"
-                    style={{
-                      flex: 1,
-                      padding: "5px 8px",
-                      borderRadius: 6,
-                      border: `1px solid ${C.border}`,
-                      fontSize: 13,
-                      outline: "none",
-                      minWidth: 0,
-                    }}
-                  />
-                  <button
-                    onClick={saveCumple}
-                    disabled={savingCumple}
-                    style={{
-                      padding: "5px 10px",
-                      background: C.primary,
-                      color: "white",
-                      border: "none",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      fontSize: 12,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {savingCumple ? "..." : "✓"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditCumple(false);
-                      setNewCumple(user.cumpleanos || "");
-                    }}
-                    style={{
-                      padding: "5px 8px",
-                      background: C.light,
-                      color: C.gray,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      fontSize: 12,
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span
-                    style={{
-                      fontSize: 13,
-                      color: user?.cumpleanos ? C.dark : "#9ca3af",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {user?.cumpleanos || "Sin registrar"}
-                  </span>
-                  <button
-                    onClick={() => {
-                      setEditCumple(true);
-                      setNewCumple(user?.cumpleanos || "");
-                    }}
-                    style={{
-                      fontSize: 11,
-                      background: "none",
-                      border: "none",
-                      color: C.primary,
-                      cursor: "pointer",
-                      padding: 0,
-                      textDecoration: "underline",
-                      flexShrink: 0,
-                    }}
-                  >
-                    Editar
-                  </button>
-                </div>
-              )}
-            </div>
+            )
+          )}
+        </div>
+
+        {/* Card Contacto */}
+        <div className="perfil-card" style={{
+          background:C.white, borderRadius:18, border:`1px solid ${C.border}`,
+          padding:20, boxShadow:"0 2px 12px rgba(0,0,0,0.05)",
+        }}>
+          <div style={{
+            display:"flex", alignItems:"center", gap:8, marginBottom:16,
+            paddingBottom:12, borderBottom:`1px solid ${C.border}`,
+          }}>
+            <div style={{
+              width:32, height:32, borderRadius:9,
+              background:`linear-gradient(135deg, ${cc}22, ${cc}11)`,
+              border:`1px solid ${cc}25`,
+              display:"flex", alignItems:"center", justifyContent:"center", fontSize:16,
+            }}>📬</div>
+            <span style={{ fontFamily:"'Poppins',sans-serif", fontWeight:600, fontSize:14, color:C.dark }}>Contacto</span>
           </div>
-          {/* Género editable */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              padding: "10px 14px",
-              background: C.light,
-              borderRadius: 8,
-              marginBottom: 10,
-              border: `1px solid ${C.border}`,
-            }}
-          >
-            <span style={{ fontSize: 18, flexShrink: 0 }}>⚧</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 11, color: C.gray, marginBottom: 1 }}>
-                Género
-              </div>
-              {editGenero ? (
-                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                  <select
-                    value={newGenero}
-                    onChange={(e) => setNewGenero(e.target.value)}
-                    style={{
-                      flex: 1,
-                      padding: "5px 8px",
-                      borderRadius: 6,
-                      border: `1px solid ${C.border}`,
-                      fontSize: 13,
-                      outline: "none",
-                      background: "white",
-                    }}
-                  >
-                    <option value="">Sin especificar</option>
-                    <option value="M">Masculino</option>
-                    <option value="F">Femenino</option>
-                  </select>
-                  <button
-                    onClick={saveGenero}
-                    disabled={savingGenero}
-                    style={{
-                      padding: "5px 10px",
-                      background: C.primary,
-                      color: "white",
-                      border: "none",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      fontSize: 12,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {savingGenero ? "..." : "✓"}
-                  </button>
-                  <button
-                    onClick={() => { setEditGenero(false); setNewGenero(user?.genero || ""); }}
-                    style={{
-                      padding: "5px 8px",
-                      background: C.light,
-                      color: C.gray,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      fontSize: 12,
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 13, color: user?.genero ? C.dark : "#9ca3af", fontWeight: 500 }}>
-                    {user?.genero === "F" ? "Femenino" : user?.genero === "M" ? "Masculino" : "Sin especificar"}
-                  </span>
-                  <button
-                    onClick={() => { setEditGenero(true); setNewGenero(user?.genero || ""); }}
-                    style={{
-                      fontSize: 11,
-                      background: "none",
-                      border: "none",
-                      color: C.primary,
-                      cursor: "pointer",
-                      padding: 0,
-                      textDecoration: "underline",
-                      flexShrink: 0,
-                    }}
-                  >
-                    Editar
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-          {/* Teléfono editable */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              padding: "10px 14px",
-              background: C.light,
-              borderRadius: 8,
-              marginBottom: 10,
-              border: `1px solid ${C.border}`,
-            }}
-          >
-            <span style={{ fontSize: 18, flexShrink: 0 }}>📱</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 11, color: C.gray, marginBottom: 1 }}>
-                Teléfono móvil
-              </div>
-              {editTel ? (
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 6,
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: C.dark,
-                      flexShrink: 0,
-                      padding: "5px 8px",
-                      background: "#e5e7eb",
-                      borderRadius: "6px 0 0 6px",
-                      border: `1px solid ${C.border}`,
-                      borderRight: "none",
-                    }}
-                  >
-                    +56
-                  </span>
+
+          {fieldRow("📱", "Teléfono móvil",
+            editTel ? (
+              <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
+                <div style={{ display:"flex", gap:0 }}>
+                  <span style={{
+                    padding:"7px 10px", background:"#f3f4f6",
+                    borderRadius:"8px 0 0 8px",
+                    border:`1.5px solid ${cc}60`, borderRight:"none",
+                    fontSize:13, fontWeight:600, color:C.dark, flexShrink:0,
+                  }}>+56</span>
                   <input
                     value={newTel}
-                    onChange={(e) =>
-                      setNewTel(e.target.value.replace(/\D/g, "").slice(0, 9))
-                    }
+                    onChange={(e) => setNewTel(e.target.value.replace(/\D/g,"").slice(0,9))}
                     placeholder="912345678"
                     maxLength={9}
                     inputMode="numeric"
                     style={{
-                      flex: 1,
-                      padding: "5px 8px",
-                      borderRadius: "0 6px 6px 0",
-                      border: `1px solid ${C.border}`,
-                      fontSize: 13,
-                      outline: "none",
-                      minWidth: 0,
-                      letterSpacing: "0.05em",
+                      flex:1, padding:"7px 10px",
+                      borderRadius:"0 8px 8px 0",
+                      border:`1.5px solid ${cc}60`,
+                      fontSize:13, outline:"none", background:"white",
                     }}
                   />
-                  <button
-                    onClick={saveTelefono}
-                    disabled={savingTel}
-                    style={{
-                      padding: "5px 10px",
-                      background: C.primary,
-                      color: "white",
-                      border: "none",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      fontSize: 12,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {savingTel ? "..." : "✓"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditTel(false);
-                      setNewTel(telSinPrefijo);
-                    }}
-                    style={{
-                      padding: "5px 8px",
-                      background: C.light,
-                      color: C.gray,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      fontSize: 12,
-                    }}
-                  >
-                    ✕
-                  </button>
                 </div>
-              ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span
-                    style={{
-                      fontSize: 13,
-                      color: user?.telefono ? C.dark : "#9ca3af",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {user?.telefono || "Sin registrar"}
-                  </span>
-                  <button
-                    onClick={() => {
-                      setEditTel(true);
-                      setNewTel((user?.telefono || "").replace(/^\+56\s?/, ""));
-                    }}
-                    style={{
-                      fontSize: 11,
-                      background: "none",
-                      border: "none",
-                      color: C.primary,
-                      cursor: "pointer",
-                      padding: 0,
-                      textDecoration: "underline",
-                      flexShrink: 0,
-                    }}
-                  >
-                    Editar
-                  </button>
+                <div style={{ display:"flex", gap:6 }}>
+                  {saveBtnEl(saveTelefono, savingTel)}
+                  {cancelBtnEl(() => { setEditTel(false); setNewTel(telSinPrefijo); })}
                 </div>
-              )}
-            </div>
-          </div>
-          {/* Correo editable */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              padding: "10px 14px",
-              background: C.light,
-              borderRadius: 8,
-              marginBottom: 10,
-              border: `1px solid ${C.border}`,
-            }}
-          >
-            <span style={{ fontSize: 18, flexShrink: 0 }}>📧</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 11, color: C.gray, marginBottom: 1 }}>
-                Correo
               </div>
-              {editEmail ? (
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 6,
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <input
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    type="email"
-                    style={{
-                      flex: 1,
-                      padding: "5px 8px",
-                      borderRadius: 6,
-                      border: `1px solid ${C.border}`,
-                      fontSize: 13,
-                      outline: "none",
-                      minWidth: 0,
-                    }}
-                  />
-                  <button
-                    onClick={saveEmail}
-                    disabled={savingEmail}
-                    style={{
-                      padding: "5px 10px",
-                      background: C.primary,
-                      color: "white",
-                      border: "none",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      fontSize: 12,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {savingEmail ? "..." : "✓"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditEmail(false);
-                      setNewEmail(user.email);
-                    }}
-                    style={{
-                      padding: "5px 8px",
-                      background: C.light,
-                      color: C.gray,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      fontSize: 12,
-                    }}
-                  >
-                    ✕
-                  </button>
+            ) : (
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
+                <span style={{ fontSize:14, fontWeight:500, color:user?.telefono ? C.dark : "#9ca3af" }}>
+                  {user?.telefono || "Sin registrar"}
+                </span>
+                {editLinkEl(() => { setEditTel(true); setNewTel((user?.telefono||"").replace(/^\+56\s?/,"")); })}
+              </div>
+            )
+          )}
+
+          {fieldRow("📧", "Correo electrónico",
+            editEmail ? (
+              <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
+                <input
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  type="email"
+                  placeholder="tu@correo.com"
+                  style={editInputStyle}
+                />
+                <div style={{ display:"flex", gap:6 }}>
+                  {saveBtnEl(saveEmail, savingEmail)}
+                  {cancelBtnEl(() => { setEditEmail(false); setNewEmail(user.email); })}
                 </div>
-              ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span
-                    style={{
-                      fontSize: 13,
-                      color: C.dark,
-                      fontWeight: 500,
-                      wordBreak: "break-all",
-                    }}
-                  >
-                    {user?.email || "—"}
-                  </span>
-                  <button
-                    onClick={() => setEditEmail(true)}
-                    style={{
-                      fontSize: 11,
-                      background: "none",
-                      border: "none",
-                      color: C.primary,
-                      cursor: "pointer",
-                      padding: 0,
-                      textDecoration: "underline",
-                      flexShrink: 0,
-                    }}
-                  >
-                    Cambiar
-                  </button>
-                </div>
-              )}
+              </div>
+            ) : (
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, flexWrap:"wrap" }}>
+                <span style={{ fontSize:13, fontWeight:500, color:C.dark, wordBreak:"break-all", flex:1 }}>
+                  {user?.email || "—"}
+                </span>
+                {editLinkEl(() => setEditEmail(true))}
+              </div>
+            )
+          )}
+
+          <div style={{
+            marginTop:8, padding:"11px 16px", borderRadius:12,
+            background:cc+"0a", border:`1px dashed ${cc}40`,
+            display:"flex", alignItems:"center", gap:10,
+          }}>
+            <span style={{ fontSize:22 }}>🖼️</span>
+            <div>
+              <div style={{ fontSize:12, fontWeight:600, color:C.dark, marginBottom:2 }}>Foto de perfil</div>
+              <button
+                onClick={() => fileRef.current?.click()}
+                style={{ fontSize:11, background:"none", border:"none", color:cc, cursor:"pointer", padding:0, fontWeight:600 }}
+              >
+                {fotoUrl ? "Cambiar foto →" : "Subir foto → (máx. 3 MB)"}
+              </button>
             </div>
           </div>
-        </Card>
+        </div>
 
-        {/* ── Notificaciones Push ── */}
-        <Card style={{ marginTop: 14, padding: 0, overflow: "hidden" }}>
+        {/* Card Notificaciones Push — ancho completo */}
+        <div className="perfil-card" style={{
+          gridColumn:"1 / -1",
+          background: pushEnabled
+            ? "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)"
+            : C.white,
+          borderRadius:18,
+          border:`1px solid ${pushEnabled ? "#86efac" : C.border}`,
+          overflow:"hidden",
+          boxShadow:"0 2px 12px rgba(0,0,0,0.05)",
+        }}>
           <div style={{
-            background: pushEnabled
-              ? "linear-gradient(135deg,#f0fdf4,#dcfce7)"
-              : "linear-gradient(135deg,#f8fafc,#f1f5f9)",
-            borderBottom: `1px solid ${pushEnabled ? "#bbf7d0" : C.border}`,
-            padding: "16px 18px",
-            display: "flex", alignItems: "center", gap: 14,
+            padding:"18px 22px",
+            display:"flex", alignItems:"center", gap:16, flexWrap:"wrap",
           }}>
-            {/* Icono */}
             <div style={{
-              width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+              width:52, height:52, borderRadius:15, flexShrink:0,
               background: pushEnabled
-                ? "linear-gradient(135deg,#16a34a,#22c55e)"
-                : "linear-gradient(135deg,#64748b,#94a3b8)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 22,
-              boxShadow: pushEnabled ? "0 4px 14px rgba(22,163,74,0.3)" : "0 2px 8px rgba(0,0,0,0.1)",
+                ? "linear-gradient(135deg, #16a34a, #22c55e)"
+                : `linear-gradient(135deg, ${cc}, ${cc}bb)`,
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:24,
+              boxShadow: pushEnabled
+                ? "0 6px 18px rgba(22,163,74,0.28)"
+                : `0 6px 18px ${cc}35`,
             }}>
               {pushLoading ? "⏳" : pushEnabled ? "🔔" : "🔕"}
             </div>
-            {/* Texto */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.dark, marginBottom: 2 }}>
-                Notificaciones push
+
+            <div style={{ flex:1, minWidth:180 }}>
+              <div style={{ fontSize:15, fontWeight:700, color:C.dark, marginBottom:3 }}>Notificaciones push</div>
+              <div style={{ fontSize:12, color:C.gray, lineHeight:1.6 }}>
+                {!pushSupported
+                  ? "⚠️ Tu navegador no soporta notificaciones. Prueba con Chrome o Firefox."
+                  : pushEnabled
+                  ? "✅ Recibirás avisos al instante sobre ensayos, misas y novedades del coro."
+                  : "Actívalas para enterarte en tiempo real de todo lo que pasa en el Coro MJ."}
               </div>
+            </div>
+
+            <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
               <div style={{
-                display: "inline-flex", alignItems: "center", gap: 5,
-                background: pushEnabled ? "#dcfce7" : "#f1f5f9",
-                border: `1px solid ${pushEnabled ? "#86efac" : C.border}`,
-                borderRadius: 20, padding: "2px 10px",
+                display:"flex", alignItems:"center", gap:5,
+                background: pushEnabled ? "#dcfce7" : C.light,
+                border:`1px solid ${pushEnabled ? "#86efac" : C.border}`,
+                borderRadius:20, padding:"4px 12px",
               }}>
                 <div style={{
-                  width: 6, height: 6, borderRadius: "50%",
+                  width:7, height:7, borderRadius:"50%",
                   background: pushEnabled ? "#16a34a" : "#94a3b8",
-                  flexShrink: 0,
                 }} />
-                <span style={{ fontSize: 11, fontWeight: 600, color: pushEnabled ? "#15803d" : "#64748b" }}>
+                <span style={{ fontSize:11, fontWeight:700, color: pushEnabled ? "#15803d" : "#64748b" }}>
                   {pushLoading ? "Procesando…" : pushEnabled ? "Activas" : "Inactivas"}
                 </span>
               </div>
+
+              {pushSupported && (
+                <button
+                  onClick={togglePush}
+                  disabled={pushLoading}
+                  style={{
+                    padding:"9px 20px", borderRadius:10,
+                    border: pushEnabled ? "1.5px solid #fca5a5" : "none",
+                    cursor: pushLoading ? "not-allowed" : "pointer",
+                    fontWeight:700, fontSize:12,
+                    background: pushEnabled
+                      ? "#fff1f2"
+                      : `linear-gradient(135deg, ${cc}, ${cc}bb)`,
+                    color: pushEnabled ? "#dc2626" : "white",
+                    opacity: pushLoading ? 0.6 : 1,
+                    transition:"all 0.18s",
+                    boxShadow: pushEnabled ? "none" : `0 4px 14px ${cc}35`,
+                    whiteSpace:"nowrap",
+                  }}
+                >
+                  {pushLoading ? "⏳ Procesando…" : pushEnabled ? "🔕 Desactivar" : "🔔 Activar"}
+                </button>
+              )}
             </div>
           </div>
-          {/* Descripción + botón */}
-          <div style={{ padding: "14px 18px" }}>
-            <div style={{ fontSize: 12, color: C.gray, lineHeight: 1.7, marginBottom: 14 }}>
-              {!pushSupported
-                ? "⚠️ Tu navegador no soporta notificaciones push. Prueba con Chrome o Firefox."
-                : pushEnabled
-                ? "✅ Recibirás un aviso al instante cuando se publiquen nuevos avisos, ensayos, misas o documentos."
-                : "Actívalas para enterarte al instante de novedades del coro, aunque no tengas el portal abierto."}
-            </div>
-            {pushSupported && (
-              <button
-                onClick={togglePush}
-                disabled={pushLoading}
-                style={{
-                  width: "100%",
-                  padding: "10px 0",
-                  borderRadius: 10,
-                  border: pushEnabled ? "1.5px solid #fca5a5" : "none",
-                  cursor: pushLoading ? "not-allowed" : "pointer",
-                  fontWeight: 700, fontSize: 13,
-                  background: pushEnabled ? "#fff1f2" : `linear-gradient(135deg,${C.primary},#0284c7)`,
-                  color: pushEnabled ? "#dc2626" : "white",
-                  opacity: pushLoading ? 0.6 : 1,
-                  transition: "all 0.18s",
-                  boxShadow: pushEnabled ? "none" : "0 4px 14px rgba(14,165,233,0.3)",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                }}
-              >
-                {pushLoading
-                  ? "⏳ Procesando…"
-                  : pushEnabled
-                  ? "🔕 Desactivar notificaciones"
-                  : "🔔 Activar notificaciones"}
-              </button>
-            )}
-          </div>
-        </Card>
+        </div>
+
       </div>
     </div>
   );
 }
+
 
 // ══════════════════════════════════════════
 //  AGENDA
