@@ -17451,12 +17451,12 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
     ? Math.round((pagaron.size / miembrosActivos.length) * 100)
     : 0;
 
-  // No mostrar morosos si el mes aún no ha comenzado
+  // No mostrar morosos si el plazo aún no ha vencido
+  // El plazo de pago vence el día 20 del mes siguiente al mes de la cuota
   const hoy = new Date();
   const [mesAnio, mesMes] = mesSeleccionado.split("-").map(Number);
-  // Moroso solo si ya venció el último día del mes de pago
-  const ultimoDiaMes = new Date(mesAnio, mesMes, 0); // día 0 del mes siguiente = último día del mes
-  const mesVencido = hoy > ultimoDiaMes;
+  const plazoVencimientoTabCuotas = new Date(mesAnio, mesMes, 20); // mesMes sin -1 = mes siguiente (0-based)
+  const mesVencido = hoy > plazoVencimientoTabCuotas;
 
   return (
     <div>
@@ -18324,9 +18324,9 @@ function TabReporte({ members, cuotas, pagos, miembrosEnCuotas }) {
   const morosos = miembrosActivos.filter((m) => !pagaron.has(m.id));
   const hoyR = new Date();
   const [rAnio, rMes] = mesReporte.split("-").map(Number);
-  // Moroso solo si ya venció el último día del mes de pago
-  const ultimoDiaMesR = new Date(rAnio, rMes, 0);
-  const mesVencidoR = hoyR > ultimoDiaMesR;
+  // Moroso solo si ya venció el plazo: día 20 del mes siguiente al mes de la cuota
+  const plazoVencimientoR = new Date(rAnio, rMes, 20); // rMes sin -1 = mes siguiente (0-based)
+  const mesVencidoR = hoyR > plazoVencimientoR;
 
   function exportCSV() {
     const rows = [
@@ -19175,8 +19175,13 @@ export function InfoGastos({ user, members }) {
   const miembrosActivos = members.filter((m) => miembrosIds.has(m.id));
   const pagaron = new Set(pagosMesActual.map((p) => p.integrante_id));
   const alDia = cuotasActivas ? miembrosActivos.filter((m) => pagaron.has(m.id)) : [];
-  const morosos = cuotasActivas ? miembrosActivos.filter((m) => !pagaron.has(m.id)) : [];
+  const pendientes = cuotasActivas ? miembrosActivos.filter((m) => !pagaron.has(m.id)) : [];
   const cuotaMesActual = cuotas.find((c) => c.mes === mesActual);
+  // El plazo de pago vence el día 20 del mes siguiente al mes de la cuota
+  const _hoyIG = new Date();
+  const [_igAnio, _igMes] = mesActual.split("-").map(Number);
+  const plazoVencimiento = new Date(_igAnio, _igMes, 20); // mes siguiente día 20 (month es 0-based, así que _igMes sin -1 = mes siguiente)
+  const mesVencidoIG = _hoyIG > plazoVencimiento;
 
   if (loading) return <FinSpinner />;
 
@@ -19290,12 +19295,20 @@ export function InfoGastos({ user, members }) {
             })}
           </FinCard>
           <FinCard>
-            <div style={{ fontWeight: 700, color: "#ef4444", fontSize: 14, marginBottom: 12 }}>
-              ⚠️ Pendientes — {finMesLabel(mesActual)}
+            <div style={{ fontWeight: 700, color: mesVencidoIG ? "#ef4444" : "#f59e0b", fontSize: 14, marginBottom: 12 }}>
+              {mesVencidoIG ? "⚠️ Morosos" : "🕐 Plazo vigente"} — {finMesLabel(mesActual)}
             </div>
-            {morosos.length === 0 ? (
+            {!mesVencidoIG ? (
+              <div style={{ fontSize: 12, color: C.gray, lineHeight: 1.6 }}>
+                <div style={{ marginBottom: 6 }}>El plazo de pago aún está abierto.</div>
+                <div>Cada integrante puede pagar hasta el <strong>día 20 de {finMesLabel(`${_igAnio}-${String(_igMes + 1).padStart(2, "0")}`)}</strong>.</div>
+                <div style={{ marginTop: 8, padding: "6px 10px", background: "#fef9c3", borderRadius: 8, color: "#92400e", fontSize: 11 }}>
+                  💡 Quienes ya aparecen como &quot;Al día&quot; pagaron de forma anticipada.
+                </div>
+              </div>
+            ) : pendientes.length === 0 ? (
               <div style={{ fontSize: 12, color: C.gray }}>¡Todos han pagado! 🎉</div>
-            ) : morosos.map((m) => (
+            ) : pendientes.map((m) => (
               <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                 <Avatar nombre={m.nombre} foto_url={m.foto_url} size={28} color="#ef4444" />
                 <span style={{ fontSize: 13 }}>{m.nombre}</span>
