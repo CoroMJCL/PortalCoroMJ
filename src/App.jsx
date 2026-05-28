@@ -13503,7 +13503,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     "Orden Litúrgico",
                     "Canción",
                     "Autor",
-                    "Salmista",
+                    "Intérprete",
                     "URL Letra (PDF)",
                     "URL Audio Ref.",
                     "⚠️",
@@ -13613,7 +13613,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                         onChange={(e) =>
                           updateFila(i, "salmista", e.target.value)
                         }
-                        placeholder="Salmista / Cantor"
+                        placeholder="Intérprete(s) / Coro"
                         style={{ ...inpTd, minWidth: 120 }}
                       />
                     </td>
@@ -14037,7 +14037,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     "Orden Litúrgico",
                     "Canción",
                     "Autor",
-                    "Salmista",
+                    "Intérprete",
                     "Letra (PDF)",
                     "Audio Referencial",
                   ].map((h, i) => (
