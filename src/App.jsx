@@ -17317,7 +17317,15 @@ function useFinanzasData() {
 // ══════════════════════════════════════════════════════════════════════
 
 function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
-  const [mesSeleccionado, setMesSeleccionado] = useState("2026-06");
+  // Mes inicial: el mes actual, o el siguiente si ya es día 20+ (pago anticipado habilitado)
+  const _initMes = (() => {
+    const hoyI = new Date();
+    const offset = hoyI.getDate() >= 20 ? 1 : 0;
+    const d = new Date(hoyI.getFullYear(), hoyI.getMonth() + offset);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    return iso >= "2026-06" ? iso : "2026-06";
+  })();
+  const [mesSeleccionado, setMesSeleccionado] = useState(_initMes);
   const [valorCuota, setValorCuota] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState(null);
@@ -17335,11 +17343,21 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
   const totalEsperado = miembrosActivos.length * (cuotaMes?.valor || 0);
   const totalRecaudado = pagosMes.reduce((s, p) => s + (p.monto || 0), 0);
 
-  // Meses disponibles (generar últimos 12 + próximo)
-  const mesesDisponibles = Array.from({ length: 55 }, (_, i) => {
-    const d = new Date(2026, 5 + i); // Junio 2026 → Diciembre 2030
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  });
+  // Meses disponibles para REGISTRAR PAGOS:
+  // - Desde Junio 2026 hasta el mes actual (inclusive).
+  // - A partir del día 20 de cada mes, también se habilita el mes siguiente
+  //   (ya que la fecha de pago del mes siguiente vence el día 5).
+  const mesesDisponibles = (() => {
+    const hoyTemp = new Date();
+    const diaHoy = hoyTemp.getDate();
+    // Mes máximo permitido: si hoy >= día 20, se habilita el mes siguiente
+    const mesMaxDate = new Date(hoyTemp.getFullYear(), hoyTemp.getMonth() + (diaHoy >= 20 ? 1 : 0));
+    const mesMaxIso = `${mesMaxDate.getFullYear()}-${String(mesMaxDate.getMonth() + 1).padStart(2, "0")}`;
+    return Array.from({ length: 55 }, (_, i) => {
+      const d = new Date(2026, 5 + i); // Junio 2026 → Diciembre 2030
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    }).filter((m) => m <= mesMaxIso);
+  })();
 
   async function guardarValorCuota() {
     if (!valorCuota || isNaN(parseFloat(valorCuota))) return;
@@ -17508,6 +17526,25 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
           </div>
         </div>
       )}
+      {/* Aviso pago anticipado */}
+      {(() => {
+        const hoyCheck = new Date();
+        const mesActualIso = `${hoyCheck.getFullYear()}-${String(hoyCheck.getMonth() + 1).padStart(2, "0")}`;
+        const esPagoAnticipado = mesSeleccionado > mesActualIso;
+        if (!esPagoAnticipado) return null;
+        return (
+          <div style={{ background: "#fffbeb", border: "1.5px solid #fcd34d", borderRadius: 12, padding: "10px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 20 }}>🗓️</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "#92400e" }}>Pago anticipado — {finMesLabel(mesSeleccionado)}</div>
+              <div style={{ fontSize: 12, color: "#b45309", marginTop: 2 }}>
+                Estás registrando el pago del próximo mes (vence el día 5). Disponible a partir del día 20 del mes anterior.
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Selector de mes y valor de cuota */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20, alignItems: "flex-end" }}>
         <div>
@@ -17517,9 +17554,14 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
             onChange={(e) => setMesSeleccionado(e.target.value)}
             style={inputS}
           >
-            {mesesDisponibles.map((m) => (
-              <option key={m} value={m}>{finMesLabel(m)}</option>
-            ))}
+            {mesesDisponibles.map((m) => {
+              const hoyChk = new Date();
+              const mesActIso = `${hoyChk.getFullYear()}-${String(hoyChk.getMonth() + 1).padStart(2, "0")}`;
+              const esAnticipado = m > mesActIso;
+              return (
+                <option key={m} value={m}>{finMesLabel(m)}{esAnticipado ? " ⚡ anticipado" : ""}</option>
+              );
+            })}
           </select>
         </div>
         <div>
