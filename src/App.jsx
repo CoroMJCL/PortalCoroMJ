@@ -705,11 +705,9 @@ function MobileMenu({ section, setSection, onClose, user }) {
           }
           if (item.id === "material_ensayo") return false;
           if (item.id === "cantos_pdf" || item.id === "audios") return false;
-          if (item.id !== "admin" || user?.cuerda === "Admin") {
-            if (item.id !== "finanzas" || esCuerdaAdmin(user) || esCuerdaContador(user)) return true;
-            return false;
-          }
-          return false;
+          if (item.id === "admin" && !esCuerdaAdmin(user)) return false;
+          if (item.id === "finanzas" && !esCuerdaAdmin(user) && !esCuerdaContador(user)) return false;
+          return true;
         }).map((item) => {
           const isVisita = esVisita(user);
           const VISITA_STYLES = {
