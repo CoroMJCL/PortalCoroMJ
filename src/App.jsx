@@ -975,7 +975,7 @@ export default function App() {
         }).then(r => r.ok ? r.json() : []).catch(() => []),
         supabase("material_ensayo", { order: "&order=created_at.desc" }).catch(() => []),
       ]);
-      setMembers(m || []);
+      setMembers((m || []).filter(u => u.cuerda && u.cuerda.trim() !== ""));
       setEventos(ev || []);
       setDocs(d || []);
       setOraciones(or || []);
@@ -1127,7 +1127,7 @@ export default function App() {
     const interval = setInterval(async () => {
       try {
         const m = await supabase("integrantes", { order: "&order=nombre.asc" });
-        if (m) setMembers(m);
+        if (m) setMembers(m.filter(u => u.cuerda && u.cuerda.trim() !== ""));
       } catch (e) {
         console.error("Error en refresh de integrantes:", e);
       }
