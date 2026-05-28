@@ -13,6 +13,18 @@ const SECRET_ADMIN_CODE = "CoroCJM2026!";
 // Detecta usuario Invitado: no es integrante del coro, no tiene cuerda asignada
 const esVisita = (u) => !u?.cuerda || u.cuerda.trim() === "";
 
+// Normaliza el valor de cuerda para comparaciones robustas (trim + lowercase)
+const esCuerdaContador = (u) => {
+  const c = (u?.cuerda || "").trim().toLowerCase();
+  const cargo = (u?.cargo || "").trim().toLowerCase();
+  return (
+    c === "contador/a coro" || c === "contadora coro" || c === "contador coro" ||
+    cargo === "contador/a coro" || cargo === "contadora coro" || cargo === "contador coro"
+  );
+};
+const esCuerdaAdmin = (u) => (u?.cuerda || "").trim().toLowerCase() === "admin";
+
+
 // URL pública del banner (imagen de Jesús) — se sube una vez al bucket "publico"
 // Para subir: ve a Supabase > Storage > publico > Upload > sube canalymj.jpg
 const BANNER_URL = `${SUPABASE_URL}/storage/v1/object/public/publico/canalymj.jpg`;
@@ -694,7 +706,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
           if (item.id === "material_ensayo") return false;
           if (item.id === "cantos_pdf" || item.id === "audios") return false;
           if (item.id !== "admin" || user?.cuerda === "Admin") {
-            if (item.id !== "finanzas" || user?.cuerda === "Admin" || user?.cuerda === "Contador/a Coro") return true;
+            if (item.id !== "finanzas" || esCuerdaAdmin(user) || esCuerdaContador(user)) return true;
             return false;
           }
           return false;
@@ -1897,7 +1909,7 @@ export default function App() {
             if (item.id === "material_ensayo") return false;
             if (item.id === "cantos_pdf" || item.id === "audios") return false;
             if (item.id === "admin" && user?.cuerda !== "Admin") return false;
-            if (item.id === "finanzas" && user?.cuerda !== "Admin" && user?.cuerda !== "Contador/a Coro") return false;
+            if (item.id === "finanzas" && !esCuerdaAdmin(user) && !esCuerdaContador(user)) return false;
             return true;
           }).map((item) => {
             const isVisita = esVisita(user);
@@ -2417,7 +2429,7 @@ export default function App() {
                   </div>
                 </div>
               )}
-              {section === "finanzas" && (user?.cuerda === "Admin" || user?.cuerda === "Contador/a Coro") && (
+              {section === "finanzas" && (esCuerdaAdmin(user) || esCuerdaContador(user)) && (
                 <ModuloFinanzas user={user} members={members} onReload={loadData} />
               )}
               {section === "info_gastos" && (
@@ -18490,8 +18502,8 @@ const inputS = {
 };
 
 export function ModuloFinanzas({ user, members }) {
-  const isAdmin = user?.cuerda === "Admin";
-  const isContadora = user?.cuerda === "Contador/a Coro";
+  const isAdmin = esCuerdaAdmin(user);
+  const isContadora = esCuerdaContador(user);
   const tieneAcceso = isAdmin || isContadora;
 
   const { cuotas, pagos, actividades, gastos, miembrosEnCuotas, loading, reload } =
@@ -19957,7 +19969,7 @@ CREATE POLICY "Acceso total" ON fin_miembros_cuotas FOR ALL USING (true) WITH CH
          (item.id !== "finanzas" || user?.cuerda === "Admin" || user?.cuerda === "Contador/a Coro")
 
   5. SECCIONES — agregar en el bloque de render:
-     {section === "finanzas" && (user?.cuerda === "Admin" || user?.cuerda === "Contador/a Coro") && (
+     {section === "finanzas" && (esCuerdaAdmin(user) || esCuerdaContador(user)) && (
        <ModuloFinanzas user={user} members={members} onReload={loadData} />
      )}
      {section === "info_gastos" && (
