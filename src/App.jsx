@@ -17984,7 +17984,9 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
 
 function TabActividades({ actividades, gastos, members, pagos, reload }) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ nombre: "", fecha: "", descripcion: "" });
+  // Step 1: choose tipo; Step 2: fill details
+  const [tipoModal, setTipoModal] = useState(false); // show tipo selector
+  const [form, setForm] = useState({ nombre: "", fecha: "", descripcion: "", tipo_actividad: "general", num_personas: "" });
   const [saving, setSaving] = useState(false);
   const [actSeleccionada, setActSeleccionada] = useState(null);
   const [showPagoExtra, setShowPagoExtra] = useState(false);
@@ -17992,17 +17994,49 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
   const fileRef = useRef(null);
   const [uploadingGasto, setUploadingGasto] = useState(false);
   const [gastoForm, setGastoForm] = useState({ descripcion: "", monto: "" });
+  // Edit personas modal
+  const [editPersonas, setEditPersonas] = useState(false);
+  const [draftPersonas, setDraftPersonas] = useState("");
+  const [savingPersonas, setSavingPersonas] = useState(false);
+
+  function abrirNuevaActividad() {
+    setTipoModal(true);
+  }
+
+  function elegirTipo(tipo) {
+    setForm({ nombre: "", fecha: "", descripcion: "", tipo_actividad: tipo, num_personas: "" });
+    setTipoModal(false);
+    setShowForm(true);
+  }
 
   async function crearActividad() {
     if (!form.nombre.trim()) return;
     setSaving(true);
     try {
-      await finDbPost("fin_actividades", { ...form });
-      setForm({ nombre: "", fecha: "", descripcion: "" });
+      const payload = {
+        nombre: form.nombre,
+        fecha: form.fecha,
+        descripcion: form.descripcion,
+        tipo_actividad: form.tipo_actividad,
+        num_personas: form.tipo_actividad === "asado" && form.num_personas ? parseInt(form.num_personas) : null,
+      };
+      await finDbPost("fin_actividades", payload);
+      setForm({ nombre: "", fecha: "", descripcion: "", tipo_actividad: "general", num_personas: "" });
       setShowForm(false);
       await reload();
     } catch (e) { alert("Error: " + e.message); }
     setSaving(false);
+  }
+
+  async function guardarPersonas() {
+    if (!actSeleccionada) return;
+    setSavingPersonas(true);
+    try {
+      await finDbPatch("fin_actividades", actSeleccionada.id, { num_personas: parseInt(draftPersonas) || null });
+      setEditPersonas(false);
+      await reload();
+    } catch (e) { alert("Error: " + e.message); }
+    setSavingPersonas(false);
   }
 
   async function eliminarActividad(id) {
@@ -18078,18 +18112,76 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
     : [];
   const totalPagosAct = pagosAct.reduce((s, p) => s + (p.monto || 0), 0);
 
+  // Costo por persona (informativo, no es cobro — muestra en qué se usaron los fondos)
+  const actActual = actSeleccionada ? actividades.find(a => a.id === actSeleccionada.id) : null;
+  const esAsado = actActual?.tipo_actividad === "asado";
+  const numPersonas = actActual?.num_personas || 0;
+  const cuotaPromedio = (esAsado && numPersonas > 0) ? Math.round(totalGastosAct / numPersonas) : null;
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 16, alignItems: "start" }}>
+
+      {/* ── Modal selector de tipo ── */}
+      {tipoModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", borderRadius: 18, padding: "28px 32px", maxWidth: 420, width: "90%", boxShadow: "0 24px 60px rgba(0,0,0,0.25)" }}>
+            <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 17, fontWeight: 700, color: C.dark, marginBottom: 6 }}>
+              ¿Qué tipo de actividad es?
+            </div>
+            <div style={{ fontSize: 13, color: C.gray, marginBottom: 20 }}>
+              El tipo determina cómo se calculan los costos compartidos.
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button
+                onClick={() => elegirTipo("general")}
+                style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", border: `1.5px solid ${C.border}`, borderRadius: 12, background: "white", cursor: "pointer", textAlign: "left", transition: "border-color 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = C.primary}
+                onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+              >
+                <span style={{ fontSize: 28 }}>🎉</span>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: C.dark }}>Actividad General</div>
+                  <div style={{ fontSize: 12, color: C.gray }}>Cumpleaños, retiro, ensayo especial, etc.</div>
+                </div>
+              </button>
+              <button
+                onClick={() => elegirTipo("asado")}
+                style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", border: `1.5px solid ${C.border}`, borderRadius: 12, background: "white", cursor: "pointer", textAlign: "left", transition: "border-color 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = C.primary}
+                onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+              >
+                <span style={{ fontSize: 28 }}>🔥</span>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: C.dark }}>Asado / Evento con cuota</div>
+                  <div style={{ fontSize: 12, color: C.gray }}>Requiere cantidad de personas para mostrar el costo por persona (transparencia de gastos).</div>
+                </div>
+              </button>
+            </div>
+            <button onClick={() => setTipoModal(false)} style={{ marginTop: 16, background: "none", border: "none", color: C.gray, fontSize: 12, cursor: "pointer" }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Listado de actividades */}
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>Actividades</span>
-          <FinBtn onClick={() => setShowForm(!showForm)} style={{ fontSize: 12, padding: "5px 10px" }}>
+          <FinBtn onClick={abrirNuevaActividad} style={{ fontSize: 12, padding: "5px 10px" }}>
             + Nueva
           </FinBtn>
         </div>
         {showForm && (
           <FinCard style={{ marginBottom: 10, padding: 14 }}>
+            {/* Tipo badge */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, padding: "6px 10px", background: form.tipo_actividad === "asado" ? "#fff7ed" : "#f0fdf4", borderRadius: 8, border: `1px solid ${form.tipo_actividad === "asado" ? "#fed7aa" : "#bbf7d0"}` }}>
+              <span>{form.tipo_actividad === "asado" ? "🔥" : "🎉"}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: form.tipo_actividad === "asado" ? "#c2410c" : C.primary }}>
+                {form.tipo_actividad === "asado" ? "Asado / Evento con cuota" : "Actividad General"}
+              </span>
+              <button onClick={() => { setShowForm(false); setTipoModal(true); }} style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 11, color: C.gray, cursor: "pointer" }}>cambiar</button>
+            </div>
             <input
               placeholder="Nombre de la actividad *"
               value={form.nombre}
@@ -18109,6 +18201,16 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
               rows={2}
               style={{ ...inputS, resize: "vertical", marginBottom: 8 }}
             />
+            {form.tipo_actividad === "asado" && (
+              <input
+                type="number"
+                placeholder="Cantidad de personas *"
+                value={form.num_personas}
+                onChange={(e) => setForm({ ...form, num_personas: e.target.value })}
+                style={{ ...inputS, marginBottom: 8 }}
+                min={1}
+              />
+            )}
             <FinBtn onClick={crearActividad} disabled={saving}>
               {saving ? "Guardando..." : "Crear actividad"}
             </FinBtn>
@@ -18125,19 +18227,16 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
               <div
                 key={a.id}
                 onClick={() => setActSeleccionada(selected ? null : a)}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: `1px solid ${selected ? C.primary : C.border}`,
-                  background: selected ? C.primary + "10" : C.white,
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                }}
+                style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${selected ? C.primary : C.border}`, background: selected ? C.primary + "10" : C.white, cursor: "pointer", transition: "all 0.15s" }}
               >
-                <div style={{ fontWeight: 600, fontSize: 13, color: C.dark }}>{a.nombre}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                  <span style={{ fontSize: 13 }}>{a.tipo_actividad === "asado" ? "🔥" : "🎉"}</span>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: C.dark }}>{a.nombre}</div>
+                </div>
                 {a.fecha && <div style={{ fontSize: 11, color: C.gray }}>{a.fecha}</div>}
                 <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>
                   {gastosA} boleta{gastosA !== 1 ? "s" : ""}
+                  {a.tipo_actividad === "asado" && a.num_personas ? ` · ${a.num_personas} personas` : ""}
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); eliminarActividad(a.id); }}
@@ -18155,17 +18254,69 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
       {actSeleccionada ? (
         <div>
           <FinCard style={{ marginBottom: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: 16, color: C.dark, marginBottom: 4 }}>
-              {actSeleccionada.nombre}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                  <span>{esAsado ? "🔥" : "🎉"}</span>
+                  <div style={{ fontWeight: 700, fontSize: 16, color: C.dark }}>{actSeleccionada.nombre}</div>
+                </div>
+                {actSeleccionada.descripcion && (
+                  <div style={{ fontSize: 13, color: C.gray, marginBottom: 8 }}>{actSeleccionada.descripcion}</div>
+                )}
+              </div>
             </div>
-            {actSeleccionada.descripcion && (
-              <div style={{ fontSize: 13, color: C.gray, marginBottom: 8 }}>{actSeleccionada.descripcion}</div>
-            )}
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <StatCard icon="💸" label="Total gastos" value={finFmtCLP(totalGastosAct)} color="#ef4444" />
               <StatCard icon="💵" label="Ingresos actividad" value={finFmtCLP(totalPagosAct)} color={C.primary} />
+              {esAsado && (
+                <div style={{ flex: 1, minWidth: 140 }}>
+                  <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 12, padding: "10px 14px" }}>
+                    <div style={{ fontSize: 11, color: "#c2410c", fontWeight: 600, marginBottom: 4 }}>🔥 Costo por persona (referencial)</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: "#c2410c" }}>
+                      {cuotaPromedio !== null ? finFmtCLP(cuotaPromedio) : "—"}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+                      <span style={{ fontSize: 12, color: C.gray }}>
+                        {numPersonas > 0 ? `${numPersonas} asistentes` : "Sin asistentes definidos"}
+                      </span>
+                      <button
+                        onClick={() => { setDraftPersonas(String(numPersonas || "")); setEditPersonas(true); }}
+                        style={{ background: "none", border: "none", fontSize: 11, color: C.primary, cursor: "pointer", padding: "0 4px" }}
+                      >✏️ editar</button>
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 10, color: "#92400e", lineHeight: 1.5, borderTop: "1px solid #fed7aa", paddingTop: 6 }}>
+                      Dato informativo: muestra cuánto costó la actividad por persona, financiada con los fondos de la cuota mensual.
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
+            {/* Si no es asado pero queremos permitir ver tipo */}
+            {!esAsado && (
+              <div style={{ marginTop: 8, fontSize: 11, color: C.gray }}>Tipo: Actividad general</div>
+            )}
           </FinCard>
+
+          {/* Modal editar personas */}
+          {editPersonas && (
+            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ background: "white", borderRadius: 14, padding: "22px 26px", maxWidth: 340, width: "90%", boxShadow: "0 16px 48px rgba(0,0,0,0.2)" }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: C.dark, marginBottom: 12 }}>🔥 Cantidad de personas</div>
+                <input
+                  type="number"
+                  value={draftPersonas}
+                  onChange={e => setDraftPersonas(e.target.value)}
+                  placeholder="Ej: 24"
+                  min={1}
+                  style={{ ...inputS, marginBottom: 14 }}
+                />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <FinBtn onClick={guardarPersonas} disabled={savingPersonas}>{savingPersonas ? "Guardando..." : "Guardar"}</FinBtn>
+                  <FinBtn variant="ghost" onClick={() => setEditPersonas(false)}>Cancelar</FinBtn>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Registrar gasto / boleta */}
           <FinCard style={{ marginBottom: 14 }}>
@@ -18214,33 +18365,19 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {gastosAct.map((g) => (
-                  <div
-                    key={g.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "8px 12px",
-                      background: C.bg,
-                      borderRadius: 8,
-                    }}
-                  >
+                  <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: C.bg, borderRadius: 8 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 500, color: C.dark }}>{g.descripcion}</div>
                       <div style={{ fontSize: 11, color: C.gray }}>{g.created_at?.split("T")[0]}</div>
                     </div>
                     <div style={{ fontWeight: 700, color: "#ef4444", fontSize: 13 }}>{finFmtCLP(g.monto)}</div>
                     {g.boleta_url && (
-                      <a href={g.boleta_url} target="_blank" rel="noreferrer" style={{ fontSize: 18 }} title="Ver boleta">
-                        📎
-                      </a>
+                      <a href={g.boleta_url} target="_blank" rel="noreferrer" style={{ fontSize: 18 }} title="Ver boleta">📎</a>
                     )}
                     <button
                       onClick={async () => { await finDbDelete("fin_gastos", g.id); reload(); }}
                       style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 14 }}
-                    >
-                      🗑
-                    </button>
+                    >🗑</button>
                   </div>
                 ))}
               </div>
@@ -18300,6 +18437,12 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
                       <Avatar nombre={m?.nombre || "?"} foto_url={m?.foto_url} size={28} />
                       <div style={{ flex: 1, fontSize: 13, color: C.dark }}>{m?.nombre || "Desconocido"}</div>
                       <div style={{ fontWeight: 700, color: C.primary, fontSize: 13 }}>{finFmtCLP(p.monto)}</div>
+                      {p.comprobante_url && (
+                        <a href={p.comprobante_url} target="_blank" rel="noreferrer" title="Ver comprobante de pago"
+                          style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: C.primary, textDecoration: "none", background: C.primary + "12", padding: "3px 9px", borderRadius: 20, fontWeight: 600 }}>
+                          📎 Comprobante
+                        </a>
+                      )}
                     </div>
                   );
                 })}
@@ -19392,12 +19535,28 @@ export function InfoGastos({ user, members }) {
             </div>
             {alDia.length === 0 ? (
               <div style={{ fontSize: 12, color: C.gray }}>Ninguno ha pagado aún.</div>
-            ) : alDia.map((m) => (
-              <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <Avatar nombre={m.nombre} foto_url={m.foto_url} size={28} color={C.primary} />
-                <span style={{ fontSize: 13 }}>{m.nombre}</span>
-              </div>
-            ))}
+            ) : alDia.map((m) => {
+              const pagoM = pagosMesActual.find(p => p.integrante_id === m.id);
+              return (
+                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "6px 8px", borderRadius: 8, background: C.bg }}>
+                  <Avatar nombre={m.nombre} foto_url={m.foto_url} size={28} color={C.primary} />
+                  <span style={{ fontSize: 13, flex: 1 }}>{m.nombre}</span>
+                  {pagoM?.comprobante_url ? (
+                    <a
+                      href={pagoM.comprobante_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Ver comprobante"
+                      style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: C.primary, textDecoration: "none", background: C.primary + "15", padding: "3px 8px", borderRadius: 16, fontWeight: 600 }}
+                    >
+                      📎 Comprobante
+                    </a>
+                  ) : (
+                    <span style={{ fontSize: 10, color: C.gray, background: "#f1f5f9", padding: "2px 7px", borderRadius: 10 }}>Sin comprobante</span>
+                  )}
+                </div>
+              );
+            })}
           </FinCard>
           <FinCard>
             <div style={{ fontWeight: 700, color: "#ef4444", fontSize: 14, marginBottom: 12 }}>
@@ -19426,6 +19585,9 @@ export function InfoGastos({ user, members }) {
             const gastosA = gastos.filter((g) => g.actividad_id === a.id);
             const totalA = gastosA.reduce((s, g) => s + (g.monto || 0), 0);
             const expanded = actExpandida === a.id;
+            const esAsadoInfo = a.tipo_actividad === "asado";
+            const npInfo = a.num_personas || 0;
+            const cuotaAvg = (esAsadoInfo && npInfo > 0) ? Math.round(totalA / npInfo) : null;
             return (
               <FinCard key={a.id} style={{ padding: 0, overflow: "hidden" }}>
                 <div
@@ -19440,8 +19602,15 @@ export function InfoGastos({ user, members }) {
                   }}
                 >
                   <div>
-                    <div style={{ fontWeight: 600, color: C.dark, fontSize: 14 }}>{a.nombre}</div>
+                    <div style={{ fontWeight: 600, color: C.dark, fontSize: 14 }}>
+                      {esAsadoInfo ? "🔥 " : "🎉 "}{a.nombre}
+                    </div>
                     {a.fecha && <div style={{ fontSize: 11, color: C.gray }}>{a.fecha}</div>}
+                    {cuotaAvg !== null && (
+                      <div style={{ fontSize: 11, color: "#c2410c", fontWeight: 600, marginTop: 2 }}>
+                        Costo por persona: {finFmtCLP(cuotaAvg)} · {npInfo} asistentes
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div style={{ fontWeight: 700, color: "#ef4444" }}>{finFmtCLP(totalA)}</div>
@@ -20002,8 +20171,14 @@ CREATE TABLE IF NOT EXISTS fin_actividades (
   nombre TEXT NOT NULL,
   fecha DATE,
   descripcion TEXT,
+  tipo_actividad TEXT DEFAULT 'general',  -- 'general' | 'asado'
+  num_personas INTEGER,                   -- solo para tipo 'asado'
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migración (si la tabla ya existe):
+-- ALTER TABLE fin_actividades ADD COLUMN IF NOT EXISTS tipo_actividad TEXT DEFAULT 'general';
+-- ALTER TABLE fin_actividades ADD COLUMN IF NOT EXISTS num_personas INTEGER;
 
 -- 4. Tabla de gastos
 CREATE TABLE IF NOT EXISTS fin_gastos (
