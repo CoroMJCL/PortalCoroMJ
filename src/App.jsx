@@ -12923,6 +12923,8 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       const found = pautas.find((p) => p.id === deepPautaId);
       if (found) {
         setSelected(found);
+        setShowColLetra(found.mostrar_col_letra || false);
+        setShowColAudio(found.mostrar_col_audio || false);
         setMode("view");
       }
     }
@@ -12937,12 +12939,17 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     tipo_celebracion: "Misa Dominical",
     notas: "",
     tipo: "grupo", // "grupo" | "parroquial"
+    mostrar_col_letra: false,
+    mostrar_col_audio: false,
   };
   const [form, setForm] = useState(emptyPauta);
   const [tituloMode, setTituloMode] = useState("select"); // "select" | "custom"
   const [canciones, setCanciones] = useState([]); // filas de la pauta
   const [showColLetra, setShowColLetra] = useState(false);
   const [showColAudio, setShowColAudio] = useState(false);
+
+  function toggleColLetra() { setShowColLetra(v => !v); }
+  function toggleColAudio() { setShowColAudio(v => !v); }
   const emptyCancion = {
     n: "",
     orden: "Entrada",
@@ -13006,6 +13013,8 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
         canciones: JSON.stringify(canciones),
         publicada: publish,
         tipo: form.tipo || "grupo",
+        mostrar_col_letra: showColLetra,
+        mostrar_col_audio: showColAudio,
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/pautas_misa`, {
         method: "POST",
@@ -13053,6 +13062,8 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
         canciones: JSON.stringify(canciones),
         publicada,
         tipo: form.tipo || pauta.tipo || "grupo",
+        mostrar_col_letra: showColLetra,
+        mostrar_col_audio: showColAudio,
       };
       await updateRecord("pautas_misa", pauta.id, body);
       await onReload();
@@ -13144,7 +13155,11 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       tipo_celebracion: pauta.tipo_celebracion || "Misa Dominical",
       notas: pauta.notas || "",
       tipo: pauta.tipo || "grupo",
+      mostrar_col_letra: pauta.mostrar_col_letra || false,
+      mostrar_col_audio: pauta.mostrar_col_audio || false,
     });
+    setShowColLetra(pauta.mostrar_col_letra || false);
+    setShowColAudio(pauta.mostrar_col_audio || false);
     const inList = TITULO_CELEBRACION_OPTIONS.includes(pauta.titulo);
     setTituloMode(inList ? "select" : "custom");
     const c =
@@ -13517,12 +13532,12 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   ))}
                   <th style={{ ...thStyle, padding: "4px 4px", whiteSpace: "nowrap" }}>
                     <button
-                      onClick={() => setShowColLetra(v => !v)}
+                      onClick={toggleColLetra}
                       title={showColLetra ? "Ocultar URL Letra" : "Mostrar URL Letra (PDF)"}
                       style={{ background: showColLetra ? "#1D9E75" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer", marginRight: 3 }}
                     >📄</button>
                     <button
-                      onClick={() => setShowColAudio(v => !v)}
+                      onClick={toggleColAudio}
                       title={showColAudio ? "Ocultar URL Audio" : "Mostrar URL Audio Ref."}
                       style={{ background: showColAudio ? "#1D9E75" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer" }}
                     >▶</button>
@@ -14059,12 +14074,12 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   ))}
                   <th style={{ ...thStyle, padding: "4px 4px", whiteSpace: "nowrap" }}>
                     <button
-                      onClick={() => setShowColLetra(v => !v)}
+                      onClick={toggleColLetra}
                       title={showColLetra ? "Ocultar Letra (PDF)" : "Mostrar Letra (PDF)"}
                       style={{ background: showColLetra ? "#1D9E75" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer", marginRight: 3 }}
                     >📄</button>
                     <button
-                      onClick={() => setShowColAudio(v => !v)}
+                      onClick={toggleColAudio}
                       title={showColAudio ? "Ocultar Audio Ref." : "Mostrar Audio Ref."}
                       style={{ background: showColAudio ? "#1D9E75" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer" }}
                     >▶</button>
@@ -14318,6 +14333,8 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                 }}
                 onClick={() => {
                   setSelected(p);
+                  setShowColLetra(p.mostrar_col_letra || false);
+                  setShowColAudio(p.mostrar_col_audio || false);
                   setMode("view");
                 }}
               >
@@ -20316,6 +20333,10 @@ CREATE POLICY "Acceso total" ON fin_miembros_cuotas FOR ALL USING (true) WITH CH
 ALTER TABLE pautas_misa
   ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'grupo';
 -- Valores: 'grupo' (solo coro) | 'parroquial' (visible para Visita)
+
+-- Visibilidad de columnas URL por pauta
+ALTER TABLE pautas_misa ADD COLUMN IF NOT EXISTS mostrar_col_letra BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE pautas_misa ADD COLUMN IF NOT EXISTS mostrar_col_audio BOOLEAN NOT NULL DEFAULT false;
 
 -- 2. Crear el usuario invitado en Supabase Auth
 -- Ve a Supabase > Authentication > Users > Add User:
