@@ -476,38 +476,39 @@ const G = `
 
   /* ── iOS Inputs ── */
   .input-apple {
-    width: 100%; padding: 11px 14px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    background: var(--bg-card-solid);
+    width: 100%; padding: 12px 15px;
+    border: 1.5px solid rgba(60,60,67,0.15);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.97);
     font-size: 15px; color: var(--text-primary);
     outline: none; letter-spacing: -0.018em;
-    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    transition: border-color 0.18s ease, box-shadow 0.2s ease;
     -webkit-appearance: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   }
   .input-apple:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3.5px rgba(28,124,84,0.14);
+    box-shadow: 0 0 0 3.5px rgba(28,124,84,0.14), 0 1px 3px rgba(0,0,0,0.05);
   }
   .input-apple::placeholder { color: var(--text-tertiary); }
 
   /* ── iOS Buttons ── */
   .btn-primary-apple {
-    width: 100%; padding: 13px 18px;
-    background: var(--accent); color: white;
-    border: none; border-radius: var(--radius-md);
+    width: 100%; padding: 14px 18px;
+    background: linear-gradient(135deg, var(--accent) 0%, #2d7a52 100%); color: white;
+    border: none; border-radius: 14px;
     font-size: 15px; font-weight: 600;
     letter-spacing: -0.022em;
-    transition: background 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
-    box-shadow: 0 2px 8px rgba(28,124,84,0.28);
+    transition: background 0.18s ease, transform 0.14s ease, box-shadow 0.18s ease;
+    box-shadow: 0 3px 12px rgba(28,124,84,0.35);
     -webkit-tap-highlight-color: transparent;
   }
   .btn-primary-apple:hover {
-    background: var(--accent-hover);
-    box-shadow: 0 4px 14px rgba(28,124,84,0.35);
+    background: linear-gradient(135deg, var(--accent-hover) 0%, #1a5c3a 100%);
+    box-shadow: 0 6px 20px rgba(28,124,84,0.45);
     transform: translateY(-0.5px);
   }
-  .btn-primary-apple:active { transform: scale(0.975); box-shadow: none; }
+  .btn-primary-apple:active { transform: scale(0.975); box-shadow: 0 1px 4px rgba(28,124,84,0.2); }
 
   /* ── iOS Segmented Control ── */
   .seg-control {
@@ -693,7 +694,7 @@ const Badge = ({ children, color = C.primary }) => (
       fontSize: 11,
       fontWeight: 500,
       padding: "2px 8px",
-      borderRadius: 6,
+      borderRadius: 9,
       background: color + "15",
       color,
     }}
@@ -735,14 +736,18 @@ function Card({ children, style = {}, hover = false, onClick }) {
       onMouseEnter={() => hover && setH(true)}
       onMouseLeave={() => setH(false)}
       style={{
-        background: "rgba(255,255,255,0.9)",
-        borderRadius: "var(--radius-lg, 16px)",
-        border: `1px solid rgba(60,60,67,0.14)`,
-        padding: 20,
+        background: "rgba(255,255,255,0.95)",
+        borderRadius: 20,
+        border: "1px solid rgba(60,60,67,0.10)",
+        padding: "18px 20px",
         boxShadow: h
-          ? "0 8px 28px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)"
-          : "0 2px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
+          ? "0 12px 36px rgba(0,0,0,0.14), 0 3px 10px rgba(0,0,0,0.07)"
+          : "0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.05)",
         transition: "all 0.22s cubic-bezier(0.25,0.46,0.45,0.94)",
+        transform: h && onClick ? "translateY(-1px)" : "none",
+        cursor: onClick ? "pointer" : "default",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
         ...style,
       }}
     >
@@ -759,37 +764,51 @@ function Btn({
   disabled = false,
 }) {
   const [h, setH] = useState(false);
+  const [pressed, setPressed] = useState(false);
   const base =
     variant === "primary"
       ? {
-          background: h && !disabled ? C.primaryDark : C.primary,
+          background: h && !disabled
+            ? `linear-gradient(135deg, ${C.primaryDark} 0%, #1a5c3a 100%)`
+            : `linear-gradient(135deg, ${C.primary} 0%, #2d7a52 100%)`,
           color: "white",
-          opacity: disabled ? 0.6 : 1,
+          opacity: disabled ? 0.5 : 1,
+          boxShadow: h && !disabled
+            ? `0 6px 20px ${C.primary}55`
+            : `0 2px 8px ${C.primary}33`,
         }
       : variant === "ghost"
       ? {
-          background: h ? "rgba(0,0,0,0.05)" : "transparent",
+          background: h ? "rgba(0,0,0,0.06)" : "rgba(0,0,0,0.03)",
           color: C.gray,
           border: `1px solid rgba(60,60,67,0.18)`,
+          boxShadow: "none",
         }
-      : { background: h ? "rgba(0,0,0,0.06)" : C.light, color: C.dark };
+      : {
+          background: h ? "rgba(0,0,0,0.08)" : "rgba(0,0,0,0.05)",
+          color: C.dark,
+          boxShadow: "none",
+        };
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       onMouseEnter={() => setH(true)}
-      onMouseLeave={() => setH(false)}
+      onMouseLeave={() => { setH(false); setPressed(false); }}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
       style={{
         display: "inline-flex",
         alignItems: "center",
         gap: 6,
-        padding: "9px 18px",
-        borderRadius: "var(--radius-md, 13px)",
-        border: "none",
+        padding: "10px 20px",
+        borderRadius: 14,
+        border: variant === "ghost" ? `1px solid rgba(60,60,67,0.18)` : "none",
         cursor: disabled ? "not-allowed" : "pointer",
         fontSize: 14,
         fontWeight: 600,
         letterSpacing: "-0.018em",
+        transform: pressed && !disabled ? "scale(0.97)" : "scale(1)",
         transition: "all 0.16s cubic-bezier(0.25,0.46,0.45,0.94)",
         WebkitTapHighlightColor: "transparent",
         ...base,
@@ -815,19 +834,26 @@ function SectionTitle({ title, subtitle, action }) {
       <div>
         <h2
           style={{
-            fontSize: 21,
+            fontSize: 22,
             fontFamily: "var(--font-display)",
             fontWeight: 700,
             color: C.dark,
-            marginBottom: 2,
-            letterSpacing: "-0.028em",
+            marginBottom: subtitle ? 3 : 0,
+            letterSpacing: "-0.032em",
+            lineHeight: 1.15,
           }}
         >
           {title}
         </h2>
-        {subtitle && <p style={{ fontSize: 13, color: C.gray }}>{subtitle}</p>}
+        {subtitle && (
+          <p style={{ fontSize: 13, color: C.gray, letterSpacing: "-0.01em" }}>
+            {subtitle}
+          </p>
+        )}
       </div>
-      {action}
+      {action && (
+        <div style={{ flexShrink: 0 }}>{action}</div>
+      )}
     </div>
   );
 }
@@ -875,7 +901,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
             style={{
               width: 32,
               height: 32,
-              borderRadius: "var(--radius-sm, 8px)",
+              borderRadius: 10,
               objectFit: "cover",
               boxShadow: "0 1px 4px rgba(0,0,0,0.10)",
             }}
@@ -905,7 +931,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
               cursor: "pointer",
               color: "var(--text-tertiary)",
               width: 28, height: 28,
-              borderRadius: 6,
+              borderRadius: 9,
               display: "flex", alignItems: "center", justifyContent: "center",
             }}
           >
@@ -945,7 +971,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
               alignItems: "center",
               gap: 9,
               padding: "7px 9px",
-              borderRadius: "var(--radius-sm, 6px)",
+              borderRadius: 8,
               background: vs
                 ? (isActive ? vs.bg : `${vs.bg}12`)
                 : (isActive ? "var(--accent-light)" : "transparent"),
@@ -1090,7 +1116,7 @@ function RadioMariaWidget() {
             style={{
               position: "absolute", top: "calc(100% + 8px)", right: 0,
               width: 290, zIndex: 500,
-              background: "white", borderRadius: "var(--radius-lg, 14px)",
+              background: "white", borderRadius: 18,
               boxShadow: "0 8px 32px rgba(0,0,0,0.16)",
               border: "1px solid var(--border-color)",
               overflow: "hidden",
@@ -1109,7 +1135,7 @@ function RadioMariaWidget() {
               {/* Reproductor TuneIn embebido directo — sin mensajes de error */}
               <iframe
                 src="https://tunein.com/embed/player/s50214/"
-                style={{ width: "100%", height: 100, border: "none", borderRadius: "var(--radius-md, 10px)", display: "block" }}
+                style={{ width: "100%", height: 100, border: "none", borderRadius: 12, display: "block" }}
                 scrolling="no"
                 frameBorder="no"
                 title="Radio María Chile"
@@ -2016,7 +2042,7 @@ export default function App() {
           padding: 20,
         }}>
           <div style={{
-            background: "var(--bg-card-solid)", borderRadius: "var(--radius-xl, 20px)", padding: "32px 28px",
+            background: "rgba(255,255,255,0.95)", borderRadius: 20, padding: "32px 28px",
             maxWidth: 360, width: "100%", textAlign: "center",
             boxShadow: "var(--shadow-lg)", border: "1px solid var(--border-color)",
           }}>
@@ -2030,7 +2056,7 @@ export default function App() {
             <button
               onClick={() => activarNotificaciones(user?.id)}
               style={{
-                width: "100%", padding: "12px", borderRadius: "var(--radius-md)", border: "none",
+                width: "100%", padding: "12px", borderRadius: 14, border: "none",
                 background: "var(--accent)", color: "white", fontSize: 14,
                 fontWeight: 600, cursor: "pointer", marginBottom: 8,
                 fontFamily: "var(--font-sans)", letterSpacing: "-0.01em",
@@ -2040,7 +2066,7 @@ export default function App() {
             <button
               onClick={() => setShowPushModal(false)}
               style={{
-                width: "100%", padding: "10px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-color)",
+                width: "100%", padding: "10px", borderRadius: 14, border: "1px solid var(--border-color)",
                 background: "white", color: "var(--text-secondary)", fontSize: 13,
                 cursor: "pointer", fontFamily: "var(--font-sans)",
               }}>
@@ -2150,7 +2176,7 @@ export default function App() {
                 alignItems: "center",
                 gap: 9,
                 padding: "6px 9px",
-                borderRadius: "var(--radius-sm, 6px)",
+                borderRadius: 8,
                 background: vs
                   ? (isActive ? vs.bg : `${vs.bg}12`)
                   : (isActive ? "var(--accent-light)" : "transparent"),
@@ -2197,7 +2223,7 @@ export default function App() {
               alignItems: "center",
               gap: 8,
               padding: sideOpen ? "9px 10px" : "7px",
-              borderRadius: "var(--radius-md, 10px)",
+              borderRadius: 12,
               background: section === "perfil"
                 ? "var(--bg-hover)"
                 : "transparent",
@@ -2294,7 +2320,7 @@ export default function App() {
               color: C.gray,
               fontSize: 18,
               padding: 4,
-              borderRadius: 6,
+              borderRadius: 9,
               flexShrink: 0,
             }}
           >
@@ -2310,7 +2336,7 @@ export default function App() {
               color: C.gray,
               fontSize: 22,
               padding: 4,
-              borderRadius: 6,
+              borderRadius: 9,
               flexShrink: 0,
             }}
           >
@@ -2323,7 +2349,7 @@ export default function App() {
             style={{
               width: 30,
               height: 30,
-              borderRadius: 6,
+              borderRadius: 9,
               objectFit: "cover",
               flexShrink: 0,
             }}
@@ -2336,7 +2362,7 @@ export default function App() {
                 alignItems: "center",
                 gap: 8,
                 background: "var(--bg-base, #f2f2f7)",
-                borderRadius: "var(--radius-md, 10px)",
+                borderRadius: 12,
                 padding: "7px 12px",
                 border: "1px solid rgba(60,60,67,0.18)",
                 opacity: esVisita(user) ? 0.55 : 1,
@@ -2375,7 +2401,7 @@ export default function App() {
                   left: 0,
                   right: 0,
                   background: C.white,
-                  borderRadius: "var(--radius-md, 10px)",
+                  borderRadius: 12,
                   boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
                   zIndex: 200,
                   border: `1px solid ${C.border}`,
@@ -2427,7 +2453,7 @@ export default function App() {
             {clima && (
               <div style={{
                 display: "flex", alignItems: "center", gap: 6,
-                background: C.primaryLight, borderRadius: "var(--radius-md, 10px)", padding: "5px 12px",
+                background: C.primaryLight, borderRadius: 12, padding: "5px 12px",
                 border: `1px solid ${C.primary}25`,
               }}>
                 <span style={{ fontSize: 20, lineHeight: 1 }}>{clima.desc.split(" ")[0]}</span>
@@ -2439,7 +2465,7 @@ export default function App() {
             )}
             {/* Fecha */}
             <div style={{
-              display: "flex", alignItems: "center", borderRadius: "var(--radius-md, 12px)", overflow: "hidden",
+              display: "flex", alignItems: "center", borderRadius: 14, overflow: "hidden",
               border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", background: C.white,
             }}>
               <div style={{
@@ -2469,7 +2495,7 @@ export default function App() {
                 display: "flex", alignItems: "center", gap: 8,
                 background: `linear-gradient(135deg, ${C.primaryLight}, #f0fdf4)`,
                 border: `1px solid ${C.primary}30`,
-                borderRadius: "var(--radius-md, 12px)", padding: "6px 14px",
+                borderRadius: 14, padding: "6px 14px",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
               }}>
                 {user.foto_url
@@ -2492,7 +2518,7 @@ export default function App() {
             style={{
               background: C.light,
               border: `1px solid ${C.border}`,
-              borderRadius: "var(--radius-sm, 8px)",
+              borderRadius: 10,
               padding: "7px 10px",
               cursor: "pointer",
               color: C.gray,
@@ -2750,7 +2776,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
   const inp = {
     width: "100%",
     padding: "11px 14px",
-    borderRadius: "var(--radius-md, 13px)",
+    borderRadius: 14,
     border: "1px solid rgba(60,60,67,0.2)",
     fontSize: 15,
     outline: "none",
@@ -2860,7 +2886,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
           box-shadow: 0 0 0 3.5px rgba(28,124,84,0.14) !important;
         }
       `}</style>
-      <div className="auth-card" style={{ width: "100%", maxWidth: 400, background: "rgba(255,255,255,0.95)", backdropFilter: "saturate(180%) blur(20px)", WebkitBackdropFilter: "saturate(180%) blur(20px)", borderRadius: "var(--radius-2xl, 28px)", border: "1px solid rgba(60,60,67,0.15)", boxShadow: "0 20px 60px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.06)", padding: "36px 28px 28px", margin: "0 auto" }}>
+      <div className="auth-card" style={{ width: "100%", maxWidth: 400, background: "rgba(255,255,255,0.95)", backdropFilter: "saturate(180%) blur(20px)", WebkitBackdropFilter: "saturate(180%) blur(20px)", borderRadius: 28, border: "1px solid rgba(60,60,67,0.15)", boxShadow: "0 20px 60px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.06)", padding: "36px 28px 28px", margin: "0 auto" }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <img
@@ -2921,7 +2947,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
               style={{
                 flex: 1,
                 padding: "8px",
-                borderRadius: 6,
+                borderRadius: 9,
                 border: "none",
                 cursor: "pointer",
                 fontSize: 13,
@@ -2943,7 +2969,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
               style={{
                 background: "#fff1f0",
                 color: "#c0392b",
-                borderRadius: "var(--radius-md)",
+                borderRadius: 14,
                 padding: "9px 13px",
                 fontSize: 13,
                 marginBottom: 14,
@@ -2959,7 +2985,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
               style={{
                 background: "#d1fae5",
                 color: "#065f46",
-                borderRadius: "var(--radius-sm, 8px)",
+                borderRadius: 10,
                 padding: "10px 14px",
                 fontSize: 13,
                 marginBottom: 14,
@@ -3022,7 +3048,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
                   padding: "13px",
                   background: "#1D9E75",
                   border: "none",
-                  borderRadius: "var(--radius-sm, 8px)",
+                  borderRadius: 10,
                   color: "white",
                   fontSize: 14,
                   fontFamily: "var(--font-display)",
@@ -3154,7 +3180,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
                   padding: "13px",
                   background: "#1D9E75",
                   border: "none",
-                  borderRadius: "var(--radius-sm, 8px)",
+                  borderRadius: 10,
                   color: "white",
                   fontSize: 14,
                   fontFamily: "var(--font-display)",
@@ -3199,7 +3225,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
                 <input name="newpass2" type="password" required minLength={6} placeholder="Repite la contraseña" style={inp} />
               </div>
               <button type="submit" disabled={loading}
-                style={{ width: "100%", padding: "14px", background: "#1c7c54", border: "none", borderRadius: "var(--radius-md, 13px)", color: "white", fontSize: 16, fontFamily: "var(--font-display)", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, letterSpacing: "-0.022em", boxShadow: "0 2px 10px rgba(28,124,84,0.30)", transition: "all 0.15s" }}>
+                style={{ width: "100%", padding: "14px", background: "#1c7c54", border: "none", borderRadius: 14, color: "white", fontSize: 16, fontFamily: "var(--font-display)", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, letterSpacing: "-0.022em", boxShadow: "0 2px 10px rgba(28,124,84,0.30)", transition: "all 0.15s" }}>
                 {loading ? "Guardando..." : "Cambiar contraseña"}
               </button>
             </form>
@@ -3238,7 +3264,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
                   padding: "13px",
                   background: "#1D9E75",
                   border: "none",
-                  borderRadius: "var(--radius-sm, 8px)",
+                  borderRadius: 10,
                   color: "white",
                   fontSize: 14,
                   fontFamily: "var(--font-display)",
@@ -3262,7 +3288,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
                   padding: "10px",
                   background: "transparent",
                   border: "1px solid var(--border-color)",
-                  borderRadius: "var(--radius-sm, 8px)",
+                  borderRadius: 10,
                   color: "var(--text-secondary)",
                   fontSize: 13,
                   cursor: "pointer",
@@ -3362,11 +3388,11 @@ function PodcastWidget({ podcasts, setSection }) {
       </div>
 
       {/* Episodio */}
-      <div style={{ background: C.primaryLight, borderRadius: "var(--radius-md, 12px)", overflow: "hidden" }}>
+      <div style={{ background: C.primaryLight, borderRadius: 14, overflow: "hidden" }}>
         {/* Fila del episodio */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px" }}>
           <div style={{
-            width: 42, height: 42, borderRadius: "var(--radius-md, 10px)", flexShrink: 0,
+            width: 42, height: 42, borderRadius: 12, flexShrink: 0,
             background: `linear-gradient(135deg,${C.primary},${C.primaryDark})`,
             display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
           }}>🎙️</div>
@@ -3386,7 +3412,7 @@ function PodcastWidget({ podcasts, setSection }) {
               <>
                 <button onClick={() => handleNav(Math.max(0, idx - 1))} disabled={idx === 0}
                   style={{
-                    width: 36, height: 36, borderRadius: "var(--radius-md, 10px)",
+                    width: 36, height: 36, borderRadius: 12,
                     border: `1px solid ${idx === 0 ? C.border : C.primary}`,
                     background: idx === 0 ? C.light : C.primaryLight,
                     cursor: idx === 0 ? "default" : "pointer",
@@ -3397,7 +3423,7 @@ function PodcastWidget({ podcasts, setSection }) {
                 <span style={{ fontSize: 10, color: C.gray, minWidth: 28, textAlign: "center" }}>{idx + 1}/{lista.length}</span>
                 <button onClick={() => handleNav(Math.min(lista.length - 1, idx + 1))} disabled={idx === lista.length - 1}
                   style={{
-                    width: 36, height: 36, borderRadius: "var(--radius-md, 10px)",
+                    width: 36, height: 36, borderRadius: 12,
                     border: `1px solid ${idx === lista.length - 1 ? C.border : C.primary}`,
                     background: idx === lista.length - 1 ? C.light : C.primaryLight,
                     cursor: idx === lista.length - 1 ? "default" : "pointer",
@@ -3448,7 +3474,7 @@ function PodcastWidget({ podcasts, setSection }) {
               frameBorder="0"
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
               loading="lazy"
-              style={{ borderRadius: "var(--radius-md, 10px)", display: "block" }}
+              style={{ borderRadius: 12, display: "block" }}
               title={p.titulo}
             />
           </div>
@@ -3558,117 +3584,90 @@ function VideoDestacadoWidget({ isAdmin }) {
   if (!videoId && !isAdmin) return null;
 
   return (
-    <Card style={{ marginBottom: 14 }}>
+    <div style={{ background:"white", borderRadius:14, overflow:"hidden", border:"1px solid rgba(60,60,67,0.1)", boxShadow:"0 1px 6px rgba(0,0,0,0.05)", marginBottom:14 }}>
       {/* Cabecera */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", borderBottom: videoId ? "1px solid rgba(60,60,67,0.08)" : "none" }}>
         <div style={{
-          width: 32, height: 32, background: "#ff0000", borderRadius: "var(--radius-sm, 8px)",
-          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          width:30, height:30, background:"#ff0000", borderRadius:8,
+          display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0,
         }}>
-          <span style={{ fontSize: 14, color: "white" }}>▶</span>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="white"><polygon points="3,1 9,5 3,9"/></svg>
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 14, fontWeight: 700, color: C.dark }}>
-            Video Destacado
-          </div>
-          <div style={{ fontSize: 11, color: C.gray }}>
-            {videoId ? "Reproducir directamente aquí" : "Sin video asignado aún"}
-          </div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:13, fontWeight:600, color:"#1c1c1e", letterSpacing:"-0.016em" }}>Video Destacado</div>
+          <div style={{ fontSize:11, color:"#8e8e93" }}>{videoId ? "YouTube" : "Sin video asignado"}</div>
         </div>
         {isAdmin && (
           <button
             onClick={editing ? cancelEdit : openEdit}
             style={{
-              background: editing ? "rgba(0,0,0,0.05)" : C.primaryLight,
-              border: `1px solid ${editing ? C.border : C.primary + "50"}`,
-              borderRadius: "var(--radius-md, 13px)", padding: "6px 14px",
-              fontSize: 11, fontWeight: 600,
-              color: editing ? C.gray : C.primary,
-              cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+              background: editing ? "rgba(0,0,0,0.04)" : "rgba(0,122,255,0.08)",
+              border: "none", borderRadius:20, padding:"5px 12px",
+              fontSize:12, fontWeight:500, color: editing ? "#8e8e93" : "#007aff",
+              cursor:"pointer", letterSpacing:"-0.01em",
             }}
           >
-            {editing ? "✕ Cancelar" : "✏️ " + (videoId ? "Cambiar video" : "Asignar video")}
+            {editing ? "Cancelar" : videoId ? "Cambiar" : "Asignar"}
           </button>
         )}
         {saved && !editing && (
-          <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600 }}>✅ Guardado</span>
+          <span style={{ fontSize:11, color:"#34c759", fontWeight:600 }}>Guardado</span>
         )}
       </div>
 
       {/* Formulario de edición (solo Admin) */}
       {editing && (
-        <div style={{
-          background: C.primaryLight, border: `1px solid ${C.primary}40`,
-          borderRadius: "var(--radius-md, 10px)", padding: "12px 14px", marginBottom: 12,
-        }}>
-          <div style={{ fontSize: 11, color: C.primaryDark, fontWeight: 600, marginBottom: 6 }}>
-            📎 Pega el link o ID del video de YouTube
-          </div>
+        <div style={{ padding:"12px 14px", background:"rgba(0,122,255,0.04)", borderBottom:"1px solid rgba(60,60,67,0.08)" }}>
           <input
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
-            placeholder="https://www.youtube.com/watch?v=...  ó  https://youtu.be/..."
+            placeholder="https://youtube.com/watch?v=..."
             onKeyDown={(e) => { if (e.key === "Enter") saveUrl(); if (e.key === "Escape") cancelEdit(); }}
             autoFocus
             style={{
-              width: "100%", boxSizing: "border-box",
-              padding: "8px 12px", borderRadius: "var(--radius-sm, 8px)",
-              border: `1px solid ${C.border}`, fontSize: 12,
-              outline: "none", marginBottom: 8, fontFamily: "Inter,sans-serif",
+              width:"100%", boxSizing:"border-box",
+              padding:"9px 12px", borderRadius:10,
+              border:"1px solid rgba(60,60,67,0.18)", fontSize:13,
+              outline:"none", marginBottom:8, background:"white", color:"#1c1c1e",
+              letterSpacing:"-0.016em",
             }}
           />
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <Btn onClick={saveUrl} style={{ fontSize: 12, padding: "6px 14px" }}>
-              💾 Guardar
-            </Btn>
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={saveUrl} style={{ background:"#007aff", border:"none", borderRadius:10, padding:"7px 16px", fontSize:13, fontWeight:500, color:"white", cursor:"pointer" }}>Guardar</button>
             {videoId && (
-              <Btn
-                variant="ghost"
-                style={{ fontSize: 12, padding: "6px 14px", color: "#dc2626", border: "1px solid #fca5a5" }}
-                onClick={async () => { setSavedUrl(""); await setConfig(VD_STORAGE_KEY, ""); setEditing(false); }}
-              >
-                🗑 Quitar video
-              </Btn>
+              <button onClick={async () => { setSavedUrl(""); await setConfig(VD_STORAGE_KEY, ""); setEditing(false); }}
+                style={{ background:"rgba(255,59,48,0.08)", border:"none", borderRadius:10, padding:"7px 16px", fontSize:13, fontWeight:500, color:"#ff3b30", cursor:"pointer" }}>
+                Quitar
+              </button>
             )}
-            <span style={{ fontSize: 10, color: C.gray, marginLeft: "auto" }}>
-              Funciona con links de YouTube, youtu.be e IDs directos
-            </span>
           </div>
         </div>
       )}
 
       {/* Player */}
       {videoId ? (
-        <div style={{
-          borderRadius: "var(--radius-md, 12px)", overflow: "hidden", background: "#000",
-          position: "relative", paddingTop: "56.25%",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
-        }}>
+        <div style={{ position:"relative", paddingTop:"56.25%", background:"#000" }}>
           <iframe
             key={videoId}
             src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`}
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+            style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none" }}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            title="Video destacado"
+            allowFullScreen title="Video destacado"
           />
         </div>
-      ) : (
-        /* Placeholder vacío (solo visible para admin) */
+      ) : isAdmin ? (
         <div style={{
-          borderRadius: "var(--radius-md, 12px)", background: "var(--bg-base)",
-          border: `2px dashed ${C.border}`,
-          display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
-          gap: 8, padding: "36px 20px", minHeight: 140,
+          padding:"32px 20px", display:"flex", flexDirection:"column",
+          alignItems:"center", justifyContent:"center", gap:6,
+          background:"rgba(242,242,247,0.5)",
         }}>
-          <div style={{ fontSize: 36, opacity: 0.25 }}>▶️</div>
-          <div style={{ fontSize: 12, color: C.gray, textAlign: "center" }}>
-            Haz clic en <strong>"Asignar video"</strong> para proyectar un video de YouTube aquí
+          <div style={{ width:40, height:40, borderRadius:10, background:"rgba(60,60,67,0.06)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polygon points="5,2 14,8 5,14" fill="rgba(60,60,67,0.3)"/></svg>
           </div>
+          <div style={{ fontSize:12, color:"#8e8e93", textAlign:"center" }}>Sin video asignado</div>
         </div>
-      )}
-    </Card>
+      ) : null}
+    </div>
   );
 }
 
@@ -3710,45 +3709,46 @@ function VocalizacionWidget({ isAdmin }) {
   }
   if (!videoId && !isAdmin) return null;
   return (
-    <Card style={{ marginBottom: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-        <div style={{ width: 32, height: 32, background: "linear-gradient(135deg,#7c3aed,#a855f7)", borderRadius: "var(--radius-sm, 8px)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <span style={{ fontSize: 14, color: "white" }}>🎤</span>
+    <div style={{ background:"white", borderRadius:14, overflow:"hidden", border:"1px solid rgba(60,60,67,0.1)", boxShadow:"0 1px 6px rgba(0,0,0,0.05)", marginBottom:14 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", borderBottom: videoId ? "1px solid rgba(60,60,67,0.08)" : "none" }}>
+        <div style={{ width:30, height:30, background:"linear-gradient(145deg,#6d28d9,#a855f7)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+          <svg width="11" height="13" viewBox="0 0 11 13" fill="none"><rect x="3" y="0" width="5" height="8" rx="2.5" fill="white"/><path d="M1 7c0 2.5 9 2.5 9 0" stroke="white" strokeWidth="1.2" strokeLinecap="round" fill="none"/><line x1="5.5" y1="10" x2="5.5" y2="13" stroke="white" strokeWidth="1.2" strokeLinecap="round"/></svg>
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 14, fontWeight: 700, color: C.dark }}>Vocalización</div>
-          <div style={{ fontSize: 11, color: C.gray }}>{videoId ? "Reproducir directamente aquí" : "Sin video asignado aún"}</div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:13, fontWeight:600, color:"#1c1c1e", letterSpacing:"-0.016em" }}>Vocalización</div>
+          <div style={{ fontSize:11, color:"#8e8e93" }}>{videoId ? "YouTube" : "Sin video asignado"}</div>
         </div>
         {isAdmin && (
-          <button onClick={editing ? cancelEdit : openEdit} style={{ background: editing ? "rgba(0,0,0,0.05)" : "#f5f3ff", border: `1px solid ${editing ? C.border : "#a855f760"}`, borderRadius: "var(--radius-md, 13px)", padding: "6px 14px", fontSize: 11, fontWeight: 600, color: editing ? C.gray : "#7c3aed", cursor: "pointer" }}>
-            {editing ? "✕ Cancelar" : "✏️ " + (videoId ? "Cambiar video" : "Asignar video")}
+          <button onClick={editing ? cancelEdit : openEdit} style={{ background: editing ? "rgba(0,0,0,0.04)" : "rgba(168,85,247,0.08)", border:"none", borderRadius:20, padding:"5px 12px", fontSize:12, fontWeight:500, color: editing ? "#8e8e93" : "#7c3aed", cursor:"pointer" }}>
+            {editing ? "Cancelar" : videoId ? "Cambiar" : "Asignar"}
           </button>
         )}
         {saved && !editing && (
-          <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600, marginLeft: 4 }}>✅ Guardado</span>
+          <span style={{ fontSize:11, color:"#34c759", fontWeight:600, marginLeft:4 }}>Guardado</span>
         )}
       </div>
       {editing && (
-        <div style={{ background: "#f5f3ff", border: "1px solid #a855f740", borderRadius: "var(--radius-md, 10px)", padding: "12px 14px", marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 600, marginBottom: 6 }}>📎 Pega el link o ID del video de YouTube</div>
-          <input value={inputVal} onChange={(e) => setInputVal(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." onKeyDown={(e) => { if (e.key === "Enter") saveUrl(); if (e.key === "Escape") cancelEdit(); }} autoFocus style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.border}`, fontSize: 12, outline: "none", marginBottom: 8 }} />
-          <div style={{ display: "flex", gap: 8 }}>
-            <Btn onClick={saveUrl} style={{ fontSize: 12, padding: "6px 14px", background: "#7c3aed", color: "white", border: "none" }}>💾 Guardar</Btn>
-            {videoId && <Btn variant="ghost" style={{ fontSize: 12, padding: "6px 14px", color: "#dc2626", border: "1px solid #fca5a5" }} onClick={async () => { setSavedUrl(""); await setConfig(VOC_STORAGE_KEY, ""); setEditing(false); }}>🗑 Quitar</Btn>}
+        <div style={{ padding:"12px 14px", background:"rgba(124,58,237,0.04)", borderBottom:"1px solid rgba(60,60,67,0.08)" }}>
+          <input value={inputVal} onChange={(e) => setInputVal(e.target.value)} placeholder="https://youtube.com/watch?v=..." onKeyDown={(e) => { if (e.key === "Enter") saveUrl(); if (e.key === "Escape") cancelEdit(); }} autoFocus style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", borderRadius:10, border:"1px solid rgba(60,60,67,0.18)", fontSize:13, outline:"none", marginBottom:8, background:"white", color:"#1c1c1e", letterSpacing:"-0.016em" }} />
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={saveUrl} style={{ background:"#7c3aed", border:"none", borderRadius:10, padding:"7px 16px", fontSize:13, fontWeight:500, color:"white", cursor:"pointer" }}>Guardar</button>
+            {videoId && <button onClick={async () => { setSavedUrl(""); await setConfig(VOC_STORAGE_KEY, ""); setEditing(false); }} style={{ background:"rgba(255,59,48,0.08)", border:"none", borderRadius:10, padding:"7px 16px", fontSize:13, fontWeight:500, color:"#ff3b30", cursor:"pointer" }}>Quitar</button>}
           </div>
         </div>
       )}
       {videoId ? (
-        <div style={{ borderRadius: "var(--radius-md, 12px)", overflow: "hidden", background: "#000", position: "relative", paddingTop: "56.25%", boxShadow: "0 4px 20px rgba(0,0,0,0.18)" }}>
-          <iframe key={videoId} src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="Vocalización" />
+        <div style={{ position:"relative", paddingTop:"56.25%", background:"#000" }}>
+          <iframe key={videoId} src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`} style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none" }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="Vocalización" />
         </div>
-      ) : (
-        <div style={{ borderRadius: "var(--radius-md, 12px)", background: "#faf5ff", border: "2px dashed #a855f750", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "36px 20px", minHeight: 140 }}>
-          <div style={{ fontSize: 36, opacity: 0.25 }}>🎤</div>
-          <div style={{ fontSize: 12, color: C.gray, textAlign: "center" }}>Haz clic en <strong>"Asignar video"</strong> para agregar un video de vocalización</div>
+      ) : isAdmin ? (
+        <div style={{ padding:"32px 20px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:6, background:"rgba(242,242,247,0.5)" }}>
+          <div style={{ width:40, height:40, borderRadius:10, background:"rgba(124,58,237,0.06)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <svg width="14" height="16" viewBox="0 0 14 16" fill="none"><rect x="4" y="0" width="6" height="9" rx="3" fill="rgba(124,58,237,0.3)"/><path d="M1 9c0 3.3 12 3.3 12 0" stroke="rgba(124,58,237,0.3)" strokeWidth="1.5" strokeLinecap="round" fill="none"/><line x1="7" y1="12" x2="7" y2="15.5" stroke="rgba(124,58,237,0.3)" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          </div>
+          <div style={{ fontSize:12, color:"#8e8e93" }}>Sin video asignado</div>
         </div>
-      )}
-    </Card>
+      ) : null}
+    </div>
   );
 }
 
@@ -3955,18 +3955,18 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
               <div style={{ position: "absolute", top: 14, right: 14, display: "flex", gap: 8 }}>
                 <button
                   onClick={() => { setDraftMeta({ ...meta }); setEditingMeta(true); }}
-                  style={{ background: "rgba(14,165,233,0.75)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.25)", borderRadius: "var(--radius-md, 10px)", padding: "7px 14px", fontSize: 11, fontWeight: 700, color: "white", cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}
+                  style={{ background: "rgba(14,165,233,0.75)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 12, padding: "7px 14px", fontSize: 11, fontWeight: 700, color: "white", cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}
                 >✏️ Texto</button>
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  style={{ background: uploading ? "rgba(0,0,0,0.7)" : "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.25)", borderRadius: "var(--radius-md, 10px)", padding: "7px 14px", fontSize: 11, fontWeight: 700, color: "white", cursor: uploading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                  style={{ background: uploading ? "rgba(0,0,0,0.7)" : "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 12, padding: "7px 14px", fontSize: 11, fontWeight: 700, color: "white", cursor: uploading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6 }}
                 >
                   {uploading ? <><span style={{ display:"inline-block", animation:"afiche-spin 0.8s linear infinite" }}>⏳</span> Subiendo…</> : "📤 Imagen"}
                 </button>
                 <button
                   onClick={removeImage}
-                  style={{ background: "rgba(220,38,38,0.7)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "var(--radius-md, 10px)", padding: "7px 12px", fontSize: 12, fontWeight: 700, color: "white", cursor: "pointer" }}
+                  style={{ background: "rgba(220,38,38,0.7)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12, padding: "7px 12px", fontSize: 12, fontWeight: 700, color: "white", cursor: "pointer" }}
                 >🗑</button>
               </div>
             )}
@@ -3994,7 +3994,7 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
                     placeholder="Ej: Virgen del Carmen · Fiesta Patronal"
                     value={draftMeta.titulo}
                     onChange={(e) => setDraftMeta(d => ({ ...d, titulo: e.target.value }))}
-                    style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "var(--radius-sm, 8px)", padding: "9px 13px", fontSize: 13, color: "white", outline: "none", boxSizing: "border-box" }}
+                    style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, padding: "9px 13px", fontSize: 13, color: "white", outline: "none", boxSizing: "border-box" }}
                   />
                 </div>
                 {/* Fecha */}
@@ -4004,7 +4004,7 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
                     type="date"
                     value={draftMeta.fecha}
                     onChange={(e) => setDraftMeta(d => ({ ...d, fecha: e.target.value }))}
-                    style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "var(--radius-sm, 8px)", padding: "9px 13px", fontSize: 13, color: "white", outline: "none", boxSizing: "border-box", colorScheme: "dark" }}
+                    style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, padding: "9px 13px", fontSize: 13, color: "white", outline: "none", boxSizing: "border-box", colorScheme: "dark" }}
                   />
                 </div>
                 {/* Lugar */}
@@ -4015,7 +4015,7 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
                     placeholder="Ej: Parroquia San Pedro · 11:00 Hrs"
                     value={draftMeta.lugar}
                     onChange={(e) => setDraftMeta(d => ({ ...d, lugar: e.target.value }))}
-                    style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "var(--radius-sm, 8px)", padding: "9px 13px", fontSize: 13, color: "white", outline: "none", boxSizing: "border-box" }}
+                    style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, padding: "9px 13px", fontSize: 13, color: "white", outline: "none", boxSizing: "border-box" }}
                   />
                 </div>
               </div>
@@ -4023,16 +4023,16 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
                 <button
                   onClick={saveMeta}
                   disabled={savingMeta}
-                  style={{ background: "linear-gradient(135deg,#1D9E75,#16a34a)", border: "none", borderRadius: "var(--radius-md, 10px)", padding: "10px 24px", fontSize: 13, fontWeight: 700, color: "white", cursor: savingMeta ? "not-allowed" : "pointer", opacity: savingMeta ? 0.7 : 1 }}
+                  style={{ background: "linear-gradient(135deg,#1D9E75,#16a34a)", border: "none", borderRadius: 12, padding: "10px 24px", fontSize: 13, fontWeight: 700, color: "white", cursor: savingMeta ? "not-allowed" : "pointer", opacity: savingMeta ? 0.7 : 1 }}
                 >{savingMeta ? "Guardando…" : "✅ Guardar"}</button>
                 <button
                   onClick={() => setEditingMeta(false)}
-                  style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "var(--radius-md, 10px)", padding: "10px 18px", fontSize: 13, fontWeight: 600, color: "white", cursor: "pointer" }}
+                  style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12, padding: "10px 18px", fontSize: 13, fontWeight: 600, color: "white", cursor: "pointer" }}
                 >Cancelar</button>
                 {hasMeta && (
                   <button
                     onClick={async () => { const empty = {titulo:"",fecha:"",lugar:""}; await setConfig(FOTO_MISA_META_KEY, JSON.stringify(empty)); setMeta(empty); setEditingMeta(false); }}
-                    style={{ background: "rgba(220,38,38,0.6)", border: "1px solid rgba(220,38,38,0.4)", borderRadius: "var(--radius-md, 10px)", padding: "10px 14px", fontSize: 12, fontWeight: 600, color: "white", cursor: "pointer" }}
+                    style={{ background: "rgba(220,38,38,0.6)", border: "1px solid rgba(220,38,38,0.4)", borderRadius: 12, padding: "10px 14px", fontSize: 12, fontWeight: 600, color: "white", cursor: "pointer" }}
                   >🗑 Quitar texto</button>
                 )}
               </div>
@@ -4085,16 +4085,16 @@ function GaleriaWidget({ fotos, setSection, isAdmin }) {
     return (
       <Card style={{ marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-          <div style={{ width: 32, height: 32, background: "linear-gradient(135deg,#f59e0b,#ef4444)", borderRadius: "var(--radius-sm, 8px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 32, height: 32, background: "linear-gradient(135deg,#f59e0b,#ef4444)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span style={{ fontSize: 14 }}>🖼️</span>
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: "var(--font-display)", fontSize: 14, fontWeight: 700, color: C.dark }}>Galería</div>
             <div style={{ fontSize: 11, color: C.gray }}>Sin fotos aún</div>
           </div>
-          <button onClick={() => setSection("admin-galeria")} style={{ background: C.primaryLight, border: `1px solid ${C.primary}50`, borderRadius: "var(--radius-md, 13px)", padding: "6px 14px", fontSize: 11, fontWeight: 600, color: C.primary, cursor: "pointer" }}>+ Agregar fotos</button>
+          <button onClick={() => setSection("admin-galeria")} style={{ background: C.primaryLight, border: `1px solid ${C.primary}50`, borderRadius: 14, padding: "6px 14px", fontSize: 11, fontWeight: 600, color: C.primary, cursor: "pointer" }}>+ Agregar fotos</button>
         </div>
-        <div style={{ borderRadius: "var(--radius-md, 12px)", background: "#fefce8", border: "2px dashed #f59e0b50", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "36px 20px", gap: 8, minHeight: 140 }}>
+        <div style={{ borderRadius: 14, background: "#fefce8", border: "2px dashed #f59e0b50", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "36px 20px", gap: 8, minHeight: 140 }}>
           <div style={{ fontSize: 36, opacity: 0.25 }}>🖼️</div>
           <div style={{ fontSize: 12, color: C.gray, textAlign: "center" }}>Sube fotos desde el panel <strong>Administrador → Galería</strong></div>
         </div>
@@ -4119,7 +4119,7 @@ function GaleriaWidget({ fotos, setSection, isAdmin }) {
       <Card style={{ marginBottom: 14 }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <div style={{ width: 32, height: 32, background: "linear-gradient(135deg,#f59e0b,#ef4444)", borderRadius: "var(--radius-sm, 8px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 32, height: 32, background: "linear-gradient(135deg,#f59e0b,#ef4444)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span style={{ fontSize: 14 }}>🖼️</span>
           </div>
           <div style={{ flex: 1 }}>
@@ -4127,12 +4127,12 @@ function GaleriaWidget({ fotos, setSection, isAdmin }) {
             <div style={{ fontSize: 11, color: C.gray }}>{idx + 1} / {fotos.length} fotos</div>
           </div>
           {isAdmin && (
-            <button onClick={() => setSection("admin-galeria")} style={{ background: C.primaryLight, border: `1px solid ${C.primary}50`, borderRadius: "var(--radius-md, 13px)", padding: "6px 14px", fontSize: 11, fontWeight: 600, color: C.primary, cursor: "pointer" }}>✏️ Gestionar</button>
+            <button onClick={() => setSection("admin-galeria")} style={{ background: C.primaryLight, border: `1px solid ${C.primary}50`, borderRadius: 14, padding: "6px 14px", fontSize: 11, fontWeight: 600, color: C.primary, cursor: "pointer" }}>✏️ Gestionar</button>
           )}
         </div>
 
         {/* Imagen principal */}
-        <div style={{ position: "relative", borderRadius: "var(--radius-md, 12px)", overflow: "hidden", background: "#000", aspectRatio: "16/9", cursor: "pointer" }} onClick={() => setLightbox(true)}>
+        <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", background: "#000", aspectRatio: "16/9", cursor: "pointer" }} onClick={() => setLightbox(true)}>
           <img src={normalizarUrlFoto(foto.url)} alt={foto.titulo || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.3s" }} />
           {foto.titulo && (
             <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent,rgba(0,0,0,0.7))", padding: "24px 14px 12px", color: "white" }}>
@@ -4141,13 +4141,13 @@ function GaleriaWidget({ fotos, setSection, isAdmin }) {
             </div>
           )}
           {/* Expand icon */}
-          <div style={{ position: "absolute", top: 10, right: 10, background: "rgba(0,0,0,0.4)", borderRadius: 7, padding: "4px 8px", fontSize: 11, color: "white" }}>⛶ Ver</div>
+          <div style={{ position: "absolute", top: 10, right: 10, background: "rgba(0,0,0,0.4)", borderRadius: 10, padding: "4px 8px", fontSize: 11, color: "white" }}>⛶ Ver</div>
         </div>
 
         {/* Navegación */}
         {fotos.length > 1 && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
-            <button onClick={prev} disabled={idx === 0} className="gal-nav" style={{ width: 36, height: 36, borderRadius: "var(--radius-md, 10px)", border: `1px solid ${idx===0?C.border:C.primary}`, background: idx===0?C.light:C.primaryLight, color: idx===0?C.border:C.primary, fontSize: 16, cursor: idx===0?"default":"pointer", display:"flex",alignItems:"center",justifyContent:"center", opacity: idx===0?0.4:0.9, transition:"all 0.15s", flexShrink:0 }}>‹</button>
+            <button onClick={prev} disabled={idx === 0} className="gal-nav" style={{ width: 36, height: 36, borderRadius: 12, border: `1px solid ${idx===0?C.border:C.primary}`, background: idx===0?C.light:C.primaryLight, color: idx===0?C.border:C.primary, fontSize: 16, cursor: idx===0?"default":"pointer", display:"flex",alignItems:"center",justifyContent:"center", opacity: idx===0?0.4:0.9, transition:"all 0.15s", flexShrink:0 }}>‹</button>
             {/* Miniaturas scrollables */}
             <div style={{ flex: 1, display: "flex", gap: 6, overflowX: "auto", padding: "2px 0", scrollbarWidth: "none" }}>
               {fotos.map((f, i) => (
@@ -4156,7 +4156,7 @@ function GaleriaWidget({ fotos, setSection, isAdmin }) {
                 </div>
               ))}
             </div>
-            <button onClick={next} disabled={idx===fotos.length-1} className="gal-nav" style={{ width: 36, height: 36, borderRadius: "var(--radius-md, 10px)", border: `1px solid ${idx===fotos.length-1?C.border:C.primary}`, background: idx===fotos.length-1?C.light:C.primaryLight, color: idx===fotos.length-1?C.border:C.primary, fontSize: 16, cursor: idx===fotos.length-1?"default":"pointer", display:"flex",alignItems:"center",justifyContent:"center", opacity: idx===fotos.length-1?0.4:0.9, transition:"all 0.15s", flexShrink:0 }}>›</button>
+            <button onClick={next} disabled={idx===fotos.length-1} className="gal-nav" style={{ width: 36, height: 36, borderRadius: 12, border: `1px solid ${idx===fotos.length-1?C.border:C.primary}`, background: idx===fotos.length-1?C.light:C.primaryLight, color: idx===fotos.length-1?C.border:C.primary, fontSize: 16, cursor: idx===fotos.length-1?"default":"pointer", display:"flex",alignItems:"center",justifyContent:"center", opacity: idx===fotos.length-1?0.4:0.9, transition:"all 0.15s", flexShrink:0 }}>›</button>
           </div>
         )}
       </Card>
@@ -4196,163 +4196,177 @@ function DashboardVisita({ user, pautas, setSection, isAdmin, evangelio, comunid
   const primerNombre = user?.nombre?.split(" ")[0] || "Visitante";
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+    <div style={{ maxWidth: 680 }}>
       <style>{`
-        @keyframes vfade { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-        .vc { animation: vfade 0.5s ease both; }
-        .vc:nth-child(2){animation-delay:0.08s} .vc:nth-child(3){animation-delay:0.14s}
-        .vc:nth-child(4){animation-delay:0.2s}  .vc:nth-child(5){animation-delay:0.26s}
-        .vc:nth-child(6){animation-delay:0.32s}
-        .vpc:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(29,158,117,0.2) !important; }
+        @keyframes vfade { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        .vc { animation: vfade 0.38s ease both; }
+        .vc:nth-child(2){animation-delay:0.06s} .vc:nth-child(3){animation-delay:0.11s}
+        .vc:nth-child(4){animation-delay:0.16s} .vc:nth-child(5){animation-delay:0.21s}
+        .vc:nth-child(6){animation-delay:0.26s}
+        .vp-row:active { opacity:0.75; }
+        .vp-tappable { transition: opacity 0.15s; }
+        .vp-tappable:hover { opacity:0.82; }
       `}</style>
 
-      {/* ── Hero compacto ── */}
+      {/* ── Hero compacto iOS ── */}
       <div className="vc" style={{
-        background:"linear-gradient(120deg,#0c1a2e 0%,#0f3460 55%,#1a5276 100%)",
-        borderRadius:16, padding:"18px 22px", marginBottom:12,
+        background:"linear-gradient(145deg,#0a1628 0%,#0d2d52 60%,#0f3d6e 100%)",
+        borderRadius:18, padding:"16px 18px 14px", marginBottom:10,
         position:"relative", overflow:"hidden",
-        boxShadow:"0 4px 24px rgba(14,165,233,0.18)",
+        boxShadow:"0 2px 16px rgba(0,0,0,0.22)",
       }}>
-        <div style={{ position:"absolute", top:-30, right:-30, width:160, height:160, borderRadius:"50%", background:"rgba(255,255,255,0.03)" }} />
-        <div style={{ position:"absolute", top:14, right:20, opacity:0.08, fontSize:72, lineHeight:1, userSelect:"none" }}>🎼</div>
-        <div style={{ position:"relative", zIndex:1, display:"flex", alignItems:"center", gap:14 }}>
-          <div style={{
-            width:42, height:42, borderRadius:12, flexShrink:0,
-            background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.18)",
-            display:"flex", alignItems:"center", justifyContent:"center", fontSize:20,
-          }}>🎵</div>
-          <div>
-            <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.45)", letterSpacing:"0.1em", textTransform:"uppercase" }}>
-              Portal Litúrgico · Acceso Invitado
-            </div>
-            <div style={{ fontFamily:"var(--font-display)", fontSize:18, fontWeight:800, color:"white", lineHeight:1.2, marginTop:2 }}>
-              {saludo}, {primerNombre} 👋
-            </div>
+        <div style={{ position:"absolute", top:-40, right:-20, width:140, height:140, borderRadius:"50%", background:"rgba(255,255,255,0.03)", pointerEvents:"none" }} />
+        <div style={{ position:"absolute", bottom:-20, left:-20, width:100, height:100, borderRadius:"50%", background:"rgba(255,255,255,0.02)", pointerEvents:"none" }} />
+        <div style={{ position:"relative", zIndex:1 }}>
+          <div style={{ fontSize:10, fontWeight:600, color:"rgba(255,255,255,0.38)", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:4 }}>
+            Portal Litúrgico · Invitado
+          </div>
+          <div style={{ fontFamily:"var(--font-display)", fontSize:20, fontWeight:700, color:"white", letterSpacing:"-0.02em", lineHeight:1.2 }}>
+            {saludo}, {primerNombre}
           </div>
         </div>
       </div>
 
       {/* ── Próxima pauta parroquial ── */}
       {proxima ? (
-        <div className="vc vpc" onClick={() => setSection("pauta_misa")} style={{
-          background:"white", borderRadius:14, padding:"14px 18px", marginBottom:12,
-          border:"1.5px solid #1D9E7528", cursor:"pointer",
-          boxShadow:"0 2px 12px rgba(29,158,117,0.1)", transition:"all 0.2s",
-          display:"flex", alignItems:"center", gap:14,
+        <div className="vc vp-tappable" onClick={() => setSection("pauta_misa")} style={{
+          background:"white", borderRadius:14, padding:"12px 14px", marginBottom:10,
+          border:"1px solid rgba(28,124,84,0.16)", cursor:"pointer",
+          boxShadow:"0 1px 6px rgba(0,0,0,0.06)",
+          display:"flex", alignItems:"center", gap:12,
         }}>
           <div style={{
-            width:44, height:44, borderRadius:12, flexShrink:0,
-            background:"linear-gradient(135deg,#1a3a2a,#1D9E75)",
+            width:40, height:40, borderRadius:10, flexShrink:0,
+            background:"linear-gradient(145deg,#145c3e,#1c7c54)",
             display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
-            boxShadow:"0 2px 8px rgba(29,158,117,0.3)",
+            boxShadow:"0 1px 6px rgba(28,124,84,0.28)",
           }}>
-            <div style={{ fontSize:15, fontWeight:800, color:"white", lineHeight:1 }}>
+            <div style={{ fontSize:14, fontWeight:700, color:"white", lineHeight:1 }}>
               {new Date(proxima.fecha+"T00:00:00").getDate()}
             </div>
-            <div style={{ fontSize:8, color:"rgba(255,255,255,0.75)", textTransform:"uppercase" }}>
+            <div style={{ fontSize:8, color:"rgba(255,255,255,0.7)", textTransform:"uppercase", letterSpacing:"0.04em" }}>
               {new Date(proxima.fecha+"T00:00:00").toLocaleDateString("es-CL",{month:"short"})}
             </div>
           </div>
           <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:9, fontWeight:700, color:"#1D9E75", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:2 }}>
-              🎼 Próxima Misa Parroquial
+            <div style={{ fontSize:10, fontWeight:600, color:"#1c7c54", letterSpacing:"0.04em", textTransform:"uppercase", marginBottom:1 }}>
+              Próxima misa parroquial
             </div>
-            <div style={{ fontSize:14, fontWeight:700, color:"#1a3a2a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+            <div style={{ fontSize:14, fontWeight:600, color:"#1c1c1e", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", letterSpacing:"-0.016em" }}>
               {proxima.titulo}
             </div>
-            <div style={{ fontSize:11, color:"#4b7a62", marginTop:1 }}>
-              {new Date(proxima.fecha+"T00:00:00").toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"})}
+            <div style={{ fontSize:11, color:"#8e8e93", marginTop:1 }}>
+              {new Date(proxima.fecha+"T00:00:00").toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"})}
               {proxima.hora ? ` · ${proxima.hora}` : ""}{proxima.lugar ? ` · ${proxima.lugar}` : ""}
             </div>
           </div>
-          <span style={{ fontSize:12, color:"#1D9E75", fontWeight:700, flexShrink:0 }}>Ver →</span>
+          <svg width="7" height="12" viewBox="0 0 7 12" fill="none" style={{ flexShrink:0, opacity:0.3 }}>
+            <path d="M1 1l5 5-5 5" stroke="#1c1c1e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </div>
       ) : (
         <div className="vc" style={{
-          background:"#f8fafc", borderRadius:14, padding:"14px 18px", marginBottom:12,
-          border:"1px dashed #cbd5e1", display:"flex", alignItems:"center", gap:10,
+          background:"rgba(242,242,247,0.7)", borderRadius:14, padding:"11px 14px", marginBottom:10,
+          border:"1px solid rgba(60,60,67,0.1)", display:"flex", alignItems:"center", gap:10,
         }}>
-          <span style={{ fontSize:20, opacity:0.35 }}>🎼</span>
-          <span style={{ fontSize:12, color:"var(--text-tertiary)" }}>No hay pautas parroquiales publicadas aún.</span>
+          <div style={{ width:6, height:6, borderRadius:"50%", background:"rgba(142,142,147,0.5)", flexShrink:0 }} />
+          <span style={{ fontSize:12, color:"#8e8e93" }}>Sin pautas parroquiales publicadas</span>
         </div>
       )}
 
       {/* ── Foto Destacada ── */}
-      <div className="vc" style={{ marginBottom:12 }}>
+      <div className="vc" style={{ marginBottom:10 }}>
         <FotoDestacadaMisaWidget isAdmin={isAdmin} />
       </div>
 
       {/* ── Video Destacado ── */}
-      <div className="vc" style={{ marginBottom:12 }}>
+      <div className="vc" style={{ marginBottom:10 }}>
         <VideoDestacadoWidget isAdmin={isAdmin} />
       </div>
 
       {/* ── Evangelio del Domingo ── */}
       {evangelio && (
         <div className="vc" style={{
-          background:"white", borderRadius:14, padding:"16px 18px", marginBottom:12,
-          border:"1px solid #e5e7eb", boxShadow:"0 2px 8px rgba(0,0,0,0.04)",
+          background:"white", borderRadius:14, padding:"14px 16px", marginBottom:10,
+          border:"1px solid rgba(60,60,67,0.1)", boxShadow:"0 1px 6px rgba(0,0,0,0.05)",
         }}>
-          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
-            <span style={{ fontSize:15 }}>📖</span>
-            <div>
-              <div style={{ fontSize:13, fontWeight:600, color:"var(--text-primary)" }}>Evangelio del Domingo</div>
-              {evangelio.domingo && <div style={{ fontSize:10, color:"var(--text-secondary)", fontStyle:"italic" }}>{evangelio.domingo}</div>}
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+            <div style={{
+              width:32, height:32, borderRadius:8, flexShrink:0,
+              background:"linear-gradient(145deg,#92400e,#d97706)",
+              display:"flex", alignItems:"center", justifyContent:"center",
+            }}>
+              <span style={{ fontSize:14 }}>✝</span>
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:13, fontWeight:600, color:"#1c1c1e", letterSpacing:"-0.016em" }}>Evangelio del Domingo</div>
+              {evangelio.domingo && <div style={{ fontSize:11, color:"#8e8e93" }}>{evangelio.domingo}</div>}
             </div>
             {evangelio.referencia && (
-              <span style={{ marginLeft:"auto", fontSize:11, fontWeight:600, color:"#d97706", background:"#fffbeb", padding:"2px 8px", borderRadius:6 }}>
+              <span style={{ fontSize:11, fontWeight:600, color:"#d97706", background:"rgba(217,119,6,0.08)", padding:"3px 9px", borderRadius:20, flexShrink:0 }}>
                 {evangelio.referencia}
               </span>
             )}
           </div>
-          <p style={{ fontSize:12, lineHeight:1.7, color:"#374151", margin:"0 0 10px", borderLeft:"3px solid #e5e7eb", paddingLeft:10 }}>
+          <p style={{ fontSize:13, lineHeight:1.65, color:"#3c3c43", margin:"0 0 10px", paddingLeft:10, borderLeft:"2px solid rgba(60,60,67,0.1)" }}>
             {evangelio.texto}
           </p>
           {evangelio.reflexion && (
-            <div style={{ background:"#f0fdf4", borderRadius:8, padding:"8px 12px", borderLeft:"3px solid #1D9E75", marginBottom:8 }}>
-              <p style={{ margin:0, fontSize:11, color:"#166534", lineHeight:1.6 }}>{evangelio.reflexion}</p>
+            <div style={{ background:"rgba(28,124,84,0.06)", borderRadius:10, padding:"10px 12px", borderLeft:"2.5px solid #1c7c54", marginBottom:8 }}>
+              <p style={{ margin:0, fontSize:12, color:"#145c3e", lineHeight:1.6 }}>{evangelio.reflexion}</p>
             </div>
           )}
           {evangelio.oracion && (
-            <div style={{ background:"#fffbeb", borderRadius:8, padding:"8px 12px", borderLeft:"3px solid #d97706" }}>
-              <div style={{ fontSize:9, fontWeight:700, color:"#d97706", letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:3 }}>🙏 Oración antes de la misa</div>
-              <p style={{ margin:0, fontSize:11, color:"#374151", lineHeight:1.6, fontStyle:"italic" }}>{evangelio.oracion}</p>
+            <div style={{ background:"rgba(217,119,6,0.06)", borderRadius:10, padding:"10px 12px", borderLeft:"2.5px solid #d97706" }}>
+              <div style={{ fontSize:10, fontWeight:600, color:"#d97706", letterSpacing:"0.05em", textTransform:"uppercase", marginBottom:4 }}>Oración antes de la misa</div>
+              <p style={{ margin:0, fontSize:12, color:"#3c3c43", lineHeight:1.6, fontStyle:"italic" }}>{evangelio.oracion}</p>
             </div>
           )}
-          {evangelio.fuente && <div style={{ marginTop:8, fontSize:9, color:"var(--text-tertiary)", textAlign:"right" }}>Fuente: {evangelio.fuente}</div>}
+          {evangelio.fuente && <div style={{ marginTop:10, fontSize:10, color:"#c7c7cc", textAlign:"right" }}>{evangelio.fuente}</div>}
         </div>
       )}
 
       {/* ── Playlist Litúrgica ── */}
       <div className="vc" style={{
-        background:"white", borderRadius:14, padding:"14px 18px", marginBottom:12,
-        border:"1px solid #e5e7eb", boxShadow:"0 2px 8px rgba(0,0,0,0.04)",
+        background:"white", borderRadius:14, padding:"12px 14px", marginBottom:10,
+        border:"1px solid rgba(60,60,67,0.1)", boxShadow:"0 1px 6px rgba(0,0,0,0.05)",
       }}>
-        <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:10 }}>
-          <span style={{ fontSize:14 }}>🎵</span>
-          <span style={{ fontSize:13, fontWeight:600, color:"var(--text-primary)" }}>Playlist Litúrgica</span>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+          <div style={{
+            width:32, height:32, borderRadius:8, flexShrink:0,
+            background:"#1DB954",
+            display:"flex", alignItems:"center", justifyContent:"center",
+          }}>
+            <span style={{ fontSize:13, color:"white" }}>♪</span>
+          </div>
+          <div>
+            <div style={{ fontSize:13, fontWeight:600, color:"#1c1c1e", letterSpacing:"-0.016em" }}>Playlist Litúrgica</div>
+            <div style={{ fontSize:11, color:"#8e8e93" }}>Spotify</div>
+          </div>
         </div>
         <iframe
           src="https://open.spotify.com/embed/playlist/3ssNSNlljyYlw2La83mXZE?utm_source=generator&theme=0"
-          width="100%" height="80" frameBorder="0"
+          width="100%" height="72" frameBorder="0"
           allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
           loading="lazy" style={{ borderRadius:10, display:"block" }}
         />
         <a href="https://open.spotify.com/playlist/3ssNSNlljyYlw2La83mXZE" target="_blank" rel="noopener"
-          style={{ display:"flex", alignItems:"center", gap:6, marginTop:8, textDecoration:"none" }}>
-          <div style={{ width:22, height:22, borderRadius:5, background:"#1DB954", display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:10, flexShrink:0 }}>▶</div>
-          <span style={{ fontSize:11, color:"var(--text-secondary)" }}>Abrir playlist completa en Spotify</span>
+          style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:10, textDecoration:"none", padding:"8px 0 0", borderTop:"1px solid rgba(60,60,67,0.08)" }}>
+          <span style={{ fontSize:12, color:"#8e8e93" }}>Abrir en Spotify</span>
+          <svg width="7" height="12" viewBox="0 0 7 12" fill="none">
+            <path d="M1 1l5 5-5 5" stroke="#c7c7cc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </a>
       </div>
 
       {/* ── Comunidades ── */}
-      <div className="vc" style={{ marginBottom:12 }}>
+      <div className="vc" style={{ marginBottom:10 }}>
         <ComunidadesWidget comunidades={comunidades} isAdmin={isAdmin} setSection={setSection} />
       </div>
 
       {/* ── Footer ── */}
-      <div className="vc" style={{ textAlign:"center", padding:"10px 0 4px", borderTop:"1px solid #f1f5f9", marginTop:4 }}>
-        <span style={{ fontSize:10, color:"#cbd5e1" }}>⛪ Portal Coro Misioneros de Jesús</span>
+      <div className="vc" style={{ padding:"8px 0 2px", borderTop:"1px solid rgba(60,60,67,0.08)", marginTop:2 }}>
+        <span style={{ fontSize:11, color:"#c7c7cc", letterSpacing:"-0.01em" }}>Coro Misioneros de Jesús</span>
       </div>
     </div>
   );
@@ -4388,70 +4402,73 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
     <div style={{ maxWidth: 860 }}>
       {/* Header */}
       <div style={{
-        background:"linear-gradient(135deg,#0c1a2e,#0ea5e9)",
-        borderRadius:20, padding:"28px 32px", marginBottom:20,
-        boxShadow:"0 12px 40px rgba(14,165,233,0.22)",
+        background:"linear-gradient(145deg,#0a1628 0%,#0d2d52 60%,#0f3d6e 100%)",
+        borderRadius:18, padding:"16px 18px", marginBottom:16,
         position:"relative", overflow:"hidden",
+        boxShadow:"0 2px 16px rgba(0,0,0,0.2)",
       }}>
-        <div style={{ position:"absolute", top:-30, right:-30, width:180, height:180, borderRadius:"50%", background:"rgba(255,255,255,0.05)" }} />
+        <div style={{ position:"absolute", top:-30, right:-20, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,0.03)", pointerEvents:"none" }} />
         <div style={{ position:"relative", zIndex:1 }}>
-          <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.55)", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:6 }}>
+          <div style={{ fontSize:10, fontWeight:600, color:"rgba(255,255,255,0.38)", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:3 }}>
             Acceso Invitado
           </div>
-          <div style={{ fontFamily:"var(--font-display)", fontSize:22, fontWeight:800, color:"white", marginBottom:8 }}>
-            📥 Material de Ensayo
+          <div style={{ fontFamily:"var(--font-display)", fontSize:18, fontWeight:700, color:"white", letterSpacing:"-0.02em", marginBottom:3 }}>
+            Material de Ensayo
           </div>
-          <div style={{ fontSize:13, color:"rgba(255,255,255,0.75)", lineHeight:1.7 }}>
-            Descarga aquí los recursos disponibles para preparar la liturgia: letras, partituras, audios y más.
+          <div style={{ fontSize:12, color:"rgba(255,255,255,0.55)", lineHeight:1.5 }}>
+            Letras, partituras, audios y más para preparar la liturgia.
           </div>
         </div>
       </div>
 
       {/* Filtros */}
-      <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap", alignItems:"center" }}>
+      <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap", alignItems:"center" }}>
         <div style={{
           display:"flex", alignItems:"center", gap:8,
-          background:"white", borderRadius:10, padding:"7px 14px",
-          border:"1px solid #e5e7eb", flex:1, maxWidth:320,
+          background:"white", borderRadius:10, padding:"7px 12px",
+          border:"1px solid rgba(60,60,67,0.15)", flex:1, maxWidth:300,
+          boxShadow:"0 1px 4px rgba(0,0,0,0.04)",
         }}>
-          <span style={{ color:"#9ca3af", fontSize:14 }}>🔍</span>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4.5" stroke="#8e8e93" strokeWidth="1.2"/><path d="M9.5 9.5l2.5 2.5" stroke="#8e8e93" strokeWidth="1.2" strokeLinecap="round"/></svg>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar material..."
-            style={{ background:"none", border:"none", outline:"none", fontSize:13, width:"100%", color:"#111827" }}
+            style={{ background:"none", border:"none", outline:"none", fontSize:13, width:"100%", color:"#1c1c1e", letterSpacing:"-0.016em" }}
           />
           {search && (
-            <button onClick={() => setSearch("")} style={{ background:"none", border:"none", color:"#9ca3af", cursor:"pointer", fontSize:16, padding:0, lineHeight:1 }}>×</button>
+            <button onClick={() => setSearch("")} style={{ background:"rgba(60,60,67,0.12)", border:"none", color:"#8e8e93", cursor:"pointer", fontSize:12, padding:0, lineHeight:1, width:16, height:16, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
           )}
         </div>
-        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+        <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
           {categorias.map(cat => (
             <button key={cat} onClick={() => setCatFiltro(cat)} style={{
-              padding:"6px 14px", borderRadius:20, border:"none", cursor:"pointer",
-              fontSize:11, fontWeight:600,
-              background: catFiltro===cat ? "#0ea5e9" : "#f1f5f9",
-              color: catFiltro===cat ? "white" : "var(--text-secondary)",
-              transition:"all 0.15s",
-            }}>{iconCat(cat)} {cat}</button>
+              padding:"5px 12px", borderRadius:20, border:"none", cursor:"pointer",
+              fontSize:12, fontWeight:catFiltro===cat ? 600 : 400,
+              background: catFiltro===cat ? "#007aff" : "rgba(60,60,67,0.08)",
+              color: catFiltro===cat ? "white" : "#3c3c43",
+              transition:"all 0.12s", letterSpacing:"-0.01em",
+            }}>{cat}</button>
           ))}
         </div>
       </div>
 
       {/* Lista de documentos */}
       {lista.length === 0 ? (
-        <div style={{ textAlign:"center", padding:"60px 20px", color:"var(--text-secondary)" }}>
-          <div style={{ fontSize:52, marginBottom:14, opacity:0.35 }}>📦</div>
-          <div style={{ fontSize:15, fontWeight:600, marginBottom:6 }}>Sin material disponible</div>
-          <div style={{ fontSize:13 }}>
+        <div style={{ padding:"48px 20px", display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
+          <div style={{ width:48, height:48, borderRadius:12, background:"rgba(60,60,67,0.06)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="1" width="11" height="15" rx="2" stroke="rgba(60,60,67,0.3)" strokeWidth="1.5"/><path d="M6 5h5M6 8h5M6 11h3" stroke="rgba(60,60,67,0.3)" strokeWidth="1.2" strokeLinecap="round"/><path d="M14 10l5 5" stroke="rgba(60,60,67,0.3)" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          </div>
+          <div style={{ fontSize:14, fontWeight:600, color:"#1c1c1e", letterSpacing:"-0.016em" }}>Sin material disponible</div>
+          <div style={{ fontSize:13, color:"#8e8e93", textAlign:"center" }}>
             {search || catFiltro !== "Todos"
               ? "No hay resultados para este filtro."
-              : "El encargado publicará material de ensayo próximamente."}
+              : "El encargado publicará material próximamente."}
           </div>
         </div>
       ) : (
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
-          {lista.map((doc) => (
+        <div style={{ display:"flex", flexDirection:"column", gap:1, background:"white", borderRadius:14, overflow:"hidden", border:"1px solid rgba(60,60,67,0.1)", boxShadow:"0 1px 6px rgba(0,0,0,0.05)" }}>
+          {lista.map((doc, i) => (
             <a
               key={doc.id}
               href={doc.url || doc.archivo_url || "#"}
@@ -4460,48 +4477,42 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
               style={{ textDecoration:"none" }}
             >
               <div style={{
-                background:"white", borderRadius:14, padding:"16px 18px",
-                border:"1px solid #e5e7eb",
-                boxShadow:"0 2px 8px rgba(0,0,0,0.04)",
-                transition:"all 0.2s",
-                display:"flex", alignItems:"center", gap:14,
-                cursor:"pointer",
+                padding:"12px 14px",
+                borderBottom: i < lista.length - 1 ? "1px solid rgba(60,60,67,0.08)" : "none",
+                display:"flex", alignItems:"center", gap:12,
+                transition:"background 0.12s",
               }}
-              onMouseEnter={e => { e.currentTarget.style.boxShadow="0 8px 28px rgba(14,165,233,0.16)"; e.currentTarget.style.borderColor="#7dd3fc"; e.currentTarget.style.transform="translateY(-2px)"; }}
-              onMouseLeave={e => { e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor="#e5e7eb"; e.currentTarget.style.transform="translateY(0)"; }}
+              onMouseEnter={e => e.currentTarget.style.background="rgba(0,0,0,0.02)"}
+              onMouseLeave={e => e.currentTarget.style.background="transparent"}
               >
                 <div style={{
-                  width:44, height:44, borderRadius:12, flexShrink:0,
-                  background:"linear-gradient(135deg,#0c1a2e,#0ea5e9)",
+                  width:36, height:36, borderRadius:9, flexShrink:0,
+                  background:"linear-gradient(145deg,#0a1628,#0071e3)",
                   display:"flex", alignItems:"center", justifyContent:"center",
-                  fontSize:20,
+                  fontSize:16,
                 }}>
                   {iconCat(doc.categoria)}
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:"#111827", marginBottom:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                  <div style={{ fontSize:13, fontWeight:500, color:"#1c1c1e", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", letterSpacing:"-0.016em" }}>
                     {doc.nombre}
                   </div>
-                  {doc.categoria && (
-                    <div style={{ fontSize:11, color:"#0ea5e9", fontWeight:600 }}>{doc.categoria}</div>
-                  )}
-                  {doc.descripcion && (
-                    <div style={{ fontSize:11, color:"#6b7280", marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{doc.descripcion}</div>
-                  )}
+                  <div style={{ fontSize:11, color:"#8e8e93", marginTop:1 }}>
+                    {doc.categoria || "Documento"}
+                    {doc.descripcion ? ` · ${doc.descripcion.slice(0,40)}` : ""}
+                  </div>
                 </div>
-                <div style={{
-                  flexShrink:0, background:"#f0f9ff", borderRadius:8,
-                  padding:"5px 10px", fontSize:11, fontWeight:700, color:"#0ea5e9",
-                  border:"1px solid #bae6fd",
-                }}>⬇ Descargar</div>
+                <svg width="7" height="12" viewBox="0 0 7 12" fill="none" style={{ flexShrink:0, opacity:0.25 }}>
+                  <path d="M1 1l5 5-5 5" stroke="#1c1c1e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </div>
             </a>
           ))}
         </div>
       )}
 
-      <div style={{ marginTop:24, textAlign:"center", fontSize:11, color:"var(--text-tertiary)" }}>
-        {lista.length} {lista.length!==1?"archivos disponibles":"archivo disponible"}
+      <div style={{ marginTop:16, fontSize:11, color:"#c7c7cc", letterSpacing:"-0.01em" }}>
+        {lista.length} {lista.length!==1?"archivos":"archivo"}
       </div>
     </div>
   );
@@ -4580,7 +4591,7 @@ function Dashboard({
           onClick={() => setSection("pauta_misa")}
           style={{
             background: "linear-gradient(135deg,#fffbeb,#fef3c7)",
-            borderRadius: "var(--radius-lg, 14px)",
+            borderRadius: 18,
             padding: "14px 18px",
             marginBottom: 12,
             border: "2px solid #fbbf24",
@@ -4634,7 +4645,7 @@ function Dashboard({
                   background: "#fef08a",
                   color: "#713f12",
                   padding: "2px 8px",
-                  borderRadius: "var(--radius-md, 10px)",
+                  borderRadius: 12,
                   fontWeight: 600,
                 }}
               >
@@ -4666,7 +4677,7 @@ function Dashboard({
           onClick={() => setSection("pauta_misa")}
           style={{
             background: "linear-gradient(135deg,#f0fdf4,#dcfce7)",
-            borderRadius: "var(--radius-lg, 14px)",
+            borderRadius: 18,
             padding: "14px 18px",
             marginBottom: 10,
             border: `2px solid ${C.primary}50`,
@@ -4736,7 +4747,7 @@ function Dashboard({
                   background: C.primaryLight,
                   color: C.primaryDark,
                   padding: "2px 8px",
-                  borderRadius: "var(--radius-md, 10px)",
+                  borderRadius: 12,
                   fontWeight: 600,
                 }}
               >
@@ -4839,7 +4850,7 @@ function Dashboard({
               <div style={{
                 position: "absolute", bottom: -4, right: -4,
                 background: pctAsistencia >= 75 ? C.primary : pctAsistencia >= 50 ? "#f59e0b" : "#ef4444",
-                color: "white", borderRadius: "var(--radius-sm, 8px)", fontSize: 9, fontWeight: 800,
+                color: "white", borderRadius: 10, fontSize: 9, fontWeight: 800,
                 padding: "2px 4px", lineHeight: 1, border: "1.5px solid white",
               }}>{pctAsistencia}%</div>
             )}
@@ -4889,7 +4900,7 @@ function Dashboard({
             style={{
               width: 48,
               height: 48,
-              borderRadius: "var(--radius-md, 12px)",
+              borderRadius: 14,
               background: C.primary + "15",
               display: "flex",
               flexDirection: "column",
@@ -4974,7 +4985,7 @@ function Dashboard({
             style={{
               width: 40,
               height: 40,
-              borderRadius: "var(--radius-md, 10px)",
+              borderRadius: 12,
               background: C.gold + "15",
               display: "flex",
               alignItems: "center",
@@ -5068,7 +5079,7 @@ function Dashboard({
                     style={{
                       flexShrink: 0,
                       width: 180,
-                      borderRadius: "var(--radius-md, 12px)",
+                      borderRadius: 14,
                       overflow: "hidden",
                       border: `1px solid ${C.border}`,
                       cursor: "pointer",
@@ -5171,7 +5182,7 @@ function Dashboard({
                   alignItems: "flex-start",
                   padding: "10px 14px",
                   background: C.white,
-                  borderRadius: "var(--radius-md, 10px)",
+                  borderRadius: 12,
                   border: `1px solid ${C.border}`,
                   marginBottom: 8,
                   cursor: "pointer",
@@ -5334,7 +5345,7 @@ function Dashboard({
               <div
                 style={{
                   background: C.primaryLight,
-                  borderRadius: "var(--radius-sm, 8px)",
+                  borderRadius: 10,
                   padding: "10px 14px",
                   borderLeft: `3px solid ${C.primary}`,
                   marginBottom: 10,
@@ -5356,7 +5367,7 @@ function Dashboard({
                 <div
                   style={{
                     background: C.goldLight,
-                    borderRadius: "var(--radius-sm, 8px)",
+                    borderRadius: 10,
                     padding: "10px 14px",
                     borderLeft: `3px solid ${C.gold}`,
                     marginBottom: 10,
@@ -5414,7 +5425,7 @@ function Dashboard({
               <div
                 style={{
                   background: `linear-gradient(135deg,${C.goldLight},#fef9e7)`,
-                  borderRadius: "var(--radius-md, 10px)",
+                  borderRadius: 12,
                   padding: "12px 14px",
                   border: `1px solid ${C.gold}30`,
                 }}
@@ -5472,7 +5483,7 @@ function Dashboard({
                 style={{
                   width: 36,
                   height: 36,
-                  borderRadius: "var(--radius-sm, 8px)",
+                  borderRadius: 10,
                   background: "#1DB954",
                   display: "flex",
                   alignItems: "center",
@@ -5526,7 +5537,7 @@ function Dashboard({
           </div>
           <div
             style={{
-              borderRadius: "var(--radius-md, 10px)",
+              borderRadius: 12,
               overflow: "hidden",
               border: `1px solid ${C.border}`,
             }}
@@ -5674,7 +5685,7 @@ function Dashboard({
               alignItems: "center",
               padding: "8px 14px",
               background: C.white,
-              borderRadius: "var(--radius-sm, 8px)",
+              borderRadius: 10,
               border: `1px solid ${C.border}`,
               color: C.dark,
               fontSize: 12,
@@ -5871,7 +5882,7 @@ function Dashboard({
                       background: "rgba(255,255,255,0.12)",
                       color: "white",
                       border: "1px solid rgba(255,255,255,0.25)",
-                      borderRadius: "var(--radius-sm, 8px)",
+                      borderRadius: 10,
                       padding: "7px 16px",
                       cursor: "pointer",
                       fontSize: 12,
@@ -5910,7 +5921,7 @@ function Dashboard({
                   <div
                     style={{
                       background: "white",
-                      borderRadius: "var(--radius-md, 12px)",
+                      borderRadius: 14,
                       padding: 8,
                       boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
                     }}
@@ -6013,10 +6024,10 @@ function YoutubeWidget({ compact = false }) {
         <div style={{
           display: "flex", alignItems: "center", gap: 10,
           background: "#fff1f2", border: "1px solid #fecdd3",
-          borderRadius: "var(--radius-md, 10px)", padding: "10px 12px",
+          borderRadius: 12, padding: "10px 12px",
         }}>
           <div style={{
-            width: 36, height: 36, background: "#ff0000", borderRadius: "var(--radius-sm, 8px)",
+            width: 36, height: 36, background: "#ff0000", borderRadius: 10,
             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
           }}>
             <span style={{ fontSize: 16, color: "white" }}>▶</span>
@@ -6026,7 +6037,7 @@ function YoutubeWidget({ compact = false }) {
             <div style={{ fontSize: 10, color: C.gray }}>Habilita YouTube Data API v3 en Google Cloud</div>
           </div>
           <a href={CHANNEL_URL} target="_blank" rel="noopener noreferrer"
-            style={{ flexShrink: 0, background: "#ff0000", color: "white", borderRadius: 6, padding: "5px 10px", fontSize: 11, fontWeight: 600, textDecoration: "none" }}>
+            style={{ flexShrink: 0, background: "#ff0000", color: "white", borderRadius: 9, padding: "5px 10px", fontSize: 11, fontWeight: 600, textDecoration: "none" }}>
             Canal
           </a>
         </div>
@@ -6046,7 +6057,7 @@ function YoutubeWidget({ compact = false }) {
       {header}
 
       {/* Player embed inline */}
-      <div style={{ borderRadius: "var(--radius-md, 10px)", overflow: "hidden", background: "#000", position: "relative", paddingTop: "56.25%" }}>
+      <div style={{ borderRadius: 12, overflow: "hidden", background: "#000", position: "relative", paddingTop: "56.25%" }}>
         <iframe
           key={vid}
           src={`https://www.youtube.com/embed/${vid}?autoplay=0`}
@@ -6061,7 +6072,7 @@ function YoutubeWidget({ compact = false }) {
         <button
           onClick={() => setCurrentIdx(i => Math.max(0, i - 1))}
           disabled={currentIdx === 0}
-          style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, width: 28, height: 28, cursor: currentIdx === 0 ? "not-allowed" : "pointer", opacity: currentIdx === 0 ? 0.3 : 1, fontSize: 12, flexShrink: 0 }}
+          style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 9, width: 28, height: 28, cursor: currentIdx === 0 ? "not-allowed" : "pointer", opacity: currentIdx === 0 ? 0.3 : 1, fontSize: 12, flexShrink: 0 }}
         >‹</button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: C.dark, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
@@ -6072,7 +6083,7 @@ function YoutubeWidget({ compact = false }) {
         <button
           onClick={() => setCurrentIdx(i => Math.min(videos.length - 1, i + 1))}
           disabled={currentIdx === videos.length - 1}
-          style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, width: 28, height: 28, cursor: currentIdx === videos.length - 1 ? "not-allowed" : "pointer", opacity: currentIdx === videos.length - 1 ? 0.3 : 1, fontSize: 12, flexShrink: 0 }}
+          style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 9, width: 28, height: 28, cursor: currentIdx === videos.length - 1 ? "not-allowed" : "pointer", opacity: currentIdx === videos.length - 1 ? 0.3 : 1, fontSize: 12, flexShrink: 0 }}
         >›</button>
       </div>
     </div>
@@ -6213,13 +6224,13 @@ function Perfil({ user, members, setUser }) {
   const fieldRow = (icon, label, content) => (
     <div style={{
       display: "flex", alignItems: "flex-start", gap: 14,
-      padding: "13px 16px", borderRadius: "var(--radius-md, 12px)",
+      padding: "13px 16px", borderRadius: 14,
       background: "rgba(255,255,255,0.7)",
       border: `1px solid ${C.border}`,
       marginBottom: 8,
     }}>
       <div style={{
-        width: 36, height: 36, borderRadius: "var(--radius-md, 10px)", flexShrink: 0,
+        width: 36, height: 36, borderRadius: 12, flexShrink: 0,
         background: cc + "15",
         display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: 17, border: `1px solid ${cc}25`,
@@ -6232,7 +6243,7 @@ function Perfil({ user, members, setUser }) {
   );
 
   const editInputStyle = {
-    width: "100%", padding: "7px 11px", borderRadius: "var(--radius-sm, 8px)",
+    width: "100%", padding: "7px 11px", borderRadius: 10,
     border: `1.5px solid ${cc}60`, fontSize: 13, outline: "none",
     background: "white", color: C.dark, fontFamily: "var(--font-sans)",
     boxSizing: "border-box",
@@ -6240,7 +6251,7 @@ function Perfil({ user, members, setUser }) {
 
   const saveBtnEl = (onClick, saving) => (
     <button onClick={onClick} disabled={saving} style={{
-      padding: "6px 14px", borderRadius: "var(--radius-sm, 8px)", border: "none",
+      padding: "6px 14px", borderRadius: 10, border: "none",
       background: `linear-gradient(135deg, ${cc}, ${cc}bb)`,
       color: "white", fontWeight: 700, fontSize: 12,
       cursor: saving ? "not-allowed" : "pointer",
@@ -6251,7 +6262,7 @@ function Perfil({ user, members, setUser }) {
 
   const cancelBtnEl = (onClick) => (
     <button onClick={onClick} style={{
-      padding: "6px 12px", borderRadius: "var(--radius-sm, 8px)",
+      padding: "6px 12px", borderRadius: 10,
       border: `1px solid ${C.border}`, background: "white",
       color: C.gray, fontSize: 12, cursor: "pointer",
     }}>Cancelar</button>
@@ -6271,7 +6282,7 @@ function Perfil({ user, members, setUser }) {
         <div style={{
           background: msg.startsWith("✅") ? "#d1fae5" : "#fee2e2",
           color: msg.startsWith("✅") ? "#065f46" : "#b91c1c",
-          borderRadius: "var(--radius-md, 10px)", padding: "10px 16px", fontSize: 13,
+          borderRadius: 12, padding: "10px 16px", fontSize: 13,
           marginBottom: 18,
           border: `1px solid ${msg.startsWith("✅") ? "#6ee7b7" : "#fca5a5"}`,
           display: "flex", alignItems: "center", gap: 8,
@@ -6685,7 +6696,7 @@ function Agenda({ eventos, onReload }) {
             padding: "8px 14px",
             background: "white",
             border: `1px solid ${C.border}`,
-            borderRadius: "var(--radius-sm, 8px)",
+            borderRadius: 10,
             fontSize: 12,
             color: C.dark,
             fontWeight: 500,
@@ -6768,7 +6779,7 @@ function Documentos({ docs, onReload }) {
             style={{
               width: "100%",
               padding: "10px 14px",
-              borderRadius: "var(--radius-sm, 8px)",
+              borderRadius: 10,
               border: `1px solid ${C.border}`,
               fontSize: 13,
               outline: "none",
@@ -6783,7 +6794,7 @@ function Documentos({ docs, onReload }) {
             style={{
               width: "100%",
               padding: "10px 14px",
-              borderRadius: "var(--radius-sm, 8px)",
+              borderRadius: 10,
               border: `1px solid ${C.border}`,
               fontSize: 13,
               outline: "none",
@@ -6806,7 +6817,7 @@ function Documentos({ docs, onReload }) {
               }
               style={{
                 padding: "10px 14px",
-                borderRadius: "var(--radius-sm, 8px)",
+                borderRadius: 10,
                 border: `1px solid ${C.border}`,
                 fontSize: 13,
                 outline: "none",
@@ -6828,7 +6839,7 @@ function Documentos({ docs, onReload }) {
               onChange={(e) => setForm((p) => ({ ...p, size: e.target.value }))}
               style={{
                 padding: "10px 14px",
-                borderRadius: "var(--radius-sm, 8px)",
+                borderRadius: 10,
                 border: `1px solid ${C.border}`,
                 fontSize: 13,
                 outline: "none",
@@ -6862,7 +6873,7 @@ function Documentos({ docs, onReload }) {
               width: 44,
               height: 44,
               background: "#ffffff",
-              borderRadius: "var(--radius-md, 10px)",
+              borderRadius: 12,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -6941,7 +6952,7 @@ function Oraciones({ oraciones, user, onReload }) {
             style={{
               width: "100%",
               padding: "10px 14px",
-              borderRadius: "var(--radius-sm, 8px)",
+              borderRadius: 10,
               border: `1px solid ${C.border}`,
               fontSize: 13,
               outline: "none",
@@ -6957,7 +6968,7 @@ function Oraciones({ oraciones, user, onReload }) {
             style={{
               width: "100%",
               padding: "10px 14px",
-              borderRadius: "var(--radius-sm, 8px)",
+              borderRadius: 10,
               border: `1px solid ${C.border}`,
               fontSize: 13,
               fontFamily: "Inter,sans-serif",
@@ -7259,7 +7270,7 @@ function Noticias({ noticias, onReload }) {
                   width: 44,
                   height: 44,
                   background: C.primaryLight,
-                  borderRadius: "var(--radius-md, 10px)",
+                  borderRadius: 12,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -7410,7 +7421,7 @@ function QandA({ preguntas, user, onReload }) {
           style={{
             width: "100%",
             padding: "10px 14px",
-            borderRadius: "var(--radius-sm, 8px)",
+            borderRadius: 10,
             border: `1px solid ${C.border}`,
             fontSize: 13,
             fontFamily: "Inter,sans-serif",
@@ -7441,7 +7452,7 @@ function QandA({ preguntas, user, onReload }) {
             <div
               style={{
                 background: C.primaryLight,
-                borderRadius: "var(--radius-sm, 8px)",
+                borderRadius: 10,
                 padding: "10px 14px",
                 display: "flex",
                 gap: 10,
@@ -7535,7 +7546,7 @@ function Integrantes({ members, setSection, setPreParaId, user }) {
               return (
                 <div key={m.id} style={{
                   display: "flex", alignItems: "center", gap: 12,
-                  padding: "10px 16px", borderRadius: "var(--radius-md, 12px)",
+                  padding: "10px 16px", borderRadius: 14,
                   background: "white", border: `1px solid ${cc}25`,
                   boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
                   flex: "0 1 300px",
@@ -7576,7 +7587,7 @@ function Integrantes({ members, setSection, setPreParaId, user }) {
                 return (
                   <div key={m.id} style={{
                     display: "flex", alignItems: "center", gap: 12,
-                    padding: "8px 14px", borderRadius: "var(--radius-md, 10px)",
+                    padding: "8px 14px", borderRadius: 12,
                     background: "white", border: `1px solid ${C.border}`,
                     boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
                   }}>
@@ -7598,7 +7609,7 @@ function Integrantes({ members, setSection, setPreParaId, user }) {
                         style={{
                           padding: "4px 10px", flexShrink: 0,
                           background: C.primaryLight, color: C.primaryDark,
-                          border: `1px solid ${C.primary}40`, borderRadius: 6,
+                          border: `1px solid ${C.primary}40`, borderRadius: 9,
                           fontSize: 10, fontWeight: 700, cursor: "pointer",
                           whiteSpace: "nowrap",
                         }}
@@ -7780,7 +7791,7 @@ function Fotos() {
             style={{
               aspectRatio: "4/3",
               background: `linear-gradient(135deg,${C.primaryLight},${C.goldLight})`,
-              borderRadius: "var(--radius-md, 12px)",
+              borderRadius: 14,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -7836,7 +7847,7 @@ function Podcast({ podcasts, onReload, user }) {
                 style={{
                   width: 56,
                   height: 56,
-                  borderRadius: "var(--radius-md, 12px)",
+                  borderRadius: 14,
                   background: `linear-gradient(135deg,${C.primary},${C.primaryDark})`,
                   display: "flex",
                   alignItems: "center",
@@ -8044,7 +8055,7 @@ function QRImg({ data, size = 120, borderColor = "#1a3a2a" }) {
   const src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}&color=1a3a2a&bgcolor=ffffff&margin=8`;
   return (
     <div style={{
-      background: "white", borderRadius: "var(--radius-md, 10px)", padding: 6,
+      background: "white", borderRadius: 12, padding: 6,
       border: `2px solid ${borderColor}`,
       boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
       display: "inline-block",
@@ -8114,7 +8125,7 @@ function Cancionero({ user }) {
         display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap",
       }}>
         <div style={{
-          width: 52, height: 52, background: "rgba(255,255,255,0.2)", borderRadius: "var(--radius-lg, 14px)",
+          width: 52, height: 52, background: "rgba(255,255,255,0.2)", borderRadius: 18,
           display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, flexShrink: 0,
         }}>🎼</div>
         <div>
@@ -8127,7 +8138,7 @@ function Cancionero({ user }) {
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           {[{ n: canciones.length, l: "Guardadas" }, { n: pautas.length, l: "Pautas" }].map((s, i) => (
-            <div key={i} style={{ background: "rgba(255,255,255,0.2)", borderRadius: "var(--radius-md, 10px)", padding: "8px 14px", textAlign: "center" }}>
+            <div key={i} style={{ background: "rgba(255,255,255,0.2)", borderRadius: 12, padding: "8px 14px", textAlign: "center" }}>
               <div style={{ fontSize: 20, fontWeight: 700, color: "white", lineHeight: 1 }}>{s.n}</div>
               <div style={{ fontSize: 10, color: "rgba(255,255,255,0.85)", marginTop: 2 }}>{s.l}</div>
             </div>
@@ -8140,7 +8151,7 @@ function Cancionero({ user }) {
         <div style={{ display: "flex", gap: 6, marginBottom: 20, overflowX: "auto", paddingBottom: 4 }}>
           {TAB_ITEMS.map(t => (
             <button key={t.id} onClick={() => setVista(t.id)} style={{
-              padding: "8px 18px", borderRadius: "var(--radius-sm, 8px)", border: "none", cursor: "pointer",
+              padding: "8px 18px", borderRadius: 10, border: "none", cursor: "pointer",
               fontSize: 13, fontWeight: vista === t.id ? 600 : 400, whiteSpace: "nowrap",
               background: vista === t.id ? C.primary : "transparent",
               color: vista === t.id ? "white" : C.gray, transition: "all 0.15s",
@@ -8148,7 +8159,7 @@ function Cancionero({ user }) {
           ))}
           {isAdmin && vista === "pautas" && (
             <button onClick={() => setVista("nueva_pauta")} style={{
-              marginLeft: "auto", padding: "8px 18px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.primary}`,
+              marginLeft: "auto", padding: "8px 18px", borderRadius: 10, border: `1px solid ${C.primary}`,
               background: C.primaryLight, color: C.primaryDark, fontSize: 13, fontWeight: 600, cursor: "pointer",
             }}>📋 Nueva Pauta</button>
           )}
@@ -8235,7 +8246,7 @@ function CancioneroDirectorio({ canciones, isAdmin, onAbrir }) {
       {/* Barra de búsqueda */}
       <div style={{
         display: "flex", alignItems: "center", gap: 8, marginBottom: 16,
-        background: C.white, borderRadius: "var(--radius-md, 10px)", padding: "10px 14px",
+        background: C.white, borderRadius: 12, padding: "10px 14px",
         border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
       }}>
         <span style={{ fontSize: 16 }}>🔍</span>
@@ -8340,7 +8351,7 @@ function CancioneroDirectorio({ canciones, isAdmin, onAbrir }) {
 
 function paginaBtnStyle(activo, disabled) {
   return {
-    padding: "6px 12px", borderRadius: 7, border: `1px solid ${activo ? C.primary : C.border}`,
+    padding: "6px 12px", borderRadius: 10, border: `1px solid ${activo ? C.primary : C.border}`,
     background: activo ? C.primary : C.white, color: activo ? "white" : disabled ? "#ccc" : C.dark,
     fontSize: 13, fontWeight: activo ? 700 : 400, cursor: disabled ? "default" : "pointer",
     minWidth: 34, textAlign: "center",
@@ -8418,7 +8429,7 @@ function CancioneroBuscador({ canciones, isAdmin, onAbrir, onReload }) {
       <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
         <div style={{
           display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 220,
-          background: C.white, borderRadius: "var(--radius-md, 13px)", padding: "9px 14px", border: `1px solid ${C.border}`,
+          background: C.white, borderRadius: 14, padding: "9px 14px", border: `1px solid ${C.border}`,
         }}>
           <span style={{ color: C.gray, fontSize: 14 }}>🔍</span>
           <input value={busqueda} onChange={onChangeBusqueda}
@@ -8428,7 +8439,7 @@ function CancioneroBuscador({ canciones, isAdmin, onAbrir, onReload }) {
           {busqueda && <button onClick={() => { setBusqueda(""); setResultsDrive([]); setBuscado(false); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.gray }}>✕</button>}
         </div>
         <select value={filtroMom} onChange={e => setFiltroMom(e.target.value)} style={{
-          padding: "8px 12px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.border}`,
+          padding: "8px 12px", borderRadius: 10, border: `1px solid ${C.border}`,
           fontSize: 13, color: C.dark, background: C.white, cursor: "pointer",
         }}>
           <option value="">Todos los momentos</option>
@@ -8460,7 +8471,7 @@ function CancioneroBuscador({ canciones, isAdmin, onAbrir, onReload }) {
             {resultsDrive.map(pdf => (
               <Card key={pdf.id} hover style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: "var(--radius-md, 10px)", flexShrink: 0, background: "var(--bg-hover)",
+                  <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: "var(--bg-hover)",
                     display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>📄</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, lineHeight: 1.3,
@@ -8469,7 +8480,7 @@ function CancioneroBuscador({ canciones, isAdmin, onAbrir, onReload }) {
                   </div>
                 </div>
                 <button onClick={() => abrirDesdeDrive(pdf)} style={{
-                  width: "100%", padding: "7px 0", borderRadius: 7, border: "none",
+                  width: "100%", padding: "7px 0", borderRadius: 10, border: "none",
                   background: C.primary, color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
                 }}>🎵 Ver letra y acordes</button>
               </Card>
@@ -8505,7 +8516,7 @@ function CancionCard({ cancion: c, isAdmin, onAbrir, onEliminar, guardada }) {
     <Card hover style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
         <div style={{
-          width: 44, height: 44, borderRadius: "var(--radius-md, 10px)", flexShrink: 0,
+          width: 44, height: 44, borderRadius: 12, flexShrink: 0,
           background: guardada ? C.primaryLight : "rgba(0,0,0,0.05)",
           display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
         }}>{guardada ? "🎵" : "📄"}</div>
@@ -8521,7 +8532,7 @@ function CancionCard({ cancion: c, isAdmin, onAbrir, onEliminar, guardada }) {
           {momentos.slice(0,3).map(mid => {
             const mom = MOMENTOS_LITURGICOS.find(m => m.id === mid);
             return mom ? (
-              <span key={mid} style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: "var(--radius-md, 12px)",
+              <span key={mid} style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 14,
                 background: mom.color + "18", color: mom.color, border: `1px solid ${mom.color}30` }}>
                 {mom.icon} {mom.label.split(" ")[0]}
               </span>
@@ -8532,18 +8543,18 @@ function CancionCard({ cancion: c, isAdmin, onAbrir, onEliminar, guardada }) {
       )}
       <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
         <button onClick={() => onAbrir(c)} style={{
-          flex: 1, padding: "7px 0", borderRadius: 7, border: "none",
+          flex: 1, padding: "7px 0", borderRadius: 10, border: "none",
           background: C.primary, color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
         }}>📄 Ver letra</button>
         {c.drive_url && (
           <a href={c.drive_url} target="_blank" rel="noopener" style={{
-            padding: "7px 10px", borderRadius: 7, border: `1px solid ${C.border}`,
+            padding: "7px 10px", borderRadius: 10, border: `1px solid ${C.border}`,
             background: C.light, color: C.gray, fontSize: 12, cursor: "pointer", textDecoration: "none",
           }}>☁️</a>
         )}
         {isAdmin && guardada && (
           <button onClick={() => onEliminar(c.id)} style={{
-            padding: "7px 10px", borderRadius: 7, border: "none",
+            padding: "7px 10px", borderRadius: 10, border: "none",
             background: "#fee2e2", color: C.danger, fontSize: 12, cursor: "pointer",
           }}>🗑</button>
         )}
@@ -8816,11 +8827,11 @@ Kyrie eleison`;
       {/* ── Barra superior del visor ── */}
       <div style={{
         display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
-        padding: "12px 16px", background: C.white, borderRadius: "var(--radius-md, 12px)",
+        padding: "12px 16px", background: C.white, borderRadius: 14,
         border: `1px solid ${C.border}`, flexWrap: "wrap",
       }}>
         <button onClick={onVolver} style={{
-          background: C.light, border: `1px solid ${C.border}`, borderRadius: "var(--radius-sm, 8px)",
+          background: C.light, border: `1px solid ${C.border}`, borderRadius: 10,
           padding: "7px 12px", cursor: "pointer", fontSize: 13, color: C.gray,
           display: "flex", alignItems: "center", gap: 5,
         }}>← Volver</button>
@@ -8833,14 +8844,14 @@ Kyrie eleison`;
 
         {isAdmin && esTemp && (
           <button onClick={guardarEnCancionero} disabled={guardandoNew} style={{
-            padding: "7px 13px", borderRadius: "var(--radius-sm, 8px)", border: "none",
+            padding: "7px 13px", borderRadius: 10, border: "none",
             background: "#f59e0b", color: "white", fontSize: 12, cursor: "pointer", fontWeight: 600,
             display: "flex", alignItems: "center", gap: 5,
           }}>{guardandoNew ? "Guardando…" : "⭐ Guardar en cancionero"}</button>
         )}
         {isAdmin && !esTemp && (
           <button onClick={() => setAsignando(!asignando)} style={{
-            padding: "7px 13px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.primary}`,
+            padding: "7px 13px", borderRadius: 10, border: `1px solid ${C.primary}`,
             background: asignando ? C.primary : C.white,
             color: asignando ? "white" : C.primary, fontSize: 12, cursor: "pointer", fontWeight: 600,
           }}>⛪ {asignando ? "Cerrar" : "Asignar momentos"}</button>
@@ -8851,7 +8862,7 @@ Kyrie eleison`;
         <div style={{
           background: msg.startsWith("✅") ? "#d1fae5" : "#fee2e2",
           color: msg.startsWith("✅") ? "#065f46" : "#b91c1c",
-          borderRadius: "var(--radius-sm, 8px)", padding: "10px 14px", fontSize: 13, marginBottom: 12,
+          borderRadius: 10, padding: "10px 14px", fontSize: 13, marginBottom: 12,
         }}>{msg}</div>
       )}
 
@@ -8865,7 +8876,7 @@ Kyrie eleison`;
             {MOMENTOS_LITURGICOS.map(m => (
               <label key={m.id} style={{
                 display: "flex", alignItems: "center", gap: 8, padding: "8px 12px",
-                borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${momsSel.includes(m.id) ? m.color : C.border}`,
+                borderRadius: 10, border: `1px solid ${momsSel.includes(m.id) ? m.color : C.border}`,
                 background: momsSel.includes(m.id) ? m.color + "12" : C.white,
                 cursor: "pointer", transition: "all 0.15s",
               }}>
@@ -8931,7 +8942,7 @@ Kyrie eleison`;
           {cancion?.drive_url && (
             <div style={{ padding: "10px 16px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <a href={cancion.drive_url} target="_blank" rel="noreferrer" style={{
-                padding: "7px 14px", borderRadius: "var(--radius-sm, 8px)", background: C.primary, color: "white",
+                padding: "7px 14px", borderRadius: 10, background: C.primary, color: "white",
                 fontSize: 12, fontWeight: 600, textDecoration: "none",
               }}>🔗 Abrir en Google Drive</a>
             </div>
@@ -8968,27 +8979,27 @@ Kyrie eleison`;
                   </p>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
                     <button onClick={() => setTabVisor("pdf")} style={{
-                      padding: "8px 16px", borderRadius: "var(--radius-sm, 8px)", background: C.primary, color: "white",
+                      padding: "8px 16px", borderRadius: 10, background: C.primary, color: "white",
                       fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
                     }}>📄 Ver PDF aquí</button>
                     <a href={cancion?.drive_url} target="_blank" rel="noreferrer" style={{
-                      display: "inline-block", padding: "8px 16px", borderRadius: "var(--radius-sm, 8px)",
+                      display: "inline-block", padding: "8px 16px", borderRadius: 10,
                       background: C.light, color: C.dark, fontSize: 13, fontWeight: 600,
                       textDecoration: "none", border: `1px solid ${C.border}`,
                     }}>🔗 Abrir en Drive</a>
                     <button onClick={extraerLetraConIA} style={{
-                      padding: "8px 16px", borderRadius: "var(--radius-sm, 8px)", background: "#6b7280", color: "white",
+                      padding: "8px 16px", borderRadius: 10, background: "#6b7280", color: "white",
                       fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
                     }}>🔄 Reintentar</button>
                   </div>
                   <div style={{
-                    background: "#fef3c7", border: "1px solid #fbbf24", borderRadius: "var(--radius-sm, 8px)",
+                    background: "#fef3c7", border: "1px solid #fbbf24", borderRadius: 10,
                     padding: "10px 14px", fontSize: 13, color: "#92400e",
                   }}>
                     <strong>💡 Opción rápida:</strong> Abre el PDF en Drive, selecciona el texto con Ctrl+A, cópialo y usa el botón de abajo para que la IA lo formatee con acordes.
                     <div style={{ marginTop: 8 }}>
                       <button onClick={() => setModoManual(true)} style={{
-                        padding: "7px 14px", borderRadius: 7, background: "#f59e0b", color: "white",
+                        padding: "7px 14px", borderRadius: 10, background: "#f59e0b", color: "white",
                         fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer",
                       }}>✏️ Pegar texto manualmente</button>
                     </div>
@@ -9013,7 +9024,7 @@ Kyrie eleison`;
                 placeholder="Pega aquí el texto completo de la canción..."
                 style={{
                   width: "100%", minHeight: 160, padding: "10px 12px",
-                  border: `1px solid ${C.border}`, borderRadius: "var(--radius-sm, 8px)",
+                  border: `1px solid ${C.border}`, borderRadius: 10,
                   fontSize: 13, color: C.dark, fontFamily: "monospace",
                   resize: "vertical", boxSizing: "border-box", marginBottom: 10,
                 }}
@@ -9056,7 +9067,7 @@ Kyrie eleison`;
                     setProcesandoManual(false);
                   }}
                   style={{
-                    padding: "8px 18px", borderRadius: "var(--radius-sm, 8px)",
+                    padding: "8px 18px", borderRadius: 10,
                     background: textoManual.trim() ? C.primary : "#ccc",
                     color: "white", fontSize: 13, fontWeight: 700,
                     border: "none", cursor: textoManual.trim() ? "pointer" : "default",
@@ -9065,7 +9076,7 @@ Kyrie eleison`;
                   {procesandoManual ? "⏳ Procesando con IA…" : "🤖 Formatear con IA"}
                 </button>
                 <button onClick={() => { setModoManual(false); setTextoManual(""); }} style={{
-                  padding: "8px 14px", borderRadius: "var(--radius-sm, 8px)", background: C.light,
+                  padding: "8px 14px", borderRadius: 10, background: C.light,
                   color: C.gray, fontSize: 13, border: `1px solid ${C.border}`, cursor: "pointer",
                 }}>Cancelar</button>
               </div>
@@ -9083,7 +9094,7 @@ Kyrie eleison`;
                 <div style={{
                   display: "flex", alignItems: "center", gap: 10, marginBottom: 16,
                   flexWrap: "wrap", padding: "10px 12px", background: "#f8f9fa",
-                  borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.border}`,
+                  borderRadius: 10, border: `1px solid ${C.border}`,
                 }}>
                   {/* Tono actual */}
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -9102,7 +9113,7 @@ Kyrie eleison`;
                   <div style={{ width: 1, height: 20, background: C.border }} />
 
                   {/* Toggle Latino / Americano */}
-                  <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: `1px solid ${C.border}` }}>
+                  <div style={{ display: "flex", borderRadius: 9, overflow: "hidden", border: `1px solid ${C.border}` }}>
                     {[["🎵 Latino", true], ["ABC Americano", false]].map(([lbl, val]) => (
                       <button key={lbl} onClick={() => setFormatoLatino(val)} style={{
                         padding: "4px 10px", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
@@ -9139,7 +9150,7 @@ Kyrie eleison`;
 
                 {/* Tono actual en el panel */}
                 <div style={{
-                  width: 44, height: 44, borderRadius: "var(--radius-sm, 8px)",
+                  width: 44, height: 44, borderRadius: 10,
                   background: C.primary, color: "white",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 14, fontWeight: 800, fontFamily: "monospace",
@@ -9152,7 +9163,7 @@ Kyrie eleison`;
 
                 {/* Subir tono */}
                 <button onClick={() => setSemis(s => s + 1)} style={{
-                  width: 44, height: 36, borderRadius: "var(--radius-sm, 8px)", border: "none",
+                  width: 44, height: 36, borderRadius: 10, border: "none",
                   background: "#4ade80", color: "#065f46", fontSize: 16, fontWeight: 700,
                   cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                   boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
@@ -9163,14 +9174,14 @@ Kyrie eleison`;
                   fontSize: 11, color: semis === 0 ? "#666" : "#f59e0b",
                   fontWeight: 700, textAlign: "center",
                   background: semis !== 0 ? "#f59e0b20" : "transparent",
-                  borderRadius: 4, padding: "2px 4px", width: 40, textAlign: "center",
+                  borderRadius: 7, padding: "2px 4px", width: 40, textAlign: "center",
                 }}>
                   {semis > 0 ? `+${semis}` : semis < 0 ? `${semis}` : "orig"}
                 </div>
 
                 {/* Bajar tono */}
                 <button onClick={() => setSemis(s => s - 1)} style={{
-                  width: 44, height: 36, borderRadius: "var(--radius-sm, 8px)", border: "none",
+                  width: 44, height: 36, borderRadius: 10, border: "none",
                   background: "#f87171", color: "#7f1d1d", fontSize: 16, fontWeight: 700,
                   cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                   boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
@@ -9180,7 +9191,7 @@ Kyrie eleison`;
 
                 {/* Reset */}
                 <button onClick={() => setSemis(0)} style={{
-                  width: 44, height: 30, borderRadius: 7, border: `1px solid #555`,
+                  width: 44, height: 30, borderRadius: 10, border: `1px solid #555`,
                   background: semis !== 0 ? "#f59e0b" : "#444",
                   color: semis !== 0 ? "#fff" : "#888",
                   fontSize: 10, fontWeight: 700, cursor: "pointer",
@@ -9199,7 +9210,7 @@ Kyrie eleison`;
                   { label: "-5", delta: -5 },
                 ].map(({ label, delta }) => (
                   <button key={label} onClick={() => setSemis(s => s + delta)} style={{
-                    width: 44, height: 26, borderRadius: 6, border: `1px solid #555`,
+                    width: 44, height: 26, borderRadius: 9, border: `1px solid #555`,
                     background: "#3a3a3a", color: "#ccc",
                     fontSize: 10, fontWeight: 600, cursor: "pointer",
                   }}>{label}</button>
@@ -9228,7 +9239,7 @@ function LetraRenderer({ texto, colorAcorde, formatoLatino = false }) {
             textTransform: "uppercase", letterSpacing: 1.5,
             marginTop: 18, marginBottom: 4,
             background: (colorAcorde || "#1a6fb5") + "15",
-            display: "inline-block", padding: "2px 8px", borderRadius: 4,
+            display: "inline-block", padding: "2px 8px", borderRadius: 7,
           }}>{b.texto}</div>
         );
         if (b.tipo === "par") return (
@@ -9290,7 +9301,7 @@ function CancioneroPautaCard({ pauta, canciones, isAdmin, onAbrir, onReload }) {
   return (
     <Card hover style={{ padding: 16 }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
-        <div style={{ width: 44, height: 44, borderRadius: "var(--radius-md, 10px)", background: C.primaryLight,
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: C.primaryLight,
           display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🎼</div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: C.dark, lineHeight: 1.3 }}>{pauta.titulo}</div>
@@ -9301,16 +9312,16 @@ function CancioneroPautaCard({ pauta, canciones, isAdmin, onAbrir, onReload }) {
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 12 }}>
         {asigs.slice(0,5).map((a, i) => {
           const mom = MOMENTOS_LITURGICOS.find(m => m.id === a.momento);
-          return mom ? <span key={i} style={{ fontSize: 10, padding: "2px 7px", borderRadius: "var(--radius-md, 10px)", background: mom.color + "18", color: mom.color, fontWeight: 600 }}>{mom.icon}</span> : null;
+          return mom ? <span key={i} style={{ fontSize: 10, padding: "2px 7px", borderRadius: 12, background: mom.color + "18", color: mom.color, fontWeight: 600 }}>{mom.icon}</span> : null;
         })}
         {asigs.length > 5 && <span style={{ fontSize: 10, color: C.gray }}>+{asigs.length - 5}</span>}
       </div>
       <div style={{ display: "flex", gap: 6 }}>
         <button onClick={() => onAbrir(pauta)} style={{
-          flex: 1, padding: "7px 0", borderRadius: 7, border: "none",
+          flex: 1, padding: "7px 0", borderRadius: 10, border: "none",
           background: C.primary, color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
         }}>📋 Ver pauta</button>
-        {isAdmin && <button onClick={eliminar} style={{ padding: "7px 10px", borderRadius: 7, border: "none", background: "#fee2e2", color: C.danger, fontSize: 12, cursor: "pointer" }}>🗑</button>}
+        {isAdmin && <button onClick={eliminar} style={{ padding: "7px 10px", borderRadius: 10, border: "none", background: "#fee2e2", color: C.danger, fontSize: 12, cursor: "pointer" }}>🗑</button>}
       </div>
     </Card>
   );
@@ -9334,7 +9345,7 @@ function CancioneroDetallePauta({ pauta, canciones, isAdmin, onVolver, onReload 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <button onClick={onVolver} style={{
-          background: C.light, border: `1px solid ${C.border}`, borderRadius: "var(--radius-sm, 8px)",
+          background: C.light, border: `1px solid ${C.border}`, borderRadius: 10,
           padding: "7px 12px", cursor: "pointer", fontSize: 13, color: C.gray,
         }}>← Volver</button>
         <div style={{ flex: 1 }}>
@@ -9342,7 +9353,7 @@ function CancioneroDetallePauta({ pauta, canciones, isAdmin, onVolver, onReload 
           {fecha && <div style={{ fontSize: 12, color: C.gray, textTransform: "capitalize" }}>{fecha}</div>}
         </div>
         <button onClick={() => window.print()} style={{
-          padding: "7px 14px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.border}`,
+          padding: "7px 14px", borderRadius: 10, border: `1px solid ${C.border}`,
           background: C.white, color: C.dark, fontSize: 12, cursor: "pointer", fontWeight: 500,
         }}>🖨️ Imprimir</button>
       </div>
@@ -9413,11 +9424,11 @@ function CancioneroDetallePauta({ pauta, canciones, isAdmin, onVolver, onReload 
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
               <QRImg data={qrLink} size={150} />
             </div>
-            <div style={{ fontSize: 9, color: C.gray, wordBreak: "break-all", background: C.light, borderRadius: 6, padding: "6px 10px", lineHeight: 1.5 }}>
+            <div style={{ fontSize: 9, color: C.gray, wordBreak: "break-all", background: C.light, borderRadius: 9, padding: "6px 10px", lineHeight: 1.5 }}>
               {qrLink}
             </div>
             <button onClick={() => navigator.clipboard?.writeText(qrLink).then(() => alert("✅ Link copiado"))} style={{
-              marginTop: 10, width: "100%", padding: 8, borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.border}`,
+              marginTop: 10, width: "100%", padding: 8, borderRadius: 10, border: `1px solid ${C.border}`,
               background: C.white, fontSize: 12, cursor: "pointer", color: C.gray,
             }}>📋 Copiar link</button>
           </Card>
@@ -9492,12 +9503,12 @@ function CancioneroFormPauta({ canciones, onGuardado, onCancelar }) {
     setGuardando(false);
   }
 
-  const inpS = { padding: "10px 13px", borderRadius: "var(--radius-md, 13px)", border: "1px solid rgba(60,60,67,0.2)", fontSize: 14, color: "var(--text-primary)", background: "#fff", outline: "none", letterSpacing: "-0.018em", WebkitAppearance: "none" };
+  const inpS = { padding: "10px 13px", borderRadius: 14, border: "1px solid rgba(60,60,67,0.2)", fontSize: 14, color: "var(--text-primary)", background: "#fff", outline: "none", letterSpacing: "-0.018em", WebkitAppearance: "none" };
 
   return (
     <div style={{ maxWidth: 860 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-        <button onClick={onCancelar} style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: "var(--radius-sm, 8px)", padding: "7px 12px", cursor: "pointer", fontSize: 13, color: C.gray }}>← Volver</button>
+        <button onClick={onCancelar} style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: 10, padding: "7px 12px", cursor: "pointer", fontSize: 13, color: C.gray }}>← Volver</button>
         <div style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, color: C.dark }}>📋 Nueva Pauta de Misa</div>
       </div>
 
@@ -9584,7 +9595,7 @@ function CancioneroFormPauta({ canciones, onGuardado, onCancelar }) {
       {/* Instrucción SQL */}
       <details style={{ marginTop: 20 }}>
         <summary style={{ fontSize: 12, color: C.gray, cursor: "pointer" }}>📦 SQL necesario en Supabase (clic para ver)</summary>
-        <pre style={{ marginTop: 8, background: "var(--text-primary)", color: "var(--border-color)", borderRadius: "var(--radius-md, 10px)", padding: "14px 16px", fontSize: 11, overflowX: "auto", lineHeight: 1.7 }}>{`-- Tabla de canciones del cancionero
+        <pre style={{ marginTop: 8, background: "var(--text-primary)", color: "var(--border-color)", borderRadius: 12, padding: "14px 16px", fontSize: 11, overflowX: "auto", lineHeight: 1.7 }}>{`-- Tabla de canciones del cancionero
 create table if not exists cancionero_canciones (
   id          uuid primary key default gen_random_uuid(),
   nombre      text not null,
@@ -9646,15 +9657,20 @@ function AdminTab({ label, active, onClick }) {
       onClick={onClick}
       style={{
         padding: "8px 16px",
-        borderRadius: "var(--radius-sm, 8px)",
-        border: "none",
+        borderRadius: 20,
+        border: active ? "none" : "1px solid rgba(60,60,67,0.15)",
         cursor: "pointer",
         fontSize: 13,
-        fontWeight: active ? 600 : 400,
-        background: active ? C.primary : "transparent",
+        fontWeight: active ? 600 : 500,
+        background: active
+          ? `linear-gradient(135deg, ${C.primary} 0%, #2d7a52 100%)`
+          : "rgba(255,255,255,0.8)",
         color: active ? "white" : C.gray,
-        transition: "all 0.15s",
+        boxShadow: active ? `0 2px 10px ${C.primary}40` : "none",
+        transition: "all 0.18s cubic-bezier(0.25,0.46,0.45,0.94)",
         whiteSpace: "nowrap",
+        letterSpacing: "-0.01em",
+        WebkitTapHighlightColor: "transparent",
       }}
     >
       {label}
@@ -9678,7 +9694,7 @@ function ConfirmBtn({ onConfirm, label = "🗑 Eliminar" }) {
             background: C.danger,
             color: "white",
             border: "none",
-            borderRadius: 6,
+            borderRadius: 9,
             cursor: "pointer",
             fontWeight: 600,
           }}
@@ -9693,7 +9709,7 @@ function ConfirmBtn({ onConfirm, label = "🗑 Eliminar" }) {
             background: C.light,
             color: C.gray,
             border: `1px solid ${C.border}`,
-            borderRadius: 6,
+            borderRadius: 9,
             cursor: "pointer",
           }}
         >
@@ -9710,7 +9726,7 @@ function ConfirmBtn({ onConfirm, label = "🗑 Eliminar" }) {
         background: "#fee2e2",
         color: C.danger,
         border: "none",
-        borderRadius: 6,
+        borderRadius: 9,
         cursor: "pointer",
         fontWeight: 500,
       }}
@@ -9901,7 +9917,7 @@ function AdminIntegrantes({ members, onReload }) {
                 gap: 10,
                 padding: "10px 14px",
                 background: "#f0fdf4",
-                borderRadius: "var(--radius-md, 10px)",
+                borderRadius: 12,
                 border: `1px solid ${C.primary}30`,
                 marginBottom: 6,
                 flexWrap: "wrap",
@@ -9939,7 +9955,7 @@ function AdminIntegrantes({ members, onReload }) {
                     onReload();
                   } catch (err) { alert("Error: " + err.message); }
                 }}
-                style={{ padding: "4px 8px", fontSize: 11, borderRadius: 6, border: `1px solid ${C.border}`, cursor: "pointer" }}
+                style={{ padding: "4px 8px", fontSize: 11, borderRadius: 9, border: `1px solid ${C.border}`, cursor: "pointer" }}
                 title="Cuerda vocal de este admin"
               >
                 <option value="">Cuerda vocal...</option>
@@ -9956,7 +9972,7 @@ function AdminIntegrantes({ members, onReload }) {
                   background: "#fee2e2",
                   color: "#b91c1c",
                   border: "1px solid #fca5a5",
-                  borderRadius: 6,
+                  borderRadius: 9,
                   cursor: "pointer",
                   fontWeight: 500,
                   flexShrink: 0,
@@ -10232,7 +10248,7 @@ function AdminIntegrantes({ members, onReload }) {
                             background: C.primary,
                             color: "white",
                             border: "none",
-                            borderRadius: 6,
+                            borderRadius: 9,
                             cursor: "pointer",
                             fontWeight: 600,
                           }}
@@ -10247,7 +10263,7 @@ function AdminIntegrantes({ members, onReload }) {
                             background: C.light,
                             color: C.gray,
                             border: `1px solid ${C.border}`,
-                            borderRadius: 6,
+                            borderRadius: 9,
                             cursor: "pointer",
                           }}
                         >
@@ -10312,7 +10328,7 @@ function AdminIntegrantes({ members, onReload }) {
                             background: C.primaryLight,
                             color: C.primaryDark,
                             border: "none",
-                            borderRadius: 6,
+                            borderRadius: 9,
                             cursor: "pointer",
                             fontWeight: 500,
                           }}
@@ -10328,7 +10344,7 @@ function AdminIntegrantes({ members, onReload }) {
                             background: "#fdf8ee",
                             color: C.gold,
                             border: `1px solid ${C.gold}50`,
-                            borderRadius: 6,
+                            borderRadius: 9,
                             cursor: "pointer",
                             fontWeight: 500,
                           }}
@@ -10524,7 +10540,7 @@ function AdminEventos({ eventos, onReload }) {
                 width: 46,
                 height: 46,
                 background: tipoC[ev.tipo] + "18",
-                borderRadius: "var(--radius-md, 10px)",
+                borderRadius: 12,
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
@@ -10766,7 +10782,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
           paddingBottom: 12, borderBottom: `2px solid ${C.border}`,
         }}>
           <div style={{
-            width: 34, height: 34, borderRadius: "var(--radius-md, 10px)", flexShrink: 0,
+            width: 34, height: 34, borderRadius: 12, flexShrink: 0,
             background: "linear-gradient(135deg,#92400e,#d97706)",
             display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
           }}>🖼️</div>
@@ -10781,7 +10797,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
       {/* Header explicativo */}
       <div style={{
         background: "linear-gradient(135deg,#0c1a2e,#0ea5e9)",
-        borderRadius: "var(--radius-lg, 14px)", padding: "18px 20px", marginBottom: 18,
+        borderRadius: 18, padding: "18px 20px", marginBottom: 18,
         display: "flex", alignItems: "center", gap: 14,
       }}>
         <div style={{ fontSize: 32 }}>📥</div>
@@ -10873,7 +10889,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{
-                    width: 40, height: 40, borderRadius: "var(--radius-md, 10px)", flexShrink: 0,
+                    width: 40, height: 40, borderRadius: 12, flexShrink: 0,
                     background: "linear-gradient(135deg,#0c1a2e,#0ea5e9)",
                     display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
                   }}>
@@ -10922,7 +10938,7 @@ function AdminOraciones({ oraciones, onReload }) {
 
   const inputS = {
     padding: "9px 12px",
-    borderRadius: "var(--radius-sm, 8px)",
+    borderRadius: 10,
     border: `1px solid ${C.border}`,
     fontSize: 13,
     outline: "none",
@@ -11190,7 +11206,7 @@ function AdminOraciones({ oraciones, onReload }) {
                     background: C.primary,
                     color: "white",
                     border: "none",
-                    borderRadius: 7,
+                    borderRadius: 10,
                     cursor: "pointer",
                     fontSize: 12,
                     fontWeight: 600,
@@ -11205,7 +11221,7 @@ function AdminOraciones({ oraciones, onReload }) {
                     background: C.light,
                     color: C.gray,
                     border: `1px solid ${C.border}`,
-                    borderRadius: 7,
+                    borderRadius: 10,
                     cursor: "pointer",
                     fontSize: 12,
                   }}
@@ -11253,7 +11269,7 @@ function AdminOraciones({ oraciones, onReload }) {
                       background: C.primaryLight,
                       color: C.primaryDark,
                       border: "none",
-                      borderRadius: 6,
+                      borderRadius: 9,
                       cursor: "pointer",
                       fontWeight: 500,
                     }}
@@ -11326,13 +11342,13 @@ function ImageField({ preview, setPreview, formSetter, uploading, fileRef, label
         onChange={(e) => onUpload(e.target.files[0], formSetter, setPreview)} />
       {preview ? (
         <div style={{ position: "relative", display: "inline-block" }}>
-          <img src={preview} alt="Preview" style={{ width: 200, height: 120, objectFit: "cover", borderRadius: "var(--radius-sm, 8px)", border: "1px solid var(--border-color)", display: "block" }} />
+          <img src={preview} alt="Preview" style={{ width: 200, height: 120, objectFit: "cover", borderRadius: 10, border: "1px solid var(--border-color)", display: "block" }} />
           <button onClick={() => { setPreview(null); formSetter((p) => ({ ...p, imagen_url: "" })); }}
             style={{ position: "absolute", top: 4, right: 4, width: 24, height: 24, borderRadius: "50%", background: "rgba(0,0,0,0.6)", border: "none", color: "white", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>×</button>
         </div>
       ) : (
         <button onClick={() => fileRef.current?.click()} disabled={uploading}
-          style={{ padding: "8px 16px", borderRadius: "var(--radius-sm, 8px)", border: "1px dashed #e5e7eb", background: "white", cursor: "pointer", fontSize: 12, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 8 }}>
+          style={{ padding: "8px 16px", borderRadius: 10, border: "1px dashed #e5e7eb", background: "white", cursor: "pointer", fontSize: 12, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 8 }}>
           {uploading ? "⏳ Subiendo..." : "📷 Subir afiche / imagen"}
         </button>
       )}
@@ -11473,7 +11489,7 @@ function AdminNoticias({ noticias, onReload }) {
         <div key={n.id}>
           <Card style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: editId === n.id ? 0 : 10, flexWrap: "wrap", borderBottomLeftRadius: editId === n.id ? 0 : undefined, borderBottomRightRadius: editId === n.id ? 0 : undefined }}>
             {n.imagen_url ? (
-              <img src={n.imagen_url} alt="" style={{ width: 70, height: 50, objectFit: "cover", borderRadius: "var(--radius-sm, 8px)", flexShrink: 0, border: `1px solid ${C.border}` }} />
+              <img src={n.imagen_url} alt="" style={{ width: 70, height: 50, objectFit: "cover", borderRadius: 10, flexShrink: 0, border: `1px solid ${C.border}` }} />
             ) : (
               <div style={{ width: 44, height: 44, background: C.primaryLight, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>📢</div>
             )}
@@ -11491,7 +11507,7 @@ function AdminNoticias({ noticias, onReload }) {
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <button
                 onClick={() => editId === n.id ? setEditId(null) : openEdit(n)}
-                style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${editId === n.id ? C.primary : C.border}`, background: editId === n.id ? C.primaryLight : "white", color: editId === n.id ? C.primary : C.gray, fontSize: 12, cursor: "pointer", fontWeight: editId === n.id ? 600 : 400 }}>
+                style={{ padding: "5px 12px", borderRadius: 10, border: `1px solid ${editId === n.id ? C.primary : C.border}`, background: editId === n.id ? C.primaryLight : "white", color: editId === n.id ? C.primary : C.gray, fontSize: 12, cursor: "pointer", fontWeight: editId === n.id ? 600 : 400 }}>
                 {editId === n.id ? "▲ Cerrar" : "✏️ Editar"}
               </button>
               <ConfirmBtn onConfirm={() => del(n.id)} />
@@ -11525,7 +11541,7 @@ function AdminNoticias({ noticias, onReload }) {
           marginTop: 16,
           padding: "12px 14px",
           background: C.goldLight,
-          borderRadius: "var(--radius-sm, 8px)",
+          borderRadius: 10,
           border: `1px solid ${C.gold}30`,
           fontSize: 11,
           color: C.gray,
@@ -11542,7 +11558,7 @@ function AdminNoticias({ noticias, onReload }) {
             fontSize: 10,
             background: "var(--bg-hover)",
             padding: "6px 10px",
-            borderRadius: 6,
+            borderRadius: 9,
             color: C.dark,
           }}
         >
@@ -11633,7 +11649,7 @@ function AdminPreguntas({ preguntas, onReload }) {
                     background: C.primaryLight,
                     color: C.primaryDark,
                     border: "none",
-                    borderRadius: 6,
+                    borderRadius: 9,
                     cursor: "pointer",
                     fontWeight: 500,
                   }}
@@ -11648,7 +11664,7 @@ function AdminPreguntas({ preguntas, onReload }) {
             <div
               style={{
                 background: C.primaryLight,
-                borderRadius: "var(--radius-sm, 8px)",
+                borderRadius: 10,
                 padding: "10px 14px",
                 display: "flex",
                 gap: 8,
@@ -11696,7 +11712,7 @@ function AdminPreguntas({ preguntas, onReload }) {
                 style={{
                   width: "100%",
                   padding: "10px 14px",
-                  borderRadius: "var(--radius-sm, 8px)",
+                  borderRadius: 10,
                   border: `1px solid ${C.border}`,
                   fontSize: 13,
                   fontFamily: "Inter,sans-serif",
@@ -11715,7 +11731,7 @@ function AdminPreguntas({ preguntas, onReload }) {
                     background: C.primary,
                     color: "white",
                     border: "none",
-                    borderRadius: 7,
+                    borderRadius: 10,
                     cursor: "pointer",
                     fontSize: 12,
                     fontWeight: 600,
@@ -11730,7 +11746,7 @@ function AdminPreguntas({ preguntas, onReload }) {
                     background: C.light,
                     color: C.gray,
                     border: `1px solid ${C.border}`,
-                    borderRadius: 7,
+                    borderRadius: 10,
                     cursor: "pointer",
                     fontSize: 12,
                   }}
@@ -12052,7 +12068,7 @@ function AdminLinks({ links, onReload }) {
                     background: C.primary,
                     color: "white",
                     border: "none",
-                    borderRadius: 7,
+                    borderRadius: 10,
                     cursor: "pointer",
                     fontSize: 12,
                     fontWeight: 600,
@@ -12067,7 +12083,7 @@ function AdminLinks({ links, onReload }) {
                     background: C.light,
                     color: C.gray,
                     border: `1px solid ${C.border}`,
-                    borderRadius: 7,
+                    borderRadius: 10,
                     cursor: "pointer",
                     fontSize: 12,
                   }}
@@ -12089,7 +12105,7 @@ function AdminLinks({ links, onReload }) {
                 style={{
                   width: 36,
                   height: 36,
-                  borderRadius: "var(--radius-sm, 8px)",
+                  borderRadius: 10,
                   background: C.primaryLight,
                   display: "flex",
                   alignItems: "center",
@@ -12133,7 +12149,7 @@ function AdminLinks({ links, onReload }) {
                     background: C.primaryLight,
                     color: C.primaryDark,
                     border: "none",
-                    borderRadius: 6,
+                    borderRadius: 9,
                     cursor: "pointer",
                     fontWeight: 500,
                   }}
@@ -12277,7 +12293,7 @@ function AdminBiblioteca({ biblioteca, onReload }) {
                 onClick={() => toggleOculto(l.id)}
                 style={{
                   border: "none",
-                  borderRadius: "var(--radius-sm, 8px)",
+                  borderRadius: 10,
                   padding: "5px 12px",
                   fontSize: 12,
                   fontWeight: 600,
@@ -12541,7 +12557,7 @@ function AdminPodcasts({ podcasts, onReload }) {
       </div>
 
       {/* SQL hint for orden column */}
-      <div style={{ background: C.goldLight, border: `1px solid ${C.gold}40`, borderRadius: "var(--radius-md, 13px)", padding: "9px 14px", fontSize: 11, color: C.gray, marginBottom: 14 }}>
+      <div style={{ background: C.goldLight, border: `1px solid ${C.gold}40`, borderRadius: 14, padding: "9px 14px", fontSize: 11, color: C.gray, marginBottom: 14 }}>
         ⚠️ Si el campo <strong>orden</strong> no existe aún, ejecuta en Supabase:<br />
         <code style={{ fontFamily: "monospace" }}>alter table podcasts add column if not exists orden int default 0;</code>
       </div>
@@ -12641,13 +12657,13 @@ function AdminPodcasts({ podcasts, onReload }) {
             // ── Modo vista ────────────────────────────
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div style={{
-                width: 44, height: 44, borderRadius: "var(--radius-md, 10px)", flexShrink: 0,
+                width: 44, height: 44, borderRadius: 12, flexShrink: 0,
                 background: `linear-gradient(135deg,${C.primary},${C.primaryDark})`,
                 display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
               }}>🎙️</div>
               {/* Orden badge */}
               <div style={{
-                minWidth: 28, height: 28, borderRadius: "var(--radius-sm, 8px)",
+                minWidth: 28, height: 28, borderRadius: 10,
                 background: C.goldLight, border: `1px solid ${C.gold}50`,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 11, fontWeight: 700, color: C.gray, flexShrink: 0,
@@ -12817,7 +12833,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
 
   const inp = {
     padding: "8px 12px",
-    borderRadius: 7,
+    borderRadius: 10,
     border: `1px solid ${C.border}`,
     fontSize: 13,
     outline: "none",
@@ -13073,7 +13089,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             style={{
               background: "none",
               border: `1px solid ${C.border}`,
-              borderRadius: "var(--radius-sm, 8px)",
+              borderRadius: 10,
               padding: "6px 14px",
               cursor: "pointer",
               fontSize: 13,
@@ -13099,7 +13115,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             style={{
               background: msg.startsWith("✅") ? "#d1fae5" : "#fee2e2",
               color: msg.startsWith("✅") ? "#065f46" : "#b91c1c",
-              borderRadius: "var(--radius-sm, 8px)",
+              borderRadius: 10,
               padding: "10px 14px",
               fontSize: 13,
               marginBottom: 14,
@@ -13159,7 +13175,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     }}
                     style={{
                       padding: "0 10px",
-                      borderRadius: 7,
+                      borderRadius: 10,
                       border: `1px solid ${C.border}`,
                       background: C.light,
                       cursor: "pointer",
@@ -13602,7 +13618,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
               marginTop: 12,
               background: msg.startsWith("✅") ? "#d1fae5" : "#fee2e2",
               color: msg.startsWith("✅") ? "#065f46" : "#b91c1c",
-              borderRadius: "var(--radius-sm, 8px)",
+              borderRadius: 10,
               padding: "10px 14px",
               fontSize: 13,
             }}
@@ -13644,7 +13660,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             style={{
               background: "none",
               border: `1px solid ${C.border}`,
-              borderRadius: "var(--radius-sm, 8px)",
+              borderRadius: 10,
               padding: "6px 14px",
               cursor: "pointer",
               fontSize: 13,
@@ -13701,7 +13717,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             style={{
               background: "#d1fae5",
               color: "#065f46",
-              borderRadius: "var(--radius-md, 10px)",
+              borderRadius: 12,
               padding: "10px 16px",
               fontSize: 13,
               marginBottom: 14,
@@ -13719,7 +13735,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             style={{
               background: msg.startsWith("✅") ? "#d1fae5" : "#fee2e2",
               color: msg.startsWith("✅") ? "#065f46" : "#b91c1c",
-              borderRadius: "var(--radius-sm, 8px)",
+              borderRadius: 10,
               padding: "10px 14px",
               fontSize: 13,
               marginBottom: 14,
@@ -13733,7 +13749,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
         <div
           style={{
             background: "white",
-            borderRadius: "var(--radius-lg, 14px)",
+            borderRadius: 18,
             border: `1px solid ${C.border}`,
             overflow: "hidden",
             boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
@@ -13834,7 +13850,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       color: "var(--text-secondary)",
                       fontStyle: "italic",
                       background: "#f0fdf4",
-                      borderRadius: "var(--radius-sm, 8px)",
+                      borderRadius: 10,
                       padding: "6px 14px",
                       display: "inline-block",
                     }}
@@ -13862,7 +13878,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       <div
                         style={{
                           background: "white",
-                          borderRadius: "var(--radius-md, 10px)",
+                          borderRadius: 12,
                           padding: 6,
                           border: `2px solid ${
                             selected.publicada ? "#1a3a2a" : "#fbbf24"
@@ -14074,7 +14090,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   background: "#25d366",
                   color: "white",
                   border: "none",
-                  borderRadius: "var(--radius-sm, 8px)",
+                  borderRadius: 10,
                   padding: "6px 14px",
                   cursor: "pointer",
                   fontSize: 12,
@@ -14196,7 +14212,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   style={{
                     width: 52,
                     height: 52,
-                    borderRadius: "var(--radius-md, 12px)",
+                    borderRadius: 14,
                     background: `linear-gradient(135deg,#1a3a2a,${C.primary})`,
                     display: "flex",
                     flexDirection: "column",
@@ -14271,7 +14287,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       flexShrink: 0,
                       background: p.visible_visita ? "#dcfce7" : "#f1f5f9",
                       border: `1px solid ${p.visible_visita ? "#86efac" : "var(--border-color)"}`,
-                      borderRadius: "var(--radius-sm, 8px)",
+                      borderRadius: 10,
                       padding: "5px 10px",
                       cursor: "pointer",
                       fontSize: 11,
@@ -14334,7 +14350,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   style={{
                     width: 52,
                     height: 52,
-                    borderRadius: "var(--radius-md, 12px)",
+                    borderRadius: 14,
                     background: "linear-gradient(135deg,#92400e,#f59e0b)",
                     display: "flex",
                     flexDirection: "column",
@@ -14383,7 +14399,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                         background: "#fef08a",
                         color: "#713f12",
                         padding: "1px 8px",
-                        borderRadius: "var(--radius-md, 10px)",
+                        borderRadius: 12,
                         fontWeight: 600,
                       }}
                     >
@@ -14464,7 +14480,7 @@ function AdminPautasMisa({ onReload }) {
             onClick={() => setSeccion(id)}
             style={{
               padding: "6px 14px",
-              borderRadius: 7,
+              borderRadius: 10,
               border: "none",
               cursor: "pointer",
               fontSize: 12,
@@ -14494,7 +14510,7 @@ function AdminPautasMisa({ onReload }) {
                 style={{
                   padding: "8px 12px",
                   background: C.light,
-                  borderRadius: 7,
+                  borderRadius: 10,
                   border: `1px solid ${C.border}`,
                   fontSize: 12,
                   color: C.dark,
@@ -14513,7 +14529,7 @@ function AdminPautasMisa({ onReload }) {
               marginTop: 12,
               padding: "10px 14px",
               background: C.goldLight,
-              borderRadius: "var(--radius-sm, 8px)",
+              borderRadius: 10,
               border: `1px solid ${C.gold}30`,
               fontSize: 11,
               color: C.gray,
@@ -14539,7 +14555,7 @@ function AdminPautasMisa({ onReload }) {
                 style={{
                   padding: "8px 12px",
                   background: C.light,
-                  borderRadius: 7,
+                  borderRadius: 10,
                   border: `1px solid ${C.border}`,
                   fontSize: 12,
                   color: C.dark,
@@ -14570,7 +14586,7 @@ function AdminPautasMisa({ onReload }) {
                 style={{
                   padding: "8px 12px",
                   background: C.light,
-                  borderRadius: 7,
+                  borderRadius: 10,
                   border: `1px solid ${C.border}`,
                   fontSize: 12,
                   color: C.dark,
@@ -14684,7 +14700,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
               { label: "Ausentes", val: misAusentes, color: "#ef4444", bg: "#fee2e2", emoji: "❌" },
               { label: "Justificados", val: misJustificados, color: "#f59e0b", bg: "#fef3c7", emoji: "🟡" },
             ].map(s => (
-              <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.color}30`, borderRadius: "var(--radius-md, 10px)", padding: "6px 12px", textAlign: "center", minWidth: 70 }}>
+              <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.color}30`, borderRadius: 12, padding: "6px 12px", textAlign: "center", minWidth: 70 }}>
                 <div style={{ fontSize: 11, color: s.color, marginBottom: 1 }}>{s.emoji} {s.label}</div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.val}</div>
               </div>
@@ -14705,7 +14721,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                 const icono = estado === "presente" ? "✅" : estado === "justificado" ? "🟡" : estado === "excluido" ? "🔵" : estado === "nuevo" ? "🆕" : "❌";
                 const tipoEmoji = e.tipo === "ensayo" ? "🎵" : e.tipo === "misa" ? "⛪" : "📅";
                 return (
-                  <div key={e.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: color + "15", border: `1px solid ${color}30`, borderRadius: "var(--radius-md, 10px)", padding: "6px 10px", fontSize: 11 }}>
+                  <div key={e.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: color + "15", border: `1px solid ${color}30`, borderRadius: 12, padding: "6px 10px", fontSize: 11 }}>
                     <span style={{ fontSize: 16 }}>{icono}</span>
                     <span style={{ color: C.dark, fontWeight: 600, textAlign: "center", maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tipoEmoji} {e.titulo.split(" ").slice(0, 2).join(" ")}</span>
                     <span style={{ color: C.gray, fontSize: 10 }}>{fmtFecha(e.fecha)}</span>
@@ -14802,7 +14818,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                   return (
                     <div key={e.id} style={{ borderTop: `1px solid ${C.border}` }}>
                       <div onClick={() => setEventoSeleccionado(isOpen ? null : e.id)} style={{ padding: "12px 18px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12, background: isOpen ? C.primaryLight + "30" : "transparent" }}>
-                        <div style={{ width: 40, height: 40, borderRadius: "var(--radius-md, 10px)", background: C.primary + "15", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 12, background: C.primary + "15", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 800, color: C.primary, lineHeight: 1 }}>{new Date(e.fecha + "T00:00:00").getDate()}</div>
                           <div style={{ fontSize: 8, color: C.primary, textTransform: "uppercase" }}>{new Date(e.fecha + "T00:00:00").toLocaleDateString("es-CL", { month: "short" })}</div>
                         </div>
@@ -14994,9 +15010,9 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
     <div style={{ marginBottom: 16 }}>
         <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.dark, marginBottom: 6 }}>Selecciona un evento del calendario</label>
         {gcalLoading ? (
-          <div style={{ padding: "10px 12px", borderRadius: "var(--radius-md, 10px)", border: `1px solid ${C.border}`, fontSize: 13, color: C.gray, background: C.bg }}>⏳ Cargando eventos de Google Calendar...</div>
+          <div style={{ padding: "10px 12px", borderRadius: 12, border: `1px solid ${C.border}`, fontSize: 13, color: C.gray, background: C.bg }}>⏳ Cargando eventos de Google Calendar...</div>
         ) : (
-        <select value={eventoId} onChange={e => setEventoId(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: "var(--radius-md, 10px)", border: `1px solid ${C.border}`, fontSize: 14, color: C.dark, background: "white" }}>
+        <select value={eventoId} onChange={e => setEventoId(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 12, border: `1px solid ${C.border}`, fontSize: 14, color: C.dark, background: "white" }}>
           <option value="">— Selecciona un evento —</option>
           {eventosOrdenados.map(e => {
             const tipoEmoji = e.tipo === "ensayo" ? "🎵" : e.tipo === "misa" ? "⛪" : "📅";
@@ -15015,23 +15031,23 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
         <>
           {/* Resumen */}
           <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: 80, background: C.primaryLight, borderRadius: "var(--radius-md, 10px)", padding: "10px 14px", textAlign: "center" }}>
+            <div style={{ flex: 1, minWidth: 80, background: C.primaryLight, borderRadius: 12, padding: "10px 14px", textAlign: "center" }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: C.primary }}>{presentes}</div>
               <div style={{ fontSize: 11, color: C.primary }}>Presentes</div>
             </div>
-            <div style={{ flex: 1, minWidth: 80, background: "#fef3c7", borderRadius: "var(--radius-md, 10px)", padding: "10px 14px", textAlign: "center" }}>
+            <div style={{ flex: 1, minWidth: 80, background: "#fef3c7", borderRadius: 12, padding: "10px 14px", textAlign: "center" }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: "#f59e0b" }}>{justificados}</div>
               <div style={{ fontSize: 11, color: "#f59e0b" }}>Justificados</div>
             </div>
-            <div style={{ flex: 1, minWidth: 80, background: "#fee2e2", borderRadius: "var(--radius-md, 10px)", padding: "10px 14px", textAlign: "center" }}>
+            <div style={{ flex: 1, minWidth: 80, background: "#fee2e2", borderRadius: 12, padding: "10px 14px", textAlign: "center" }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: "#ef4444" }}>{ausentes}</div>
               <div style={{ fontSize: 11, color: "#ef4444" }}>Ausentes</div>
             </div>
-            <div style={{ flex: 1, minWidth: 80, background: "#ede9fe", borderRadius: "var(--radius-md, 10px)", padding: "10px 14px", textAlign: "center" }}>
+            <div style={{ flex: 1, minWidth: 80, background: "#ede9fe", borderRadius: 12, padding: "10px 14px", textAlign: "center" }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: "#8b5cf6" }}>{excluidos}</div>
               <div style={{ fontSize: 11, color: "#8b5cf6" }}>🔵 Excluidos</div>
             </div>
-            <div style={{ flex: 1, minWidth: 80, background: "#cffafe", borderRadius: "var(--radius-md, 10px)", padding: "10px 14px", textAlign: "center" }}>
+            <div style={{ flex: 1, minWidth: 80, background: "#cffafe", borderRadius: 12, padding: "10px 14px", textAlign: "center" }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: "#06b6d4" }}>{nuevosCount}</div>
               <div style={{ fontSize: 11, color: "#06b6d4" }}>🆕 Nuevos</div>
             </div>
@@ -15039,9 +15055,9 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
 
           {/* Botones marcar todos */}
           <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-            <button onClick={() => marcarTodos("presente")} style={{ padding: "6px 14px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.primary}`, background: C.primaryLight, color: C.primary, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>✅ Todos presentes</button>
-            <button onClick={() => marcarTodos("ausente")} style={{ padding: "6px 14px", borderRadius: "var(--radius-sm, 8px)", border: "1px solid #ef4444", background: "#fee2e2", color: "#ef4444", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>❌ Todos ausentes</button>
-            <button onClick={() => marcarTodos("excluido")} style={{ padding: "6px 14px", borderRadius: "var(--radius-sm, 8px)", border: "1px solid #8b5cf6", background: "#ede9fe", color: "#8b5cf6", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔵 Excluir todos</button>
+            <button onClick={() => marcarTodos("presente")} style={{ padding: "6px 14px", borderRadius: 10, border: `1px solid ${C.primary}`, background: C.primaryLight, color: C.primary, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>✅ Todos presentes</button>
+            <button onClick={() => marcarTodos("ausente")} style={{ padding: "6px 14px", borderRadius: 10, border: "1px solid #ef4444", background: "#fee2e2", color: "#ef4444", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>❌ Todos ausentes</button>
+            <button onClick={() => marcarTodos("excluido")} style={{ padding: "6px 14px", borderRadius: 10, border: "1px solid #8b5cf6", background: "#ede9fe", color: "#8b5cf6", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔵 Excluir todos</button>
           </div>
 
           {/* Lista de integrantes */}
@@ -15067,7 +15083,7 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
                       return (
                         <button key={op} onClick={() => setRegistros(r => ({ ...r, [m.id]: op }))}
                           title={tooltips[op]}
-                          style={{ width: 34, height: 34, borderRadius: "var(--radius-sm, 8px)", border: activo ? `2px solid ${colors[op]}` : `1px solid ${C.border}`, background: activo ? colors[op] + "20" : "white", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
+                          style={{ width: 34, height: 34, borderRadius: 10, border: activo ? `2px solid ${colors[op]}` : `1px solid ${C.border}`, background: activo ? colors[op] + "20" : "white", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
                           {labels[op]}
                         </button>
                       );
@@ -15078,7 +15094,7 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
             })}
           </Card>
 
-          <button onClick={guardar} disabled={saving} style={{ width: "100%", padding: "12px", borderRadius: "var(--radius-md, 10px)", border: "none", background: saved ? "#10b981" : C.primary, color: "white", fontSize: 14, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer" }}>
+          <button onClick={guardar} disabled={saving} style={{ width: "100%", padding: "12px", borderRadius: 12, border: "none", background: saved ? "#10b981" : C.primary, color: "white", fontSize: 14, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer" }}>
             {saving ? "Guardando..." : saved ? "✅ Guardado correctamente" : "Guardar asistencia"}
           </button>
         </>
@@ -15221,7 +15237,7 @@ function AdminCuentas({ members, onReload }) {
       </div>
 
       {msg && (
-        <div style={{ padding: "10px 14px", borderRadius: "var(--radius-md, 10px)", marginBottom: 14, fontSize: 13, fontWeight: 600,
+        <div style={{ padding: "10px 14px", borderRadius: 12, marginBottom: 14, fontSize: 13, fontWeight: 600,
           background: msgType === "ok" ? "#d1fae5" : "#fee2e2",
           color: msgType === "ok" ? "#065f46" : "#991b1b",
           border: `1px solid ${msgType === "ok" ? "#6ee7b7" : "#fca5a5"}` }}>
@@ -15234,14 +15250,14 @@ function AdminCuentas({ members, onReload }) {
         <label style={{ fontSize: 13, fontWeight: 600, color: C.dark, display: "block", marginBottom: 8 }}>
           Selecciona un integrante
         </label>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: "var(--radius-md, 12px)", padding: 8 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 14, padding: 8 }}>
           {members.map(m => {
             const cc = CUERDAS[m.cuerda] || C.primary;
             const inactivo = m.activo === false;
             const sel = selectedId === m.id;
             return (
               <div key={m.id} onClick={() => { setSelectedId(sel ? null : m.id); setNewPass(""); setNewPass2(""); setMsg(""); }}
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: "var(--radius-md, 10px)", cursor: "pointer",
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, cursor: "pointer",
                   background: sel ? C.primary + "15" : "transparent",
                   border: sel ? `1.5px solid ${C.primary}` : "1.5px solid transparent",
                   opacity: inactivo ? 0.5 : 1 }}>
@@ -15254,24 +15270,24 @@ function AdminCuentas({ members, onReload }) {
                 </div>
                 {inactivo ? (
                   <button onClick={e => { e.stopPropagation(); reactivar(m.id); }} disabled={saving}
-                    style={{ padding: "4px 10px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.primary}`, background: C.primaryLight, color: C.primary, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                    style={{ padding: "4px 10px", borderRadius: 10, border: `1px solid ${C.primary}`, background: C.primaryLight, color: C.primary, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                     Reactivar
                   </button>
                 ) : (
                   confirmBaja === m.id ? (
                     <div style={{ display: "flex", gap: 4 }} onClick={e => e.stopPropagation()}>
                       <button onClick={() => darDeBaja(m.id)} disabled={saving}
-                        style={{ padding: "4px 10px", borderRadius: "var(--radius-sm, 8px)", border: "1px solid #ef4444", background: "#fee2e2", color: "#ef4444", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                        style={{ padding: "4px 10px", borderRadius: 10, border: "1px solid #ef4444", background: "#fee2e2", color: "#ef4444", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                         Confirmar baja
                       </button>
                       <button onClick={() => setConfirmBaja(null)}
-                        style={{ padding: "4px 8px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.border}`, background: "white", color: C.gray, fontSize: 11, cursor: "pointer" }}>
+                        style={{ padding: "4px 8px", borderRadius: 10, border: `1px solid ${C.border}`, background: "white", color: C.gray, fontSize: 11, cursor: "pointer" }}>
                         Cancelar
                       </button>
                     </div>
                   ) : (
                     <button onClick={e => { e.stopPropagation(); setConfirmBaja(m.id); }}
-                      style={{ padding: "4px 10px", borderRadius: "var(--radius-sm, 8px)", border: "1px solid #ef4444", background: "#fff0f0", color: "#ef4444", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ padding: "4px 10px", borderRadius: 10, border: "1px solid #ef4444", background: "#fff0f0", color: "#ef4444", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                       Dar de baja
                     </button>
                   )
@@ -15284,7 +15300,7 @@ function AdminCuentas({ members, onReload }) {
 
       {/* Panel de cambio de contraseña */}
       {selected && selected.activo !== false && (
-        <div style={{ background: C.bg, borderRadius: "var(--radius-md, 12px)", padding: 16, border: `1px solid ${C.border}` }}>
+        <div style={{ background: C.bg, borderRadius: 14, padding: 16, border: `1px solid ${C.border}` }}>
           <div style={{ fontWeight: 700, color: C.dark, fontSize: 14, marginBottom: 12 }}>
             🔑 Cambiar contraseña — {selected.nombre}
           </div>
@@ -15292,19 +15308,19 @@ function AdminCuentas({ members, onReload }) {
             <label style={{ fontSize: 12, fontWeight: 600, color: C.gray, display: "block", marginBottom: 4 }}>Nueva contraseña</label>
             <input type="password" value={newPass} onChange={e => setNewPass(e.target.value)}
               placeholder="Mínimo 6 caracteres" minLength={6}
-              style={{ width: "100%", padding: "10px 12px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.border}`, fontSize: 14, boxSizing: "border-box" }} />
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 14, boxSizing: "border-box" }} />
           </div>
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: C.gray, display: "block", marginBottom: 4 }}>Repetir contraseña</label>
             <input type="password" value={newPass2} onChange={e => setNewPass2(e.target.value)}
               placeholder="Repite la contraseña" minLength={6}
-              style={{ width: "100%", padding: "10px 12px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.border}`, fontSize: 14, boxSizing: "border-box" }} />
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 14, boxSizing: "border-box" }} />
           </div>
-          <div style={{ fontSize: 11, color: C.gray, marginBottom: 12, background: "#fef3c7", padding: "8px 12px", borderRadius: "var(--radius-sm, 8px)", border: "1px solid #fde68a" }}>
+          <div style={{ fontSize: 11, color: C.gray, marginBottom: 12, background: "#fef3c7", padding: "8px 12px", borderRadius: 10, border: "1px solid #fde68a" }}>
             💡 Asigna una contraseña temporal y comunícasela al integrante para que luego la cambie desde su perfil.
           </div>
           <button onClick={cambiarPassword} disabled={saving || !newPass || !newPass2}
-            style={{ width: "100%", padding: "11px", borderRadius: "var(--radius-md, 10px)", border: "none",
+            style={{ width: "100%", padding: "11px", borderRadius: 12, border: "none",
               background: saving || !newPass || !newPass2 ? "#e5e7eb" : C.primary,
               color: saving || !newPass || !newPass2 ? C.gray : "white",
               fontSize: 14, fontWeight: 700, cursor: saving || !newPass || !newPass2 ? "not-allowed" : "pointer" }}>
@@ -15602,7 +15618,7 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
           onClick={() => setSection("reconoceme")}
           style={{
             fontSize: 12, color: "#0d3d2e", background: "#7fffd4",
-            border: "none", borderRadius: "var(--radius-md, 10px)", padding: "9px 16px",
+            border: "none", borderRadius: 12, padding: "9px 16px",
             fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
             boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
             display: "flex", alignItems: "center", gap: 6,
@@ -15615,7 +15631,7 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
       {recientes.length === 0 ? (
         <div style={{
           textAlign: "center", padding: "28px 0",
-          background: "rgba(255,255,255,0.06)", borderRadius: "var(--radius-lg, 14px)",
+          background: "rgba(255,255,255,0.06)", borderRadius: 18,
           border: "1px dashed rgba(255,255,255,0.15)",
         }}>
           <img src={LOGO_RECONOCIMIENTO_PERSONAL} alt="" style={{ width: 52, height: 52, objectFit: "contain", marginBottom: 10, opacity: 0.5 }} />
@@ -15655,7 +15671,7 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
                 <div key={r.id} style={{
                   background: "#ffffff",
                   backdropFilter: "none",
-                  borderRadius: "var(--radius-lg, 14px)",
+                  borderRadius: 18,
                   padding: "14px 16px",
                   border: `1px solid var(--border-color)`,
                   borderTop: `3px solid ${cc}`,
@@ -15743,7 +15759,7 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
               style={{
                 marginTop: 14, fontSize: 12, color: "rgba(255,255,255,0.85)",
                 background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.2)",
-                borderRadius: "var(--radius-md, 10px)", cursor: "pointer", fontWeight: 600,
+                borderRadius: 12, cursor: "pointer", fontWeight: 600,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                 width: "100%", padding: "9px 0",
               }}
@@ -15958,7 +15974,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
       {/* Explicación */}
       <div style={{
         background: `linear-gradient(135deg, #e8f7f2, #fff9f0)`,
-        borderRadius: "var(--radius-lg, 14px)", padding: "18px 20px", marginBottom: 20,
+        borderRadius: 18, padding: "18px 20px", marginBottom: 20,
         border: `1px solid ${C.primary}25`,
         display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start",
       }}>
@@ -15985,7 +16001,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
               </div>
             ))}
           </div>
-          <div style={{ marginTop: 12, background: C.primaryLight, borderRadius: "var(--radius-md, 13px)", padding: "9px 14px", fontSize: 12, color: C.primaryDark, fontWeight: 500 }}>
+          <div style={{ marginTop: 12, background: C.primaryLight, borderRadius: 14, padding: "9px 14px", fontSize: 12, color: C.primaryDark, fontWeight: 500 }}>
             💡 Reconocer el esfuerzo real de los demás fortalece el compromiso y la unidad del coro.
           </div>
         </div>
@@ -16003,7 +16019,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
           </div>
 
           {success && (
-            <div style={{ background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: "var(--radius-md, 10px)", padding: "12px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: 12, padding: "12px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 20 }}>🎉</span>
               <div>
                 <div style={{ fontWeight: 700, color: "#065f46", fontSize: 13 }}>¡Reconocimiento enviado!</div>
@@ -16026,7 +16042,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
                   key={t.id}
                   onClick={() => { setTipoReco(t.id); setEventoId(""); }}
                   style={{
-                    flex: 1, padding: "10px 8px", borderRadius: "var(--radius-md, 10px)", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                    flex: 1, padding: "10px 8px", borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 600,
                     background: tipoReco === t.id ? C.primary : C.light,
                     color: tipoReco === t.id ? "white" : C.dark,
                     border: tipoReco === t.id ? `1px solid ${C.primaryDark}` : `1px solid ${C.border}`,
@@ -16055,7 +16071,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
                 <select
                   value={eventoId}
                   onChange={(e) => setEventoId(e.target.value)}
-                  style={{ width: "100%", padding: "9px 12px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.border}`, fontSize: 13, color: C.dark, background: "white", outline: "none" }}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, color: C.dark, background: "white", outline: "none" }}
                 >
                   <option value="">— Selecciona un evento —</option>
                   {eventosDisponibles.map((ev) => (
@@ -16085,7 +16101,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
                   key={t.id}
                   onClick={() => { setModoDestinatario(t.id); setParaId(""); setGrupoSelec(""); }}
                   style={{
-                    flex: 1, padding: "7px 10px", borderRadius: "var(--radius-sm, 8px)", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                    flex: 1, padding: "7px 10px", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 600,
                     background: modoDestinatario === t.id ? C.primary : C.light,
                     color: modoDestinatario === t.id ? "white" : C.dark,
                     border: modoDestinatario === t.id ? `1px solid ${C.primaryDark}` : `1px solid ${C.border}`,
@@ -16101,7 +16117,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
               <select
                 value={paraId}
                 onChange={(e) => setParaId(e.target.value)}
-                style={{ width: "100%", padding: "9px 12px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.border}`, fontSize: 13, color: C.dark, background: "white", outline: "none" }}
+                style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, color: C.dark, background: "white", outline: "none" }}
               >
                 <option value="">— Selecciona un integrante —</option>
                 {[...otrosMembers]
@@ -16139,7 +16155,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
 
           {/* Vista previa del destinatario */}
           {modoDestinatario === "persona" && paraInfo && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.primaryLight, borderRadius: "var(--radius-md, 10px)", padding: "10px 12px", marginBottom: 14, border: `1px solid ${C.primary}30` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.primaryLight, borderRadius: 12, padding: "10px 12px", marginBottom: 14, border: `1px solid ${C.primary}30` }}>
               <div style={{ width: 36, height: 36, borderRadius: "50%", background: getColor(paraId), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 13, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
                 {paraInfo.foto_url ? <img src={paraInfo.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(paraInfo.nombre || "?")}
               </div>
@@ -16151,7 +16167,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
             </div>
           )}
           {modoDestinatario === "grupo" && grupoInfo && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: grupoInfo.color + "15", borderRadius: "var(--radius-md, 10px)", padding: "10px 12px", marginBottom: 14, border: `1px solid ${grupoInfo.color}30` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: grupoInfo.color + "15", borderRadius: 12, padding: "10px 12px", marginBottom: 14, border: `1px solid ${grupoInfo.color}30` }}>
               <div style={{ width: 36, height: 36, borderRadius: "50%", background: grupoInfo.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
                 {grupoInfo.icon}
               </div>
@@ -16175,7 +16191,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
                   key={cat.id}
                   onClick={() => setCategoria(cat.id)}
                   style={{
-                    padding: "7px 8px", borderRadius: "var(--radius-sm, 8px)", fontSize: 11, fontWeight: 500,
+                    padding: "7px 8px", borderRadius: 10, fontSize: 11, fontWeight: 500,
                     cursor: "pointer", textAlign: "left", transition: "all 0.15s",
                     background: categoria === cat.id ? C.primary : C.light,
                     color: categoria === cat.id ? "white" : C.dark,
@@ -16200,13 +16216,13 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
               onChange={(e) => setMensaje(e.target.value)}
               placeholder="Escribe aquí por qué quieres reconocer a esta persona... Este mensaje será público y también le llegará por correo."
               rows={4}
-              style={{ width: "100%", padding: "10px 12px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.border}`, fontSize: 13, resize: "vertical", outline: "none", lineHeight: 1.5, color: C.dark }}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, resize: "vertical", outline: "none", lineHeight: 1.5, color: C.dark }}
             />
             <div style={{ fontSize: 11, color: C.gray, marginTop: 4 }}>{mensaje.length} caracteres</div>
           </div>
 
           {error && (
-            <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "var(--radius-sm, 8px)", padding: "9px 12px", marginBottom: 12, fontSize: 12, color: "#991b1b" }}>
+            <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 10, padding: "9px 12px", marginBottom: 12, fontSize: 12, color: "#991b1b" }}>
               ⚠️ {error}
             </div>
           )}
@@ -16229,7 +16245,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
             <select
               value={filtroId}
               onChange={(e) => setFiltroId(e.target.value)}
-              style={{ width: "100%", padding: "8px 12px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.border}`, fontSize: 13, color: C.dark, background: "white", outline: "none" }}
+              style={{ width: "100%", padding: "8px 12px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, color: C.dark, background: "white", outline: "none" }}
             >
               <option value="">Todos los reconocimientos</option>
               {(members || []).map((m) => (
@@ -16277,7 +16293,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
                 const fecha = r.created_at ? new Date(r.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" }) : "";
                 return (
                   <div key={r.id} style={{
-                    background: "white", borderRadius: "var(--radius-md, 12px)", padding: "14px 16px",
+                    background: "white", borderRadius: 14, padding: "14px 16px",
                     border: `1px solid ${C.border}`,
                     boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
                     borderLeft: `4px solid ${cc}`,
@@ -16318,7 +16334,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
 
                     {/* Evento vinculado */}
                     {r.evento_titulo && (
-                      <div style={{ fontSize: 11, color: "var(--text-secondary)", background: "var(--bg-hover)", borderRadius: "var(--radius-sm, 8px)", padding: "4px 10px", display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 8, maxWidth: "100%" }}>
+                      <div style={{ fontSize: 11, color: "var(--text-secondary)", background: "var(--bg-hover)", borderRadius: 10, padding: "4px 10px", display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 8, maxWidth: "100%" }}>
                         <span>📅</span>
                         <span style={{ fontWeight: 600 }}>{r.evento_titulo}</span>
                         {r.evento_fecha && <span style={{ opacity: 0.7 }}>· {new Date(r.evento_fecha + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" })}</span>}
@@ -16326,7 +16342,7 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
                     )}
 
                     {/* Mensaje */}
-                    <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.65, fontFamily: "var(--font-sans)", fontWeight: 400, marginBottom: 10, background: "var(--bg-base)", borderRadius: "var(--radius-sm, 8px)", padding: "10px 12px", borderLeft: "3px solid #e5e7eb" }}>
+                    <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.65, fontFamily: "var(--font-sans)", fontWeight: 400, marginBottom: 10, background: "var(--bg-base)", borderRadius: 10, padding: "10px 12px", borderLeft: "3px solid #e5e7eb" }}>
                       {r.mensaje}
                     </div>
 
@@ -16373,7 +16389,7 @@ function SqlSetupBlock() {
       {open && (
         <div style={{
           marginTop: 6, padding: "12px 16px",
-          background: C.goldLight, borderRadius: "var(--radius-md, 10px)",
+          background: C.goldLight, borderRadius: 12,
           border: `1px solid ${C.gold}30`, fontSize: 12,
           color: C.gray, lineHeight: 1.6,
         }}>
@@ -16382,7 +16398,7 @@ function SqlSetupBlock() {
           <code style={{
             display: "block", marginTop: 6, fontFamily: "monospace",
             fontSize: 11, background: "var(--bg-hover)", padding: "8px 10px",
-            borderRadius: 6, color: C.dark,
+            borderRadius: 9, color: C.dark,
           }}>
             -- Columna teléfono (si aún no existe):<br />
             alter table integrantes add column if not exists telefono text;<br />
@@ -16450,22 +16466,24 @@ function ComunidadesWidget({ comunidades, isAdmin, setSection }) {
   if (!comunidades || comunidades.length === 0) {
     if (!isAdmin) return null;
     return (
-      <Card style={{ marginBottom: 14 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
-          <div style={{ width:32, height:32, background:"linear-gradient(135deg,#0ea5e9,#2563eb)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <span style={{ fontSize:14 }}>⛪</span>
+      <div style={{ background:"white", borderRadius:14, border:"1px solid rgba(60,60,67,0.1)", boxShadow:"0 1px 6px rgba(0,0,0,0.05)", overflow:"hidden", marginBottom:14 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px" }}>
+          <div style={{ width:30, height:30, background:"linear-gradient(145deg,#0071e3,#34aadc)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1C3.46 1 1 3.46 1 6.5S3.46 12 6.5 12 12 9.54 12 6.5 9.54 1 6.5 1z" stroke="white" strokeWidth="1.2" fill="none"/><path d="M4 6.5h5M6.5 4v5" stroke="white" strokeWidth="1.2" strokeLinecap="round"/></svg>
           </div>
           <div style={{ flex:1 }}>
-            <div style={{ fontFamily:"var(--font-display)", fontSize:14, fontWeight:700, color:C.dark }}>Comunidades</div>
-            <div style={{ fontSize:11, color:C.gray }}>Sin comunidades aún</div>
+            <div style={{ fontSize:13, fontWeight:600, color:"#1c1c1e", letterSpacing:"-0.016em" }}>Comunidades</div>
+            <div style={{ fontSize:11, color:"#8e8e93" }}>Sin comunidades aún</div>
           </div>
-          <button onClick={() => setSection("admin")} style={{ background:C.primaryLight, border:`1px solid ${C.primary}50`, borderRadius:8, padding:"5px 12px", fontSize:11, fontWeight:600, color:C.primary, cursor:"pointer" }}>+ Agregar</button>
+          <button onClick={() => setSection("admin")} style={{ background:"rgba(0,113,227,0.08)", border:"none", borderRadius:20, padding:"5px 12px", fontSize:12, fontWeight:500, color:"#007aff", cursor:"pointer" }}>Agregar</button>
         </div>
-        <div style={{ borderRadius:12, background:"#f0f9ff", border:"2px dashed #0ea5e950", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"36px 20px", minHeight:140 }}>
-          <div style={{ fontSize:36, opacity:0.25 }}>⛪</div>
-          <div style={{ fontSize:12, color:C.gray, textAlign:"center" }}>Agrega comunidades desde el panel <strong>Administrador → Comunidades</strong></div>
+        <div style={{ padding:"28px 20px", background:"rgba(242,242,247,0.5)", display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+          <div style={{ width:40, height:40, borderRadius:10, background:"rgba(0,113,227,0.06)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="rgba(0,122,255,0.3)" strokeWidth="1.2"/><path d="M5 8.5C5.5 10.5 10.5 10.5 11 8.5" stroke="rgba(0,122,255,0.3)" strokeWidth="1.2" strokeLinecap="round" fill="none"/><circle cx="5.5" cy="6" r="1" fill="rgba(0,122,255,0.3)"/><circle cx="10.5" cy="6" r="1" fill="rgba(0,122,255,0.3)"/></svg>
+          </div>
+          <div style={{ fontSize:12, color:"#8e8e93" }}>Agrega comunidades desde el panel Admin</div>
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -16476,22 +16494,22 @@ function ComunidadesWidget({ comunidades, isAdmin, setSection }) {
   return (
     <>
       <style>{`
-        @keyframes com-slide { from{opacity:0;transform:translateX(12px)} to{opacity:1;transform:translateX(0)} }
-        .com-card-inner { animation: com-slide 0.22s ease; }
+        @keyframes com-slide { from{opacity:0;transform:translateX(8px)} to{opacity:1;transform:translateX(0)} }
+        .com-card-inner { animation: com-slide 0.2s ease; }
       `}</style>
 
-      <Card style={{ marginBottom:14, padding:0, overflow:"hidden" }}>
-        {/* Header fuera de la foto */}
-        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"14px 16px 10px" }}>
-          <div style={{ width:32, height:32, background:"linear-gradient(135deg,#0ea5e9,#2563eb)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-            <span style={{ fontSize:14 }}>⛪</span>
+      <div style={{ background:"white", borderRadius:14, border:"1px solid rgba(60,60,67,0.1)", boxShadow:"0 1px 6px rgba(0,0,0,0.05)", overflow:"hidden", marginBottom:14 }}>
+        {/* Header */}
+        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", borderBottom:"1px solid rgba(60,60,67,0.08)" }}>
+          <div style={{ width:30, height:30, background:"linear-gradient(145deg,#0071e3,#34aadc)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="white" strokeWidth="1.2" fill="none"/><path d="M3.5 9C4.5 6.5 8.5 6.5 9.5 9" stroke="white" strokeWidth="1.2" strokeLinecap="round" fill="none"/><circle cx="6.5" cy="4.5" r="1.5" fill="white"/></svg>
           </div>
           <div style={{ flex:1 }}>
-            <div style={{ fontFamily:"var(--font-display)", fontSize:14, fontWeight:700, color:C.dark }}>Comunidades</div>
-            <div style={{ fontSize:11, color:C.gray }}>{idx+1} de {comunidades.length}</div>
+            <div style={{ fontSize:13, fontWeight:600, color:"#1c1c1e", letterSpacing:"-0.016em" }}>Comunidades</div>
+            {comunidades.length > 1 && <div style={{ fontSize:11, color:"#8e8e93" }}>{idx+1} / {comunidades.length}</div>}
           </div>
           {isAdmin && (
-            <button onClick={() => setSection("admin")} style={{ background:C.primaryLight, border:`1px solid ${C.primary}50`, borderRadius:8, padding:"5px 12px", fontSize:11, fontWeight:600, color:C.primary, cursor:"pointer" }}>✏️ Gestionar</button>
+            <button onClick={() => setSection("admin")} style={{ background:"rgba(0,113,227,0.08)", border:"none", borderRadius:20, padding:"5px 12px", fontSize:12, fontWeight:500, color:"#007aff", cursor:"pointer" }}>Gestionar</button>
           )}
         </div>
 
@@ -16499,69 +16517,70 @@ function ComunidadesWidget({ comunidades, isAdmin, setSection }) {
         <div key={idx} className="com-card-inner">
           {/* Foto */}
           <div
-            style={{ position:"relative", width:"100%", aspectRatio:"16/9", background:"var(--text-primary)", cursor:"pointer", overflow:"hidden" }}
+            style={{ position:"relative", width:"100%", aspectRatio:"16/9", background:"#1c1c1e", cursor:"pointer", overflow:"hidden" }}
             onClick={() => setLightbox(true)}
           >
             {com.foto_url
               ? <img src={normalizarUrlFoto(com.foto_url)} alt={com.nombre} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
-              : <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:48, opacity:0.18 }}>⛪</div>
+              : <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", opacity:0.1 }}>
+                  <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" stroke="white" strokeWidth="2"/><path d="M14 34c2-7 18-7 20 0" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none"/><circle cx="24" cy="18" r="6" fill="white"/></svg>
+                </div>
             }
-            {/* Gradiente inferior */}
             <div style={{ position:"absolute", inset:0, background:"linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.72) 100%)" }} />
-            {/* Nombre superpuesto */}
-            <div style={{ position:"absolute", bottom:0, left:0, right:0, padding:"18px 16px 14px" }}>
-              <div style={{ fontSize:20, fontWeight:800, color:"white", fontFamily:"var(--font-display)", lineHeight:1.1, textShadow:"0 2px 8px rgba(0,0,0,0.4)" }}>{com.nombre}</div>
+            <div style={{ position:"absolute", bottom:0, left:0, right:0, padding:"16px 14px 12px" }}>
+              <div style={{ fontSize:17, fontWeight:700, color:"white", fontFamily:"var(--font-display)", letterSpacing:"-0.02em", lineHeight:1.1, textShadow:"0 1px 8px rgba(0,0,0,0.5)" }}>{com.nombre}</div>
             </div>
-            {/* Expand */}
-            <div style={{ position:"absolute", top:10, right:10, background:"rgba(0,0,0,0.35)", borderRadius:7, padding:"3px 8px", fontSize:10, color:"white" }}>⛶ Ver</div>
+            <div style={{ position:"absolute", top:10, right:10, background:"rgba(0,0,0,0.28)", backdropFilter:"blur(8px)", borderRadius:6, padding:"3px 8px", fontSize:11, color:"rgba(255,255,255,0.85)", fontWeight:500 }}>Ver</div>
           </div>
 
           {/* Info */}
-          <div style={{ padding:"14px 16px" }}>
+          <div style={{ padding:"12px 14px" }}>
             {com.direccion && (
-              <div style={{ display:"flex", alignItems:"flex-start", gap:8, marginBottom:6 }}>
-                <span style={{ fontSize:14, flexShrink:0, marginTop:1 }}>📍</span>
-                <span style={{ fontSize:13, color:C.dark }}>{com.direccion}</span>
+              <div style={{ display:"flex", alignItems:"flex-start", gap:8, marginBottom:5 }}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink:0, marginTop:1 }}><path d="M7 1C4.79 1 3 2.79 3 5c0 3 4 8 4 8s4-5 4-8c0-2.21-1.79-4-4-4z" stroke="#8e8e93" strokeWidth="1.2" fill="none"/><circle cx="7" cy="5" r="1.5" fill="#8e8e93"/></svg>
+                <span style={{ fontSize:13, color:"#3c3c43", letterSpacing:"-0.016em" }}>{com.direccion}</span>
               </div>
             )}
             {com.telefono && (
-              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
-                <span style={{ fontSize:14, flexShrink:0 }}>📞</span>
-                <a href={`tel:${com.telefono}`} style={{ fontSize:13, color:C.dark, textDecoration:"none" }}>{com.telefono}</a>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5 }}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2.5C2 2 2.5 1 4 1s2.5 2 2.5 2.5-1 2-1 3 3 3 3 3 2.5-1 3.5-1 2.5 1 2.5 2.5-1 2-2 2C4 13 1 7 1 4.5 1 3 1.5 2.5 2 2.5z" stroke="#8e8e93" strokeWidth="1.1" fill="none"/></svg>
+                <a href={`tel:${com.telefono}`} style={{ fontSize:13, color:"#007aff", textDecoration:"none", letterSpacing:"-0.016em" }}>{com.telefono}</a>
               </div>
             )}
             {com.email && (
-              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
-                <span style={{ fontSize:14, flexShrink:0 }}>✉️</span>
-                <a href={`mailto:${com.email}`} style={{ fontSize:13, color:"#0ea5e9", textDecoration:"none", wordBreak:"break-all" }}>{com.email}</a>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5 }}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="1.5" stroke="#8e8e93" strokeWidth="1.1" fill="none"/><path d="M1 4l6 4.5L13 4" stroke="#8e8e93" strokeWidth="1.1" strokeLinejoin="round"/></svg>
+                <a href={`mailto:${com.email}`} style={{ fontSize:13, color:"#007aff", textDecoration:"none", wordBreak:"break-all", letterSpacing:"-0.016em" }}>{com.email}</a>
               </div>
             )}
             {com.descripcion && (
-              <div style={{ fontSize:12, color:C.gray, marginTop:8, lineHeight:1.5, borderTop:`1px solid ${C.border}`, paddingTop:10 }}>{com.descripcion}</div>
+              <div style={{ fontSize:12, color:"#8e8e93", marginTop:8, lineHeight:1.5, paddingTop:10, borderTop:"1px solid rgba(60,60,67,0.08)", letterSpacing:"-0.01em" }}>{com.descripcion}</div>
             )}
 
             {/* Navegación */}
             {comunidades.length > 1 && (
-              <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:14, paddingTop:12, borderTop:`1px solid ${C.border}` }}>
-                <button onClick={prev} disabled={idx===0} style={{ width:40, height:40, borderRadius:10, border:`1px solid ${idx===0?C.border:"#0ea5e9"}`, background:idx===0?C.light:"#f0f9ff", color:idx===0?C.border:"#0ea5e9", fontSize:20, cursor:idx===0?"default":"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.15s", opacity:idx===0?0.4:1, flexShrink:0 }}>‹</button>
-                <div style={{ flex:1, display:"flex", gap:6, justifyContent:"center" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:12, paddingTop:10, borderTop:"1px solid rgba(60,60,67,0.08)" }}>
+                <button onClick={prev} disabled={idx===0} style={{ width:36, height:36, borderRadius:9, border:"none", background:idx===0?"rgba(60,60,67,0.06)":"rgba(0,122,255,0.08)", color:idx===0?"#c7c7cc":"#007aff", fontSize:18, cursor:idx===0?"default":"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.15s", flexShrink:0 }}>‹</button>
+                <div style={{ flex:1, display:"flex", gap:5, justifyContent:"center" }}>
                   {comunidades.map((_,i) => (
-                    <div key={i} onClick={() => setIdx(i)} style={{ width:i===idx?20:8, height:8, borderRadius:4, background:i===idx?"#0ea5e9":C.border, cursor:"pointer", transition:"all 0.25s" }} />
+                    <div key={i} onClick={() => setIdx(i)} style={{ width:i===idx?16:6, height:6, borderRadius:3, background:i===idx?"#007aff":"rgba(60,60,67,0.15)", cursor:"pointer", transition:"all 0.2s" }} />
                   ))}
                 </div>
-                <button onClick={next} disabled={idx===comunidades.length-1} style={{ width:40, height:40, borderRadius:10, border:`1px solid ${idx===comunidades.length-1?C.border:"#0ea5e9"}`, background:idx===comunidades.length-1?C.light:"#f0f9ff", color:idx===comunidades.length-1?C.border:"#0ea5e9", fontSize:20, cursor:idx===comunidades.length-1?"default":"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.15s", opacity:idx===comunidades.length-1?0.4:1, flexShrink:0 }}>›</button>
+                <button onClick={next} disabled={idx===comunidades.length-1} style={{ width:36, height:36, borderRadius:9, border:"none", background:idx===comunidades.length-1?"rgba(60,60,67,0.06)":"rgba(0,122,255,0.08)", color:idx===comunidades.length-1?"#c7c7cc":"#007aff", fontSize:18, cursor:idx===comunidades.length-1?"default":"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.15s", flexShrink:0 }}>›</button>
               </div>
             )}
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* Lightbox */}
       {lightbox && com.foto_url && (
         <div onClick={() => setLightbox(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.92)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center" }}>
-          <div style={{ position:"absolute", top:16, right:16, color:"white", fontSize:28, cursor:"pointer" }}>✕</div>
-          <img src={normalizarUrlFoto(com.foto_url)} alt={com.nombre} onClick={e=>e.stopPropagation()} style={{ maxWidth:"95vw", maxHeight:"90vh", borderRadius:12, objectFit:"contain" }} />
-          <div style={{ position:"absolute", bottom:24, left:0, right:0, textAlign:"center", color:"white", fontSize:15, fontWeight:700 }}>{com.nombre}</div>
+          <div style={{ position:"absolute", top:16, right:16, width:32, height:32, borderRadius:"50%", background:"rgba(255,255,255,0.12)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="white" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          </div>
+          <img src={normalizarUrlFoto(com.foto_url)} alt={com.nombre} onClick={e=>e.stopPropagation()} style={{ maxWidth:"95vw", maxHeight:"90vh", borderRadius:14, objectFit:"contain" }} />
+          <div style={{ position:"absolute", bottom:24, left:0, right:0, textAlign:"center", color:"white", fontSize:15, fontWeight:600, letterSpacing:"-0.02em" }}>{com.nombre}</div>
         </div>
       )}
     </>
@@ -16731,7 +16750,7 @@ function AdminGaleria({ fotos, onReload }) {
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({});
-  const inputS = { padding: "8px 12px", borderRadius: 7, border: `1px solid ${C.border}`, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
+  const inputS = { padding: "8px 12px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
 
   const sorted = [...fotos].sort((a, b) => {
     const oa = a.orden ?? 999, ob = b.orden ?? 999;
@@ -16801,7 +16820,7 @@ function AdminGaleria({ fotos, onReload }) {
         <Btn onClick={() => setShowForm(p => !p)}>+ Nueva foto</Btn>
       </div>
 
-      <div style={{ background: C.goldLight, border: `1px solid ${C.gold}40`, borderRadius: "var(--radius-md, 13px)", padding: "9px 14px", fontSize: 11, color: C.gray, marginBottom: 14 }}>
+      <div style={{ background: C.goldLight, border: `1px solid ${C.gold}40`, borderRadius: 14, padding: "9px 14px", fontSize: 11, color: C.gray, marginBottom: 14 }}>
         ⚠️ SQL requerido en Supabase (una vez):<br />
         <code style={{ fontFamily: "monospace" }}>create table if not exists galeria (id uuid default gen_random_uuid() primary key, url text not null, titulo text, descripcion text, orden int default 0, created_at timestamptz default now());</code>
       </div>
@@ -16847,9 +16866,9 @@ function AdminGaleria({ fotos, onReload }) {
               </div>
             ) : (
               <>
-                <div style={{ position: "relative", aspectRatio: "4/3", borderRadius: "var(--radius-sm, 8px)", overflow: "hidden", background: "var(--bg-hover)", marginBottom: 8 }}>
+                <div style={{ position: "relative", aspectRatio: "4/3", borderRadius: 10, overflow: "hidden", background: "var(--bg-hover)", marginBottom: 8 }}>
                   <img src={normalizarUrlFoto(f.url)} alt={f.titulo || ""} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  <div style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.5)", color: "white", borderRadius: 6, fontSize: 10, padding: "2px 6px", fontWeight: 700 }}>#{f.orden ?? 0}</div>
+                  <div style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.5)", color: "white", borderRadius: 9, fontSize: 10, padding: "2px 6px", fontWeight: 700 }}>#{f.orden ?? 0}</div>
                 </div>
                 {f.titulo && <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, marginBottom: 2 }}>{f.titulo}</div>}
                 {f.descripcion && <div style={{ fontSize: 11, color: C.gray, marginBottom: 6 }}>{f.descripcion}</div>}
@@ -16921,7 +16940,7 @@ function AdminHistorialAsistencia({ members }) {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {historial.map(h => (
             <button key={h.ano} onClick={() => setAnoSeleccionado(h.ano)}
-              style={{ padding: "6px 16px", borderRadius: "var(--radius-sm, 8px)", border: `2px solid ${anoSeleccionado === h.ano ? C.primary : C.border}`, background: anoSeleccionado === h.ano ? C.primaryLight : "white", color: anoSeleccionado === h.ano ? C.primary : C.dark, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+              style={{ padding: "6px 16px", borderRadius: 10, border: `2px solid ${anoSeleccionado === h.ano ? C.primary : C.border}`, background: anoSeleccionado === h.ano ? C.primaryLight : "white", color: anoSeleccionado === h.ano ? C.primary : C.dark, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
               {h.ano}
             </button>
           ))}
@@ -17035,7 +17054,7 @@ function Admin({
             width: 48,
             height: 48,
             background: "rgba(255,255,255,0.2)",
-            borderRadius: "var(--radius-md, 12px)",
+            borderRadius: 14,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -17076,7 +17095,7 @@ function Admin({
               key={i}
               style={{
                 background: s.alert ? "#fbbf24" : "rgba(255,255,255,0.2)",
-                borderRadius: "var(--radius-md, 10px)",
+                borderRadius: 12,
                 padding: "8px 14px",
                 textAlign: "center",
               }}
@@ -17223,7 +17242,7 @@ function AdminNotificaciones() {
     setSending(false);
   }
 
-  const inputS = { padding: "8px 10px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.border}`, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
+  const inputS = { padding: "8px 10px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
 
   return (
     <div>
@@ -17232,21 +17251,21 @@ function AdminNotificaciones() {
 
       {/* Stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
-        <div style={{ background: C.primary + "12", border: `1px solid ${C.primary}30`, borderRadius: "var(--radius-md, 12px)", padding: "14px 18px", flex: 1 }}>
+        <div style={{ background: C.primary + "12", border: `1px solid ${C.primary}30`, borderRadius: 14, padding: "14px 18px", flex: 1 }}>
           <div style={{ fontSize: 24 }}>📱</div>
           <div style={{ fontSize: 28, fontWeight: 800, color: C.primary, marginTop: 4 }}>
             {loading ? "..." : totalSubs}
           </div>
           <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>Dispositivos suscritos</div>
         </div>
-        <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: "var(--radius-md, 12px)", padding: "14px 18px", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 14, padding: "14px 18px", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
           <div style={{ fontSize: 11, color: "#15803d", fontWeight: 600, marginBottom: 4 }}>✅ OneSignal activo</div>
           <div style={{ fontSize: 10, color: C.gray, lineHeight: 1.5 }}>Las notificaciones llegan directamente al teléfono aunque el usuario no tenga la app abierta.</div>
         </div>
       </div>
 
       {/* Formulario envío manual */}
-      <div style={{ background: C.primaryLight, border: `1px solid ${C.primary}40`, borderRadius: "var(--radius-md, 12px)", padding: "18px 20px", marginBottom: 24 }}>
+      <div style={{ background: C.primaryLight, border: `1px solid ${C.primary}40`, borderRadius: 14, padding: "18px 20px", marginBottom: 24 }}>
         <div style={{ fontWeight: 700, fontSize: 14, color: C.dark, marginBottom: 14 }}>📤 Enviar notificación</div>
         <div style={{ marginBottom: 10 }}>
           <div style={{ fontSize: 11, color: C.gray, marginBottom: 4 }}>Título *</div>
@@ -17258,7 +17277,7 @@ function AdminNotificaciones() {
             style={{ ...inputS, resize: "vertical", fontFamily: "Inter,sans-serif" }} />
         </div>
         {msg && (
-          <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: "var(--radius-sm, 8px)", background: msg.ok ? "#dcfce7" : "#fee2e2", color: msg.ok ? "#15803d" : "#dc2626", fontSize: 13, fontWeight: 600 }}>
+          <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, background: msg.ok ? "#dcfce7" : "#fee2e2", color: msg.ok ? "#15803d" : "#dc2626", fontSize: 13, fontWeight: 600 }}>
             {msg.text}
           </div>
         )}
@@ -17268,7 +17287,7 @@ function AdminNotificaciones() {
       </div>
 
       {/* Info OneSignal */}
-      <div style={{ background: "#f8faff", border: `1px solid #c7d7f9`, borderRadius: "var(--radius-md, 12px)", padding: "14px 18px" }}>
+      <div style={{ background: "#f8faff", border: `1px solid #c7d7f9`, borderRadius: 14, padding: "14px 18px" }}>
         <div style={{ fontWeight: 600, fontSize: 13, color: "#3b5bdb", marginBottom: 8 }}>ℹ️ Cómo funciona</div>
         <div style={{ fontSize: 12, color: C.gray, lineHeight: 1.8 }}>
           • Los integrantes activan las notificaciones desde <strong>Mi Perfil → Notificaciones</strong>.<br />
@@ -17379,11 +17398,13 @@ function FinCard({ children, style = {} }) {
   return (
     <div
       style={{
-        background: "var(--bg-card-solid)",
-        borderRadius: "var(--radius-lg, 14px)",
-        border: "1px solid rgba(60,60,67,0.18)",
-        padding: 20,
-        boxShadow: "var(--shadow-sm)",
+        background: "rgba(255,255,255,0.95)",
+        borderRadius: 20,
+        border: "1px solid rgba(60,60,67,0.09)",
+        padding: "18px 20px",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.05)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
         ...style,
       }}
     >
@@ -17393,34 +17414,48 @@ function FinCard({ children, style = {} }) {
 }
 
 function FinBtn({ children, onClick, variant = "primary", disabled = false, style = {} }) {
+  const [h, setH] = useState(false);
+  const [pressed, setPressed] = useState(false);
   const bg =
     variant === "primary"
-      ? C.primary
+      ? h ? `linear-gradient(135deg, ${C.primaryDark} 0%, #1a5c3a 100%)` : `linear-gradient(135deg, ${C.primary} 0%, #2d7a52 100%)`
       : variant === "danger"
-      ? "#ef4444"
+      ? h ? "#dc2626" : "#ef4444"
       : variant === "ghost"
-      ? "transparent"
-      : C.light;
+      ? h ? "rgba(0,0,0,0.07)" : "rgba(0,0,0,0.04)"
+      : h ? "rgba(0,0,0,0.09)" : "rgba(0,0,0,0.05)";
   const color =
     variant === "primary" || variant === "danger" ? "white" : C.dark;
+  const shadow =
+    variant === "primary" ? `0 2px 10px ${C.primary}40`
+    : variant === "danger" ? "0 2px 10px rgba(239,68,68,0.35)"
+    : "none";
   return (
     <button
       onClick={onClick}
       disabled={disabled}
+      onMouseEnter={() => setH(true)}
+      onMouseLeave={() => { setH(false); setPressed(false); }}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
       style={{
         display: "inline-flex",
         alignItems: "center",
         gap: 6,
-        padding: "8px 14px",
-        borderRadius: "var(--radius-sm, 8px)",
-        border: variant === "ghost" ? `1px solid ${C.border}` : "none",
+        padding: "8px 16px",
+        borderRadius: 12,
+        border: variant === "ghost" ? `1px solid rgba(60,60,67,0.16)` : "none",
         cursor: disabled ? "not-allowed" : "pointer",
         fontSize: 13,
-        fontWeight: 500,
+        fontWeight: 600,
+        letterSpacing: "-0.01em",
         background: bg,
         color,
-        opacity: disabled ? 0.6 : 1,
-        transition: "all 0.15s",
+        opacity: disabled ? 0.5 : 1,
+        boxShadow: disabled ? "none" : shadow,
+        transform: pressed && !disabled ? "scale(0.97)" : "scale(1)",
+        transition: "all 0.16s cubic-bezier(0.25,0.46,0.45,0.94)",
+        WebkitTapHighlightColor: "transparent",
         ...style,
       }}
     >
@@ -17433,34 +17468,36 @@ function StatCard({ icon, label, value, color = C.primary, sub }) {
   return (
     <div
       style={{
-        background: color + "10",
-        border: `1px solid ${color}30`,
-        borderRadius: "var(--radius-lg, 14px)",
-        padding: "16px 20px",
+        background: `linear-gradient(135deg, ${color}12 0%, ${color}06 100%)`,
+        border: `1px solid ${color}22`,
+        borderRadius: 18,
+        padding: "16px 18px",
         display: "flex",
         alignItems: "center",
         gap: 14,
+        boxShadow: `0 2px 12px ${color}14`,
       }}
     >
       <div
         style={{
-          width: 44,
-          height: 44,
-          borderRadius: "var(--radius-md, 12px)",
-          background: color + "20",
+          width: 46,
+          height: 46,
+          borderRadius: 14,
+          background: `linear-gradient(135deg, ${color}28 0%, ${color}18 100%)`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           fontSize: 22,
           flexShrink: 0,
+          boxShadow: `0 2px 8px ${color}22`,
         }}
       >
         {icon}
       </div>
       <div>
-        <div style={{ fontSize: 11, color: C.gray, marginBottom: 2 }}>{label}</div>
-        <div style={{ fontSize: 20, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
-        {sub && <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>{sub}</div>}
+        <div style={{ fontSize: 11, color: C.gray, marginBottom: 2, fontWeight: 500, letterSpacing: "0.02em", textTransform: "uppercase" }}>{label}</div>
+        <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1, letterSpacing: "-0.02em" }}>{value}</div>
+        {sub && <div style={{ fontSize: 11, color: C.gray, marginTop: 3 }}>{sub}</div>}
       </div>
     </div>
   );
@@ -17495,8 +17532,23 @@ function Avatar({ nombre, foto_url, size = 32, color = C.primary }) {
 
 function FinSpinner() {
   return (
-    <div style={{ padding: "30px 0", textAlign: "center", color: C.gray, fontSize: 13 }}>
-      ⏳ Cargando...
+    <div style={{
+      padding: "32px 0",
+      textAlign: "center",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 10,
+    }}>
+      <div style={{
+        width: 28, height: 28,
+        border: "2.5px solid rgba(60,60,67,0.12)",
+        borderTopColor: C.primary,
+        borderRadius: "50%",
+        animation: "spin 0.7s linear infinite",
+      }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <span style={{ fontSize: 13, color: C.gray, letterSpacing: "-0.01em" }}>Cargando...</span>
     </div>
   );
 }
@@ -17507,15 +17559,20 @@ function TabBtn({ label, active, onClick }) {
       onClick={onClick}
       style={{
         padding: "8px 16px",
-        borderRadius: "var(--radius-sm, 8px)",
-        border: "none",
+        borderRadius: 20,
+        border: active ? "none" : "1px solid rgba(60,60,67,0.15)",
         cursor: "pointer",
         fontSize: 13,
-        fontWeight: active ? 600 : 400,
-        background: active ? C.primary : "transparent",
+        fontWeight: active ? 600 : 500,
+        background: active
+          ? `linear-gradient(135deg, ${C.primary} 0%, #2d7a52 100%)`
+          : "rgba(255,255,255,0.8)",
         color: active ? "white" : C.gray,
+        boxShadow: active ? `0 2px 10px ${C.primary}40` : "none",
         whiteSpace: "nowrap",
-        transition: "all 0.15s",
+        letterSpacing: "-0.01em",
+        transition: "all 0.18s cubic-bezier(0.25,0.46,0.45,0.94)",
+        WebkitTapHighlightColor: "transparent",
       }}
     >
       {label}
@@ -17710,7 +17767,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
             </div>
             <div style={{ fontSize: 13, color: "var(--text-secondary)", textAlign: "center", marginBottom: 18, lineHeight: 1.6 }}>
               ¿Registrar el pago de cuota de <strong>{confirmPagar.miembro.nombre}</strong>?
-              <div style={{ marginTop: 10, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "var(--radius-md, 10px)", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ marginTop: 10, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 12, color: "#166534" }}>📅 {mesSeleccionado}</span>
                 <span style={{ fontSize: 14, fontWeight: 700, color: "#15803d" }}>{finFmtCLP(cuotaMes?.valor || 0)}</span>
               </div>
@@ -17719,12 +17776,12 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
               <button
                 onClick={() => ejecutarPago(confirmPagar.miembro)}
                 disabled={procesando}
-                style={{ flex: 1, background: "linear-gradient(135deg,#1D9E75,#16a34a)", border: "none", borderRadius: "var(--radius-md, 10px)", padding: "11px 0", fontSize: 13, fontWeight: 700, color: "white", cursor: procesando ? "not-allowed" : "pointer", opacity: procesando ? 0.7 : 1 }}
+                style={{ flex: 1, background: "linear-gradient(135deg,#1D9E75,#16a34a)", border: "none", borderRadius: 12, padding: "11px 0", fontSize: 13, fontWeight: 700, color: "white", cursor: procesando ? "not-allowed" : "pointer", opacity: procesando ? 0.7 : 1 }}
               >{procesando ? "Registrando..." : "✅ Sí, registrar pago"}</button>
               <button
                 onClick={() => setConfirmPagar(null)}
                 disabled={procesando}
-                style={{ flex: 1, background: "white", border: "1.5px solid #e2e8f0", borderRadius: "var(--radius-md, 10px)", padding: "11px 0", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", cursor: "pointer" }}
+                style={{ flex: 1, background: "white", border: "1.5px solid #e2e8f0", borderRadius: 12, padding: "11px 0", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", cursor: "pointer" }}
               >Cancelar</button>
             </div>
           </div>
@@ -17742,14 +17799,14 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
             <div style={{ fontSize: 13, color: "var(--text-secondary)", textAlign: "center", marginBottom: 6, lineHeight: 1.6 }}>
               Estás a punto de <strong>borrar el pago registrado</strong> de:
             </div>
-            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "var(--radius-md, 10px)", padding: "12px 16px", marginBottom: 14 }}>
+            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "12px 16px", marginBottom: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-primary)", marginBottom: 4 }}>{confirmBorrar.miembro.nombre}</div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text-secondary)" }}>
                 <span>📅 {mesSeleccionado}</span>
                 <span style={{ fontWeight: 600, color: "#dc2626" }}>{finFmtCLP(confirmBorrar.pago.monto)}</span>
               </div>
               {confirmBorrar.pago.comprobante_url && (
-                <div style={{ marginTop: 8, padding: "6px 10px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "var(--radius-sm, 8px)", display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ marginTop: 8, padding: "6px 10px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 14 }}>📎</span>
                   <span style={{ fontSize: 11, color: "#92400e", fontWeight: 600 }}>
                     Este pago tiene comprobante adjunto. También se perderá.
@@ -17764,12 +17821,12 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
               <button
                 onClick={() => setConfirmBorrar(null)}
                 disabled={procesando}
-                style={{ flex: 1, background: "white", border: "1.5px solid #e2e8f0", borderRadius: "var(--radius-md, 10px)", padding: "11px 0", fontSize: 13, fontWeight: 700, color: "var(--text-secondary)", cursor: "pointer" }}
+                style={{ flex: 1, background: "white", border: "1.5px solid #e2e8f0", borderRadius: 12, padding: "11px 0", fontSize: 13, fontWeight: 700, color: "var(--text-secondary)", cursor: "pointer" }}
               >← No, mantener pago</button>
               <button
                 onClick={() => ejecutarBorrarPago(confirmBorrar.pago)}
                 disabled={procesando}
-                style={{ flex: 1, background: "linear-gradient(135deg,#dc2626,#b91c1c)", border: "none", borderRadius: "var(--radius-md, 10px)", padding: "11px 0", fontSize: 13, fontWeight: 700, color: "white", cursor: procesando ? "not-allowed" : "pointer", opacity: procesando ? 0.7 : 1 }}
+                style={{ flex: 1, background: "linear-gradient(135deg,#dc2626,#b91c1c)", border: "none", borderRadius: 12, padding: "11px 0", fontSize: 13, fontWeight: 700, color: "white", cursor: procesando ? "not-allowed" : "pointer", opacity: procesando ? 0.7 : 1 }}
               >{procesando ? "Eliminando..." : "🗑 Sí, eliminar pago"}</button>
             </div>
           </div>
@@ -17782,7 +17839,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
         const esPagoAnticipado = mesSeleccionado > mesActualIso;
         if (!esPagoAnticipado) return null;
         return (
-          <div style={{ background: "#fffbeb", border: "1.5px solid #fcd34d", borderRadius: "var(--radius-md, 12px)", padding: "10px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ background: "#fffbeb", border: "1.5px solid #fcd34d", borderRadius: 14, padding: "10px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 20 }}>🗓️</span>
             <div>
               <div style={{ fontWeight: 700, fontSize: 13, color: "#92400e" }}>Pago anticipado — {finMesLabel(mesSeleccionado)}</div>
@@ -17842,13 +17899,13 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
 
       {/* Barra de progreso */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ height: 8, background: C.border, borderRadius: 4, overflow: "hidden" }}>
+        <div style={{ height: 8, background: C.border, borderRadius: 7, overflow: "hidden" }}>
           <div
             style={{
               height: "100%",
               width: `${pctPago}%`,
               background: `linear-gradient(90deg,${C.primary},${C.primaryDark})`,
-              borderRadius: 4,
+              borderRadius: 7,
               transition: "width 0.4s",
             }}
           />
@@ -17876,7 +17933,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
                   alignItems: "center",
                   gap: 12,
                   padding: "12px 16px",
-                  borderRadius: "var(--radius-md, 10px)",
+                  borderRadius: 12,
                   border: `1px solid ${pagado ? C.primary + "40" : C.border}`,
                   background: pagado ? C.primary + "08" : C.white,
                   transition: "all 0.2s",
@@ -18104,7 +18161,7 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <button
                 onClick={() => elegirTipo("general")}
-                style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", border: `1.5px solid ${C.border}`, borderRadius: "var(--radius-md, 12px)", background: "white", cursor: "pointer", textAlign: "left", transition: "border-color 0.15s" }}
+                style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", border: `1.5px solid ${C.border}`, borderRadius: 14, background: "white", cursor: "pointer", textAlign: "left", transition: "border-color 0.15s" }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = C.primary}
                 onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
               >
@@ -18116,7 +18173,7 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
               </button>
               <button
                 onClick={() => elegirTipo("asado")}
-                style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", border: `1.5px solid ${C.border}`, borderRadius: "var(--radius-md, 12px)", background: "white", cursor: "pointer", textAlign: "left", transition: "border-color 0.15s" }}
+                style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", border: `1.5px solid ${C.border}`, borderRadius: 14, background: "white", cursor: "pointer", textAlign: "left", transition: "border-color 0.15s" }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = C.primary}
                 onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
               >
@@ -18145,7 +18202,7 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
         {showForm && (
           <FinCard style={{ marginBottom: 10, padding: 14 }}>
             {/* Tipo badge */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, padding: "6px 10px", background: form.tipo_actividad === "asado" ? "#fff7ed" : "#f0fdf4", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${form.tipo_actividad === "asado" ? "#fed7aa" : "#bbf7d0"}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, padding: "6px 10px", background: form.tipo_actividad === "asado" ? "#fff7ed" : "#f0fdf4", borderRadius: 10, border: `1px solid ${form.tipo_actividad === "asado" ? "#fed7aa" : "#bbf7d0"}` }}>
               <span>{form.tipo_actividad === "asado" ? "🔥" : "🎉"}</span>
               <span style={{ fontSize: 12, fontWeight: 600, color: form.tipo_actividad === "asado" ? "#c2410c" : C.primary }}>
                 {form.tipo_actividad === "asado" ? "Asado / Evento con cuota" : "Actividad General"}
@@ -18197,7 +18254,7 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
               <div
                 key={a.id}
                 onClick={() => setActSeleccionada(selected ? null : a)}
-                style={{ padding: "10px 12px", borderRadius: "var(--radius-md, 10px)", border: `1px solid ${selected ? C.primary : C.border}`, background: selected ? C.primary + "10" : C.white, cursor: "pointer", transition: "all 0.15s" }}
+                style={{ padding: "10px 12px", borderRadius: 12, border: `1px solid ${selected ? C.primary : C.border}`, background: selected ? C.primary + "10" : C.white, cursor: "pointer", transition: "all 0.15s" }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                   <span style={{ fontSize: 13 }}>{a.tipo_actividad === "asado" ? "🔥" : "🎉"}</span>
@@ -18240,7 +18297,7 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
               <StatCard icon="💵" label="Ingresos actividad" value={finFmtCLP(totalPagosAct)} color={C.primary} />
               {esAsado && (
                 <div style={{ flex: 1, minWidth: 140 }}>
-                  <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "var(--radius-md, 12px)", padding: "10px 14px" }}>
+                  <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 14, padding: "10px 14px" }}>
                     <div style={{ fontSize: 11, color: "#c2410c", fontWeight: 600, marginBottom: 4 }}>🔥 Costo por persona (referencial)</div>
                     <div style={{ fontSize: 20, fontWeight: 800, color: "#c2410c" }}>
                       {cuotaPromedio !== null ? finFmtCLP(cuotaPromedio) : "—"}
@@ -18729,7 +18786,7 @@ function TabParticipantes({ members, miembrosEnCuotas, reload }) {
 
 const inputS = {
   padding: "8px 10px",
-  borderRadius: "var(--radius-sm, 8px)",
+  borderRadius: 10,
   border: `1px solid #e2e8f0`,
   fontSize: 13,
   outline: "none",
@@ -18792,7 +18849,7 @@ export function ModuloFinanzas({ user, members }) {
             width: 48,
             height: 48,
             background: "rgba(255,255,255,0.2)",
-            borderRadius: "var(--radius-md, 12px)",
+            borderRadius: 14,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -18818,7 +18875,7 @@ export function ModuloFinanzas({ user, members }) {
               key={i}
               style={{
                 background: "rgba(255,255,255,0.2)",
-                borderRadius: "var(--radius-md, 10px)",
+                borderRadius: 12,
                 padding: "8px 14px",
                 textAlign: "center",
               }}
@@ -18975,7 +19032,7 @@ function AdminVisitas() {
   const statBox = (icon, label, value, color) => (
     <div style={{
       background: color + "12", border: `1px solid ${color}30`,
-      borderRadius: "var(--radius-md, 12px)", padding: "14px 18px", flex: 1, minWidth: 120,
+      borderRadius: 14, padding: "14px 18px", flex: 1, minWidth: 120,
     }}>
       <div style={{ fontSize: 22 }}>{icon}</div>
       <div style={{ fontSize: 24, fontWeight: 800, color, marginTop: 4 }}>{value}</div>
@@ -19005,7 +19062,7 @@ function AdminVisitas() {
       <div style={{
         background: "linear-gradient(135deg,#f0fdf4,#dcfce7)",
         border: "1.5px solid #86efac",
-        borderRadius: "var(--radius-lg, 14px)", padding: "16px 20px", marginBottom: 28,
+        borderRadius: 18, padding: "16px 20px", marginBottom: 28,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <span style={{
@@ -19061,7 +19118,7 @@ function AdminVisitas() {
           <div key={r.email} style={{
             display: "flex", alignItems: "center", gap: 12,
             background: i === 0 ? "#fef9c3" : i === 1 ? "#f1f5f9" : i === 2 ? "#fef3e2" : C.white,
-            border: `1px solid ${C.border}`, borderRadius: "var(--radius-md, 10px)", padding: "10px 14px",
+            border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 14px",
           }}>
             <div style={{ fontWeight: 800, fontSize: 16, width: 24, textAlign: "center", color: i < 3 ? ["#f59e0b","var(--text-tertiary)","#cd7c2f"][i] : C.gray }}>
               {i < 3 ? ["🥇","🥈","🥉"][i] : `${i+1}`}
@@ -19222,7 +19279,7 @@ function AdminCuentaBancaria() {
   }
 
   const inputStyle = {
-    width: "100%", padding: "9px 12px", borderRadius: "var(--radius-sm, 8px)", border: `1px solid ${C.border}`,
+    width: "100%", padding: "9px 12px", borderRadius: 10, border: `1px solid ${C.border}`,
     fontSize: 13, color: C.dark, background: C.white, boxSizing: "border-box", outline: "none",
   };
   const labelStyle = { fontSize: 12, fontWeight: 600, color: C.gray, marginBottom: 4, display: "block" };
@@ -19247,7 +19304,7 @@ function AdminCuentaBancaria() {
 
       {msg && (
         <div style={{
-          padding: "10px 14px", borderRadius: "var(--radius-sm, 8px)", marginBottom: 14, fontSize: 13,
+          padding: "10px 14px", borderRadius: 10, marginBottom: 14, fontSize: 13,
           background: msg.type === "ok" ? "#d1fae5" : "#fee2e2",
           color: msg.type === "ok" ? "#065f46" : "#991b1b",
           border: `1px solid ${msg.type === "ok" ? "#6ee7b7" : "#fca5a5"}`,
@@ -19259,7 +19316,7 @@ function AdminCuentaBancaria() {
         <div style={{
           background: "linear-gradient(135deg,#f0fdf8,#e6f7f1)",
           border: `1px solid ${C.primary}30`,
-          borderRadius: "var(--radius-lg, 14px)", padding: "20px 24px",
+          borderRadius: 18, padding: "20px 24px",
         }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px" }}>
             {[
@@ -19523,7 +19580,7 @@ export function InfoGastos({ user, members }) {
             ) : alDia.map((m) => {
               const pagoM = pagosMesActual.find(p => p.integrante_id === m.id);
               return (
-                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "6px 8px", borderRadius: "var(--radius-sm, 8px)", background: C.bg }}>
+                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "6px 8px", borderRadius: 10, background: C.bg }}>
                   <Avatar nombre={m.nombre} foto_url={m.foto_url} size={28} color={C.primary} />
                   <span style={{ fontSize: 13, flex: 1 }}>{m.nombre}</span>
                   {pagoM?.comprobante_url ? (
@@ -19551,7 +19608,7 @@ export function InfoGastos({ user, members }) {
               <div style={{ fontSize: 12, color: C.gray, lineHeight: 1.6 }}>
                 <div style={{ marginBottom: 6 }}>El plazo de pago aún está abierto.</div>
                 <div>Cada integrante puede pagar hasta el <strong>día 20 de {finMesLabel(mesActual)}</strong>.</div>
-                <div style={{ marginTop: 8, padding: "6px 10px", background: "#fef9c3", borderRadius: "var(--radius-sm, 8px)", color: "#92400e", fontSize: 11 }}>
+                <div style={{ marginTop: 8, padding: "6px 10px", background: "#fef9c3", borderRadius: 10, color: "#92400e", fontSize: 11 }}>
                   💡 Quienes ya aparecen como &quot;Al día&quot; pagaron de forma anticipada.
                 </div>
               </div>
@@ -19666,7 +19723,7 @@ export function InfoGastos({ user, members }) {
               ].map(([lbl, val]) => (
                 <div key={lbl} style={{
                   background: "white",
-                  borderRadius: "var(--radius-md, 10px)",
+                  borderRadius: 12,
                   padding: "10px 14px",
                   border: `1px solid ${C.border}`,
                 }}>
@@ -19685,7 +19742,7 @@ export function InfoGastos({ user, members }) {
                       onClick={() => navigator.clipboard.writeText(val).catch(() => {})}
                       style={{
                         background: "none", border: "none", cursor: "pointer",
-                        padding: "1px 4px", borderRadius: 4, fontSize: 12,
+                        padding: "1px 4px", borderRadius: 7, fontSize: 12,
                         color: C.gray, opacity: 0.7,
                       }}
                     >📋</button>
@@ -19697,7 +19754,7 @@ export function InfoGastos({ user, members }) {
               marginTop: 12,
               padding: "8px 14px",
               background: C.primary + "12",
-              borderRadius: "var(--radius-sm, 8px)",
+              borderRadius: 10,
               fontSize: 12,
               color: C.primary,
               fontWeight: 500,
@@ -19807,7 +19864,7 @@ function ProximosCumpleanosWidget({ members, setSection }) {
   return (
     <div style={{
       background: C.white,
-      borderRadius: "var(--radius-lg, 14px)",
+      borderRadius: 18,
       border: `1px solid ${C.border}`,
       padding: "16px 20px",
       marginBottom: 14,
@@ -20059,7 +20116,7 @@ function Cumpleanos({ members }) {
                       alignItems: "center",
                       gap: 12,
                       padding: "10px 14px",
-                      borderRadius: "var(--radius-md, 10px)",
+                      borderRadius: 12,
                       background: esHoy ? C.primary + "0d" : C.white,
                       border: `1px solid ${esHoy ? C.primary + "50" : C.border}`,
                       transition: "box-shadow 0.15s",
