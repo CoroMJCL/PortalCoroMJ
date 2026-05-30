@@ -344,7 +344,7 @@ const C = {
   border: "#e5e5ea",
   white: "#ffffff",
   danger: "#ff3b30",
-  purple: "#af52de",
+  purple: "#1e3a5f",
 };
 
 const G = `
@@ -380,9 +380,9 @@ const G = `
     --ios-green: #34c759;
     --ios-orange: #ff9500;
     --ios-red: #ff3b30;
-    --ios-purple: #af52de;
+    --ios-purple: #1e3a5f;
     --ios-teal: #30b0c7;
-    --ios-indigo: #5856d6;
+    --ios-indigo: #2563eb;
     --blur-bg: saturate(180%) blur(20px);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -496,7 +496,7 @@ const G = `
   /* ── iOS Buttons ── */
   .btn-primary-apple {
     width: 100%; padding: 14px 18px;
-    background: linear-gradient(135deg, var(--accent) 0%, #2d1b69 100%); color: white;
+    background: linear-gradient(135deg, var(--accent) 0%, #0f3d6e 100%); color: white;
     border: none; border-radius: 14px;
     font-size: 15px; font-weight: 600;
     letter-spacing: -0.022em;
@@ -593,7 +593,7 @@ const NAV = [
   { id: "asistencia",       icon: "✅", label: "Asistencia" },
   { id: "reconoceme",       icon: "🌟", label: "Reconóceme" },
   { id: "noticias",         icon: "◈",  label: "Avisos" },
-  { id: "escuela_canto",    icon: "🎤", label: "Escuela de Canto" },
+  { id: "escuela_canto",    icon: "🎤", label: "Curso de Canto Litúrgico" },
   { id: "biblioteca",       icon: "▤",  label: "Biblioteca" },
   { id: "cancionero",       icon: "♫",  label: "Canto Digital" },
   { id: "documentos",       icon: "⬇",  label: "Descargas Misas" },
@@ -619,7 +619,7 @@ const BOTTOM_NAV = [
 
 const CUERDAS = {
   Soprano: "#ec4899",
-  Contralto: "#8b5cf6",
+  Contralto: "#0e7490",
   Tenor: "#3b82f6",
   Bajo: "#1e3a5f",
   Admin: "#6b7280",
@@ -772,7 +772,7 @@ function Btn({
       ? {
           background: h && !disabled
             ? `linear-gradient(135deg, ${C.primaryDark} 0%, #1a2d4a 100%)`
-            : `linear-gradient(135deg, ${C.primary} 0%, #2d1b69 100%)`,
+            : `linear-gradient(135deg, ${C.primary} 0%, #0f3d6e 100%)`,
           color: "white",
           opacity: disabled ? 0.5 : 1,
           boxShadow: h && !disabled
@@ -2693,8 +2693,11 @@ export default function App() {
                 <EscuelaCanto
                   user={user}
                   docs={materialEnsayo}
+                  podcasts={podcasts}
                   setSection={setSection}
                   esVisita={esVisita(user)}
+                  isAdmin={esCuerdaAdmin(user)}
+                  onReload={loadData}
                 />
               )}
             </>
@@ -3037,7 +3040,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
                   background: "none",
                   border: "none",
                   fontSize: 12,
-                  color: "#4f46e5",
+                  color: "#1d6fc7",
                   cursor: "pointer",
                   padding: "0 0 16px",
                   textDecoration: "underline",
@@ -3051,7 +3054,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
                 style={{
                   width: "100%",
                   padding: "13px",
-                  background: "#4f46e5",
+                  background: "#1d6fc7",
                   border: "none",
                   borderRadius: 10,
                   color: "white",
@@ -3183,7 +3186,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
                 style={{
                   width: "100%",
                   padding: "13px",
-                  background: "#4f46e5",
+                  background: "#1d6fc7",
                   border: "none",
                   borderRadius: 10,
                   color: "white",
@@ -3267,7 +3270,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
                 style={{
                   width: "100%",
                   padding: "13px",
-                  background: "#4f46e5",
+                  background: "#1d6fc7",
                   border: "none",
                   borderRadius: 10,
                   color: "white",
@@ -3716,7 +3719,7 @@ function VocalizacionWidget({ isAdmin }) {
   return (
     <div style={{ background:"white", borderRadius:14, overflow:"hidden", border:"1px solid rgba(60,60,67,0.1)", boxShadow:"0 1px 6px rgba(0,0,0,0.05)", marginBottom:14 }}>
       <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", borderBottom: videoId ? "1px solid rgba(60,60,67,0.08)" : "none" }}>
-        <div style={{ width:30, height:30, background:"linear-gradient(145deg,#6d28d9,#a855f7)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+        <div style={{ width:30, height:30, background:"linear-gradient(145deg,#152d4a,#1e6ab0)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
           <svg width="11" height="13" viewBox="0 0 11 13" fill="none"><rect x="3" y="0" width="5" height="8" rx="2.5" fill="white"/><path d="M1 7c0 2.5 9 2.5 9 0" stroke="white" strokeWidth="1.2" strokeLinecap="round" fill="none"/><line x1="5.5" y1="10" x2="5.5" y2="13" stroke="white" strokeWidth="1.2" strokeLinecap="round"/></svg>
         </div>
         <div style={{ flex:1 }}>
@@ -3724,7 +3727,7 @@ function VocalizacionWidget({ isAdmin }) {
           <div style={{ fontSize:11, color:"#8e8e93" }}>{videoId ? "YouTube" : "Sin video asignado"}</div>
         </div>
         {isAdmin && (
-          <button onClick={editing ? cancelEdit : openEdit} style={{ background: editing ? "rgba(0,0,0,0.04)" : "rgba(168,85,247,0.08)", border:"none", borderRadius:20, padding:"5px 12px", fontSize:12, fontWeight:500, color: editing ? "#8e8e93" : "#7c3aed", cursor:"pointer" }}>
+          <button onClick={editing ? cancelEdit : openEdit} style={{ background: editing ? "rgba(0,0,0,0.04)" : "rgba(30,58,95,0.08)", border:"none", borderRadius:20, padding:"5px 12px", fontSize:12, fontWeight:500, color: editing ? "#8e8e93" : "#1e3a5f", cursor:"pointer" }}>
             {editing ? "Cancelar" : videoId ? "Cambiar" : "Asignar"}
           </button>
         )}
@@ -3733,10 +3736,10 @@ function VocalizacionWidget({ isAdmin }) {
         )}
       </div>
       {editing && (
-        <div style={{ padding:"12px 14px", background:"rgba(124,58,237,0.04)", borderBottom:"1px solid rgba(60,60,67,0.08)" }}>
+        <div style={{ padding:"12px 14px", background:"rgba(29,111,199,0.05)", borderBottom:"1px solid rgba(60,60,67,0.08)" }}>
           <input value={inputVal} onChange={(e) => setInputVal(e.target.value)} placeholder="https://youtube.com/watch?v=..." onKeyDown={(e) => { if (e.key === "Enter") saveUrl(); if (e.key === "Escape") cancelEdit(); }} autoFocus style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", borderRadius:10, border:"1px solid rgba(60,60,67,0.18)", fontSize:13, outline:"none", marginBottom:8, background:"white", color:"#1c1c1e", letterSpacing:"-0.016em" }} />
           <div style={{ display:"flex", gap:8 }}>
-            <button onClick={saveUrl} style={{ background:"#7c3aed", border:"none", borderRadius:10, padding:"7px 16px", fontSize:13, fontWeight:500, color:"white", cursor:"pointer" }}>Guardar</button>
+            <button onClick={saveUrl} style={{ background:"#1e3a5f", border:"none", borderRadius:10, padding:"7px 16px", fontSize:13, fontWeight:500, color:"white", cursor:"pointer" }}>Guardar</button>
             {videoId && <button onClick={async () => { setSavedUrl(""); await setConfig(VOC_STORAGE_KEY, ""); setEditing(false); }} style={{ background:"rgba(255,59,48,0.08)", border:"none", borderRadius:10, padding:"7px 16px", fontSize:13, fontWeight:500, color:"#ff3b30", cursor:"pointer" }}>Quitar</button>}
           </div>
         </div>
@@ -3747,8 +3750,8 @@ function VocalizacionWidget({ isAdmin }) {
         </div>
       ) : isAdmin ? (
         <div style={{ padding:"32px 20px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:6, background:"rgba(242,242,247,0.5)" }}>
-          <div style={{ width:40, height:40, borderRadius:10, background:"rgba(124,58,237,0.06)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <svg width="14" height="16" viewBox="0 0 14 16" fill="none"><rect x="4" y="0" width="6" height="9" rx="3" fill="rgba(124,58,237,0.3)"/><path d="M1 9c0 3.3 12 3.3 12 0" stroke="rgba(124,58,237,0.3)" strokeWidth="1.5" strokeLinecap="round" fill="none"/><line x1="7" y1="12" x2="7" y2="15.5" stroke="rgba(124,58,237,0.3)" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          <div style={{ width:40, height:40, borderRadius:10, background:"rgba(29,111,199,0.07)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <svg width="14" height="16" viewBox="0 0 14 16" fill="none"><rect x="4" y="0" width="6" height="9" rx="3" fill="rgba(29,111,199,0.35)"/><path d="M1 9c0 3.3 12 3.3 12 0" stroke="rgba(29,111,199,0.35)" strokeWidth="1.5" strokeLinecap="round" fill="none"/><line x1="7" y1="12" x2="7" y2="15.5" stroke="rgba(29,111,199,0.35)" strokeWidth="1.5" strokeLinecap="round"/></svg>
           </div>
           <div style={{ fontSize:12, color:"#8e8e93" }}>Sin video asignado</div>
         </div>
@@ -4028,7 +4031,7 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
                 <button
                   onClick={saveMeta}
                   disabled={savingMeta}
-                  style={{ background: "linear-gradient(135deg,#4f46e5,#4338ca)", border: "none", borderRadius: 12, padding: "10px 24px", fontSize: 13, fontWeight: 700, color: "white", cursor: savingMeta ? "not-allowed" : "pointer", opacity: savingMeta ? 0.7 : 1 }}
+                  style={{ background: "linear-gradient(135deg,#1d6fc7,#1a4d8f)", border: "none", borderRadius: 12, padding: "10px 24px", fontSize: 13, fontWeight: 700, color: "white", cursor: savingMeta ? "not-allowed" : "pointer", opacity: savingMeta ? 0.7 : 1 }}
                 >{savingMeta ? "Guardando…" : "✅ Guardar"}</button>
                 <button
                   onClick={() => setEditingMeta(false)}
@@ -6230,8 +6233,9 @@ function Perfil({ user, members, setUser }) {
     <div style={{
       display: "flex", alignItems: "flex-start", gap: 14,
       padding: "13px 16px", borderRadius: 14,
-      background: "rgba(255,255,255,0.7)",
-      border: `1px solid ${C.border}`,
+      background: "white",
+      border: `1px solid rgba(60,60,67,0.09)`,
+      boxShadow: "0 1px 5px rgba(0,0,0,0.04)",
       marginBottom: 8,
     }}>
       <div style={{
@@ -6588,7 +6592,7 @@ function Perfil({ user, members, setUser }) {
             <div style={{
               width:52, height:52, borderRadius:15, flexShrink:0,
               background: pushEnabled
-                ? "linear-gradient(135deg, #4338ca, #22c55e)"
+                ? "linear-gradient(135deg, #1a4d8f, #22c55e)"
                 : `linear-gradient(135deg, ${cc}, ${cc}bb)`,
               display:"flex", alignItems:"center", justifyContent:"center",
               fontSize:24,
@@ -6619,7 +6623,7 @@ function Perfil({ user, members, setUser }) {
               }}>
                 <div style={{
                   width:7, height:7, borderRadius:"50%",
-                  background: pushEnabled ? "#4338ca" : "var(--text-tertiary)",
+                  background: pushEnabled ? "#1a4d8f" : "var(--text-tertiary)",
                 }} />
                 <span style={{ fontSize:11, fontWeight:700, color: pushEnabled ? "#15803d" : "var(--text-secondary)" }}>
                   {pushLoading ? "Procesando…" : pushEnabled ? "Activas" : "Inactivas"}
@@ -6663,67 +6667,45 @@ function Perfil({ user, members, setUser }) {
 // ══════════════════════════════════════════
 function Agenda({ eventos, onReload }) {
   return (
-    <div style={{ maxWidth: 900 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-          flexWrap: "wrap",
-          gap: 8,
-        }}
-      >
+    <div style={{ maxWidth: 1100 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:20, flexWrap:"wrap", gap:12 }}>
         <div>
-          <h2
-            style={{
-              fontSize: 20,
-              fontFamily: "var(--font-display)",
-              fontWeight: 600,
-              color: C.dark,
-              marginBottom: 2,
-            }}
-          >
-            Agenda del Coro
-          </h2>
-          <p style={{ fontSize: 13, color: C.gray }}>
-            Calendario Coro Misioneros de Jesús
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:4 }}>
+            <div style={{ width:36, height:36, borderRadius:10, background:"linear-gradient(135deg, #1e3a5f, #2d5a8e)", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 4px 14px rgba(30,58,95,0.30)" }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <rect x="1" y="3" width="14" height="12" rx="2" stroke="white" strokeWidth="1.3" fill="none"/>
+                <path d="M1 7h14" stroke="white" strokeWidth="1.3"/>
+                <path d="M5 1v3M11 1v3" stroke="white" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <h2 style={{ fontSize:20, fontFamily:"var(--font-display)", fontWeight:700, color:C.dark, letterSpacing:"-0.025em", margin:0 }}>
+              Agenda del Coro
+            </h2>
+          </div>
+          <p style={{ fontSize:13, color:C.gray, margin:0, letterSpacing:"-0.01em" }}>
+            Calendario Coro Misioneros de Jesús · Próximos eventos y ensayos
           </p>
         </div>
-        <a
-          href="https://calendar.google.com/calendar/r?cid=coromisionerosdjesuscl@gmail.com"
-          target="_blank"
-          rel="noopener"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "8px 14px",
-            background: "white",
-            border: `1px solid ${C.border}`,
-            borderRadius: 10,
-            fontSize: 12,
-            color: C.dark,
-            fontWeight: 500,
-            textDecoration: "none",
-          }}
-        >
-          📅 Abrir en Google Calendar
+        <a href="https://calendar.google.com/calendar/r?cid=coromisionerosdjesuscl@gmail.com" target="_blank" rel="noopener"
+          style={{ display:"inline-flex", alignItems:"center", gap:7, padding:"9px 16px", background:"linear-gradient(135deg, #1e3a5f, #2d5a8e)", borderRadius:10, fontSize:12, color:"white", fontWeight:600, textDecoration:"none", boxShadow:"0 3px 12px rgba(30,58,95,0.25)", letterSpacing:"-0.01em" }}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <rect x="0.5" y="2" width="11" height="9.5" rx="1.5" stroke="white" strokeWidth="1.2" fill="none"/>
+            <path d="M0.5 5.5h11" stroke="white" strokeWidth="1.2"/>
+            <path d="M3.5 0.5v2.5M8.5 0.5v2.5" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
+          </svg>
+          Google Calendar
         </a>
       </div>
-      <div
-        style={{
-          borderRadius: 16,
-          overflow: "hidden",
-          border: `1px solid ${C.border}`,
-          boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-        }}
-      >
+      <div style={{ borderRadius:18, overflow:"hidden", border:`1px solid ${C.border}`, boxShadow:"0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)", background:"white" }}>
         <iframe
           src="https://calendar.google.com/calendar/embed?src=coromisionerosdjesuscl%40gmail.com&ctz=America%2FSantiago&hl=es&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=0&showCalendars=0&showTz=0&mode=AGENDA"
-          style={{ width: "100%", height: 680, border: 0, display: "block" }}
+          style={{ width:"100%", height:760, border:0, display:"block" }}
           title="Calendario Coro MJ"
         />
+      </div>
+      <div style={{ marginTop:12, display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+        <div style={{ width:6, height:6, borderRadius:"50%", background:"#34c759" }} />
+        <span style={{ fontSize:11, color:C.gray, letterSpacing:"-0.01em" }}>Sincronizado con Google Calendar en tiempo real</span>
       </div>
     </div>
   );
@@ -7643,90 +7625,42 @@ function Integrantes({ members, setSection, setPreParaId, user }) {
 // ══════════════════════════════════════════
 function Biblioteca({ biblioteca, onReload, user }) {
   const LIBROS_DEFAULT = [
-    {
-      id: "d1",
-      titulo: "Catecismo de la Iglesia Católica",
-      autor: "Vaticano",
-      year: "1992",
-      emoji: "📕",
-      url: "https://www.vatican.va/archive/catechism_sp/index_sp.html",
-    },
-    {
-      id: "d2",
-      titulo: "Sacrosanctum Concilium",
-      autor: "Concilio Vaticano II",
-      year: "1963",
-      emoji: "📗",
-      url: "https://www.vatican.va/archive/hist_councils/ii_vatican_council/documents/vat-ii_const_19631204_sacrosanctum-concilium_sp.html",
-    },
-    {
-      id: "d3",
-      titulo: "Musicam Sacram",
-      autor: "Santa Sede",
-      year: "1967",
-      emoji: "📘",
-      url: "https://www.vatican.va/roman_curia/congregations/ccdds/documents/rc_con_ccdds_doc_19670305_musicam-sacram_sp.html",
-    },
-    {
-      id: "d4",
-      titulo: "Spiritus et Sponsa",
-      autor: "Juan Pablo II",
-      year: "2003",
-      emoji: "📙",
-      url: "https://www.vatican.va/content/john-paul-ii/es/apostolic_letters/2003/documents/hf_jp-ii_apl_20031204_spiritus-et-sponsa.html",
-    },
+    { id:"d1", titulo:"Catecismo de la Iglesia Católica", autor:"Vaticano", year:"1992", emoji:"📕", url:"https://www.vatican.va/archive/catechism_sp/index_sp.html" },
+    { id:"d2", titulo:"Sacrosanctum Concilium", autor:"Concilio Vaticano II", year:"1963", emoji:"📗", url:"https://www.vatican.va/archive/hist_councils/ii_vatican_council/documents/vat-ii_const_19631204_sacrosanctum-concilium_sp.html" },
+    { id:"d3", titulo:"Musicam Sacram", autor:"Santa Sede", year:"1967", emoji:"📘", url:"https://www.vatican.va/roman_curia/congregations/ccdds/documents/rc_con_ccdds_doc_19670305_musicam-sacram_sp.html" },
+    { id:"d4", titulo:"Spiritus et Sponsa", autor:"Juan Pablo II", year:"2003", emoji:"📙", url:"https://www.vatican.va/content/john-paul-ii/es/apostolic_letters/2003/documents/hf_jp-ii_apl_20031204_spiritus-et-sponsa.html" },
   ];
-  const ocultos = (() => {
-    try { return JSON.parse(localStorage.getItem("biblioteca_ocultos") || "[]"); }
-    catch { return []; }
-  })();
-  const librosDefault = LIBROS_DEFAULT.filter((l) => !ocultos.includes(l.id));
-  const todos = [...librosDefault, ...(biblioteca || [])];
-  const emojis = ["📕", "📗", "📘", "📙", "📓", "📔", "📒", "📃"];
+  const ocultos = (() => { try { return JSON.parse(localStorage.getItem("biblioteca_ocultos") || "[]"); } catch { return []; } })();
+  const todos = [...LIBROS_DEFAULT.filter(l => !ocultos.includes(l.id)), ...(biblioteca || [])];
+  const emojis = ["📕","📗","📘","📙","📓","📔","📒","📃"];
+  const paleta = ["#1d6fc7","#0d9488","#b45309","#be185d","#1d4ed8","#2563a8","#065f46","#9a3412"];
+
   return (
     <div style={{ maxWidth: 900 }}>
-      <SectionTitle
-        title="Biblioteca Católica"
-        subtitle="Textos del Magisterio"
-      />
-      <div
-        className="grid-2"
-        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}
-      >
-        {todos.map((l, i) => (
-          <Card
-            key={l.id || i}
-            hover
-            style={{ display: "flex", gap: 14, alignItems: "flex-start" }}
-          >
-            <div style={{ fontSize: 36, flexShrink: 0 }}>
-              {l.emoji || emojis[i % emojis.length]}
-            </div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div
-                style={{
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: C.dark,
-                  marginBottom: 4,
-                }}
-              >
-                {l.titulo}
+      <SectionTitle title="Biblioteca Católica" subtitle="Textos del Magisterio" />
+      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        {todos.map((l, i) => {
+          const color = paleta[i % paleta.length];
+          return (
+            <a key={l.id || i} href={l.url} target="_blank" rel="noopener"
+              style={{ display:"flex", alignItems:"center", gap:14, padding:"13px 16px", background:"white", borderRadius:14, border:"1px solid rgba(60,60,67,0.09)", textDecoration:"none", boxShadow:"0 1px 4px rgba(0,0,0,0.04)", transition:"all 0.18s ease", cursor:"pointer" }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow="0 4px 18px rgba(0,0,0,0.09)"; e.currentTarget.style.transform="translateY(-1px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.04)"; e.currentTarget.style.transform="translateY(0)"; }}
+            >
+              <div style={{ width:42, height:42, borderRadius:11, flexShrink:0, background:color+"14", border:`1px solid ${color}22`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>
+                {l.emoji || emojis[i % emojis.length]}
               </div>
-              <div style={{ fontSize: 12, color: C.gray, marginBottom: 10 }}>
-                {l.autor} · {l.year || l.anio}
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:600, color:C.dark, letterSpacing:"-0.014em", lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{l.titulo}</div>
+                <div style={{ fontSize:11, color:C.gray, marginTop:2, letterSpacing:"-0.01em" }}>{l.autor} · {l.year || l.anio}</div>
               </div>
-              <a href={l.url} target="_blank" rel="noopener">
-                <Btn
-                  variant="ghost"
-                  style={{ fontSize: 11, padding: "5px 10px" }}
-                >
-                  🔗 Leer
-                </Btn>
-              </a>
-            </div>
-          </Card>
-        ))}
+              <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+                <span style={{ fontSize:11, fontWeight:700, color:color, background:color+"12", borderRadius:8, padding:"3px 9px", letterSpacing:"-0.01em" }}>{l.year || l.anio}</span>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M8 4l3 3-3 3" stroke="#8e8e93" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>
+            </a>
+          );
+        })}
       </div>
     </div>
   );
@@ -7942,16 +7876,16 @@ function Videos() {
 // ══════════════════════════════════════════════════════════════════
 
 const MOMENTOS_LITURGICOS = [
-  { id: "entrada",       label: "Canto de Entrada",         color: "#4f46e5", icon: "🚪" },
-  { id: "acto_penit",   label: "Acto Penitencial / Kyrie",  color: "#8b5cf6", icon: "🙏" },
+  { id: "entrada",       label: "Canto de Entrada",         color: "#1d6fc7", icon: "🚪" },
+  { id: "acto_penit",   label: "Acto Penitencial / Kyrie",  color: "#2d7dd2", icon: "🙏" },
   { id: "gloria",       label: "Gloria",                    color: "#B8922A", icon: "✨" },
   { id: "salmo",        label: "Salmo Responsorial",        color: "#3b82f6", icon: "📖" },
   { id: "aleluya",      label: "Aleluya / Aclamación",      color: "#f59e0b", icon: "🎶" },
   { id: "ofertorio",    label: "Ofertorio",                 color: "#ef4444", icon: "🍞" },
   { id: "santo",        label: "Santo",                     color: "#ec4899", icon: "⭐" },
   { id: "paz",          label: "Rito de la Paz",            color: "#06b6d4", icon: "🕊️" },
-  { id: "comunion",     label: "Comunión",                  color: "#4f46e5", icon: "💫" },
-  { id: "accion",       label: "Acción de Gracias",         color: "#8b5cf6", icon: "🙌" },
+  { id: "comunion",     label: "Comunión",                  color: "#1d6fc7", icon: "💫" },
+  { id: "accion",       label: "Acción de Gracias",         color: "#2d7dd2", icon: "🙌" },
   { id: "salida",       label: "Canto de Salida",           color: "var(--text-secondary)", icon: "🚶" },
 ];
 
@@ -8517,54 +8451,36 @@ function CancioneroBuscador({ canciones, isAdmin, onAbrir, onReload }) {
 
 function CancionCard({ cancion: c, isAdmin, onAbrir, onEliminar, guardada }) {
   const momentos = c.momentos || [];
+  const primerMomento = momentos[0] ? MOMENTOS_LITURGICOS.find(m => m.id === momentos[0]) : null;
   return (
-    <Card hover style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-        <div style={{
-          width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-          background: guardada ? C.primaryLight : "rgba(0,0,0,0.05)",
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
-        }}>{guardada ? "🎵" : "📄"}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, lineHeight: 1.3,
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nombre}</div>
-          {c.artista && <div style={{ fontSize: 12, color: C.gray, marginTop: 2 }}>{c.artista}</div>}
-          {c.tono_base && <div style={{ fontSize: 11, color: C.primary, fontWeight: 600, marginTop: 2 }}>Tono: {notaLatina(c.tono_base)}</div>}
+    <div style={{ background:"white", borderRadius:13, border:"1px solid rgba(60,60,67,0.09)", boxShadow:"0 1px 4px rgba(0,0,0,0.04)", padding:"12px 14px", display:"flex", alignItems:"center", gap:12, transition:"all 0.18s ease", cursor:"pointer" }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.transform="translateY(-1px)"; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.04)"; e.currentTarget.style.transform="translateY(0)"; }}
+      onClick={() => onAbrir(c)}
+    >
+      <div style={{ width:38, height:38, borderRadius:10, flexShrink:0, background:guardada ? `linear-gradient(135deg, ${C.primary}18, ${C.primary}0a)` : "rgba(0,0,0,0.04)", border:guardada ? `1px solid ${C.primary}25` : "1px solid rgba(0,0,0,0.06)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>
+        {guardada ? "🎵" : "📄"}
+      </div>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontSize:13, fontWeight:600, color:C.dark, letterSpacing:"-0.014em", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", lineHeight:1.3 }}>{c.nombre}</div>
+        <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:3 }}>
+          {c.artista && <span style={{ fontSize:11, color:C.gray, letterSpacing:"-0.01em" }}>{c.artista}</span>}
+          {c.artista && c.tono_base && <span style={{ color:C.border }}>·</span>}
+          {c.tono_base && <span style={{ fontSize:11, fontWeight:700, color:C.primary, letterSpacing:"-0.01em" }}>{notaLatina(c.tono_base)}</span>}
+          {primerMomento && <><span style={{ color:C.border }}>·</span><span style={{ fontSize:10, fontWeight:700, color:primerMomento.color }}>{primerMomento.icon}</span></>}
+          {momentos.length > 1 && <span style={{ fontSize:10, color:C.gray }}>+{momentos.length - 1}</span>}
         </div>
       </div>
-      {momentos.length > 0 && (
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-          {momentos.slice(0,3).map(mid => {
-            const mom = MOMENTOS_LITURGICOS.find(m => m.id === mid);
-            return mom ? (
-              <span key={mid} style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 14,
-                background: mom.color + "18", color: mom.color, border: `1px solid ${mom.color}30` }}>
-                {mom.icon} {mom.label.split(" ")[0]}
-              </span>
-            ) : null;
-          })}
-          {momentos.length > 3 && <span style={{ fontSize: 10, color: C.gray }}>+{momentos.length - 3}</span>}
-        </div>
-      )}
-      <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
-        <button onClick={() => onAbrir(c)} style={{
-          flex: 1, padding: "7px 0", borderRadius: 10, border: "none",
-          background: C.primary, color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
-        }}>📄 Ver letra</button>
+      <div style={{ display:"flex", gap:6, flexShrink:0 }} onClick={e => e.stopPropagation()}>
         {c.drive_url && (
-          <a href={c.drive_url} target="_blank" rel="noopener" style={{
-            padding: "7px 10px", borderRadius: 10, border: `1px solid ${C.border}`,
-            background: C.light, color: C.gray, fontSize: 12, cursor: "pointer", textDecoration: "none",
-          }}>☁️</a>
+          <a href={c.drive_url} target="_blank" rel="noopener" style={{ width:30, height:30, borderRadius:8, border:`1px solid ${C.border}`, background:"rgba(0,0,0,0.02)", color:C.gray, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, textDecoration:"none" }} title="Ver en Drive">☁️</a>
         )}
         {isAdmin && guardada && (
-          <button onClick={() => onEliminar(c.id)} style={{
-            padding: "7px 10px", borderRadius: 10, border: "none",
-            background: "#fee2e2", color: C.danger, fontSize: 12, cursor: "pointer",
-          }}>🗑</button>
+          <button onClick={() => onEliminar(c.id)} style={{ width:30, height:30, borderRadius:8, border:"none", background:"#fee2e2", color:C.danger, fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }} title="Eliminar">🗑</button>
         )}
+        <button onClick={() => onAbrir(c)} style={{ height:30, borderRadius:8, border:"none", padding:"0 10px", background:`linear-gradient(135deg, ${C.primary}, ${C.primaryDark})`, color:"white", fontSize:11, fontWeight:600, cursor:"pointer", letterSpacing:"-0.01em", whiteSpace:"nowrap" }}>Ver letra</button>
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -9668,7 +9584,7 @@ function AdminTab({ label, active, onClick }) {
         fontSize: 13,
         fontWeight: active ? 600 : 500,
         background: active
-          ? `linear-gradient(135deg, ${C.primary} 0%, #2d1b69 100%)`
+          ? `linear-gradient(135deg, ${C.primary} 0%, #0f3d6e 100%)`
           : "rgba(255,255,255,0.8)",
         color: active ? "white" : C.gray,
         boxShadow: active ? `0 2px 10px ${C.primary}40` : "none",
@@ -12304,7 +12220,7 @@ function AdminBiblioteca({ biblioteca, onReload }) {
                   fontWeight: 600,
                   cursor: "pointer",
                   background: visible ? "#dcfce7" : "#fee2e2",
-                  color: visible ? "#4338ca" : "#dc2626",
+                  color: visible ? "#1a4d8f" : "#dc2626",
                   flexShrink: 0,
                 }}
               >
@@ -13409,12 +13325,12 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     <button
                       onClick={toggleColLetra}
                       title={showColLetra ? "Ocultar URL Letra" : "Mostrar URL Letra (PDF)"}
-                      style={{ background: showColLetra ? "#4f46e5" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer", marginRight: 3 }}
+                      style={{ background: showColLetra ? "#1d6fc7" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer", marginRight: 3 }}
                     >📄</button>
                     <button
                       onClick={toggleColAudio}
                       title={showColAudio ? "Ocultar URL Audio" : "Mostrar URL Audio Ref."}
-                      style={{ background: showColAudio ? "#4f46e5" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer" }}
+                      style={{ background: showColAudio ? "#1d6fc7" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer" }}
                     >▶</button>
                   </th>
                 </tr>
@@ -13951,12 +13867,12 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     <button
                       onClick={toggleColLetra}
                       title={showColLetra ? "Ocultar Letra (PDF)" : "Mostrar Letra (PDF)"}
-                      style={{ background: showColLetra ? "#4f46e5" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer", marginRight: 3 }}
+                      style={{ background: showColLetra ? "#1d6fc7" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer", marginRight: 3 }}
                     >📄</button>
                     <button
                       onClick={toggleColAudio}
                       title={showColAudio ? "Ocultar Audio Ref." : "Mostrar Audio Ref."}
-                      style={{ background: showColAudio ? "#4f46e5" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer" }}
+                      style={{ background: showColAudio ? "#1d6fc7" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer" }}
                     >▶</button>
                   </th>
                 </tr>
@@ -14722,7 +14638,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                 const reg = misReg.find(a => a.evento_id === e.id);
                 const estado = reg?.estado;
                 if (!estado) return null;
-                const color = estado === "presente" ? C.primary : estado === "justificado" ? "#f59e0b" : estado === "excluido" ? "#8b5cf6" : estado === "nuevo" ? "#06b6d4" : "#ef4444";
+                const color = estado === "presente" ? C.primary : estado === "justificado" ? "#f59e0b" : estado === "excluido" ? "#2d7dd2" : estado === "nuevo" ? "#06b6d4" : "#ef4444";
                 const icono = estado === "presente" ? "✅" : estado === "justificado" ? "🟡" : estado === "excluido" ? "🔵" : estado === "nuevo" ? "🆕" : "❌";
                 const tipoEmoji = e.tipo === "ensayo" ? "🎵" : e.tipo === "misa" ? "⛪" : "📅";
                 return (
@@ -14841,7 +14757,7 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                           {members.map(m => {
                             const reg = regEvento.find(a => a.member_id === m.id);
                             const estado = reg?.estado || "sin registro";
-                            const color = estado === "presente" ? C.primary : estado === "justificado" ? "#f59e0b" : estado === "ausente" ? "#ef4444" : estado === "excluido" ? "#8b5cf6" : estado === "nuevo" ? "#06b6d4" : C.gray;
+                            const color = estado === "presente" ? C.primary : estado === "justificado" ? "#f59e0b" : estado === "ausente" ? "#ef4444" : estado === "excluido" ? "#2d7dd2" : estado === "nuevo" ? "#06b6d4" : C.gray;
                             const icono = estado === "presente" ? "✅" : estado === "justificado" ? "🟡" : estado === "ausente" ? "❌" : estado === "excluido" ? "🔵" : estado === "nuevo" ? "🆕" : "⬜";
                             return (
                               <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 6, background: color + "15", border: `1px solid ${color}30`, borderRadius: 20, padding: "4px 10px", fontSize: 12 }}>
@@ -15048,9 +14964,9 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
               <div style={{ fontSize: 20, fontWeight: 800, color: "#ef4444" }}>{ausentes}</div>
               <div style={{ fontSize: 11, color: "#ef4444" }}>Ausentes</div>
             </div>
-            <div style={{ flex: 1, minWidth: 80, background: "#ede9fe", borderRadius: 12, padding: "10px 14px", textAlign: "center" }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: "#8b5cf6" }}>{excluidos}</div>
-              <div style={{ fontSize: 11, color: "#8b5cf6" }}>🔵 Excluidos</div>
+            <div style={{ flex: 1, minWidth: 80, background: "#e3effb", borderRadius: 12, padding: "10px 14px", textAlign: "center" }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#2d7dd2" }}>{excluidos}</div>
+              <div style={{ fontSize: 11, color: "#2d7dd2" }}>🔵 Excluidos</div>
             </div>
             <div style={{ flex: 1, minWidth: 80, background: "#cffafe", borderRadius: 12, padding: "10px 14px", textAlign: "center" }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: "#06b6d4" }}>{nuevosCount}</div>
@@ -15062,7 +14978,7 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
           <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
             <button onClick={() => marcarTodos("presente")} style={{ padding: "6px 14px", borderRadius: 10, border: `1px solid ${C.primary}`, background: C.primaryLight, color: C.primary, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>✅ Todos presentes</button>
             <button onClick={() => marcarTodos("ausente")} style={{ padding: "6px 14px", borderRadius: 10, border: "1px solid #ef4444", background: "#fee2e2", color: "#ef4444", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>❌ Todos ausentes</button>
-            <button onClick={() => marcarTodos("excluido")} style={{ padding: "6px 14px", borderRadius: 10, border: "1px solid #8b5cf6", background: "#ede9fe", color: "#8b5cf6", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔵 Excluir todos</button>
+            <button onClick={() => marcarTodos("excluido")} style={{ padding: "6px 14px", borderRadius: 10, border: "1px solid #2d7dd2", background: "#e3effb", color: "#2d7dd2", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔵 Excluir todos</button>
           </div>
 
           {/* Lista de integrantes */}
@@ -15082,7 +14998,7 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
                   <div style={{ display: "flex", gap: 6 }}>
                     {["presente", "justificado", "ausente", "excluido", "nuevo"].map(op => {
                       const labels = { presente: "✅", justificado: "🟡", ausente: "❌", excluido: "🔵", nuevo: "🆕" };
-                      const colors = { presente: C.primary, justificado: "#f59e0b", ausente: "#ef4444", excluido: "#8b5cf6", nuevo: "#06b6d4" };
+                      const colors = { presente: C.primary, justificado: "#f59e0b", ausente: "#ef4444", excluido: "#2d7dd2", nuevo: "#06b6d4" };
                       const tooltips = { presente: "Presente", justificado: "Justificado", ausente: "Ausente", excluido: "Excluido (no aplica)", nuevo: "Integrante nuevo" };
                       const activo = estado === op;
                       return (
@@ -15341,99 +15257,133 @@ function AdminCuentas({ members, onReload }) {
 //  WIDGET VALORES DEL CORO
 // ═══════════════════════════════════════════════════════════════
 const VALORES = [
-  { icon: "✝️", label: "Fe",          color: "#4f46e5", bg: "#e8f7f2", desc: "Cantamos porque creemos. Nuestra voz es oración, nuestro servicio es adoración." },
-  { icon: "🤝", label: "Respeto",     color: "#534AB7", bg: "#eeedfe", desc: "Valoramos a cada persona, su tiempo, su voz y su lugar en el coro." },
+  { icon: "✝️", label: "Fe",          color: "#1d6fc7", bg: "#e8f7f2", desc: "Cantamos porque creemos. Nuestra voz es oración, nuestro servicio es adoración." },
+  { icon: "🤝", label: "Respeto",     color: "#2563a8", bg: "#e3effb", desc: "Valoramos a cada persona, su tiempo, su voz y su lugar en el coro." },
   { icon: "🤜", label: "Compromiso",  color: "#BA7517", bg: "#faeeda", desc: "Cumplimos con nuestra palabra: en los ensayos, en las misas y en el grupo." },
   { icon: "💜", label: "Comunidad",   color: "#D4537E", bg: "#fbeaf0", desc: "Somos más que un coro, somos una familia que camina junta en la fe." },
 ];
 
 function ValoresWidget() {
   const [activo, setActivo] = useState(0);
+  const [fade, setFade] = useState(true);
+
   useEffect(() => {
-    const t = setInterval(() => setActivo(i => (i + 1) % VALORES.length), 4000);
+    const t = setInterval(() => {
+      setFade(false);
+      setTimeout(() => {
+        setActivo(i => (i + 1) % VALORES.length);
+        setFade(true);
+      }, 220);
+    }, 4200);
     return () => clearInterval(t);
   }, []);
+
   const v = VALORES[activo];
+
   return (
-    <div style={{
-      borderRadius: 20,
-      marginBottom: 14,
-      background: "linear-gradient(135deg, #1e2028 0%, #2d3142 60%, #232633 100%)",
-      boxShadow: "0 8px 32px rgba(10,12,20,0.30)",
-      overflow: "hidden",
-      position: "relative",
-    }}>
-      {/* Decoración fondo */}
-      <div style={{ position:"absolute", top:-40, right:-40, width:200, height:200, borderRadius:"50%", background:"rgba(255,255,255,0.03)", pointerEvents:"none" }} />
-      <div style={{ position:"absolute", bottom:-30, left:-20, width:140, height:140, borderRadius:"50%", background:"rgba(255,255,255,0.025)", pointerEvents:"none" }} />
+    <>
+      <style>{`
+        @keyframes val-fade { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+        .val-content { transition: opacity 0.22s ease; }
+        .val-content.visible { opacity: 1; animation: val-fade 0.28s ease both; }
+        .val-content.hidden  { opacity: 0; }
+        .val-side-btn { transition: all 0.18s ease; }
+        .val-side-btn:hover { background: rgba(255,255,255,0.10) !important; }
+      `}</style>
+      <div style={{
+        borderRadius: 18,
+        marginBottom: 14,
+        background: "linear-gradient(160deg, #0c1120 0%, #111827 55%, #0d1830 100%)",
+        boxShadow: "0 12px 40px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.04) inset",
+        overflow: "hidden",
+        position: "relative",
+        border: "1px solid rgba(255,255,255,0.06)",
+      }}>
+        <div style={{ position:"absolute", top:-60, right:-60, width:220, height:220, borderRadius:"50%", background:"radial-gradient(circle, rgba(180,140,60,0.06) 0%, transparent 70%)", pointerEvents:"none" }} />
+        <div style={{ position:"absolute", bottom:-40, left:-30, width:160, height:160, borderRadius:"50%", background:"radial-gradient(circle, rgba(60,80,180,0.07) 0%, transparent 70%)", pointerEvents:"none" }} />
 
-      <div style={{ display:"flex", alignItems:"stretch", flexWrap:"wrap" }}>
-        {/* Lado izquierdo: título */}
-        <div style={{ padding:"24px 28px", display:"flex", flexDirection:"column", justifyContent:"center", borderRight:"1px solid rgba(255,255,255,0.08)", minWidth:200, flexShrink:0 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-              <polygon points="14,3 17,10.5 25,11.2 19.5,16.5 21.3,24 14,19.8 6.7,24 8.5,16.5 3,11.2 11,10.5" fill="#FFD700" stroke="#FFA500" strokeWidth="0.8" strokeLinejoin="round"/>
-            </svg>
-            <div>
-              <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.5)", letterSpacing:"0.1em", textTransform:"uppercase" }}>Lo que nos une</div>
-              <div style={{ fontFamily:"var(--font-display)", fontSize:16, fontWeight:700, color:"white", lineHeight:1.2 }}>Nuestros Valores</div>
-            </div>
-          </div>
-          {/* Indicadores */}
-          <div style={{ display:"flex", gap:5, marginTop:10 }}>
-            {VALORES.map((_, i) => (
-              <button key={i} onClick={() => setActivo(i)} style={{
-                width: i === activo ? 22 : 7, height:7, borderRadius:4,
-                background: i === activo ? "#7fffd4" : "rgba(255,255,255,0.25)",
-                border:"none", cursor:"pointer", padding:0,
-                transition:"all 0.35s",
-              }} />
-            ))}
-          </div>
-        </div>
-
-        {/* Lado derecho: valor activo */}
-        <div style={{ flex:1, padding:"24px 28px", display:"flex", alignItems:"center", gap:20, minWidth:0 }}>
+        <div style={{ display:"flex", alignItems:"stretch" }}>
+          {/* Columna izquierda */}
           <div style={{
-            width:64, height:64, borderRadius:18, flexShrink:0,
-            background:"rgba(255,255,255,0.13)",
-            border:"1px solid rgba(255,255,255,0.20)",
-            display:"flex", alignItems:"center", justifyContent:"center",
-            fontSize:34,
-            boxShadow:"0 4px 16px rgba(0,0,0,0.2)",
-            transition:"all 0.3s",
+            padding: "22px 22px",
+            display: "flex", flexDirection: "column", justifyContent: "space-between",
+            borderRight: "1px solid rgba(255,255,255,0.07)",
+            minWidth: 170, flexShrink: 0,
           }}>
-            {v.icon}
-          </div>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontFamily:"var(--font-display)", fontSize:26, fontWeight:800, color:"white", marginBottom:8, lineHeight:1.1, letterSpacing:"-0.3px" }}>
-              {v.label}
+            <div>
+              <div style={{ marginBottom: 10 }}>
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                  <polygon points="11,2 13.5,8.5 20.5,9.2 15.5,13.8 17.2,20.5 11,16.8 4.8,20.5 6.5,13.8 1.5,9.2 8.5,8.5"
+                    fill="#c9a227" stroke="#a07c1a" strokeWidth="0.6" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 4 }}>
+                Identidad
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.92)", letterSpacing: "-0.02em", lineHeight: 1.3 }}>
+                Nuestros<br/>Valores
+              </div>
             </div>
-            <div style={{ fontSize:14, color:"rgba(255,255,255,0.88)", lineHeight:1.6, fontWeight:500 }}>
-              {v.desc}
+            <div style={{ display:"flex", flexDirection:"column", gap: 4, marginTop: 16 }}>
+              {VALORES.map((val, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setFade(false); setTimeout(() => { setActivo(i); setFade(true); }, 120); }}
+                  className="val-side-btn"
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    background: i === activo ? "rgba(201,162,39,0.12)" : "transparent",
+                    border: "none", borderRadius: 8, padding: "5px 8px",
+                    cursor: "pointer", textAlign: "left",
+                    borderLeft: `2px solid ${i === activo ? "#c9a227" : "rgba(255,255,255,0.12)"}`,
+                  }}
+                >
+                  <span style={{ fontSize: 13 }}>{val.icon}</span>
+                  <span style={{ fontSize: 11, fontWeight: i === activo ? 700 : 400, color: i === activo ? "#e8c76a" : "rgba(255,255,255,0.45)", whiteSpace:"nowrap", letterSpacing:"-0.01em" }}>
+                    {val.label}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
-        </div>
 
-        {/* Rejilla mini de los 4 valores */}
-        <div style={{ display:"flex", flexDirection:"column", justifyContent:"center", gap:2, padding:"16px 20px 16px 4px", borderLeft:"1px solid rgba(255,255,255,0.08)", flexShrink:0 }}>
-          {VALORES.map((val, i) => (
-            <button key={i} onClick={() => setActivo(i)} style={{
-              display:"flex", alignItems:"center", gap:8,
-              background: i === activo ? "rgba(255,255,255,0.12)" : "transparent",
-              border:"none", borderRadius:10, padding:"7px 12px",
-              cursor:"pointer", textAlign:"left", transition:"all 0.2s",
-              borderLeft: i === activo ? "3px solid #7fffd4" : "3px solid transparent",
-            }}>
-              <span style={{ fontSize:18 }}>{val.icon}</span>
-              <span style={{ fontSize:13, fontWeight: i === activo ? 700 : 500, color: i === activo ? "white" : "rgba(255,255,255,0.65)", whiteSpace:"nowrap" }}>
-                {val.label}
-              </span>
-            </button>
-          ))}
+          {/* Columna derecha: valor activo */}
+          <div style={{ flex: 1, padding: "26px 26px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 14, minWidth: 0 }}>
+            <div className={`val-content ${fade ? "visible" : "hidden"}`}>
+              <div style={{ marginBottom: 10 }}>
+                <div style={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  width: 52, height: 52, borderRadius: 14,
+                  background: "rgba(255,255,255,0.07)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  fontSize: 26,
+                  boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+                }}>
+                  {v.icon}
+                </div>
+              </div>
+              <div style={{
+                fontSize: 28, fontWeight: 800,
+                color: "white",
+                letterSpacing: "-0.03em", lineHeight: 1,
+                marginBottom: 10,
+              }}>
+                {v.label}
+              </div>
+              <div style={{ width: 36, height: 2, background: "linear-gradient(90deg, #c9a227, transparent)", borderRadius: 2, marginBottom: 12 }} />
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.72)", lineHeight: 1.65, fontWeight: 400, letterSpacing: "-0.01em" }}>
+                {v.desc}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+              {VALORES.map((_, i) => (
+                <div key={i} style={{ flex: 1, height: 2, borderRadius: 2, background: i === activo ? "#c9a227" : "rgba(255,255,255,0.12)" }} />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -15540,12 +15490,12 @@ function ReaccionesBar({ recoId, userId }) {
               display: "flex", alignItems: "center", gap: 5,
               padding: "5px 12px", borderRadius: 24,
               border: active
-                ? tipo === "like"     ? "1px solid rgba(99,102,241,0.5)"
+                ? tipo === "like"     ? "1px solid rgba(37,125,210,0.5)"
                 : tipo === "corazon"  ? "1px solid rgba(239,68,68,0.5)"
                 :                       "1px solid rgba(251,191,36,0.5)"
                 : "1px solid rgba(0,0,0,0.10)",
               background: active
-                ? tipo === "like"     ? "rgba(99,102,241,0.10)"
+                ? tipo === "like"     ? "rgba(37,125,210,0.10)"
                 : tipo === "corazon"  ? "rgba(239,68,68,0.10)"
                 :                       "rgba(251,191,36,0.10)"
                 : "rgba(0,0,0,0.03)",
@@ -15561,7 +15511,7 @@ function ReaccionesBar({ recoId, userId }) {
               <span style={{
                 fontSize: 11, fontWeight: 700, minWidth: 12,
                 color: active
-                  ? tipo === "like"    ? "#4f46e5"
+                  ? tipo === "like"    ? "#1d6fc7"
                   : tipo === "corazon" ? "#dc2626"
                   :                      "#d97706"
                   : "#9ca3af",
@@ -15577,204 +15527,122 @@ function ReaccionesBar({ recoId, userId }) {
 }
 
 function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
-  // Mostrar los 6 más recientes que tengan menos de 7 días desde su creación.
-  // Si no hay ninguno dentro de ese plazo, el widget queda vacío hasta el próximo reconocimiento.
   const _ahora = Date.now();
   const recientes = (reconocimientos || [])
     .filter(r => (_ahora - new Date(r.created_at).getTime()) < 7 * 24 * 60 * 60 * 1000)
     .slice(0, 9);
   const total = (reconocimientos || []).length;
+  const getAvatar = (id) => (members || []).find(m => m.id === id);
+  const ini = (n) => (n || "?").charAt(0).toUpperCase();
 
   return (
-    <div style={{
-      background: `linear-gradient(145deg, #0d3d2e 0%, #155e45 45%, #0f4d38 100%)`,
-      borderRadius: 20,
-      padding: "22px 24px",
-      marginBottom: 14,
-      position: "relative",
-      overflow: "hidden",
-      boxShadow: "0 8px 32px rgba(13,61,46,0.25)",
-    }}>
-      {/* Decoración de fondo */}
-      <div style={{ position: "absolute", top: -30, right: -30, width: 160, height: 160, borderRadius: "50%", background: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", bottom: -40, left: -20, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,0.03)", pointerEvents: "none" }} />
+    <>
+      <style>{`
+        @keyframes reco-in { from{opacity:0;transform:scale(0.94)} to{opacity:1;transform:scale(1)} }
+        .reco-avatar { animation: reco-in 0.25s ease both; }
+        .reco-btn-main { transition: all 0.18s ease; }
+        .reco-btn-main:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.28) !important; }
+      `}</style>
+      <div style={{
+        background: "linear-gradient(155deg, #1a1f3c 0%, #242b50 50%, #1c2240 100%)",
+        borderRadius: 18,
+        padding: "22px 24px 20px",
+        marginBottom: 14,
+        position: "relative",
+        overflow: "hidden",
+        boxShadow: "0 12px 40px rgba(10,15,50,0.30), 0 1px 0 rgba(255,255,255,0.04) inset",
+        border: "1px solid rgba(255,255,255,0.06)",
+      }}>
+        <div style={{ position:"absolute", top:-50, right:-50, width:180, height:180, borderRadius:"50%", background:"radial-gradient(circle, rgba(120,130,255,0.08) 0%, transparent 70%)", pointerEvents:"none" }} />
+        <div style={{ position:"absolute", bottom:-40, left:-30, width:140, height:140, borderRadius:"50%", background:"radial-gradient(circle, rgba(200,160,40,0.05) 0%, transparent 70%)", pointerEvents:"none" }} />
 
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10, position: "relative" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          {/* Estrella dorada como ícono del título */}
-          <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.35))" }}>
-            <circle cx="26" cy="26" r="26" fill="rgba(255,255,255,0.10)" />
-            <polygon points="26,8 30.9,20.2 44,21.2 34.3,29.6 37.4,42.4 26,35.4 14.6,42.4 17.7,29.6 8,21.2 21.1,20.2" fill="#FFD700" stroke="#FFA500" strokeWidth="1.2" strokeLinejoin="round" />
-            <polygon points="26,12 30,22.2 41,23 33,30 35.6,41 26,35.2 16.4,41 19,30 11,23 22,22.2" fill="#FFE44D" />
-          </svg>
-          <div>
-            <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 17, color: "white", lineHeight: 1.2 }}>
-              Reconocimientos
+        {/* Header */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: 16, flexWrap:"wrap", gap: 10, position:"relative" }}>
+          <div style={{ display:"flex", alignItems:"center", gap: 14 }}>
+            <div style={{ width: 46, height: 46, borderRadius: 13, background: "rgba(201,162,39,0.15)", border: "1px solid rgba(201,162,39,0.25)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink: 0 }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path d="M8 21h8M12 17v4M17 3H7l1 8c0 2.21 1.79 4 4 4s4-1.79 4-4l1-8z" stroke="#c9a227" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M7 3H4.5C4 5.5 4.5 8 7 9.5M17 3h2.5C20 5.5 19.5 8 17 9.5" stroke="#c9a227" strokeWidth="1.6" strokeLinecap="round"/>
+              </svg>
             </div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 3 }}>
-              {total > 0
-                ? <span><strong style={{ color: "#FFE44D" }}>{total}</strong> reconocimiento{total !== 1 ? "s" : ""} entregado{total !== 1 ? "s" : ""} 🎉</span>
-                : "Sé el primero en reconocer a alguien"}
-            </div>
-          </div>
-        </div>
-        <button
-          onClick={() => setSection("reconoceme")}
-          style={{
-            fontSize: 12, color: "#0d3d2e", background: "#7fffd4",
-            border: "none", borderRadius: 12, padding: "9px 16px",
-            fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-            display: "flex", alignItems: "center", gap: 6,
-          }}
-        >
-          ✦ Reconocer a alguien
-        </button>
-      </div>
-
-      {recientes.length === 0 ? (
-        <div style={{
-          textAlign: "center", padding: "28px 0",
-          background: "rgba(255,255,255,0.06)", borderRadius: 18,
-          border: "1px dashed rgba(255,255,255,0.15)",
-        }}>
-          <img src={LOGO_RECONOCIMIENTO_PERSONAL} alt="" style={{ width: 52, height: 52, objectFit: "contain", marginBottom: 10, opacity: 0.5 }} />
-          {total > 0 ? (
-            <>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>Sin reconocimientos recientes</div>
-              <div style={{ fontSize: 11, marginTop: 4, color: "rgba(255,255,255,0.45)" }}>
-                Los últimos 7 días aparecen aquí ·{" "}
-                <span style={{ textDecoration: "underline", cursor: "pointer" }} onClick={() => setSection("reconoceme")}>Ver todos ({total})</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 16, color: "white", letterSpacing: "-0.02em", lineHeight: 1.1 }}>Reconocimientos</div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginTop: 4 }}>
+                {total > 0
+                  ? <span><strong style={{ color: "#e8c76a", fontWeight: 700 }}>{total}</strong> entregado{total !== 1 ? "s" : ""} al coro</span>
+                  : "Sé el primero en reconocer"}
               </div>
-            </>
-          ) : (
-            <>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>¡Aún no hay reconocimientos!</div>
-              <div style={{ fontSize: 11, marginTop: 4, color: "rgba(255,255,255,0.45)" }}>Haz clic en el botón y reconoce a un compañero del coro.</div>
-            </>
-          )}
-        </div>
-      ) : (
-        <>
-          <div className="grid-reco" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, position: "relative" }}>
-            {recientes.map((r) => {
-              const para = members.find(m => m.id === r.para_id);
-              const de = members.find(m => m.id === r.de_id);
-              const esGrupo = !r.para_id && r.para_grupo;
-              const GRUPOS_W = [
-                { id: "Soprano", color: CUERDAS.Soprano }, { id: "Contralto", color: CUERDAS.Contralto },
-                { id: "Tenor", color: CUERDAS.Tenor }, { id: "Bajo", color: CUERDAS.Bajo },
-                { id: "Coro", color: C.primary },
-              ];
-              const grupoCard = esGrupo ? GRUPOS_W.find(g => g.id === r.para_grupo) : null;
-              const cc = esGrupo ? (grupoCard?.color || C.primary) : (CUERDAS[para?.cuerda] || C.primary);
-              const dc = CUERDAS[de?.cuerda] || "#888";
-              const cat = RECO_CATS.find(c => c.id === r.categoria);
-              const fecha = r.created_at ? new Date(r.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short" }) : "";
-              return (
-                <div key={r.id} style={{
-                  background: "#ffffff",
-                  backdropFilter: "none",
-                  borderRadius: 18,
-                  padding: "14px 16px",
-                  border: `1px solid var(--border-color)`,
-                  borderTop: `3px solid ${cc}`,
-                  display: "flex", flexDirection: "column", gap: 10,
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-                }}>
-                  {/* Para quién */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                    <div style={{
-                      width: 38, height: 38, borderRadius: esGrupo ? 10 : "50%",
-                      background: cc, display: "flex", alignItems: "center", justifyContent: "center",
-                      color: "white", fontSize: esGrupo ? 16 : 13, fontWeight: 700,
-                      flexShrink: 0, overflow: "hidden",
-                      boxShadow: `0 2px 8px ${cc}66`,
-                    }}>
-                      {esGrupo
-                        ? (r.para_grupo === "Soprano" ? "🎶" : r.para_grupo === "Contralto" ? "🎵" : r.para_grupo === "Tenor" ? "🎼" : r.para_grupo === "Bajo" ? "🎹" : "🌟")
-                        : para?.foto_url
-                          ? <img src={para.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          : ini(r.para_nombre || "?")}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1a2332", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {r.para_nombre}
-                      </div>
-                      <div style={{ fontSize: 10, color: cc, fontWeight: 600, marginTop: 1 }}>
-                        {esGrupo ? "Grupo" : rolFullLabel(para)}
-                      </div>
-                    </div>
-                    <img
-                      src={esGrupo ? LOGO_RECONOCIMIENTO_GRUPAL : LOGO_RECONOCIMIENTO_PERSONAL}
-                      alt=""
-                      style={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }}
-                    />
-                  </div>
-
-                  {/* Categoría */}
-                  {cat && (
-                    <div style={{
-                      fontSize: 10, fontWeight: 700, color: "var(--text-secondary)",
-                      background: "var(--bg-hover)", borderRadius: 20,
-                      padding: "3px 10px", display: "inline-flex", alignItems: "center", gap: 4,
-                      alignSelf: "flex-start", textTransform: "uppercase", letterSpacing: "0.05em",
-                      border: `1px solid var(--border-color)`,
-                    }}>
-                      {cat.icon} {cat.label}
-                    </div>
-                  )}
-
-                  {/* Mensaje */}
-                  <div style={{
-                    fontSize: 12, color: "#4b5563", lineHeight: 1.6,
-                    fontFamily: "var(--font-sans)", fontWeight: 400, flex: 1,
-                    display: "-webkit-box", WebkitLineClamp: 3,
-                    WebkitBoxOrient: "vertical", overflow: "hidden",
-                  }}>
-                    {r.mensaje}
-                  </div>
-
-                  {/* Reacciones */}
-                  {r.id && <ReaccionesBar recoId={r.id} userId={user?.id} />}
-
-                  {/* Pie: de quién + fecha */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 8, borderTop: "1px solid #f0f0f0" }}>
-                    <div style={{
-                      width: 20, height: 20, borderRadius: "50%", background: dc,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      color: "white", fontSize: 8, fontWeight: 700, flexShrink: 0, overflow: "hidden",
-                    }}>
-                      {de?.foto_url ? <img src={de.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(r.de_nombre || "?")}
-                    </div>
-                    <div style={{ fontSize: 10, color: "var(--text-secondary)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      De <span style={{ color: "var(--text-secondary)", fontWeight: 600 }}>{r.de_nombre}</span>
-                    </div>
-                    <div style={{ fontSize: 9, color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>{fecha}</div>
-                  </div>
-                </div>
-              );
-            })}
+            </div>
           </div>
+          <button
+            className="reco-btn-main"
+            onClick={() => setSection("reconoceme")}
+            style={{
+              fontSize: 12, color: "#1a1f3c",
+              background: "linear-gradient(135deg, #e8c76a 0%, #c9a227 100%)",
+              border: "none", borderRadius: 10, padding: "9px 16px",
+              fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+              boxShadow: "0 3px 12px rgba(0,0,0,0.25)",
+              display: "flex", alignItems: "center", gap: 6,
+              letterSpacing: "-0.01em",
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+              <polygon points="6.5,1 8,5 12.5,5.5 9.3,8.5 10.3,13 6.5,10.8 2.7,13 3.7,8.5 0.5,5.5 5,5" fill="#1a1f3c"/>
+            </svg>
+            Reconocer
+          </button>
+        </div>
 
-          {(recientes.length >= 6 || total > recientes.length) && (
-            <button
-              onClick={() => setSection("reconoceme")}
-              style={{
-                marginTop: 14, fontSize: 12, color: "rgba(255,255,255,0.85)",
-                background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.2)",
-                borderRadius: 12, cursor: "pointer", fontWeight: 600,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                width: "100%", padding: "9px 0",
-              }}
-            >
-              Ver todos los reconocimientos ({total}) →
+        <div style={{ height: 1, background: "rgba(255,255,255,0.07)", marginBottom: 16 }} />
+
+        {recientes.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"24px 0", background:"rgba(255,255,255,0.04)", borderRadius:14, border:"1px dashed rgba(255,255,255,0.10)" }}>
+            <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.4 }}>⭐</div>
+            {total > 0 ? (
+              <>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", fontWeight: 600, marginBottom: 4 }}>{total} reconocimiento{total !== 1 ? "s" : ""} en total</div>
+                <button onClick={() => setSection("reconoceme")} style={{ fontSize: 12, color: "#9ca3ff", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Ver todos →</button>
+              </>
+            ) : (
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}>No hay reconocimientos recientes</div>
+            )}
+          </div>
+        ) : (
+          <>
+            <div style={{ display:"flex", flexWrap:"wrap", gap: 8, alignItems:"center" }}>
+              {recientes.slice(0, 7).map((r, idx) => {
+                const para = getAvatar(r.para_id);
+                const cc = CUERDAS[para?.cuerda] || C.primary;
+                const cat = RECO_CATS.find(c => c.id === r.categoria);
+                return (
+                  <div key={r.id} className="reco-avatar" title={`${cat?.icon || "⭐"} Para ${r.para_nombre}`}
+                    style={{ position:"relative", width:40, height:40, borderRadius:"50%", background:cc, border:"2.5px solid rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:13, fontWeight:700, overflow:"hidden", cursor:"pointer", boxShadow:"0 2px 8px rgba(0,0,0,0.25)", animationDelay:`${idx*0.05}s`, flexShrink:0 }}>
+                    {para?.foto_url ? <img src={para.foto_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : ini(r.para_nombre || "?")}
+                    <div style={{ position:"absolute", bottom:-1, right:-1, fontSize:10, lineHeight:1, background:"rgba(26,31,60,0.9)", borderRadius:"50%", width:16, height:16, display:"flex", alignItems:"center", justifyContent:"center" }}>{cat?.icon || "⭐"}</div>
+                  </div>
+                );
+              })}
+              {recientes.length > 7 && (
+                <div style={{ width:40, height:40, borderRadius:"50%", background:"rgba(255,255,255,0.10)", border:"2px dashed rgba(255,255,255,0.20)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color:"rgba(255,255,255,0.65)", fontWeight:700, flexShrink:0 }}>+{recientes.length - 7}</div>
+              )}
+              <div style={{ flex:1, minWidth:160, marginLeft:4 }}>
+                <div style={{ fontSize:11, color:"rgba(255,255,255,0.45)", marginBottom:2, letterSpacing:"0.02em", textTransform:"uppercase", fontWeight:600 }}>Más reciente</div>
+                <div style={{ fontSize:12, color:"rgba(255,255,255,0.85)", fontWeight:600, letterSpacing:"-0.01em" }}>
+                  Para <span style={{ color:"#e8c76a" }}>{recientes[0]?.para_nombre}</span>
+                </div>
+                <div style={{ fontSize:11, color:"rgba(255,255,255,0.45)", marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{(recientes[0]?.mensaje || "").slice(0,48)}{recientes[0]?.mensaje?.length > 48 ? "…" : ""}</div>
+              </div>
+            </div>
+            <button onClick={() => setSection("reconoceme")} style={{ marginTop:16, width:"100%", padding:"9px 0", borderRadius:10, background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.10)", color:"rgba(255,255,255,0.70)", fontSize:12, fontWeight:600, cursor:"pointer", letterSpacing:"-0.01em" }}
+              onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.10)"}
+              onMouseLeave={e => e.currentTarget.style.background="rgba(255,255,255,0.06)"}>
+              Ver todos los reconocimientos →
             </button>
-          )}
-        </>
-      )}
-    </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 const LOGO_RECONOCIMIENTO_PERSONAL = "data:image/png;base64,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";
@@ -17423,7 +17291,7 @@ function FinBtn({ children, onClick, variant = "primary", disabled = false, styl
   const [pressed, setPressed] = useState(false);
   const bg =
     variant === "primary"
-      ? h ? `linear-gradient(135deg, ${C.primaryDark} 0%, #1a2d4a 100%)` : `linear-gradient(135deg, ${C.primary} 0%, #2d1b69 100%)`
+      ? h ? `linear-gradient(135deg, ${C.primaryDark} 0%, #1a2d4a 100%)` : `linear-gradient(135deg, ${C.primary} 0%, #0f3d6e 100%)`
       : variant === "danger"
       ? h ? "#dc2626" : "#ef4444"
       : variant === "ghost"
@@ -17570,7 +17438,7 @@ function TabBtn({ label, active, onClick }) {
         fontSize: 13,
         fontWeight: active ? 600 : 500,
         background: active
-          ? `linear-gradient(135deg, ${C.primary} 0%, #2d1b69 100%)`
+          ? `linear-gradient(135deg, ${C.primary} 0%, #0f3d6e 100%)`
           : "rgba(255,255,255,0.8)",
         color: active ? "white" : C.gray,
         boxShadow: active ? `0 2px 10px ${C.primary}40` : "none",
@@ -17781,7 +17649,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
               <button
                 onClick={() => ejecutarPago(confirmPagar.miembro)}
                 disabled={procesando}
-                style={{ flex: 1, background: "linear-gradient(135deg,#4f46e5,#4338ca)", border: "none", borderRadius: 12, padding: "11px 0", fontSize: 13, fontWeight: 700, color: "white", cursor: procesando ? "not-allowed" : "pointer", opacity: procesando ? 0.7 : 1 }}
+                style={{ flex: 1, background: "linear-gradient(135deg,#1d6fc7,#1a4d8f)", border: "none", borderRadius: 12, padding: "11px 0", fontSize: 13, fontWeight: 700, color: "white", cursor: procesando ? "not-allowed" : "pointer", opacity: procesando ? 0.7 : 1 }}
               >{procesando ? "Registrando..." : "✅ Sí, registrar pago"}</button>
               <button
                 onClick={() => setConfirmPagar(null)}
@@ -17899,7 +17767,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
         <StatCard icon="👥" label="En sistema" value={miembrosActivos.length} color="#3b82f6" />
         <StatCard icon="✅" label="Pagaron" value={pagaron.size} color={C.primary} sub={`${pctPago}%`} />
         <StatCard icon="⚠️" label="Morosos" value={mesVencido ? miembrosActivos.length - pagaron.size : "—"} color="#ef4444" />
-        <StatCard icon="💰" label="Recaudado" value={finFmtCLP(totalRecaudado)} color="#8b5cf6" sub={`de ${finFmtCLP(totalEsperado)}`} />
+        <StatCard icon="💰" label="Recaudado" value={finFmtCLP(totalRecaudado)} color="#2d7dd2" sub={`de ${finFmtCLP(totalEsperado)}`} />
       </div>
 
       {/* Barra de progreso */}
@@ -19045,7 +18913,7 @@ function AdminVisitas() {
     </div>
   );
 
-  const cuerdaColor = { Soprano: "#ec4899", Contralto: "#8b5cf6", Tenor: "#3b82f6", Bajo: "#f59e0b", Admin: "#10b981" };
+  const cuerdaColor = { Soprano: "#ec4899", Contralto: "#0e7490", Tenor: "#3b82f6", Bajo: "#f59e0b", Admin: "#10b981" };
 
   if (loading) return <FinSpinner />;
 
@@ -19058,7 +18926,7 @@ function AdminVisitas() {
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
         {statBox("📅", "Hoy", visitasHoy, C.primary)}
         {statBox("📆", "Últimos 7 días", visitas7d, "#3b82f6")}
-        {statBox("🗓️", "Últimos 30 días", visitas30d, "#8b5cf6")}
+        {statBox("🗓️", "Últimos 30 días", visitas30d, "#2d7dd2")}
         {statBox("♾️", "Total histórico", visitas.length, "#f59e0b")}
         {statBox("👥", "Integrantes únicos", unicosTotal, "#ec4899")}
       </div>
@@ -19085,7 +18953,7 @@ function AdminVisitas() {
           }}>🔄 Actualizar</button>
         </div>
         {online.length === 0 ? (
-          <div style={{ fontSize: 12, color: "#4338ca", fontStyle: "italic" }}>No hay integrantes conectados en este momento.</div>
+          <div style={{ fontSize: 12, color: "#1a4d8f", fontStyle: "italic" }}>No hay integrantes conectados en este momento.</div>
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {online.map((u) => (
@@ -19776,11 +19644,11 @@ function CumpleanosHoyWidget({ cumple }) {
   return (
     <div
       style={{
-        background: "linear-gradient(135deg,#4f46e5 0%,#1a2d5a 50%,#0f2d5c 100%)",
+        background: "linear-gradient(135deg,#1d6fc7 0%,#12325c 50%,#0f2d5c 100%)",
         borderRadius: 18,
         padding: "22px 26px",
         marginBottom: 16,
-        border: "2px solid #4f46e560",
+        border: "2px solid #1d6fc760",
         boxShadow: "0 12px 40px rgba(29,158,117,0.30)",
         position: "relative",
         overflow: "hidden",
