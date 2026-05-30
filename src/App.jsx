@@ -15270,10 +15270,7 @@ function ValoresWidget() {
   useEffect(() => {
     const t = setInterval(() => {
       setFade(false);
-      setTimeout(() => {
-        setActivo(i => (i + 1) % VALORES.length);
-        setFade(true);
-      }, 220);
+      setTimeout(() => { setActivo(i => (i + 1) % VALORES.length); setFade(true); }, 240);
     }, 4200);
     return () => clearInterval(t);
   }, []);
@@ -15284,77 +15281,79 @@ function ValoresWidget() {
   return (
     <>
       <style>{`
-        @keyframes val-fade { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
-        .val-content { transition: opacity 0.22s ease; }
-        .val-content.visible { opacity: 1; animation: val-fade 0.3s ease both; }
-        .val-content.hidden  { opacity: 0; }
-        .val-chip { transition: all 0.18s ease; }
-        .val-chip:hover { background: rgba(0,0,0,0.04) !important; }
+        @keyframes val-rise { from{opacity:0;transform:translateY(8px) scale(0.98)} to{opacity:1;transform:translateY(0) scale(1)} }
+        .vw-content { transition: opacity 0.24s ease; }
+        .vw-content.show { opacity:1; animation: val-rise 0.34s cubic-bezier(0.22,1,0.36,1) both; }
+        .vw-content.hide { opacity:0; }
+        .vw-seg { transition: all 0.2s cubic-bezier(0.22,1,0.36,1); }
       `}</style>
       <div style={{
-        borderRadius: 18,
+        position: "relative",
+        borderRadius: 22,
         marginBottom: 14,
-        background: "rgba(255,255,255,0.72)",
-        backdropFilter: "saturate(180%) blur(20px)",
-        WebkitBackdropFilter: "saturate(180%) blur(20px)",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 8px 28px rgba(0,0,0,0.05)",
-        border: "1px solid rgba(60,60,67,0.08)",
         overflow: "hidden",
+        background: `linear-gradient(150deg, ${ac}0f 0%, rgba(255,255,255,0.96) 42%, rgba(255,255,255,0.98) 100%)`,
+        boxShadow: `0 1px 2px rgba(0,0,0,0.04), 0 10px 34px ${ac}1f, 0 2px 10px rgba(0,0,0,0.04)`,
+        border: "1px solid rgba(255,255,255,0.8)",
+        transition: "background 0.5s ease, box-shadow 0.5s ease",
       }}>
+        {/* halo de color difuso */}
+        <div style={{ position:"absolute", top:-70, right:-50, width:200, height:200, borderRadius:"50%", background:`radial-gradient(circle, ${ac}26 0%, transparent 70%)`, pointerEvents:"none", transition:"background 0.5s ease" }} />
+
         {/* Encabezado */}
-        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"14px 18px 0" }}>
-          <div style={{ width:26, height:26, borderRadius:8, background:"#fdf3d6", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-            <svg width="14" height="14" viewBox="0 0 22 22" fill="none">
-              <polygon points="11,2 13.5,8.5 20.5,9.2 15.5,13.8 17.2,20.5 11,16.8 4.8,20.5 6.5,13.8 1.5,9.2 8.5,8.5" fill="#c9a227" stroke="#a07c1a" strokeWidth="0.6" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <div style={{ fontSize:9, fontWeight:700, color:"#a0a0a8", letterSpacing:"0.12em", textTransform:"uppercase" }}>Identidad</div>
+        <div style={{ display:"flex", alignItems:"center", gap:9, padding:"16px 20px 0", position:"relative" }}>
+          <svg width="15" height="15" viewBox="0 0 22 22" fill="none">
+            <polygon points="11,2 13.5,8.5 20.5,9.2 15.5,13.8 17.2,20.5 11,16.8 4.8,20.5 6.5,13.8 1.5,9.2 8.5,8.5" fill="#c9a227" stroke="#a07c1a" strokeWidth="0.6" strokeLinejoin="round"/>
+          </svg>
+          <div style={{ fontSize:9.5, fontWeight:800, color:ac, letterSpacing:"0.16em", textTransform:"uppercase", transition:"color 0.5s ease" }}>Nuestros Valores</div>
           <div style={{ flex:1 }} />
-          <div style={{ fontSize:13, fontWeight:600, color:"#1c1c1e", letterSpacing:"-0.016em" }}>Nuestros Valores</div>
+          <div style={{ fontSize:11, fontWeight:600, color:"#b8b8be", letterSpacing:"0.02em" }}>{activo + 1} / {VALORES.length}</div>
         </div>
 
         {/* Valor activo */}
-        <div style={{ padding:"16px 18px 14px" }}>
-          <div className={`val-content ${fade ? "visible" : "hidden"}`} style={{ display:"flex", alignItems:"center", gap:16 }}>
+        <div style={{ padding:"18px 20px 16px", position:"relative" }}>
+          <div className={`vw-content ${fade ? "show" : "hide"}`} style={{ display:"flex", alignItems:"center", gap:18 }}>
             <div style={{
-              width:60, height:60, borderRadius:16, flexShrink:0,
-              background: ac + "14",
-              border: `1px solid ${ac}22`,
+              width:68, height:68, borderRadius:20, flexShrink:0,
+              background:`linear-gradient(145deg, ${ac} 0%, ${ac}cc 100%)`,
               display:"flex", alignItems:"center", justifyContent:"center",
-              fontSize:30,
+              fontSize:32,
+              boxShadow:`0 8px 22px ${ac}55, inset 0 1px 0 rgba(255,255,255,0.4)`,
             }}>
-              {v.icon}
+              <span style={{ filter:"drop-shadow(0 1px 2px rgba(0,0,0,0.15))" }}>{v.icon}</span>
             </div>
             <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:22, fontWeight:700, color:"#1c1c1e", letterSpacing:"-0.03em", lineHeight:1.1, marginBottom:5 }}>
+              <div style={{ fontSize:25, fontWeight:800, color:"#1c1c1e", letterSpacing:"-0.035em", lineHeight:1.05, marginBottom:7 }}>
                 {v.label}
               </div>
-              <div style={{ fontSize:13, color:"#6b6b70", lineHeight:1.55, letterSpacing:"-0.01em" }}>
+              <div style={{ fontSize:13.5, color:"#5c5c63", lineHeight:1.55, letterSpacing:"-0.012em", fontWeight:450 }}>
                 {v.desc}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Selector segmentado estilo iOS */}
-        <div style={{ display:"flex", gap:3, padding:"0 12px 12px" }}>
+        {/* Selector segmentado iOS premium */}
+        <div style={{ display:"flex", gap:4, padding:"0 13px 14px", position:"relative" }}>
           {VALORES.map((val, i) => {
             const on = i === activo;
             return (
               <button
                 key={i}
-                onClick={() => { setFade(false); setTimeout(() => { setActivo(i); setFade(true); }, 120); }}
-                className="val-chip"
+                onClick={() => { setFade(false); setTimeout(() => { setActivo(i); setFade(true); }, 130); }}
+                className="vw-seg"
                 style={{
-                  flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:5,
-                  background: on ? "white" : "transparent",
-                  border:"none", borderRadius:10, padding:"7px 6px",
+                  flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:6,
+                  background: on ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.0)",
+                  border: on ? `1px solid ${val.color}30` : "1px solid transparent",
+                  borderRadius:12, padding:"8px 6px",
                   cursor:"pointer",
-                  boxShadow: on ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
+                  boxShadow: on ? `0 2px 8px ${val.color}22, 0 1px 2px rgba(0,0,0,0.04)` : "none",
+                  transform: on ? "translateY(-1px)" : "none",
                 }}
               >
-                <span style={{ fontSize:14 }}>{val.icon}</span>
-                <span style={{ fontSize:11.5, fontWeight: on ? 600 : 500, color: on ? "#1c1c1e" : "#9a9aa0", whiteSpace:"nowrap", letterSpacing:"-0.01em" }}>
+                <span style={{ fontSize:15, opacity: on ? 1 : 0.5 }}>{val.icon}</span>
+                <span style={{ fontSize:11.5, fontWeight: on ? 700 : 500, color: on ? val.color : "#a0a0a8", whiteSpace:"nowrap", letterSpacing:"-0.012em" }}>
                   {val.label}
                 </span>
               </button>
@@ -15508,141 +15507,184 @@ function ReaccionesBar({ recoId, userId }) {
 function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
   const _ahora = Date.now();
   const recientes = (reconocimientos || [])
-    .filter(r => (_ahora - new Date(r.created_at).getTime()) < 7 * 24 * 60 * 60 * 1000)
-    .slice(0, 9);
+    .filter(r => (_ahora - new Date(r.created_at).getTime()) < 14 * 24 * 60 * 60 * 1000)
+    .slice(0, 12);
   const total = (reconocimientos || []).length;
   const getAvatar = (id) => (members || []).find(m => m.id === id);
   const ini = (n) => (n || "?").charAt(0).toUpperCase();
-  const ultimo = recientes[0];
-  const ultimoCat = ultimo ? RECO_CATS.find(c => c.id === ultimo.categoria) : null;
+  const GOLD = "#c9a227";
+
+  const [idx, setIdx] = useState(0);
+  const [fade, setFade] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const n = recientes.length;
+
+  const goTo = (next) => {
+    setFade(false);
+    setTimeout(() => { setIdx(next); setFade(true); }, 240);
+  };
+
+  useEffect(() => {
+    if (n <= 1 || paused) return;
+    const t = setInterval(() => {
+      setFade(false);
+      setTimeout(() => { setIdx(i => (i + 1) % n); setFade(true); }, 240);
+    }, 4500);
+    return () => clearInterval(t);
+  }, [n, paused]);
+
+  useEffect(() => { if (idx >= n && n > 0) setIdx(0); }, [n, idx]);
+
+  const grupoData = [
+    { id: "Soprano", label: "Sopranos", icon: "🎶", color: CUERDAS.Soprano },
+    { id: "Contralto", label: "Contraltos", icon: "🎵", color: CUERDAS.Contralto },
+    { id: "Tenor", label: "Tenores", icon: "🎼", color: CUERDAS.Tenor },
+    { id: "Bajo", label: "Bajos", icon: "🎹", color: CUERDAS.Bajo },
+    { id: "Coro", label: "Todo el coro", icon: "🌟", color: C.primary },
+  ];
+
+  const r = recientes[idx];
+  const para = r ? getAvatar(r.para_id) : null;
+  const de = r ? getAvatar(r.de_id) : null;
+  const esGrupo = r ? (!r.para_id && r.para_grupo) : false;
+  const gCard = esGrupo ? grupoData.find(g => g.id === r.para_grupo) : null;
+  const cc = r ? (esGrupo ? (gCard?.color || C.primary) : (CUERDAS[para?.cuerda] || C.primary)) : C.primary;
+  const cat = r ? RECO_CATS.find(c => c.id === r.categoria) : null;
+  const fecha = r?.created_at ? new Date(r.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "long" }) : "";
 
   return (
     <>
       <style>{`
-        @keyframes reco-in { from{opacity:0;transform:scale(0.9)} to{opacity:1;transform:scale(1)} }
-        .reco-av { animation: reco-in 0.28s ease both; }
-        .reco-cta { transition: all 0.18s ease; }
-        .reco-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(30,58,95,0.28) !important; }
-        .reco-verlink { transition: background 0.15s ease; }
-        .reco-verlink:hover { background: #f4f7fb !important; }
+        @keyframes reco-slide { from{opacity:0;transform:translateX(14px)} to{opacity:1;transform:translateX(0)} }
+        .reco-slide { transition: opacity 0.24s ease; }
+        .reco-slide.show { opacity:1; animation: reco-slide 0.36s cubic-bezier(0.22,1,0.36,1) both; }
+        .reco-slide.hide { opacity:0; }
+        .reco-cta { transition: all 0.2s cubic-bezier(0.22,1,0.36,1); }
+        .reco-cta:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(30,58,95,0.30) !important; }
+        .reco-arrow { transition: all 0.16s ease; }
+        .reco-arrow:hover { background: rgba(0,0,0,0.06) !important; }
+        .reco-dot { transition: all 0.3s cubic-bezier(0.22,1,0.36,1); cursor:pointer; }
       `}</style>
-      <div style={{
-        background: "#ffffff",
-        borderRadius: 18,
-        padding: "20px 22px 18px",
-        marginBottom: 14,
-        position: "relative",
-        overflow: "hidden",
-        boxShadow: "0 4px 20px rgba(30,58,95,0.08), 0 1px 3px rgba(0,0,0,0.04)",
-        border: "1px solid rgba(60,60,67,0.09)",
+      <div
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+        style={{
+          position:"relative",
+          background: "linear-gradient(155deg, #fffdf7 0%, rgba(255,255,255,0.97) 38%, #ffffff 100%)",
+          borderRadius: 22,
+          padding: "20px 22px 16px",
+          marginBottom: 14,
+          overflow: "hidden",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 10px 34px rgba(201,162,39,0.10), 0 2px 10px rgba(0,0,0,0.04)",
+          border: "1px solid rgba(255,255,255,0.8)",
       }}>
-        {/* Acento superior sutil */}
-        <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:"linear-gradient(90deg, #c9a227, #e8c76a 50%, #c9a227)" }} />
+        <div style={{ position:"absolute", top:-70, right:-40, width:190, height:190, borderRadius:"50%", background:`radial-gradient(circle, ${cc}1a 0%, transparent 70%)`, pointerEvents:"none", transition:"background 0.5s ease" }} />
 
         {/* Header */}
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: 16, flexWrap:"wrap", gap: 10 }}>
-          <div style={{ display:"flex", alignItems:"center", gap: 13 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, #fdf3d6, #f6e3a8)", border: "1px solid rgba(201,162,39,0.3)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink: 0, boxShadow:"0 2px 8px rgba(201,162,39,0.15)" }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <path d="M8 21h8M12 17v4M17 3H7l1 8c0 2.21 1.79 4 4 4s4-1.79 4-4l1-8z" stroke="#b8901a" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M7 3H4.5C4 5.5 4.5 8 7 9.5M17 3h2.5C20 5.5 19.5 8 17 9.5" stroke="#b8901a" strokeWidth="1.7" strokeLinecap="round"/>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: 14, gap:10, flexWrap:"wrap", position:"relative" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:13 }}>
+            <div style={{ width:46, height:46, borderRadius:14, background:`linear-gradient(145deg, ${GOLD} 0%, #e0bf5a 100%)`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:`0 6px 18px ${GOLD}55, inset 0 1px 0 rgba(255,255,255,0.45)` }}>
+              <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+                <path d="M8 21h8M12 17v4M17 3H7l1 8c0 2.21 1.79 4 4 4s4-1.79 4-4l1-8z" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M7 3H4.5C4 5.5 4.5 8 7 9.5M17 3h2.5C20 5.5 19.5 8 17 9.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
               </svg>
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 16, color: C.dark, letterSpacing: "-0.02em", lineHeight: 1.1 }}>Reconocimientos</div>
-              <div style={{ fontSize: 12, color: C.gray, marginTop: 3 }}>
+              <div style={{ fontWeight:800, fontSize:17, color:"#1c1c1e", letterSpacing:"-0.03em", lineHeight:1.1 }}>Reconocimientos</div>
+              <div style={{ fontSize:12.5, color:"#8a8a90", marginTop:3, fontWeight:500 }}>
                 {total > 0
-                  ? <span><strong style={{ color: C.primary, fontWeight: 700 }}>{total}</strong> entregado{total !== 1 ? "s" : ""} al coro</span>
+                  ? <span><strong style={{ color:"#b8901a", fontWeight:800 }}>{total}</strong> entregado{total !== 1 ? "s" : ""} al coro</span>
                   : "Sé el primero en reconocer"}
               </div>
             </div>
           </div>
-          <button
-            className="reco-cta"
-            onClick={() => setSection("reconoceme")}
-            style={{
-              fontSize: 12, color: "white",
-              background: `linear-gradient(135deg, ${C.primary}, ${C.primaryDark})`,
-              border: "none", borderRadius: 10, padding: "9px 16px",
-              fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
-              boxShadow: "0 3px 12px rgba(30,58,95,0.22)",
-              display: "flex", alignItems: "center", gap: 6,
-              letterSpacing: "-0.01em",
-            }}
-          >
-            <span style={{ fontSize: 13 }}>✦</span> Reconocer
+          <button className="reco-cta" onClick={() => setSection("reconoceme")}
+            style={{ fontSize:12.5, color:"white", background:`linear-gradient(135deg, ${C.primary}, ${C.primaryDark})`, border:"none", borderRadius:13, padding:"10px 18px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap", boxShadow:"0 4px 14px rgba(30,58,95,0.28), inset 0 1px 0 rgba(255,255,255,0.18)", display:"flex", alignItems:"center", gap:6, letterSpacing:"-0.01em" }}>
+            <span style={{ fontSize:13 }}>✦</span> Reconocer
           </button>
         </div>
 
-        {recientes.length === 0 ? (
-          <div style={{ textAlign:"center", padding:"22px 0", background:"#f8fafc", borderRadius:14, border:"1px dashed rgba(60,60,67,0.14)" }}>
-            <div style={{ fontSize: 30, marginBottom: 6, opacity: 0.45 }}>⭐</div>
+        {n === 0 ? (
+          <div style={{ textAlign:"center", padding:"26px 0", background:"rgba(0,0,0,0.02)", borderRadius:16, border:"1px dashed rgba(60,60,67,0.12)" }}>
+            <div style={{ fontSize:32, marginBottom:6, opacity:0.5 }}>⭐</div>
             {total > 0 ? (
               <>
-                <div style={{ fontSize: 13, color: C.dark, fontWeight: 600, marginBottom: 4 }}>{total} reconocimiento{total !== 1 ? "s" : ""} en total</div>
-                <button onClick={() => setSection("reconoceme")} style={{ fontSize: 12, color: C.primary, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Ver todos →</button>
+                <div style={{ fontSize:13, color:"#1c1c1e", fontWeight:600, marginBottom:4 }}>{total} reconocimiento{total !== 1 ? "s" : ""} en total</div>
+                <button onClick={() => setSection("reconoceme")} style={{ fontSize:12, color:C.primary, background:"none", border:"none", cursor:"pointer", fontWeight:700 }}>Ver todos →</button>
               </>
             ) : (
-              <div style={{ fontSize: 13, color: C.gray }}>No hay reconocimientos recientes</div>
+              <div style={{ fontSize:13, color:"#8a8a90" }}>No hay reconocimientos recientes</div>
             )}
           </div>
         ) : (
           <>
-            {/* Último reconocimiento destacado */}
-            {ultimo && (
-              <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:"#f8fafc", borderRadius:13, border:"1px solid rgba(60,60,67,0.07)", marginBottom:14 }}>
-                {(() => {
-                  const para = getAvatar(ultimo.para_id);
-                  const cc = CUERDAS[para?.cuerda] || C.primary;
-                  return (
-                    <div style={{ position:"relative", width:42, height:42, borderRadius:"50%", background:cc, border:"2px solid white", boxShadow:"0 2px 6px rgba(0,0,0,0.12)", display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:14, fontWeight:700, overflow:"hidden", flexShrink:0 }}>
-                      {para?.foto_url ? <img src={para.foto_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : ini(ultimo.para_nombre || "?")}
+            {/* CARRUSEL — tarjeta del reconocimiento actual */}
+            <div style={{ position:"relative", minHeight:150 }}>
+              <div className={`reco-slide ${fade ? "show" : "hide"}`} key={idx} style={{
+                background:"rgba(255,255,255,0.72)",
+                borderRadius:18,
+                border:"1px solid rgba(60,60,67,0.07)",
+                boxShadow:"0 2px 12px rgba(0,0,0,0.05)",
+                padding:"16px 18px",
+              }}>
+                {/* Destinatario */}
+                <div style={{ display:"flex", alignItems:"center", gap:13, marginBottom:12 }}>
+                  <div style={{ width:52, height:52, borderRadius: esGrupo ? 15 : "50%", background:`linear-gradient(145deg, ${cc}, ${cc}cc)`, border:"2.5px solid white", boxShadow:`0 5px 14px ${cc}48`, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize: esGrupo ? 24 : 19, fontWeight:700, overflow:"hidden", flexShrink:0 }}>
+                    {esGrupo
+                      ? (gCard?.icon || "👥")
+                      : para?.foto_url
+                        ? <img src={para.foto_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                        : ini(r.para_nombre || "?")}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:10, fontWeight:800, color:"#b0b0b6", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:1 }}>Para</div>
+                    <div style={{ fontSize:18, fontWeight:800, color:"#1c1c1e", letterSpacing:"-0.025em", lineHeight:1.15, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                      {r.para_nombre}
                     </div>
-                  );
-                })()}
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:2 }}>
-                    <span style={{ fontSize:9, fontWeight:700, color:C.gray, letterSpacing:"0.08em", textTransform:"uppercase" }}>Más reciente</span>
-                    {ultimoCat && <span style={{ fontSize:10, fontWeight:700, color:C.primary, background:C.primaryLight, borderRadius:20, padding:"1px 8px" }}>{ultimoCat.icon} {ultimoCat.label}</span>}
+                    {cat && (
+                      <div style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:10.5, fontWeight:700, color:cc, background:cc+"14", borderRadius:20, padding:"2px 10px", marginTop:4, border:`1px solid ${cc}22` }}>
+                        <span style={{ fontSize:12 }}>{cat.icon}</span> {cat.label}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ fontSize:13, fontWeight:700, color:C.dark, letterSpacing:"-0.01em" }}>
-                    Para <span style={{ color:C.primary }}>{ultimo.para_nombre}</span>
+                </div>
+
+                {/* Mensaje */}
+                <div style={{ position:"relative", paddingLeft:14 }}>
+                  <div style={{ position:"absolute", left:0, top:2, bottom:2, width:3, borderRadius:2, background:cc, opacity:0.35 }} />
+                  <div style={{ fontSize:13.5, color:"#3c3c43", lineHeight:1.6, letterSpacing:"-0.012em", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>
+                    {r.mensaje}
                   </div>
-                  <div style={{ fontSize:11.5, color:C.gray, marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", lineHeight:1.4 }}>
-                    "{(ultimo.mensaje || "").slice(0,60)}{ultimo.mensaje?.length > 60 ? "…" : ""}"
+                </div>
+
+                {/* Remitente + fecha */}
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:12 }}>
+                  <div style={{ width:24, height:24, borderRadius:"50%", background:`linear-gradient(145deg, ${CUERDAS[de?.cuerda] || C.gray}, ${CUERDAS[de?.cuerda] || C.gray}cc)`, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:10, fontWeight:700, overflow:"hidden", flexShrink:0 }}>
+                    {de?.foto_url ? <img src={de.foto_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : ini(r.de_nombre || "?")}
+                  </div>
+                  <div style={{ fontSize:11.5, color:"#8a8a90", fontWeight:500 }}>
+                    de <span style={{ fontWeight:700, color:"#3c3c43" }}>{r.de_nombre}</span>
+                    <span style={{ opacity:0.7 }}> · {fecha}</span>
                   </div>
                 </div>
               </div>
-            )}
-
-            {/* Avatares recientes */}
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
-              <span style={{ fontSize:11, color:C.gray, fontWeight:600, flexShrink:0, marginRight:2 }}>Recientes:</span>
-              <div style={{ display:"flex", flexWrap:"wrap", gap:7, alignItems:"center" }}>
-                {recientes.slice(0, 8).map((r, idx) => {
-                  const para = getAvatar(r.para_id);
-                  const cc = CUERDAS[para?.cuerda] || C.primary;
-                  const cat = RECO_CATS.find(c => c.id === r.categoria);
-                  return (
-                    <div key={r.id} className="reco-av" title={`${cat?.icon || "⭐"} Para ${r.para_nombre}`}
-                      style={{ position:"relative", width:34, height:34, borderRadius:"50%", background:cc, border:"2px solid white", boxShadow:"0 1px 4px rgba(0,0,0,0.15)", display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:12, fontWeight:700, overflow:"hidden", cursor:"pointer", animationDelay:`${idx*0.04}s`, flexShrink:0 }}>
-                      {para?.foto_url ? <img src={para.foto_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : ini(r.para_nombre || "?")}
-                    </div>
-                  );
-                })}
-                {recientes.length > 8 && (
-                  <div style={{ width:34, height:34, borderRadius:"50%", background:C.primaryLight, border:"2px solid white", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:C.primary, fontWeight:700, flexShrink:0 }}>+{recientes.length - 8}</div>
-                )}
-              </div>
             </div>
 
-            <button
-              className="reco-verlink"
-              onClick={() => setSection("reconoceme")}
-              style={{ width:"100%", padding:"10px 0", borderRadius:10, background:"#f8fafc", border:`1px solid ${C.border}`, color:C.primary, fontSize:12, fontWeight:600, cursor:"pointer", letterSpacing:"-0.01em" }}
-            >
-              Ver todos los reconocimientos →
-            </button>
+            {/* Controles del carrusel */}
+            {n > 1 && (
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginTop:14 }}>
+                <button className="reco-arrow" onClick={() => goTo((idx - 1 + n) % n)}
+                  style={{ width:30, height:30, borderRadius:10, border:"1px solid rgba(60,60,67,0.10)", background:"rgba(255,255,255,0.8)", color:"#6b6b70", fontSize:15, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>‹</button>
+                <div style={{ flex:1, display:"flex", gap:5, justifyContent:"center", alignItems:"center" }}>
+                  {recientes.map((_, i) => (
+                    <div key={i} className="reco-dot" onClick={() => goTo(i)}
+                      style={{ width: i === idx ? 18 : 6, height:6, borderRadius:4, background: i === idx ? cc : "rgba(60,60,67,0.18)" }} />
+                  ))}
+                </div>
+                <button className="reco-arrow" onClick={() => goTo((idx + 1) % n)}
+                  style={{ width:30, height:30, borderRadius:10, border:"1px solid rgba(60,60,67,0.10)", background:"rgba(255,255,255,0.8)", color:"#6b6b70", fontSize:15, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>›</button>
+              </div>
+            )}
           </>
         )}
       </div>
