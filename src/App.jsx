@@ -15260,7 +15260,7 @@ const VALORES = [
   { icon: "✝️", label: "Fe",          color: "#1d6fc7", bg: "#e8f7f2", desc: "Cantamos porque creemos. Nuestra voz es oración, nuestro servicio es adoración." },
   { icon: "🤝", label: "Respeto",     color: "#2563a8", bg: "#e3effb", desc: "Valoramos a cada persona, su tiempo, su voz y su lugar en el coro." },
   { icon: "🤜", label: "Compromiso",  color: "#BA7517", bg: "#faeeda", desc: "Cumplimos con nuestra palabra: en los ensayos, en las misas y en el grupo." },
-  { icon: "💜", label: "Comunidad",   color: "#D4537E", bg: "#fbeaf0", desc: "Somos más que un coro, somos una familia que camina junta en la fe." },
+  { icon: "💙", label: "Comunidad",   color: "#1d6fc7", bg: "#e8f1fc", desc: "Somos más que un coro, somos una familia que camina junta en la fe." },
 ];
 
 function ValoresWidget() {
@@ -15279,108 +15279,87 @@ function ValoresWidget() {
   }, []);
 
   const v = VALORES[activo];
+  const ac = v.color;
 
   return (
     <>
       <style>{`
-        @keyframes val-fade { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes val-fade { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
         .val-content { transition: opacity 0.22s ease; }
-        .val-content.visible { opacity: 1; animation: val-fade 0.28s ease both; }
+        .val-content.visible { opacity: 1; animation: val-fade 0.3s ease both; }
         .val-content.hidden  { opacity: 0; }
-        .val-side-btn { transition: all 0.18s ease; }
-        .val-side-btn:hover { background: rgba(255,255,255,0.10) !important; }
+        .val-chip { transition: all 0.18s ease; }
+        .val-chip:hover { background: rgba(0,0,0,0.04) !important; }
       `}</style>
       <div style={{
         borderRadius: 18,
         marginBottom: 14,
-        background: "linear-gradient(160deg, #0c1120 0%, #111827 55%, #0d1830 100%)",
-        boxShadow: "0 12px 40px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.04) inset",
+        background: "rgba(255,255,255,0.72)",
+        backdropFilter: "saturate(180%) blur(20px)",
+        WebkitBackdropFilter: "saturate(180%) blur(20px)",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 8px 28px rgba(0,0,0,0.05)",
+        border: "1px solid rgba(60,60,67,0.08)",
         overflow: "hidden",
-        position: "relative",
-        border: "1px solid rgba(255,255,255,0.06)",
       }}>
-        <div style={{ position:"absolute", top:-60, right:-60, width:220, height:220, borderRadius:"50%", background:"radial-gradient(circle, rgba(180,140,60,0.06) 0%, transparent 70%)", pointerEvents:"none" }} />
-        <div style={{ position:"absolute", bottom:-40, left:-30, width:160, height:160, borderRadius:"50%", background:"radial-gradient(circle, rgba(60,80,180,0.07) 0%, transparent 70%)", pointerEvents:"none" }} />
-
-        <div style={{ display:"flex", alignItems:"stretch" }}>
-          {/* Columna izquierda */}
-          <div style={{
-            padding: "22px 22px",
-            display: "flex", flexDirection: "column", justifyContent: "space-between",
-            borderRight: "1px solid rgba(255,255,255,0.07)",
-            minWidth: 170, flexShrink: 0,
-          }}>
-            <div>
-              <div style={{ marginBottom: 10 }}>
-                <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                  <polygon points="11,2 13.5,8.5 20.5,9.2 15.5,13.8 17.2,20.5 11,16.8 4.8,20.5 6.5,13.8 1.5,9.2 8.5,8.5"
-                    fill="#c9a227" stroke="#a07c1a" strokeWidth="0.6" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 4 }}>
-                Identidad
-              </div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.92)", letterSpacing: "-0.02em", lineHeight: 1.3 }}>
-                Nuestros<br/>Valores
-              </div>
-            </div>
-            <div style={{ display:"flex", flexDirection:"column", gap: 4, marginTop: 16 }}>
-              {VALORES.map((val, i) => (
-                <button
-                  key={i}
-                  onClick={() => { setFade(false); setTimeout(() => { setActivo(i); setFade(true); }, 120); }}
-                  className="val-side-btn"
-                  style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    background: i === activo ? "rgba(201,162,39,0.12)" : "transparent",
-                    border: "none", borderRadius: 8, padding: "5px 8px",
-                    cursor: "pointer", textAlign: "left",
-                    borderLeft: `2px solid ${i === activo ? "#c9a227" : "rgba(255,255,255,0.12)"}`,
-                  }}
-                >
-                  <span style={{ fontSize: 13 }}>{val.icon}</span>
-                  <span style={{ fontSize: 11, fontWeight: i === activo ? 700 : 400, color: i === activo ? "#e8c76a" : "rgba(255,255,255,0.45)", whiteSpace:"nowrap", letterSpacing:"-0.01em" }}>
-                    {val.label}
-                  </span>
-                </button>
-              ))}
-            </div>
+        {/* Encabezado */}
+        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"14px 18px 0" }}>
+          <div style={{ width:26, height:26, borderRadius:8, background:"#fdf3d6", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+            <svg width="14" height="14" viewBox="0 0 22 22" fill="none">
+              <polygon points="11,2 13.5,8.5 20.5,9.2 15.5,13.8 17.2,20.5 11,16.8 4.8,20.5 6.5,13.8 1.5,9.2 8.5,8.5" fill="#c9a227" stroke="#a07c1a" strokeWidth="0.6" strokeLinejoin="round"/>
+            </svg>
           </div>
+          <div style={{ fontSize:9, fontWeight:700, color:"#a0a0a8", letterSpacing:"0.12em", textTransform:"uppercase" }}>Identidad</div>
+          <div style={{ flex:1 }} />
+          <div style={{ fontSize:13, fontWeight:600, color:"#1c1c1e", letterSpacing:"-0.016em" }}>Nuestros Valores</div>
+        </div>
 
-          {/* Columna derecha: valor activo */}
-          <div style={{ flex: 1, padding: "26px 26px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 14, minWidth: 0 }}>
-            <div className={`val-content ${fade ? "visible" : "hidden"}`}>
-              <div style={{ marginBottom: 10 }}>
-                <div style={{
-                  display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  width: 52, height: 52, borderRadius: 14,
-                  background: "rgba(255,255,255,0.07)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  fontSize: 26,
-                  boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
-                }}>
-                  {v.icon}
-                </div>
-              </div>
-              <div style={{
-                fontSize: 28, fontWeight: 800,
-                color: "white",
-                letterSpacing: "-0.03em", lineHeight: 1,
-                marginBottom: 10,
-              }}>
+        {/* Valor activo */}
+        <div style={{ padding:"16px 18px 14px" }}>
+          <div className={`val-content ${fade ? "visible" : "hidden"}`} style={{ display:"flex", alignItems:"center", gap:16 }}>
+            <div style={{
+              width:60, height:60, borderRadius:16, flexShrink:0,
+              background: ac + "14",
+              border: `1px solid ${ac}22`,
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:30,
+            }}>
+              {v.icon}
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:22, fontWeight:700, color:"#1c1c1e", letterSpacing:"-0.03em", lineHeight:1.1, marginBottom:5 }}>
                 {v.label}
               </div>
-              <div style={{ width: 36, height: 2, background: "linear-gradient(90deg, #c9a227, transparent)", borderRadius: 2, marginBottom: 12 }} />
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.72)", lineHeight: 1.65, fontWeight: 400, letterSpacing: "-0.01em" }}>
+              <div style={{ fontSize:13, color:"#6b6b70", lineHeight:1.55, letterSpacing:"-0.01em" }}>
                 {v.desc}
               </div>
             </div>
-            <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
-              {VALORES.map((_, i) => (
-                <div key={i} style={{ flex: 1, height: 2, borderRadius: 2, background: i === activo ? "#c9a227" : "rgba(255,255,255,0.12)" }} />
-              ))}
-            </div>
           </div>
+        </div>
+
+        {/* Selector segmentado estilo iOS */}
+        <div style={{ display:"flex", gap:3, padding:"0 12px 12px" }}>
+          {VALORES.map((val, i) => {
+            const on = i === activo;
+            return (
+              <button
+                key={i}
+                onClick={() => { setFade(false); setTimeout(() => { setActivo(i); setFade(true); }, 120); }}
+                className="val-chip"
+                style={{
+                  flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:5,
+                  background: on ? "white" : "transparent",
+                  border:"none", borderRadius:10, padding:"7px 6px",
+                  cursor:"pointer",
+                  boxShadow: on ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
+                }}
+              >
+                <span style={{ fontSize:14 }}>{val.icon}</span>
+                <span style={{ fontSize:11.5, fontWeight: on ? 600 : 500, color: on ? "#1c1c1e" : "#9a9aa0", whiteSpace:"nowrap", letterSpacing:"-0.01em" }}>
+                  {val.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </>
@@ -15534,109 +15513,134 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
   const total = (reconocimientos || []).length;
   const getAvatar = (id) => (members || []).find(m => m.id === id);
   const ini = (n) => (n || "?").charAt(0).toUpperCase();
+  const ultimo = recientes[0];
+  const ultimoCat = ultimo ? RECO_CATS.find(c => c.id === ultimo.categoria) : null;
 
   return (
     <>
       <style>{`
-        @keyframes reco-in { from{opacity:0;transform:scale(0.94)} to{opacity:1;transform:scale(1)} }
-        .reco-avatar { animation: reco-in 0.25s ease both; }
-        .reco-btn-main { transition: all 0.18s ease; }
-        .reco-btn-main:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.28) !important; }
+        @keyframes reco-in { from{opacity:0;transform:scale(0.9)} to{opacity:1;transform:scale(1)} }
+        .reco-av { animation: reco-in 0.28s ease both; }
+        .reco-cta { transition: all 0.18s ease; }
+        .reco-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(30,58,95,0.28) !important; }
+        .reco-verlink { transition: background 0.15s ease; }
+        .reco-verlink:hover { background: #f4f7fb !important; }
       `}</style>
       <div style={{
-        background: "linear-gradient(155deg, #1a1f3c 0%, #242b50 50%, #1c2240 100%)",
+        background: "#ffffff",
         borderRadius: 18,
-        padding: "22px 24px 20px",
+        padding: "20px 22px 18px",
         marginBottom: 14,
         position: "relative",
         overflow: "hidden",
-        boxShadow: "0 12px 40px rgba(10,15,50,0.30), 0 1px 0 rgba(255,255,255,0.04) inset",
-        border: "1px solid rgba(255,255,255,0.06)",
+        boxShadow: "0 4px 20px rgba(30,58,95,0.08), 0 1px 3px rgba(0,0,0,0.04)",
+        border: "1px solid rgba(60,60,67,0.09)",
       }}>
-        <div style={{ position:"absolute", top:-50, right:-50, width:180, height:180, borderRadius:"50%", background:"radial-gradient(circle, rgba(120,130,255,0.08) 0%, transparent 70%)", pointerEvents:"none" }} />
-        <div style={{ position:"absolute", bottom:-40, left:-30, width:140, height:140, borderRadius:"50%", background:"radial-gradient(circle, rgba(200,160,40,0.05) 0%, transparent 70%)", pointerEvents:"none" }} />
+        {/* Acento superior sutil */}
+        <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:"linear-gradient(90deg, #c9a227, #e8c76a 50%, #c9a227)" }} />
 
         {/* Header */}
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: 16, flexWrap:"wrap", gap: 10, position:"relative" }}>
-          <div style={{ display:"flex", alignItems:"center", gap: 14 }}>
-            <div style={{ width: 46, height: 46, borderRadius: 13, background: "rgba(201,162,39,0.15)", border: "1px solid rgba(201,162,39,0.25)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink: 0 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: 16, flexWrap:"wrap", gap: 10 }}>
+          <div style={{ display:"flex", alignItems:"center", gap: 13 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, #fdf3d6, #f6e3a8)", border: "1px solid rgba(201,162,39,0.3)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink: 0, boxShadow:"0 2px 8px rgba(201,162,39,0.15)" }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <path d="M8 21h8M12 17v4M17 3H7l1 8c0 2.21 1.79 4 4 4s4-1.79 4-4l1-8z" stroke="#c9a227" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M7 3H4.5C4 5.5 4.5 8 7 9.5M17 3h2.5C20 5.5 19.5 8 17 9.5" stroke="#c9a227" strokeWidth="1.6" strokeLinecap="round"/>
+                <path d="M8 21h8M12 17v4M17 3H7l1 8c0 2.21 1.79 4 4 4s4-1.79 4-4l1-8z" stroke="#b8901a" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M7 3H4.5C4 5.5 4.5 8 7 9.5M17 3h2.5C20 5.5 19.5 8 17 9.5" stroke="#b8901a" strokeWidth="1.7" strokeLinecap="round"/>
               </svg>
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 16, color: "white", letterSpacing: "-0.02em", lineHeight: 1.1 }}>Reconocimientos</div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginTop: 4 }}>
+              <div style={{ fontWeight: 700, fontSize: 16, color: C.dark, letterSpacing: "-0.02em", lineHeight: 1.1 }}>Reconocimientos</div>
+              <div style={{ fontSize: 12, color: C.gray, marginTop: 3 }}>
                 {total > 0
-                  ? <span><strong style={{ color: "#e8c76a", fontWeight: 700 }}>{total}</strong> entregado{total !== 1 ? "s" : ""} al coro</span>
+                  ? <span><strong style={{ color: C.primary, fontWeight: 700 }}>{total}</strong> entregado{total !== 1 ? "s" : ""} al coro</span>
                   : "Sé el primero en reconocer"}
               </div>
             </div>
           </div>
           <button
-            className="reco-btn-main"
+            className="reco-cta"
             onClick={() => setSection("reconoceme")}
             style={{
-              fontSize: 12, color: "#1a1f3c",
-              background: "linear-gradient(135deg, #e8c76a 0%, #c9a227 100%)",
+              fontSize: 12, color: "white",
+              background: `linear-gradient(135deg, ${C.primary}, ${C.primaryDark})`,
               border: "none", borderRadius: 10, padding: "9px 16px",
               fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
-              boxShadow: "0 3px 12px rgba(0,0,0,0.25)",
+              boxShadow: "0 3px 12px rgba(30,58,95,0.22)",
               display: "flex", alignItems: "center", gap: 6,
               letterSpacing: "-0.01em",
             }}
           >
-            <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
-              <polygon points="6.5,1 8,5 12.5,5.5 9.3,8.5 10.3,13 6.5,10.8 2.7,13 3.7,8.5 0.5,5.5 5,5" fill="#1a1f3c"/>
-            </svg>
-            Reconocer
+            <span style={{ fontSize: 13 }}>✦</span> Reconocer
           </button>
         </div>
 
-        <div style={{ height: 1, background: "rgba(255,255,255,0.07)", marginBottom: 16 }} />
-
         {recientes.length === 0 ? (
-          <div style={{ textAlign:"center", padding:"24px 0", background:"rgba(255,255,255,0.04)", borderRadius:14, border:"1px dashed rgba(255,255,255,0.10)" }}>
-            <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.4 }}>⭐</div>
+          <div style={{ textAlign:"center", padding:"22px 0", background:"#f8fafc", borderRadius:14, border:"1px dashed rgba(60,60,67,0.14)" }}>
+            <div style={{ fontSize: 30, marginBottom: 6, opacity: 0.45 }}>⭐</div>
             {total > 0 ? (
               <>
-                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", fontWeight: 600, marginBottom: 4 }}>{total} reconocimiento{total !== 1 ? "s" : ""} en total</div>
-                <button onClick={() => setSection("reconoceme")} style={{ fontSize: 12, color: "#9ca3ff", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Ver todos →</button>
+                <div style={{ fontSize: 13, color: C.dark, fontWeight: 600, marginBottom: 4 }}>{total} reconocimiento{total !== 1 ? "s" : ""} en total</div>
+                <button onClick={() => setSection("reconoceme")} style={{ fontSize: 12, color: C.primary, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Ver todos →</button>
               </>
             ) : (
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}>No hay reconocimientos recientes</div>
+              <div style={{ fontSize: 13, color: C.gray }}>No hay reconocimientos recientes</div>
             )}
           </div>
         ) : (
           <>
-            <div style={{ display:"flex", flexWrap:"wrap", gap: 8, alignItems:"center" }}>
-              {recientes.slice(0, 7).map((r, idx) => {
-                const para = getAvatar(r.para_id);
-                const cc = CUERDAS[para?.cuerda] || C.primary;
-                const cat = RECO_CATS.find(c => c.id === r.categoria);
-                return (
-                  <div key={r.id} className="reco-avatar" title={`${cat?.icon || "⭐"} Para ${r.para_nombre}`}
-                    style={{ position:"relative", width:40, height:40, borderRadius:"50%", background:cc, border:"2.5px solid rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:13, fontWeight:700, overflow:"hidden", cursor:"pointer", boxShadow:"0 2px 8px rgba(0,0,0,0.25)", animationDelay:`${idx*0.05}s`, flexShrink:0 }}>
-                    {para?.foto_url ? <img src={para.foto_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : ini(r.para_nombre || "?")}
-                    <div style={{ position:"absolute", bottom:-1, right:-1, fontSize:10, lineHeight:1, background:"rgba(26,31,60,0.9)", borderRadius:"50%", width:16, height:16, display:"flex", alignItems:"center", justifyContent:"center" }}>{cat?.icon || "⭐"}</div>
+            {/* Último reconocimiento destacado */}
+            {ultimo && (
+              <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:"#f8fafc", borderRadius:13, border:"1px solid rgba(60,60,67,0.07)", marginBottom:14 }}>
+                {(() => {
+                  const para = getAvatar(ultimo.para_id);
+                  const cc = CUERDAS[para?.cuerda] || C.primary;
+                  return (
+                    <div style={{ position:"relative", width:42, height:42, borderRadius:"50%", background:cc, border:"2px solid white", boxShadow:"0 2px 6px rgba(0,0,0,0.12)", display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:14, fontWeight:700, overflow:"hidden", flexShrink:0 }}>
+                      {para?.foto_url ? <img src={para.foto_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : ini(ultimo.para_nombre || "?")}
+                    </div>
+                  );
+                })()}
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:2 }}>
+                    <span style={{ fontSize:9, fontWeight:700, color:C.gray, letterSpacing:"0.08em", textTransform:"uppercase" }}>Más reciente</span>
+                    {ultimoCat && <span style={{ fontSize:10, fontWeight:700, color:C.primary, background:C.primaryLight, borderRadius:20, padding:"1px 8px" }}>{ultimoCat.icon} {ultimoCat.label}</span>}
                   </div>
-                );
-              })}
-              {recientes.length > 7 && (
-                <div style={{ width:40, height:40, borderRadius:"50%", background:"rgba(255,255,255,0.10)", border:"2px dashed rgba(255,255,255,0.20)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color:"rgba(255,255,255,0.65)", fontWeight:700, flexShrink:0 }}>+{recientes.length - 7}</div>
-              )}
-              <div style={{ flex:1, minWidth:160, marginLeft:4 }}>
-                <div style={{ fontSize:11, color:"rgba(255,255,255,0.45)", marginBottom:2, letterSpacing:"0.02em", textTransform:"uppercase", fontWeight:600 }}>Más reciente</div>
-                <div style={{ fontSize:12, color:"rgba(255,255,255,0.85)", fontWeight:600, letterSpacing:"-0.01em" }}>
-                  Para <span style={{ color:"#e8c76a" }}>{recientes[0]?.para_nombre}</span>
+                  <div style={{ fontSize:13, fontWeight:700, color:C.dark, letterSpacing:"-0.01em" }}>
+                    Para <span style={{ color:C.primary }}>{ultimo.para_nombre}</span>
+                  </div>
+                  <div style={{ fontSize:11.5, color:C.gray, marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", lineHeight:1.4 }}>
+                    "{(ultimo.mensaje || "").slice(0,60)}{ultimo.mensaje?.length > 60 ? "…" : ""}"
+                  </div>
                 </div>
-                <div style={{ fontSize:11, color:"rgba(255,255,255,0.45)", marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{(recientes[0]?.mensaje || "").slice(0,48)}{recientes[0]?.mensaje?.length > 48 ? "…" : ""}</div>
+              </div>
+            )}
+
+            {/* Avatares recientes */}
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
+              <span style={{ fontSize:11, color:C.gray, fontWeight:600, flexShrink:0, marginRight:2 }}>Recientes:</span>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:7, alignItems:"center" }}>
+                {recientes.slice(0, 8).map((r, idx) => {
+                  const para = getAvatar(r.para_id);
+                  const cc = CUERDAS[para?.cuerda] || C.primary;
+                  const cat = RECO_CATS.find(c => c.id === r.categoria);
+                  return (
+                    <div key={r.id} className="reco-av" title={`${cat?.icon || "⭐"} Para ${r.para_nombre}`}
+                      style={{ position:"relative", width:34, height:34, borderRadius:"50%", background:cc, border:"2px solid white", boxShadow:"0 1px 4px rgba(0,0,0,0.15)", display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:12, fontWeight:700, overflow:"hidden", cursor:"pointer", animationDelay:`${idx*0.04}s`, flexShrink:0 }}>
+                      {para?.foto_url ? <img src={para.foto_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : ini(r.para_nombre || "?")}
+                    </div>
+                  );
+                })}
+                {recientes.length > 8 && (
+                  <div style={{ width:34, height:34, borderRadius:"50%", background:C.primaryLight, border:"2px solid white", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:C.primary, fontWeight:700, flexShrink:0 }}>+{recientes.length - 8}</div>
+                )}
               </div>
             </div>
-            <button onClick={() => setSection("reconoceme")} style={{ marginTop:16, width:"100%", padding:"9px 0", borderRadius:10, background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.10)", color:"rgba(255,255,255,0.70)", fontSize:12, fontWeight:600, cursor:"pointer", letterSpacing:"-0.01em" }}
-              onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.10)"}
-              onMouseLeave={e => e.currentTarget.style.background="rgba(255,255,255,0.06)"}>
+
+            <button
+              className="reco-verlink"
+              onClick={() => setSection("reconoceme")}
+              style={{ width:"100%", padding:"10px 0", borderRadius:10, background:"#f8fafc", border:`1px solid ${C.border}`, color:C.primary, fontSize:12, fontWeight:600, cursor:"pointer", letterSpacing:"-0.01em" }}
+            >
               Ver todos los reconocimientos →
             </button>
           </>
@@ -15654,7 +15658,7 @@ const LOGO_RECONOCIMIENTO_GRUPAL = "data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQ
 const RECO_CATS = [
   { id: "compañero",   icon: "🤝", label: "Gran compañero/a" },
   { id: "aporte",      icon: "💡", label: "Gran aporte al coro" },
-  { id: "importante",  icon: "💜", label: "Persona importante para el grupo" },
+  { id: "importante",  icon: "💙", label: "Persona importante para el grupo" },
   { id: "liderazgo",   icon: "⭐", label: "Liderazgo y servicio" },
   { id: "fe",          icon: "✝️", label: "Testimonio de fe" },
   { id: "salmos",      icon: "🎵", label: "Interpretación de Salmos" },
@@ -16166,72 +16170,66 @@ function Reconoceme({ members, user, reconocimientos, onReload, gcalEventos, pre
                 const fecha = r.created_at ? new Date(r.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" }) : "";
                 return (
                   <div key={r.id} style={{
-                    background: "white", borderRadius: 14, padding: "14px 16px",
-                    border: `1px solid ${C.border}`,
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-                    borderLeft: `4px solid ${cc}`,
+                    background: "white", borderRadius: 16, padding: "18px 20px",
+                    border: `1px solid rgba(60,60,67,0.09)`,
+                    boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
                   }}>
-                    {/* Cabecera destinatario */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: esGrupo ? 10 : "50%", background: cc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: esGrupo ? 18 : 12, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                    {/* Cabecera: destinatario + fecha */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                      <div style={{ width: 46, height: 46, borderRadius: esGrupo ? 13 : "50%", background: cc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: esGrupo ? 22 : 16, fontWeight: 700, flexShrink: 0, overflow: "hidden", boxShadow: `0 3px 10px ${cc}40`, border: "2px solid white" }}>
                         {esGrupo
                           ? grupoCard?.icon || "👥"
                           : para?.foto_url
                             ? <img src={para.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             : ini(r.para_nombre || "?")}
                       </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: C.dark }}>
-                          Para <span style={{ color: cc }}>{r.para_nombre}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: C.gray, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 1 }}>
+                          {esGrupo ? "Reconocimiento grupal" : "Para"}
                         </div>
-                        <div style={{ fontSize: 11, color: C.gray }}>
-                          {esGrupo ? "Reconocimiento grupal" : rolFullLabel(para)}
+                        <div style={{ fontSize: 16, fontWeight: 700, color: C.dark, letterSpacing: "-0.02em", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {r.para_nombre}
                         </div>
+                        {!esGrupo && (
+                          <div style={{ fontSize: 11, color: cc, fontWeight: 600, marginTop: 1 }}>{rolFullLabel(para)}</div>
+                        )}
                       </div>
-                      <div style={{ textAlign: "right" }}>
-                        <img
-                          src={esGrupo ? LOGO_RECONOCIMIENTO_GRUPAL : LOGO_RECONOCIMIENTO_PERSONAL}
-                          alt=""
-                          style={{ width: 40, height: 40, objectFit: "contain", display: "block" }}
-                        />
-                        <div style={{ fontSize: 9, color: C.gray, marginTop: 1, whiteSpace: "nowrap" }}>{fecha}</div>
+                      {cat && (
+                        <div style={{ fontSize: 11, fontWeight: 700, color: cc, background: cc + "14", borderRadius: 20, padding: "5px 12px", display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap", border: `1px solid ${cc}22` }}>
+                          <span style={{ fontSize: 13 }}>{cat.icon}</span> {cat.label}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Mensaje tipo cita */}
+                    <div style={{ position: "relative", paddingLeft: 16, marginBottom: 14 }}>
+                      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, borderRadius: 2, background: cc, opacity: 0.4 }} />
+                      <div style={{ fontSize: 14, color: C.dark, lineHeight: 1.7, fontFamily: "var(--font-sans)", fontWeight: 400, letterSpacing: "-0.01em" }}>
+                        {r.mensaje}
                       </div>
                     </div>
 
-                    {/* Categoría */}
-                    {cat && (
-                      <div style={{ fontSize: 10, fontWeight: 700, color: cc, background: cc + "15", borderRadius: 20, padding: "2px 10px", display: "inline-block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                        {cat.icon} {cat.label}
-                      </div>
-                    )}
-
-                    {/* Evento vinculado */}
+                    {/* Evento vinculado (chip discreto) */}
                     {r.evento_titulo && (
-                      <div style={{ fontSize: 11, color: "var(--text-secondary)", background: "var(--bg-hover)", borderRadius: 10, padding: "4px 10px", display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 8, maxWidth: "100%" }}>
+                      <div style={{ fontSize: 11, color: C.gray, display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 12, background: "rgba(0,0,0,0.03)", borderRadius: 8, padding: "4px 10px" }}>
                         <span>📅</span>
-                        <span style={{ fontWeight: 600 }}>{r.evento_titulo}</span>
-                        {r.evento_fecha && <span style={{ opacity: 0.7 }}>· {new Date(r.evento_fecha + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" })}</span>}
+                        <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>{r.evento_titulo}</span>
+                        {r.evento_fecha && <span>· {new Date(r.evento_fecha + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" })}</span>}
                       </div>
                     )}
 
-                    {/* Mensaje */}
-                    <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.65, fontFamily: "var(--font-sans)", fontWeight: 400, marginBottom: 10, background: "var(--bg-base)", borderRadius: 10, padding: "10px 12px", borderLeft: "3px solid #e5e7eb" }}>
-                      {r.mensaje}
-                    </div>
-
-                    {/* Reacciones */}
-                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", paddingTop:8, borderTop:"1px solid #f0f0f0", marginBottom:8 }}>
+                    {/* Pie: remitente + fecha + reacciones */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 12, borderTop: "1px solid rgba(60,60,67,0.07)", flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0 }}>
+                        <div style={{ width: 26, height: 26, borderRadius: "50%", background: dc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 10, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                          {de?.foto_url ? <img src={de.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(r.de_nombre || "?")}
+                        </div>
+                        <div style={{ fontSize: 11, color: C.gray, minWidth: 0 }}>
+                          de <span style={{ fontWeight: 700, color: C.dark }}>{r.de_nombre}</span>
+                          <span style={{ opacity: 0.6 }}> · {fecha}</span>
+                        </div>
+                      </div>
                       {r.id && <ReaccionesBar recoId={r.id} userId={user?.id} />}
-                    </div>
-
-                    {/* Remitente */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <div style={{ width: 22, height: 22, borderRadius: "50%", background: dc, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 9, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
-                        {de?.foto_url ? <img src={de.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(r.de_nombre || "?")}
-                      </div>
-                      <div style={{ fontSize: 11, color: C.gray }}>
-                        Reconocido por <span style={{ fontWeight: 600, color: C.dark }}>{r.de_nombre}</span>
-                      </div>
                     </div>
                   </div>
                 );
