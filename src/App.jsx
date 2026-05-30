@@ -8057,29 +8057,35 @@ function Cancionero({ user }) {
 
   return (
     <div style={{ maxWidth: 1100 }}>
-      {/* ── Encabezado ── */}
+      {/* ── Encabezado premium iOS ── */}
       <div style={{
-        background: `linear-gradient(135deg,${C.primaryDark},${C.primary})`,
-        borderRadius: 16, padding: "20px 24px", marginBottom: 20,
-        display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap",
+        position: "relative", overflow: "hidden",
+        background: `linear-gradient(150deg, ${C.primary}0f 0%, rgba(255,255,255,0.96) 44%, #ffffff 100%)`,
+        borderRadius: 22, padding: "18px 22px", marginBottom: 20,
+        display: "flex", alignItems: "center", gap: 15, flexWrap: "wrap",
+        boxShadow: `0 1px 2px rgba(0,0,0,0.04), 0 10px 30px ${C.primary}1a, 0 2px 8px rgba(0,0,0,0.04)`,
+        border: "1px solid rgba(255,255,255,0.8)",
       }}>
+        <div style={{ position:"absolute", top:-60, right:-40, width:170, height:170, borderRadius:"50%", background:`radial-gradient(circle, ${C.primary}1f 0%, transparent 70%)`, pointerEvents:"none" }} />
         <div style={{
-          width: 52, height: 52, background: "rgba(255,255,255,0.2)", borderRadius: 18,
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, flexShrink: 0,
+          width: 50, height: 50, borderRadius: 15, flexShrink: 0,
+          background: `linear-gradient(145deg, ${C.primary}, ${C.primaryDark})`,
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26,
+          boxShadow: `0 6px 18px ${C.primary}50, inset 0 1px 0 rgba(255,255,255,0.3)`,
         }}>🎼</div>
-        <div>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "white" }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.03em" }}>
             Cancionero Digital
           </div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)" }}>
+          <div style={{ fontSize: 12, color: "#8a8a90", fontWeight: 500, marginTop: 1 }}>
             Letras · Acordes · Pautas de Misa · QR
           </div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           {[{ n: canciones.length, l: "Guardadas" }, { n: pautas.length, l: "Pautas" }].map((s, i) => (
-            <div key={i} style={{ background: "rgba(255,255,255,0.2)", borderRadius: 12, padding: "8px 14px", textAlign: "center" }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "white", lineHeight: 1 }}>{s.n}</div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.85)", marginTop: 2 }}>{s.l}</div>
+            <div key={i} style={{ background: "rgba(255,255,255,0.85)", borderRadius: 14, padding: "9px 16px", textAlign: "center", border: `1px solid ${C.primary}1a`, boxShadow: "0 1px 4px rgba(0,0,0,0.04)", minWidth: 62 }}>
+              <div style={{ fontSize: 21, fontWeight: 800, color: C.primary, lineHeight: 1, letterSpacing: "-0.03em" }}>{s.n}</div>
+              <div style={{ fontSize: 10, color: "#8a8a90", marginTop: 3, fontWeight: 600 }}>{s.l}</div>
             </div>
           ))}
         </div>
@@ -8088,18 +8094,25 @@ function Cancionero({ user }) {
       {/* ── Tabs ── */}
       {!enSubvista && (
         <div style={{ display: "flex", gap: 6, marginBottom: 20, overflowX: "auto", paddingBottom: 4 }}>
-          {TAB_ITEMS.map(t => (
-            <button key={t.id} onClick={() => setVista(t.id)} style={{
-              padding: "8px 18px", borderRadius: 10, border: "none", cursor: "pointer",
-              fontSize: 13, fontWeight: vista === t.id ? 600 : 400, whiteSpace: "nowrap",
-              background: vista === t.id ? C.primary : "transparent",
-              color: vista === t.id ? "white" : C.gray, transition: "all 0.15s",
-            }}>{t.icon} {t.label}</button>
-          ))}
+          {TAB_ITEMS.map(t => {
+            const on = vista === t.id;
+            return (
+              <button key={t.id} onClick={() => setVista(t.id)} style={{
+                padding: "9px 18px", borderRadius: 13, cursor: "pointer",
+                fontSize: 13, fontWeight: on ? 700 : 500, whiteSpace: "nowrap",
+                border: on ? "none" : "1px solid rgba(60,60,67,0.12)",
+                background: on ? `linear-gradient(135deg, ${C.primary}, ${C.primaryDark})` : "rgba(255,255,255,0.85)",
+                color: on ? "white" : C.gray,
+                boxShadow: on ? `0 3px 12px ${C.primary}40` : "none",
+                letterSpacing: "-0.01em",
+                transition: "all 0.18s cubic-bezier(0.22,1,0.36,1)",
+              }}>{t.icon} {t.label}</button>
+            );
+          })}
           {isAdmin && vista === "pautas" && (
             <button onClick={() => setVista("nueva_pauta")} style={{
-              marginLeft: "auto", padding: "8px 18px", borderRadius: 10, border: `1px solid ${C.primary}`,
-              background: C.primaryLight, color: C.primaryDark, fontSize: 13, fontWeight: 600, cursor: "pointer",
+              marginLeft: "auto", padding: "9px 18px", borderRadius: 13, border: `1px solid ${C.primary}40`,
+              background: C.primaryLight, color: C.primaryDark, fontSize: 13, fontWeight: 700, cursor: "pointer", letterSpacing: "-0.01em",
             }}>📋 Nueva Pauta</button>
           )}
         </div>
@@ -9599,7 +9612,7 @@ function AdminTab({ label, active, onClick }) {
   );
 }
 
-function ConfirmBtn({ onConfirm, label = "🗑 Eliminar" }) {
+function ConfirmBtn({ onConfirm, label = "🗑 Eliminar", compact = false }) {
   const [ask, setAsk] = useState(false);
   if (ask)
     return (
@@ -9637,6 +9650,20 @@ function ConfirmBtn({ onConfirm, label = "🗑 Eliminar" }) {
           No
         </button>
       </span>
+    );
+  if (compact)
+    return (
+      <button
+        onClick={() => setAsk(true)}
+        title="Eliminar"
+        style={{
+          width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 13, background: "#fee2e2", color: C.danger,
+          border: "none", borderRadius: 10, cursor: "pointer", transition: "all 0.15s",
+        }}
+        onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+        onMouseLeave={e => e.currentTarget.style.transform = "none"}
+      >🗑</button>
     );
   return (
     <button
@@ -10024,26 +10051,27 @@ function AdminIntegrantes({ members, onReload }) {
           style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}
         >
           <thead>
-            <tr style={{ background: C.light }}>
+            <tr style={{ background: "rgba(0,0,0,0.025)" }}>
               {[
-                "Nombre",
-                "Email",
+                "Integrante",
                 "Cuerda",
                 "V. Vocal",
                 "Cargo extra",
                 "Género",
                 "Cumpleaños",
-                "Activo",
+                "Estado",
                 "Acciones",
               ].map((h) => (
                 <th
                   key={h}
                   style={{
-                    padding: "10px 12px",
+                    padding: "11px 12px",
                     textAlign: "left",
-                    fontWeight: 600,
+                    fontWeight: 700,
                     color: C.gray,
-                    fontSize: 11,
+                    fontSize: 10.5,
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
                     borderBottom: `1px solid ${C.border}`,
                     whiteSpace: "nowrap",
                   }}
@@ -10058,23 +10086,25 @@ function AdminIntegrantes({ members, onReload }) {
               <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}` }}>
                 {editId === m.id ? (
                   <>
-                    <td style={{ padding: "8px 12px" }}>
-                      <input
-                        value={editData.nombre || ""}
-                        onChange={(e) =>
-                          setEditData((p) => ({ ...p, nombre: e.target.value }))
-                        }
-                        style={inputS}
-                      />
-                    </td>
-                    <td style={{ padding: "8px 12px" }}>
-                      <input
-                        value={editData.email || ""}
-                        onChange={(e) =>
-                          setEditData((p) => ({ ...p, email: e.target.value }))
-                        }
-                        style={inputS}
-                      />
+                    <td style={{ padding: "8px 12px", minWidth: 200 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        <input
+                          placeholder="Nombre"
+                          value={editData.nombre || ""}
+                          onChange={(e) =>
+                            setEditData((p) => ({ ...p, nombre: e.target.value }))
+                          }
+                          style={inputS}
+                        />
+                        <input
+                          placeholder="Email"
+                          value={editData.email || ""}
+                          onChange={(e) =>
+                            setEditData((p) => ({ ...p, email: e.target.value }))
+                          }
+                          style={{ ...inputS, fontSize: 12 }}
+                        />
+                      </div>
                     </td>
                     <td style={{ padding: "8px 12px" }}>
                       <select
@@ -10195,84 +10225,59 @@ function AdminIntegrantes({ members, onReload }) {
                   </>
                 ) : (
                   <>
-                    <td
-                      style={{
-                        padding: "10px 12px",
-                        fontWeight: 500,
-                        color: C.dark,
-                      }}
-                    >
-                      {m.nombre}
+                    <td style={{ padding: "12px 12px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                        <div style={{ width: 38, height: 38, borderRadius: "50%", flexShrink: 0, background: `linear-gradient(145deg, ${CUERDAS[m.cuerda] || C.gray}, ${CUERDAS[m.cuerda] || C.gray}cc)`, border: "2px solid white", boxShadow: `0 2px 7px ${CUERDAS[m.cuerda] || C.gray}40`, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 13, fontWeight: 700, overflow: "hidden" }}>
+                          {m.foto_url ? <img src={m.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (m.nombre || "?").charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, color: C.dark, fontSize: 13, letterSpacing: "-0.01em", lineHeight: 1.25 }}>{m.nombre}</div>
+                          <div style={{ fontSize: 11, color: C.gray, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>{m.email}</div>
+                        </div>
+                      </div>
                     </td>
-                    <td style={{ padding: "10px 12px", color: C.gray }}>
-                      {m.email}
-                    </td>
-                    <td style={{ padding: "10px 12px" }}>
+                    <td style={{ padding: "12px 12px" }}>
                       <Chip
                         label={rolLabel(m.cuerda, m.genero)}
                         color={CUERDAS[m.cuerda] || C.gray}
                       />
                     </td>
-                    <td style={{ padding: "10px 12px", color: C.gray, fontSize: 12 }}>
+                    <td style={{ padding: "12px 12px", color: C.gray, fontSize: 12 }}>
                       {m.cuerda_vocal || <span style={{ color: C.border }}>—</span>}
                     </td>
-                    <td style={{ padding: "10px 12px", color: C.gray, fontSize: 12 }}>
+                    <td style={{ padding: "12px 12px", color: C.gray, fontSize: 12 }}>
                       {m.cargo || <span style={{ color: C.border }}>—</span>}
                     </td>
-                    <td style={{ padding: "10px 12px", color: C.gray, fontSize: 12 }}>
+                    <td style={{ padding: "12px 12px", color: C.gray, fontSize: 12 }}>
                       {m.genero === "F" ? "F" : m.genero === "M" ? "M" : <span style={{ color: C.border }}>—</span>}
                     </td>
-                    <td style={{ padding: "10px 12px", color: C.gray }}>
-                      {m.cumpleanos || "-"}
+                    <td style={{ padding: "12px 12px", color: C.gray, fontSize: 12, whiteSpace: "nowrap" }}>
+                      {m.cumpleanos || "—"}
                     </td>
-                    <td style={{ padding: "10px 12px" }}>
-                      <span style={{ fontSize: 14 }}>
-                        {m.activo ? "✅" : "⬜"}
+                    <td style={{ padding: "12px 12px" }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: m.activo ? "#1a8a4a" : C.gray, background: m.activo ? "rgba(26,138,74,0.10)" : "rgba(0,0,0,0.04)", borderRadius: 20, padding: "3px 9px" }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: m.activo ? "#1a8a4a" : "#c0c0c6" }} />
+                        {m.activo ? "Activo" : "Inactivo"}
                       </span>
                     </td>
-                    <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          gap: 6,
-                          flexWrap: "wrap",
-                        }}
-                      >
+                    <td style={{ padding: "12px 12px", whiteSpace: "nowrap" }}>
+                      <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
                         <button
-                          onClick={() => {
-                            setEditId(m.id);
-                            setEditData({ ...m });
-                          }}
-                          style={{
-                            padding: "4px 10px",
-                            fontSize: 11,
-                            background: C.primaryLight,
-                            color: C.primaryDark,
-                            border: "none",
-                            borderRadius: 9,
-                            cursor: "pointer",
-                            fontWeight: 500,
-                          }}
-                        >
-                          ✏ Editar
-                        </button>
+                          onClick={() => { setEditId(m.id); setEditData({ ...m }); }}
+                          title="Editar"
+                          style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, background: C.primaryLight, color: C.primaryDark, border: "none", borderRadius: 10, cursor: "pointer", transition: "all 0.15s" }}
+                          onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+                          onMouseLeave={e => e.currentTarget.style.transform = "none"}
+                        >✏️</button>
                         <button
                           onClick={() => toggleAdmin(m)}
                           disabled={roleLoading === m.id}
-                          style={{
-                            padding: "4px 10px",
-                            fontSize: 11,
-                            background: "#fdf8ee",
-                            color: C.gold,
-                            border: `1px solid ${C.gold}50`,
-                            borderRadius: 9,
-                            cursor: "pointer",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {roleLoading === m.id ? "..." : "⚙ Hacer Admin"}
-                        </button>
-                        <ConfirmBtn onConfirm={() => del(m.id)} />
+                          title="Hacer Admin"
+                          style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, background: "#fdf8ee", color: C.gold, border: `1px solid ${C.gold}45`, borderRadius: 10, cursor: "pointer", transition: "all 0.15s" }}
+                          onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+                          onMouseLeave={e => e.currentTarget.style.transform = "none"}
+                        >{roleLoading === m.id ? "…" : "⚙️"}</button>
+                        <ConfirmBtn onConfirm={() => del(m.id)} compact />
                       </span>
                     </td>
                   </>
@@ -16952,43 +16957,50 @@ function Admin({
     <div style={{ maxWidth: 1000 }}>
       <div
         style={{
-          background: `linear-gradient(135deg,${C.primaryDark},${C.primary})`,
-          borderRadius: 16,
-          padding: "20px 24px",
+          position: "relative", overflow: "hidden",
+          background: `linear-gradient(150deg, ${C.primary}0f 0%, rgba(255,255,255,0.96) 44%, #ffffff 100%)`,
+          borderRadius: 22,
+          padding: "18px 22px",
           marginBottom: 20,
           display: "flex",
           alignItems: "center",
-          gap: 16,
+          gap: 15,
           flexWrap: "wrap",
+          boxShadow: `0 1px 2px rgba(0,0,0,0.04), 0 10px 30px ${C.primary}1a, 0 2px 8px rgba(0,0,0,0.04)`,
+          border: "1px solid rgba(255,255,255,0.8)",
         }}
       >
+        <div style={{ position:"absolute", top:-60, right:-40, width:170, height:170, borderRadius:"50%", background:`radial-gradient(circle, ${C.primary}1f 0%, transparent 70%)`, pointerEvents:"none" }} />
         <div
           style={{
-            width: 48,
-            height: 48,
-            background: "rgba(255,255,255,0.2)",
-            borderRadius: 14,
+            width: 50,
+            height: 50,
+            background: `linear-gradient(145deg, ${C.primary}, ${C.primaryDark})`,
+            borderRadius: 15,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             fontSize: 24,
+            color: "white",
             flexShrink: 0,
+            boxShadow: `0 6px 18px ${C.primary}50, inset 0 1px 0 rgba(255,255,255,0.3)`,
           }}
         >
           ⚙
         </div>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div
             style={{
               fontFamily: "var(--font-display)",
               fontSize: 18,
-              fontWeight: 700,
-              color: "white",
+              fontWeight: 800,
+              color: "#1c1c1e",
+              letterSpacing: "-0.03em",
             }}
           >
             Panel de Administración
           </div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)" }}>
+          <div style={{ fontSize: 12, color: "#8a8a90", fontWeight: 500, marginTop: 1 }}>
             Gestiona toda la información del Coro MJ · {user?.nombre}
           </div>
         </div>
@@ -16996,7 +17008,7 @@ function Admin({
           style={{
             marginLeft: "auto",
             display: "flex",
-            gap: 10,
+            gap: 8,
             flexWrap: "wrap",
           }}
         >
@@ -17007,18 +17019,22 @@ function Admin({
             <div
               key={i}
               style={{
-                background: s.alert ? "#fbbf24" : "rgba(255,255,255,0.2)",
-                borderRadius: 12,
-                padding: "8px 14px",
+                background: s.alert ? "linear-gradient(145deg, #f5b945, #e09b1f)" : "rgba(255,255,255,0.85)",
+                borderRadius: 14,
+                padding: "9px 16px",
                 textAlign: "center",
+                border: s.alert ? "1px solid rgba(224,155,31,0.3)" : `1px solid ${C.primary}1a`,
+                boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+                minWidth: 62,
               }}
             >
               <div
                 style={{
-                  fontSize: 20,
-                  fontWeight: 700,
-                  color: "white",
+                  fontSize: 21,
+                  fontWeight: 800,
+                  color: s.alert ? "white" : C.primary,
                   lineHeight: 1,
+                  letterSpacing: "-0.03em",
                 }}
               >
                 {s.val}
@@ -17026,8 +17042,9 @@ function Admin({
               <div
                 style={{
                   fontSize: 10,
-                  color: "rgba(255,255,255,0.85)",
-                  marginTop: 2,
+                  color: s.alert ? "rgba(255,255,255,0.95)" : "#8a8a90",
+                  marginTop: 3,
+                  fontWeight: 600,
                 }}
               >
                 {s.label}
