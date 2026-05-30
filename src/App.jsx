@@ -8197,24 +8197,28 @@ function CancioneroDirectorio({ canciones, isAdmin, onAbrir }) {
     <div>
       {/* Barra de búsqueda */}
       <div style={{
-        display: "flex", alignItems: "center", gap: 8, marginBottom: 16,
-        background: C.white, borderRadius: 12, padding: "10px 14px",
-        border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+        display: "flex", alignItems: "center", gap: 10, marginBottom: 18,
+        background: "white", borderRadius: 12, padding: "10px 14px",
+        border: "1px solid rgba(60,60,67,0.10)",
       }}>
-        <span style={{ fontSize: 16 }}>🔍</span>
+        <svg width="16" height="16" viewBox="0 0 17 17" fill="none" style={{ flexShrink: 0 }}>
+          <circle cx="7.5" cy="7.5" r="5.5" stroke={C.gray} strokeWidth="1.5"/>
+          <path d="M11.5 11.5L15 15" stroke={C.gray} strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
         <input
           value={filtro}
           onChange={e => { setFiltro(e.target.value); setPagina(0); }}
           placeholder="Filtrar por nombre…"
-          style={{ border: "none", outline: "none", fontSize: 14, flex: 1, color: C.dark, background: "none" }}
+          style={{ border: "none", outline: "none", fontSize: 14, flex: 1, color: C.dark, background: "none", letterSpacing: "-0.01em" }}
         />
         {filtro && (
           <button onClick={() => { setFiltro(""); setPagina(0); }} style={{
-            background: "none", border: "none", cursor: "pointer", color: C.gray, fontSize: 16,
+            background: "rgba(0,0,0,0.05)", border: "none", cursor: "pointer", color: C.gray, fontSize: 12,
+            width: 20, height: 20, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
           }}>✕</button>
         )}
         {!cargando && (
-          <span style={{ fontSize: 12, color: C.gray, whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 12, color: C.gray, whiteSpace: "nowrap", fontWeight: 500 }}>
             {filtrados.length} canciones
           </span>
         )}
@@ -8230,41 +8234,46 @@ function CancioneroDirectorio({ canciones, isAdmin, onAbrir }) {
 
       {!cargando && !errorDrive && (
         <>
-          {/* Lista agrupada por letra */}
+          {/* Directorio agrupado tipo iOS */}
           {Object.keys(grupos).sort().map(letra => (
-            <div key={letra} style={{ marginBottom: 16 }}>
+            <div key={letra} style={{ marginBottom: 18 }}>
               <div style={{
-                fontSize: 11, fontWeight: 800, color: C.primaryDark, textTransform: "uppercase",
-                letterSpacing: 2, marginBottom: 6, paddingLeft: 4,
-                borderLeft: `3px solid ${C.primary}`, paddingLeft: 8,
+                fontSize: 13, fontWeight: 700, color: C.primary,
+                letterSpacing: "0.02em", marginBottom: 7, paddingLeft: 6,
               }}>{letra}</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 8 }}>
-                {grupos[letra].map(pdf => {
+              <div style={{
+                background: "white", borderRadius: 14,
+                border: "1px solid rgba(60,60,67,0.08)",
+                overflow: "hidden",
+              }}>
+                {grupos[letra].map((pdf, i) => {
                   const guardada = idsGuardados.has(pdf.id);
                   return (
                     <button key={pdf.id} onClick={() => abrirPdf(pdf)} style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      padding: "10px 12px", borderRadius: 9,
-                      border: `1px solid ${guardada ? C.primary + "40" : C.border}`,
-                      background: guardada ? C.primaryLight : C.white,
-                      cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+                      display: "flex", alignItems: "center", gap: 12, width: "100%",
+                      padding: "11px 14px",
+                      border: "none",
+                      borderTop: i === 0 ? "none" : "1px solid rgba(60,60,67,0.07)",
+                      background: guardada ? `${C.primary}07` : "transparent",
+                      cursor: "pointer", textAlign: "left",
+                      transition: "background 0.15s ease",
                     }}
-                    onMouseOver={e => e.currentTarget.style.borderColor = C.primary}
-                    onMouseOut={e => e.currentTarget.style.borderColor = guardada ? C.primary + "40" : C.border}
+                    onMouseOver={e => { e.currentTarget.style.background = guardada ? `${C.primary}12` : "rgba(0,0,0,0.02)"; }}
+                    onMouseOut={e => { e.currentTarget.style.background = guardada ? `${C.primary}07` : "transparent"; }}
                     >
-                      <span style={{ fontSize: 20, flexShrink: 0 }}>{guardada ? "🎵" : "📄"}</span>
+                      <span style={{ fontSize: 16, flexShrink: 0, opacity: guardada ? 1 : 0.45, width: 20, textAlign: "center" }}>{guardada ? "🎵" : "📄"}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{
-                          fontSize: 13, fontWeight: 600, color: C.dark,
+                          fontSize: 14, fontWeight: 500, color: C.dark, letterSpacing: "-0.014em",
                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                         }}>{pdf.nombre}</div>
                         {guardada && (
-                          <div style={{ fontSize: 10, color: C.primary, fontWeight: 600, marginTop: 1 }}>
+                          <div style={{ fontSize: 10.5, color: C.primary, fontWeight: 600, marginTop: 1 }}>
                             ⭐ En cancionero
                           </div>
                         )}
                       </div>
-                      <span style={{ fontSize: 11, color: C.gray, flexShrink: 0 }}>▶</span>
+                      <span style={{ fontSize: 14, color: "#c8c8ce", flexShrink: 0, fontWeight: 600 }}>›</span>
                     </button>
                   );
                 })}
@@ -8274,7 +8283,7 @@ function CancioneroDirectorio({ canciones, isAdmin, onAbrir }) {
 
           {/* Paginación */}
           {totalPags > 1 && (
-            <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 20, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 24, flexWrap: "wrap" }}>
               <button onClick={() => setPagina(0)} disabled={pagActual === 0} style={paginaBtnStyle(false, pagActual === 0)}>«</button>
               <button onClick={() => setPagina(p => Math.max(0, p - 1))} disabled={pagActual === 0} style={paginaBtnStyle(false, pagActual === 0)}>‹</button>
               {Array.from({ length: Math.min(7, totalPags) }, (_, i) => {
@@ -8303,10 +8312,13 @@ function CancioneroDirectorio({ canciones, isAdmin, onAbrir }) {
 
 function paginaBtnStyle(activo, disabled) {
   return {
-    padding: "6px 12px", borderRadius: 10, border: `1px solid ${activo ? C.primary : C.border}`,
-    background: activo ? C.primary : C.white, color: activo ? "white" : disabled ? "#ccc" : C.dark,
-    fontSize: 13, fontWeight: activo ? 700 : 400, cursor: disabled ? "default" : "pointer",
-    minWidth: 34, textAlign: "center",
+    width: 32, height: 32, borderRadius: 9,
+    border: activo ? "none" : "1px solid rgba(60,60,67,0.10)",
+    background: activo ? C.primary : "white",
+    color: activo ? "white" : disabled ? "#c8c8ce" : C.dark,
+    fontSize: 13, fontWeight: activo ? 600 : 500, cursor: disabled ? "default" : "pointer",
+    textAlign: "center",
+    transition: "all 0.15s",
   };
 }
 
