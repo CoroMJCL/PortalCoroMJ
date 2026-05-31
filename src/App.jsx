@@ -77,24 +77,27 @@ async function checkPushSubscribed() {
   } catch { return false; }
 }
 
-// Envía notificación a TODOS los suscritos vía OneSignal REST API
+// Envía notificación a TODOS los suscritos.
+// Llama a la función de servidor /api/send-push (que a su vez habla con OneSignal).
+// El navegador NO puede llamar a OneSignal directamente (CORS), por eso pasa por el servidor.
 async function sendPushToAll(title, body, url = "/") {
   try {
-    await fetch("https://api.onesignal.com/notifications", {
+    const res = await fetch("/api/send-push", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Key ${ONESIGNAL_API_KEY}`,
-      },
-      body: JSON.stringify({
-        app_id: ONESIGNAL_APP_ID,
-        included_segments: ["Total Subscriptions"],
-        headings: { en: title, es: title },
-        contents: { en: body || title, es: body || title },
-        url: `https://portal-coro-mj.vercel.app${url}`,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, body, url }),
     });
-  } catch (e) { console.warn("Error enviando push OneSignal:", e); }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.ok === false) {
+      console.error("Error enviando push:", data);
+      return { ok: false, data };
+    }
+    console.log("Push enviada. Destinatarios:", data?.recipients);
+    return { ok: true, recipients: data?.recipients };
+  } catch (e) {
+    console.error("Error enviando push (red):", e);
+    return { ok: false, error: String(e) };
+  }
 }
 
 // ── Google Calendar API (pública, solo lectura) ───────────────────────
@@ -12651,6 +12654,7 @@ const ORDEN_LITURGICO_OPTIONS = [
   "Gloria",
   "Salmos Responsoriales",
   "Salmo",
+  "Secuencia",
   "Aclamación Evangelio",
   "Proclamación Evangelio",
   "Ofertorio",
@@ -12928,7 +12932,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       if (publish) {
         setSelected(created);
         await notificarIntegrantes(created, members);
-        sendPushToAll("📋 Nueva pauta de misa publicada", `${created.titulo}${created.fecha ? " — " + created.fecha : ""}`, "/");
+        sendPushToAll("📋 Nueva pauta de misa", `${created.titulo}${created.fecha ? " — " + created.fecha : ""}. Revisa el repertorio en el portal.`, "/");
         setNotifStatus("✅ Notificación WhatsApp lista para enviar.");
       } else {
         setMsg("✅ Pauta guardada como borrador.");
@@ -17032,6 +17036,62 @@ function AdminHistorialAsistencia({ members }) {
   );
 }
 
+function PushTestBar() {
+  const [estado, setEstado] = useState(null); // null | "enviando" | "ok" | "error"
+  const [detalle, setDetalle] = useState("");
+
+  async function enviarPrueba() {
+    setEstado("enviando");
+    setDetalle("");
+    const r = await sendPushToAll(
+      "🔔 Notificación de prueba",
+      "Si ves esto, las notificaciones del Coro MJ funcionan correctamente.",
+      "/"
+    );
+    if (r?.ok) {
+      setEstado("ok");
+      setDetalle(
+        typeof r.recipients === "number"
+          ? `Enviada a ${r.recipients} dispositivo${r.recipients === 1 ? "" : "s"} suscrito${r.recipients === 1 ? "" : "s"}.`
+          : "Enviada correctamente."
+      );
+    } else {
+      setEstado("error");
+      setDetalle("No se pudo enviar. Revisa que /api/send-push esté publicado en Vercel.");
+    }
+  }
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+      background: "white", borderRadius: 16, padding: "14px 18px", marginBottom: 16,
+      border: "1px solid rgba(60,60,67,0.09)", boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+    }}>
+      <div style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, background: "linear-gradient(145deg, #34c759, #2aa14a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, boxShadow: "0 4px 12px rgba(52,199,89,0.4)" }}>🔔</div>
+      <div style={{ flex: 1, minWidth: 180 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 700, color: C.dark, letterSpacing: "-0.01em" }}>Probar notificaciones push</div>
+        <div style={{ fontSize: 11.5, color: C.gray, marginTop: 1 }}>
+          {estado === "ok" && <span style={{ color: "#1a8a4a", fontWeight: 600 }}>✅ {detalle}</span>}
+          {estado === "error" && <span style={{ color: C.danger, fontWeight: 600 }}>⚠️ {detalle}</span>}
+          {(!estado || estado === "enviando") && "Envía un aviso de prueba a todos los suscritos para confirmar que llega."}
+        </div>
+      </div>
+      <button
+        onClick={enviarPrueba}
+        disabled={estado === "enviando"}
+        style={{
+          padding: "9px 18px", borderRadius: 12, border: "none",
+          background: estado === "enviando" ? "#a8c8a8" : "linear-gradient(135deg, #34c759, #2aa14a)",
+          color: "white", fontSize: 12.5, fontWeight: 700, cursor: estado === "enviando" ? "default" : "pointer",
+          whiteSpace: "nowrap", boxShadow: "0 3px 10px rgba(52,199,89,0.3)", letterSpacing: "-0.01em",
+        }}
+      >
+        {estado === "enviando" ? "Enviando…" : "Enviar prueba"}
+      </button>
+    </div>
+  );
+}
+
 function Admin({
   members,
   eventos,
@@ -17152,6 +17212,8 @@ function Admin({
           ))}
         </div>
       </div>
+
+      <PushTestBar />
 
       <div
         style={{
