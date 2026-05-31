@@ -100,6 +100,25 @@ async function sendPushToAll(title, body, url = "/") {
   }
 }
 
+// ── Detección de dispositivo para instrucciones de notificaciones ──
+function detectarDispositivo() {
+  if (typeof navigator === "undefined") return "desktop";
+  const ua = navigator.userAgent || "";
+  const esIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const esAndroid = /Android/.test(ua);
+  if (esIOS) return "ios";
+  if (esAndroid) return "android";
+  return "desktop";
+}
+// ¿La app está abierta como app instalada (PWA) y no en el navegador?
+function estaInstalada() {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia?.("(display-mode: standalone)")?.matches ||
+    window.navigator.standalone === true
+  );
+}
+
 // ── Google Calendar API (pública, solo lectura) ───────────────────────
 const GCAL_CALENDAR_ID = "coromisionerosdjesuscl@gmail.com";
 const GCAL_API_KEY = "AIzaSyAFSJguKkIY1shCYA1HIFwv9OtaYGnu45k";
@@ -2037,7 +2056,13 @@ export default function App() {
       )}
 
       {/* ── Modal explicativo notificaciones push ── */}
-      {showPushModal && (
+      {showPushModal && (() => {
+        const disp = detectarDispositivo();
+        const instalada = estaInstalada();
+        // En iPhone, si NO está instalada como app, el permiso no funciona: hay que instalar primero
+        const iosSinInstalar = disp === "ios" && !instalada;
+
+        return (
         <div style={{
           position: "fixed", inset: 0, zIndex: 9999,
           background: "rgba(0,0,0,0.55)",
@@ -2045,39 +2070,79 @@ export default function App() {
           padding: 20,
         }}>
           <div style={{
-            background: "rgba(255,255,255,0.95)", borderRadius: 20, padding: "32px 28px",
-            maxWidth: 360, width: "100%", textAlign: "center",
-            boxShadow: "var(--shadow-lg)", border: "1px solid var(--border-color)",
+            background: "rgba(255,255,255,0.97)", borderRadius: 22, padding: "30px 26px",
+            maxWidth: 380, width: "100%",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.3)", border: "1px solid rgba(60,60,67,0.08)",
           }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>🔔</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", marginBottom: 10, fontFamily: "var(--font-display)" }}>
-              ¡Mantente al día con el Coro!
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 44, marginBottom: 10 }}>🔔</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#1c1c1e", marginBottom: 8, fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>
+                {iosSinInstalar ? "Activa las notificaciones" : "¡Mantente al día con el Coro!"}
+              </div>
+              <div style={{ fontSize: 13.5, color: "#6b6b70", lineHeight: 1.6, marginBottom: 20 }}>
+                Entérate al instante de <strong>avisos, ensayos, misas y nuevas pautas</strong>, aunque no tengas el portal abierto.
+              </div>
             </div>
-            <div style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.7, marginBottom: 24 }}>
-              Activa las notificaciones para enterarte al instante cuando se publiquen <strong>nuevos avisos, ensayos, misas o documentos</strong> — aunque no tengas el portal abierto.
-            </div>
-            <button
-              onClick={() => activarNotificaciones(user?.id)}
-              style={{
-                width: "100%", padding: "12px", borderRadius: 14, border: "none",
-                background: "var(--accent)", color: "white", fontSize: 14,
-                fontWeight: 600, cursor: "pointer", marginBottom: 8,
-                fontFamily: "var(--font-sans)", letterSpacing: "-0.01em",
-              }}>
-              ✅ Sí, activar notificaciones
-            </button>
-            <button
-              onClick={() => setShowPushModal(false)}
-              style={{
-                width: "100%", padding: "10px", borderRadius: 14, border: "1px solid var(--border-color)",
-                background: "white", color: "var(--text-secondary)", fontSize: 13,
-                cursor: "pointer", fontFamily: "var(--font-sans)",
-              }}>
-              Ahora no
-            </button>
+
+            {iosSinInstalar ? (
+              /* ── iPhone sin instalar: instrucciones de instalación ── */
+              <>
+                <div style={{ background: "#f0f6ff", borderRadius: 14, padding: "14px 16px", marginBottom: 16, border: "1px solid rgba(30,58,95,0.10)" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.primary, marginBottom: 10, letterSpacing: "-0.01em" }}>
+                    📱 En iPhone, primero instala el portal:
+                  </div>
+                  {[
+                    ["1", <>Toca el botón <strong>Compartir</strong> <span style={{fontSize:14}}>􀈂</span> (el cuadrado con la flecha hacia arriba, abajo en Safari).</>],
+                    ["2", <>Desliza y toca <strong>"Agregar a inicio"</strong>.</>],
+                    ["3", <>Abre el portal desde el <strong>ícono nuevo</strong> en tu pantalla de inicio.</>],
+                    ["4", <>Inicia sesión y toca <strong>"Permitir"</strong> cuando pida notificaciones.</>],
+                  ].map(([n, txt]) => (
+                    <div key={n} style={{ display: "flex", gap: 10, marginBottom: 9, alignItems: "flex-start" }}>
+                      <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: "50%", background: C.primary, color: "white", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{n}</span>
+                      <span style={{ fontSize: 12.5, color: "#3c3c43", lineHeight: 1.5 }}>{txt}</span>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: 11, color: "#8a8a90", marginTop: 6, fontStyle: "italic" }}>
+                    Debe ser con <strong>Safari</strong> (no Chrome). Requiere iPhone con iOS 16.4 o más nuevo.
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPushModal(false)}
+                  style={{ width: "100%", padding: "11px", borderRadius: 13, border: "none", background: `linear-gradient(135deg, ${C.primary}, ${C.primaryDark})`, color: "white", fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+                  Entendido
+                </button>
+              </>
+            ) : (
+              /* ── Android / Escritorio / iPhone ya instalada: botón directo ── */
+              <>
+                {disp === "android" && !instalada && (
+                  <div style={{ background: "#f0f6ff", borderRadius: 12, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: C.primaryDark, lineHeight: 1.5, border: "1px solid rgba(30,58,95,0.10)" }}>
+                    💡 Para mejores resultados, abre esto en <strong>Chrome</strong>. Y si quieres, instálalo como app desde el menú ⋮ → "Agregar a pantalla de inicio".
+                  </div>
+                )}
+                <button
+                  onClick={() => activarNotificaciones(user?.id)}
+                  style={{
+                    width: "100%", padding: "12px", borderRadius: 14, border: "none",
+                    background: `linear-gradient(135deg, ${C.primary}, ${C.primaryDark})`, color: "white", fontSize: 14,
+                    fontWeight: 700, cursor: "pointer", marginBottom: 8, letterSpacing: "-0.01em",
+                  }}>
+                  ✅ Sí, activar notificaciones
+                </button>
+                <button
+                  onClick={() => setShowPushModal(false)}
+                  style={{
+                    width: "100%", padding: "10px", borderRadius: 14, border: "1px solid rgba(60,60,67,0.12)",
+                    background: "white", color: "#8a8a90", fontSize: 13, cursor: "pointer",
+                  }}>
+                  Ahora no
+                </button>
+              </>
+            )}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {mobileMenu && (
         <MobileMenu
