@@ -9353,9 +9353,9 @@ function CancioneroDetallePauta({ pauta, canciones, isAdmin, onVolver, onReload 
             </div>
           )}
 
-          {pauta?.notas_generales && (
+          {(pauta?.notas_generales || pauta?.notas) && (
             <div style={{ padding: "12px 22px", borderTop: `1px solid ${C.border}`, background: "#f0fdf4" }}>
-              <div style={{ fontSize: 12, color: C.primaryDark, fontStyle: "italic" }}>📝 {pauta.notas_generales}</div>
+              <div style={{ fontSize: 12, color: C.primaryDark, lineHeight: 1.6 }}>📝 {renderNotas(pauta.notas_generales || pauta.notas)}</div>
             </div>
           )}
         </Card>
@@ -12712,6 +12712,90 @@ const TITULO_CELEBRACION_OPTIONS = [
   "Misa Misión / Retiro",
 ];
 
+// Renderiza notas con **negrita** y saltos de línea
+function renderNotas(texto) {
+  if (!texto) return null;
+  return texto.split("\n").map((linea, li) => {
+    const partes = linea.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+    return (
+      <span key={li}>
+        {partes.map((p, pi) =>
+          p.startsWith("**") && p.endsWith("**")
+            ? <strong key={pi} style={{ fontWeight: 700 }}>{p.slice(2, -2)}</strong>
+            : <span key={pi}>{p}</span>
+        )}
+        {li < texto.split("\n").length - 1 && <br />}
+      </span>
+    );
+  });
+}
+
+// Editor de notas: textarea con barra de formato (negrita + saltos de línea)
+function NotasEditor({ value, onChange, placeholder }) {
+  const ref = useRef(null);
+
+  const wrapBold = () => {
+    const ta = ref.current;
+    if (!ta) return;
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    const sel = value.slice(start, end);
+    const nuevo = sel
+      ? value.slice(0, start) + "**" + sel + "**" + value.slice(end)
+      : value.slice(0, start) + "**texto**" + value.slice(end);
+    onChange(nuevo);
+    setTimeout(() => {
+      ta.focus();
+      if (sel) { ta.selectionStart = start + 2; ta.selectionEnd = end + 2; }
+      else { ta.selectionStart = start + 2; ta.selectionEnd = start + 7; }
+    }, 0);
+  };
+
+  const insertBullet = () => {
+    const ta = ref.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const antes = value.slice(0, start);
+    const prefijo = (antes === "" || antes.endsWith("\n")) ? "• " : "\n• ";
+    const nuevo = antes + prefijo + value.slice(start);
+    onChange(nuevo);
+    setTimeout(() => { ta.focus(); ta.selectionStart = ta.selectionEnd = start + prefijo.length; }, 0);
+  };
+
+  return (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", background: "white" }}>
+      {/* Barra de formato */}
+      <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 8px", borderBottom: `1px solid ${C.border}`, background: "rgba(0,0,0,0.015)" }}>
+        <button type="button" onClick={wrapBold} title="Negrita (selecciona texto y pulsa)"
+          style={{ width: 30, height: 28, borderRadius: 7, border: "1px solid rgba(60,60,67,0.10)", background: "white", cursor: "pointer", fontWeight: 800, fontSize: 13, color: C.dark }}>B</button>
+        <button type="button" onClick={insertBullet} title="Agregar viñeta"
+          style={{ width: 30, height: 28, borderRadius: 7, border: "1px solid rgba(60,60,67,0.10)", background: "white", cursor: "pointer", fontSize: 14, color: C.dark }}>•</button>
+        <span style={{ marginLeft: "auto", fontSize: 10.5, color: C.gray, paddingRight: 4 }}>
+          Enter = salto de línea · <strong>**texto**</strong> = negrita
+        </span>
+      </div>
+      <textarea
+        ref={ref}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={6}
+        style={{
+          width: "100%", border: "none", outline: "none", resize: "vertical",
+          padding: "11px 13px", fontSize: 13, lineHeight: 1.6, color: C.dark,
+          boxSizing: "border-box", background: "white", minHeight: 120, fontFamily: "inherit",
+        }}
+      />
+      {/* Vista previa */}
+      {value && value.trim() && (
+        <div style={{ borderTop: `1px solid ${C.border}`, padding: "10px 13px", background: "rgba(0,0,0,0.015)" }}>
+          <div style={{ fontSize: 9.5, fontWeight: 700, color: C.gray, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 5 }}>Vista previa</div>
+          <div style={{ fontSize: 12.5, color: C.dark, lineHeight: 1.6 }}>{renderNotas(value)}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const isAdmin = user?.cuerda === "Admin";
   const isVisita = esVisita(user);
@@ -13238,7 +13322,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             </div>
           </div>
           <div
-            style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10 }}
+            style={{ display: "flex", flexDirection: "column", gap: 12 }}
           >
             <div>
               <label
@@ -13273,13 +13357,10 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
               >
                 Notas generales
               </label>
-              <input
+              <NotasEditor
                 value={form.notas}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, notas: e.target.value }))
-                }
-                placeholder="Indicaciones adicionales para el coro..."
-                style={inp}
+                onChange={(v) => setForm((p) => ({ ...p, notas: v }))}
+                placeholder="Indicaciones para el coro. Ej:&#10;**Ofertorio:** solo cantan varones.&#10;**Comunión:** cantan mujeres."
               />
             </div>
           </div>
@@ -13331,7 +13412,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     "Intérprete",
                     ...(showColLetra ? ["URL Letra (PDF)"] : []),
                     ...(showColAudio ? ["URL Audio Ref."] : []),
-                    "⚠️",
+                    "Estado",
                     "",
                   ].map((h, i) => (
                     <th key={i} style={{ ...thStyle, width: i === 0 ? "40px" : "auto" }}>
@@ -13374,10 +13455,11 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     key={i}
                     style={{
                       background: c.pendiente
-                        ? "#fefce8"
+                        ? "#fef9c3"
                         : i % 2 === 0
                         ? C.white
                         : "var(--bg-base)",
+                      boxShadow: c.pendiente ? "inset 3px 0 0 #eab308" : "none",
                     }}
                   >
                     <td style={tdEditStyle}>
@@ -13466,31 +13548,22 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     </td>
                     )}
                     <td style={{ ...tdEditStyle, textAlign: "center" }}>
-                      <label
+                      <button
+                        type="button"
+                        onClick={() => updateFila(i, "pendiente", !c.pendiente)}
+                        title={c.pendiente ? "Marcado por confirmar — clic para quitar" : "Marcar como 'por confirmar'"}
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 4,
-                          cursor: "pointer",
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          padding: "4px 9px", borderRadius: 20, cursor: "pointer",
+                          fontSize: 10, fontWeight: 700, whiteSpace: "nowrap",
+                          border: c.pendiente ? "1px solid #eab308" : "1px solid rgba(60,60,67,0.15)",
+                          background: c.pendiente ? "#fef08a" : "white",
+                          color: c.pendiente ? "#854d0e" : "#9ca3af",
+                          transition: "all 0.15s",
                         }}
                       >
-                        <input
-                          type="checkbox"
-                          checked={c.pendiente || false}
-                          onChange={(e) =>
-                            updateFila(i, "pendiente", e.target.checked)
-                          }
-                        />
-                        <span
-                          style={{
-                            fontSize: 10,
-                            color: c.pendiente ? "#b45309" : "#9ca3af",
-                          }}
-                        >
-                          {c.pendiente ? "⚠️" : ""}
-                        </span>
-                      </label>
+                        {c.pendiente ? "⚠️ Por confirmar" : "Confirmar"}
+                      </button>
                     </td>
                     <td style={{ ...tdEditStyle, textAlign: "center" }}>
                       <button
@@ -13513,9 +13586,14 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
               </tbody>
             </table>
           </div>
+          {/* Leyenda fila amarilla */}
+          <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 16px", borderTop: `1px solid ${C.border}`, background: "#fffbeb" }}>
+            <span style={{ width: 22, height: 14, borderRadius: 4, background: "#fef08a", border: "1px solid #eab308", flexShrink: 0, boxShadow: "inset 2px 0 0 #eab308" }} />
+            <span style={{ fontSize: 11.5, color: "#854d0e", lineHeight: 1.4 }}>
+              Las filas en <strong>amarillo</strong> indican un canto <strong>por confirmar</strong>: aún puede cambiar antes de la misa. Usa el botón "⚠️ Por confirmar" de cada fila para marcarlo.
+            </span>
+          </div>
         </Card>
-
-        {/* Botones de acción */}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {mode === "edit" ? (
             <>
@@ -13784,16 +13862,15 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   <div
                     style={{
                       marginTop: 8,
-                      fontSize: 12,
+                      fontSize: 12.5,
                       color: "var(--text-secondary)",
-                      fontStyle: "italic",
                       background: "#f0fdf4",
                       borderRadius: 10,
-                      padding: "6px 14px",
-                      display: "inline-block",
+                      padding: "10px 14px",
+                      lineHeight: 1.6,
                     }}
                   >
-                    {selected.notas}
+                    {renderNotas(selected.notas)}
                   </div>
                 )}
               </div>
@@ -13903,10 +13980,11 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       key={i}
                       style={{
                         background: c.pendiente
-                          ? "#fefce8"
+                          ? "#fef9c3"
                           : i % 2 === 0
                           ? "#ffffff"
                           : "#f8fffe",
+                        boxShadow: c.pendiente ? "inset 3px 0 0 #eab308" : "none",
                       }}
                     >
                       <td
@@ -14006,6 +14084,15 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
               </tbody>
             </table>
           </div>
+
+          {cancionesData.some((c) => c.pendiente) && (
+            <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 16px", borderTop: `1px solid ${C.border}`, background: "#fffbeb" }}>
+              <span style={{ width: 22, height: 14, borderRadius: 4, background: "#fef08a", border: "1px solid #eab308", flexShrink: 0, boxShadow: "inset 2px 0 0 #eab308" }} />
+              <span style={{ fontSize: 11.5, color: "#854d0e", lineHeight: 1.4 }}>
+                Las filas en <strong>amarillo</strong> son cantos <strong>por confirmar</strong>: aún pueden cambiar antes de la misa.
+              </span>
+            </div>
+          )}
 
           {isAdmin && (
             <div
