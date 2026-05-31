@@ -615,7 +615,6 @@ const NAV = [
   { id: "asistencia",       icon: "✅", label: "Asistencia" },
   { id: "reconoceme",       icon: "🌟", label: "Reconóceme" },
   { id: "noticias",         icon: "◈",  label: "Avisos" },
-  { id: "escuela_canto",    icon: "🎤", label: "Curso de Canto Litúrgico" },
   { id: "biblioteca",       icon: "▤",  label: "Biblioteca" },
   { id: "cancionero",       icon: "♫",  label: "Canto Digital" },
   { id: "documentos",       icon: "⬇",  label: "Descargas Misas" },
@@ -965,7 +964,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
         {NAV.filter((item) => {
           const isVisita = esVisita(user);
           if (isVisita) {
-            return ["escuela_canto"].includes(item.id);
+            return ["material_ensayo"].includes(item.id);
           }
           if (item.id === "material_ensayo") return false;
           if (item.id === "cantos_pdf" || item.id === "audios") return false;
@@ -975,7 +974,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
         }).map((item) => {
           const isVisita = esVisita(user);
           const VISITA_STYLES = {
-            escuela_canto: { bg:"#1c4a8a", color:"white", icon:"🎤" },
+            material_ensayo: { bg:"#1c4a8a", color:"white", icon:"🎼" },
           };
           const vs = isVisita ? VISITA_STYLES[item.id] : null;
           const isActive = section === item.id;
@@ -1883,7 +1882,7 @@ export default function App() {
     setAuthToken(data.access_token);
     setUser(p);
     setView("app");
-    if (esVisita(p)) setSection("escuela_canto");
+    if (esVisita(p)) setSection("material_ensayo");
     registrarVisita(p, data.access_token);
     // Mostrar modal solo si no tiene permiso aún y no es usuario Visita
     setTimeout(() => {
@@ -2216,7 +2215,7 @@ export default function App() {
           {NAV.filter((item) => {
             const isVisita = esVisita(user);
             if (isVisita) {
-              return ["escuela_canto"].includes(item.id);
+              return ["material_ensayo"].includes(item.id);
             }
             // Ocultar material_ensayo, cantos_pdf, audios para no-visitas
             if (item.id === "material_ensayo") return false;
@@ -2227,7 +2226,7 @@ export default function App() {
           }).map((item) => {
             const isVisita = esVisita(user);
             const VISITA_STYLES = {
-              escuela_canto: { bg:"#1c4a8a", icon:"🎤" },
+              material_ensayo: { bg:"#1c4a8a", icon:"🎼" },
             };
             const vs = isVisita ? VISITA_STYLES[item.id] : null;
             const isActive = section === item.id;
@@ -4452,144 +4451,166 @@ function DashboardVisita({ user, pautas, setSection, isAdmin, evangelio, comunid
 //  MATERIAL DE ENSAYO — Sección exclusiva para usuario Visita
 // ══════════════════════════════════════════════════════════════════════
 function MaterialEnsayo({ docs, user, catFiltroInicial }) {
+  const CUERDAS_EST = [
+    { id: "Soprano",      emoji: "🎵", color: "#D4537E", colorLight: "#fbeaf0", desc: "Voz femenina aguda" },
+    { id: "Contralto",    emoji: "🎶", color: "#0e7490", colorLight: "#e0f2f7", desc: "Voz femenina grave" },
+    { id: "Tenor",        emoji: "🎼", color: "#3b82f6", colorLight: "#e8f1fc", desc: "Voz masculina aguda" },
+    { id: "Bajo",         emoji: "🎹", color: "#f59e0b", colorLight: "#fef3e2", desc: "Voz masculina grave" },
+    { id: "Instrumentos", emoji: "🎸", color: "#0a7e6e", colorLight: "#e6f4f1", desc: "Guitarra, teclado y más" },
+  ];
+  const [cuerdaSel, setCuerdaSel] = useState(null);
   const [search, setSearch] = useState("");
-  const [catFiltro, setCatFiltro] = useState(catFiltroInicial || "Todos");
 
-  // Mostrar todos los documentos disponibles (el admin decide qué subir)
-  const lista = (docs || []).filter((d) => {
-    const matchSearch = !search || d.nombre?.toLowerCase().includes(search.toLowerCase());
-    const matchCat = catFiltro === "Todos" || (d.categoria||"").toLowerCase().includes(catFiltro.toLowerCase());
-    return matchSearch && matchCat;
+  const norm = (s) => (s || "").trim().toLowerCase();
+  // Material visible para una cuerda: el etiquetado a esa cuerda + el etiquetado "Todas"
+  const materialDeCuerda = (cuerdaId) => (docs || []).filter((d) => {
+    const c = norm(d.cuerda_mat);
+    const match = c === norm(cuerdaId) || c === "todas" || c === "" || !d.cuerda_mat;
+    const matchSearch = !search || norm(d.nombre).includes(norm(search));
+    return match && matchSearch;
   });
-
-  const categorias = ["Todos", ...Array.from(new Set((docs||[]).map(d => d.categoria).filter(Boolean)))];
+  const conteo = (cuerdaId) => (docs || []).filter((d) => {
+    const c = norm(d.cuerda_mat);
+    return c === norm(cuerdaId) || c === "todas" || c === "" || !d.cuerda_mat;
+  }).length;
 
   const iconCat = (cat) => {
-    const c = (cat||"").toLowerCase();
+    const c = norm(cat);
     if (c.includes("letra")) return "📝";
     if (c.includes("partitura")) return "🎵";
     if (c.includes("audio")) return "🎧";
-    if (c.includes("pdf")) return "📄";
     if (c.includes("video")) return "🎬";
-    return "📥";
+    if (c.includes("pdf")) return "📄";
+    return "📄";
   };
+  const esAudio = (d) => norm(d.categoria).includes("audio");
+
+  const nombre1 = (user?.nombre || "Cantor").split(" ")[0];
+  const cActiva = CUERDAS_EST.find((c) => c.id === cuerdaSel);
 
   return (
-    <div style={{ maxWidth: 860 }}>
-      {/* Header */}
-      <div style={{
-        background:"linear-gradient(145deg,#0a1628 0%,#0d2d52 60%,#0f3d6e 100%)",
-        borderRadius:18, padding:"16px 18px", marginBottom:16,
-        position:"relative", overflow:"hidden",
-        boxShadow:"0 2px 16px rgba(0,0,0,0.2)",
+    <div style={{ maxWidth: 880 }}>
+      <style>{`
+        @keyframes me-fade { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        .me-fade { animation: me-fade 0.32s cubic-bezier(0.22,1,0.36,1) both; }
+        .me-tile { transition: all 0.2s cubic-bezier(0.22,1,0.36,1); }
+        .me-tile:hover { transform: translateY(-3px); }
+        .me-row { transition: background 0.14s ease; }
+      `}</style>
+
+      {/* ── Hero ── */}
+      <div className="me-fade" style={{
+        position: "relative", overflow: "hidden",
+        background: "linear-gradient(150deg, rgba(30,58,95,0.06) 0%, rgba(255,255,255,0.97) 46%, #ffffff 100%)",
+        borderRadius: 22, padding: "20px 22px", marginBottom: 18,
+        boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 10px 30px rgba(30,58,95,0.08)",
+        border: "1px solid rgba(255,255,255,0.8)",
       }}>
-        <div style={{ position:"absolute", top:-30, right:-20, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,0.03)", pointerEvents:"none" }} />
-        <div style={{ position:"relative", zIndex:1 }}>
-          <div style={{ fontSize:10, fontWeight:600, color:"rgba(255,255,255,0.38)", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:3 }}>
-            Acceso Invitado
-          </div>
-          <div style={{ fontFamily:"var(--font-display)", fontSize:18, fontWeight:700, color:"white", letterSpacing:"-0.02em", marginBottom:3 }}>
-            Material de Ensayo
-          </div>
-          <div style={{ fontSize:12, color:"rgba(255,255,255,0.55)", lineHeight:1.5 }}>
-            Letras, partituras, audios y más para preparar la liturgia.
+        <div style={{ position: "absolute", top: -60, right: -40, width: 180, height: 180, borderRadius: "50%", background: "radial-gradient(circle, rgba(30,58,95,0.10) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 14, position: "relative" }}>
+          <div style={{ width: 50, height: 50, borderRadius: 15, flexShrink: 0, background: `linear-gradient(145deg, ${C.primary}, ${C.primaryDark})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, boxShadow: `0 6px 18px ${C.primary}50, inset 0 1px 0 rgba(255,255,255,0.3)` }}>🎼</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 9.5, fontWeight: 800, color: C.primary, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 2 }}>Sala de Estudio</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+              {cuerdaSel ? cuerdaSel : `Hola, ${nombre1}`}
+            </div>
+            <div style={{ fontSize: 12.5, color: "#8a8a90", marginTop: 2, lineHeight: 1.4 }}>
+              {cuerdaSel ? `Audios y letras para tu voz` : "Elige tu cuerda para estudiar los cantos de la misa"}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Filtros */}
-      <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap", alignItems:"center" }}>
-        <div style={{
-          display:"flex", alignItems:"center", gap:8,
-          background:"white", borderRadius:10, padding:"7px 12px",
-          border:"1px solid rgba(60,60,67,0.15)", flex:1, maxWidth:300,
-          boxShadow:"0 1px 4px rgba(0,0,0,0.04)",
-        }}>
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4.5" stroke="#8e8e93" strokeWidth="1.2"/><path d="M9.5 9.5l2.5 2.5" stroke="#8e8e93" strokeWidth="1.2" strokeLinecap="round"/></svg>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar material..."
-            style={{ background:"none", border:"none", outline:"none", fontSize:13, width:"100%", color:"#1c1c1e", letterSpacing:"-0.016em" }}
-          />
-          {search && (
-            <button onClick={() => setSearch("")} style={{ background:"rgba(60,60,67,0.12)", border:"none", color:"#8e8e93", cursor:"pointer", fontSize:12, padding:0, lineHeight:1, width:16, height:16, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
-          )}
-        </div>
-        <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
-          {categorias.map(cat => (
-            <button key={cat} onClick={() => setCatFiltro(cat)} style={{
-              padding:"5px 12px", borderRadius:20, border:"none", cursor:"pointer",
-              fontSize:12, fontWeight:catFiltro===cat ? 600 : 400,
-              background: catFiltro===cat ? "#007aff" : "rgba(60,60,67,0.08)",
-              color: catFiltro===cat ? "white" : "#3c3c43",
-              transition:"all 0.12s", letterSpacing:"-0.01em",
-            }}>{cat}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Lista de documentos */}
-      {lista.length === 0 ? (
-        <div style={{ padding:"48px 20px", display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
-          <div style={{ width:48, height:48, borderRadius:12, background:"rgba(60,60,67,0.06)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="1" width="11" height="15" rx="2" stroke="rgba(60,60,67,0.3)" strokeWidth="1.5"/><path d="M6 5h5M6 8h5M6 11h3" stroke="rgba(60,60,67,0.3)" strokeWidth="1.2" strokeLinecap="round"/><path d="M14 10l5 5" stroke="rgba(60,60,67,0.3)" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          </div>
-          <div style={{ fontSize:14, fontWeight:600, color:"#1c1c1e", letterSpacing:"-0.016em" }}>Sin material disponible</div>
-          <div style={{ fontSize:13, color:"#8e8e93", textAlign:"center" }}>
-            {search || catFiltro !== "Todos"
-              ? "No hay resultados para este filtro."
-              : "El encargado publicará material próximamente."}
-          </div>
+      {!cuerdaSel ? (
+        /* ── Selección de cuerda ── */
+        <div className="me-fade" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 12 }}>
+          {CUERDAS_EST.map((c, i) => {
+            const n = conteo(c.id);
+            return (
+              <button key={c.id} className="me-tile" onClick={() => { setCuerdaSel(c.id); setSearch(""); }}
+                style={{
+                  position: "relative", overflow: "hidden", textAlign: "left", cursor: "pointer",
+                  background: `linear-gradient(150deg, ${c.colorLight} 0%, #ffffff 70%)`,
+                  border: `1px solid ${c.color}22`, borderRadius: 18, padding: "18px 18px",
+                  boxShadow: `0 2px 10px ${c.color}14`, animationDelay: `${i * 0.04}s`,
+                }}
+                onMouseOver={e => e.currentTarget.style.boxShadow = `0 10px 26px ${c.color}28`}
+                onMouseOut={e => e.currentTarget.style.boxShadow = `0 2px 10px ${c.color}14`}>
+                <div style={{ position: "absolute", top: -30, right: -20, width: 100, height: 100, borderRadius: "50%", background: `radial-gradient(circle, ${c.color}1a 0%, transparent 70%)`, pointerEvents: "none" }} />
+                <div style={{ width: 48, height: 48, borderRadius: 14, background: `linear-gradient(145deg, ${c.color}, ${c.color}cc)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 12, boxShadow: `0 5px 14px ${c.color}45` }}>{c.emoji}</div>
+                <div style={{ fontSize: 17, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.02em" }}>{c.id}</div>
+                <div style={{ fontSize: 12, color: "#8a8a90", marginTop: 2 }}>{c.desc}</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: c.color, background: `${c.color}14`, borderRadius: 20, padding: "3px 11px" }}>
+                    {n} {n === 1 ? "archivo" : "archivos"}
+                  </span>
+                  <span style={{ fontSize: 16, color: c.color, fontWeight: 700 }}>›</span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       ) : (
-        <div style={{ display:"flex", flexDirection:"column", gap:1, background:"white", borderRadius:14, overflow:"hidden", border:"1px solid rgba(60,60,67,0.1)", boxShadow:"0 1px 6px rgba(0,0,0,0.05)" }}>
-          {lista.map((doc, i) => (
-            <a
-              key={doc.id}
-              href={doc.url || doc.archivo_url || "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ textDecoration:"none" }}
-            >
-              <div style={{
-                padding:"12px 14px",
-                borderBottom: i < lista.length - 1 ? "1px solid rgba(60,60,67,0.08)" : "none",
-                display:"flex", alignItems:"center", gap:12,
-                transition:"background 0.12s",
-              }}
-              onMouseEnter={e => e.currentTarget.style.background="rgba(0,0,0,0.02)"}
-              onMouseLeave={e => e.currentTarget.style.background="transparent"}
-              >
-                <div style={{
-                  width:36, height:36, borderRadius:9, flexShrink:0,
-                  background:"linear-gradient(145deg,#0a1628,#0071e3)",
-                  display:"flex", alignItems:"center", justifyContent:"center",
-                  fontSize:16,
-                }}>
-                  {iconCat(doc.categoria)}
+        /* ── Material de la cuerda seleccionada ── */
+        <div className="me-fade">
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+            <button onClick={() => setCuerdaSel(null)} style={{ display: "flex", alignItems: "center", gap: 6, background: "white", border: "1px solid rgba(60,60,67,0.12)", borderRadius: 11, padding: "8px 13px", cursor: "pointer", fontSize: 12.5, color: C.primary, fontWeight: 600 }}>
+              ‹ Cuerdas
+            </button>
+            <div style={{ flex: 1, minWidth: 160, display: "flex", alignItems: "center", gap: 8, background: "white", borderRadius: 11, padding: "8px 13px", border: "1px solid rgba(60,60,67,0.12)" }}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#8e8e93" strokeWidth="1.3"/><path d="M9.5 9.5l3 3" stroke="#8e8e93" strokeWidth="1.3" strokeLinecap="round"/></svg>
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={`Buscar en ${cuerdaSel}…`} style={{ border: "none", outline: "none", fontSize: 13, flex: 1, color: "#1c1c1e", background: "none" }} />
+            </div>
+          </div>
+
+          {(() => {
+            const lista = materialDeCuerda(cuerdaSel);
+            const audios = lista.filter(esAudio);
+            const otros = lista.filter((d) => !esAudio(d));
+            if (lista.length === 0) {
+              return (
+                <div style={{ textAlign: "center", padding: "44px 20px", background: "white", borderRadius: 18, border: "1px solid rgba(60,60,67,0.08)" }}>
+                  <div style={{ fontSize: 40, marginBottom: 10, opacity: 0.4 }}>{cActiva?.emoji}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1c1e" }}>Aún no hay material para {cuerdaSel}</div>
+                  <div style={{ fontSize: 12.5, color: "#8a8a90", marginTop: 4 }}>El encargado publicará los audios y letras pronto.</div>
                 </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:500, color:"#1c1c1e", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", letterSpacing:"-0.016em" }}>
-                    {doc.nombre}
-                  </div>
-                  <div style={{ fontSize:11, color:"#8e8e93", marginTop:1 }}>
-                    {doc.categoria || "Documento"}
-                    {doc.descripcion ? ` · ${doc.descripcion.slice(0,40)}` : ""}
-                  </div>
+              );
+            }
+            const Grupo = ({ titulo, icon, items }) => items.length === 0 ? null : (
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9, paddingLeft: 4 }}>
+                  <span style={{ fontSize: 15 }}>{icon}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.01em" }}>{titulo}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: cActiva.color, background: `${cActiva.color}14`, borderRadius: 20, padding: "1px 8px" }}>{items.length}</span>
                 </div>
-                <svg width="7" height="12" viewBox="0 0 7 12" fill="none" style={{ flexShrink:0, opacity:0.25 }}>
-                  <path d="M1 1l5 5-5 5" stroke="#1c1c1e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                <div style={{ background: "white", borderRadius: 16, border: "1px solid rgba(60,60,67,0.08)", overflow: "hidden" }}>
+                  {items.map((d, i) => (
+                    <a key={d.id} href={d.url || d.archivo_url || "#"} target="_blank" rel="noopener noreferrer" className="me-row"
+                      style={{ display: "flex", alignItems: "center", gap: 13, padding: "13px 15px", textDecoration: "none", borderTop: i === 0 ? "none" : "1px solid rgba(60,60,67,0.07)" }}
+                      onMouseOver={e => e.currentTarget.style.background = `${cActiva.color}0a`}
+                      onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+                      <div style={{ width: 40, height: 40, borderRadius: 11, flexShrink: 0, background: `${cActiva.color}14`, border: `1px solid ${cActiva.color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{iconCat(d.categoria)}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: "#1c1c1e", letterSpacing: "-0.012em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.nombre}</div>
+                        <div style={{ fontSize: 11, color: "#8a8a90", marginTop: 1 }}>{d.categoria}{d.size ? ` · ${d.size}` : ""}{d.descripcion ? ` · ${d.descripcion}` : ""}</div>
+                      </div>
+                      <span style={{ flexShrink: 0, width: 30, height: 30, borderRadius: "50%", background: `${cActiva.color}14`, color: cActiva.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>
+                        {esAudio(d) ? "▶" : "↓"}
+                      </span>
+                    </a>
+                  ))}
+                </div>
               </div>
-            </a>
-          ))}
+            );
+            return (
+              <>
+                <Grupo titulo="Audios para estudiar" icon="🎧" items={audios} />
+                <Grupo titulo="Letras y partituras" icon="📝" items={otros} />
+              </>
+            );
+          })()}
         </div>
       )}
-
-      <div style={{ marginTop:16, fontSize:11, color:"#c7c7cc", letterSpacing:"-0.01em" }}>
-        {lista.length} {lista.length!==1?"archivos":"archivo"}
-      </div>
     </div>
   );
 }
@@ -10728,7 +10749,8 @@ function AdminDocumentos({ docs, onReload }) {
 // ═══════════════════════════════════════════════════════════════
 function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
   const CATS = ["Repertorio", "Partituras", "Letras", "Audio", "Video", "Comunicados", "Otro"];
-  const [form, setForm] = useState({ nombre: "", url: "", categoria: "Repertorio", descripcion: "", size: "" });
+  const CUERDAS_MAT = ["Todas", "Soprano", "Contralto", "Tenor", "Bajo", "Instrumentos"];
+  const [form, setForm] = useState({ nombre: "", url: "", categoria: "Repertorio", cuerda_mat: "Todas", descripcion: "", size: "" });
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -10747,7 +10769,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
     setSaving(true);
     try {
       await supabase("material_ensayo", { method: "POST", body: form });
-      setForm({ nombre: "", url: "", categoria: "Repertorio", descripcion: "", size: "" });
+      setForm({ nombre: "", url: "", categoria: "Repertorio", cuerda_mat: "Todas", descripcion: "", size: "" });
       setShowForm(false);
       onReload();
     } catch (e) { alert("Error: " + e.message); }
@@ -10766,7 +10788,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
 
   function startEdit(d) {
     setEditId(d.id);
-    setEditForm({ nombre: d.nombre || "", url: d.url || "", categoria: d.categoria || "Repertorio", descripcion: d.descripcion || "", size: d.size || "" });
+    setEditForm({ nombre: d.nombre || "", url: d.url || "", categoria: d.categoria || "Repertorio", cuerda_mat: d.cuerda_mat || "Todas", descripcion: d.descripcion || "", size: d.size || "" });
   }
 
   const iconCat = (cat) => {
@@ -10849,6 +10871,12 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
               </select>
             </div>
             <div>
+              <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Cuerda / Voz</label>
+              <select value={form.cuerda_mat} onChange={e => setForm(p => ({ ...p, cuerda_mat: e.target.value }))} style={inp}>
+                {CUERDAS_MAT.map(c => <option key={c} value={c}>{c === "Todas" ? "Todas las cuerdas" : c}</option>)}
+              </select>
+            </div>
+            <div>
               <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Tamaño (opcional)</label>
               <input value={form.size} onChange={e => setForm(p => ({ ...p, size: e.target.value }))}
                 placeholder="Ej: 2.4 MB" style={inp} />
@@ -10883,6 +10911,9 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
                     <input value={editForm.url} onChange={e => setEditForm(p => ({ ...p, url: e.target.value }))} style={inp} placeholder="URL" />
                     <select value={editForm.categoria} onChange={e => setEditForm(p => ({ ...p, categoria: e.target.value }))} style={inp}>
                       {CATS.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select value={editForm.cuerda_mat} onChange={e => setEditForm(p => ({ ...p, cuerda_mat: e.target.value }))} style={inp}>
+                      {CUERDAS_MAT.map(c => <option key={c} value={c}>{c === "Todas" ? "Todas las cuerdas" : c}</option>)}
                     </select>
                     <input value={editForm.size} onChange={e => setEditForm(p => ({ ...p, size: e.target.value }))} style={inp} placeholder="Tamaño" />
                   </div>
