@@ -625,7 +625,8 @@ const NAV = [
   { id: "pauta_misa",       icon: "🎼", label: "Pauta de Misa" },
   { id: "podcast",          icon: "◉",  label: "Podcast" },
   { id: "qanda",            icon: "?",  label: "Preguntas" },
-  { id: "material_ensayo",  icon: "📥", label: "Material de Ensayo" },
+  { id: "material_ensayo",  icon: "📥", label: "Sala de Ensayo" },
+  { id: "vista_invitado",   icon: "👁", label: "Vista Invitado" },
   { id: "cantos_pdf",       icon: "📄", label: "Cantos PDF" },
   { id: "audios",           icon: "🎧", label: "Audios" },
 ];
@@ -966,7 +967,8 @@ function MobileMenu({ section, setSection, onClose, user }) {
           if (isVisita) {
             return ["dashboard", "material_ensayo"].includes(item.id);
           }
-          if (item.id === "material_ensayo") return false;
+          if (item.id === "material_ensayo" && !esCuerdaAdmin(user)) return false;
+          if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
           if (item.id === "cantos_pdf" || item.id === "audios") return false;
           if (item.id === "admin" && !esCuerdaAdmin(user)) return false;
           if (item.id === "finanzas" && !esCuerdaAdmin(user) && !esCuerdaContador(user)) return false;
@@ -2218,8 +2220,9 @@ export default function App() {
             if (isVisita) {
               return ["dashboard", "material_ensayo"].includes(item.id);
             }
-            // Ocultar material_ensayo, cantos_pdf, audios para no-visitas
-            if (item.id === "material_ensayo") return false;
+            // Sala de Ensayo y Vista Invitado: visibles solo para Admin
+            if (item.id === "material_ensayo" && !esCuerdaAdmin(user)) return false;
+            if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
             if (item.id === "cantos_pdf" || item.id === "audios") return false;
             if (item.id === "admin" && user?.cuerda !== "Admin") return false;
             if (item.id === "finanzas" && !esCuerdaAdmin(user) && !esCuerdaContador(user)) return false;
@@ -2749,8 +2752,33 @@ export default function App() {
               {section === "info_gastos" && (
                 <InfoGastos user={user} members={members} />
               )}
-              {section === "material_ensayo" && esVisita(user) && (
+              {section === "material_ensayo" && (esVisita(user) || esCuerdaAdmin(user)) && (
                 <MaterialEnsayo docs={materialEnsayo} user={user} />
+              )}
+              {section === "vista_invitado" && esCuerdaAdmin(user) && (
+                <div>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    background: "linear-gradient(135deg,#0c1a2e,#0ea5e9)",
+                    borderRadius: 14, padding: "12px 16px", marginBottom: 16, color: "white",
+                  }}>
+                    <span style={{ fontSize: 20 }}>👁</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>Vista previa del Portal Invitado</div>
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.78)", lineHeight: 1.5 }}>
+                        Así lo ven los coros invitados. Puedes editar el afiche y la agenda aquí mismo. Para la Sala de Ensayo usa el menú "Sala de Ensayo".
+                      </div>
+                    </div>
+                  </div>
+                  <DashboardVisita
+                    user={user}
+                    pautas={pautas}
+                    setSection={setSection}
+                    isAdmin={true}
+                    evangelio={evangelio}
+                    comunidades={comunidades}
+                  />
+                </div>
               )}
               {section === "cantos_pdf" && esVisita(user) && (
                 <MaterialEnsayo docs={materialEnsayo} user={user} catFiltroInicial="PDF" />
@@ -4653,15 +4681,18 @@ function DashboardVisita({ user, pautas, setSection, isAdmin, evangelio, comunid
             </div>
           </div>
           <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:10, fontWeight:600, color:"#1e3a5f", letterSpacing:"0.04em", textTransform:"uppercase", marginBottom:1 }}>
-              Próxima misa parroquial
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:3 }}>
+              <span style={{ fontSize:9.5, fontWeight:800, color:"#1e3a5f", background:"rgba(30,58,95,0.1)", borderRadius:6, padding:"2px 8px", letterSpacing:"0.05em", textTransform:"uppercase" }}>📋 Pauta de la misa</span>
             </div>
-            <div style={{ fontSize:14, fontWeight:600, color:"#1c1c1e", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", letterSpacing:"-0.016em" }}>
+            <div style={{ fontSize:14, fontWeight:700, color:"#1c1c1e", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", letterSpacing:"-0.016em" }}>
               {proxima.titulo}
             </div>
             <div style={{ fontSize:11, color:"#8e8e93", marginTop:1 }}>
               {new Date(proxima.fecha+"T00:00:00").toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"})}
               {proxima.hora ? ` · ${proxima.hora}` : ""}{proxima.lugar ? ` · ${proxima.lugar}` : ""}
+            </div>
+            <div style={{ fontSize:11, fontWeight:700, color:"#1e3a5f", marginTop:7 }}>
+              Ver cantos y pauta ›
             </div>
           </div>
           <svg width="7" height="12" viewBox="0 0 7 12" fill="none" style={{ flexShrink:0, opacity:0.3 }}>
@@ -16290,6 +16321,7 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
   const [idx, setIdx] = useState(0);
   const [fade, setFade] = useState(true);
   const [paused, setPaused] = useState(false);
+  const [openReco, setOpenReco] = useState(null);
   const n = recientes.length;
 
   const goTo = (next) => {
@@ -16298,13 +16330,13 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
   };
 
   useEffect(() => {
-    if (n <= 1 || paused) return;
+    if (n <= 1 || paused || openReco) return;
     const t = setInterval(() => {
       setFade(false);
       setTimeout(() => { setIdx(i => (i + 1) % n); setFade(true); }, 240);
     }, 4500);
     return () => clearInterval(t);
-  }, [n, paused]);
+  }, [n, paused, openReco]);
 
   useEffect(() => { if (idx >= n && n > 0) setIdx(0); }, [n, idx]);
 
@@ -16428,6 +16460,12 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
                   <div style={{ fontSize:13.5, color:"#3c3c43", lineHeight:1.6, letterSpacing:"-0.012em", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>
                     {r.mensaje}
                   </div>
+                  {(r.mensaje || "").length > 90 && (
+                    <button onClick={() => setOpenReco(r)}
+                      style={{ marginTop:6, background:"none", border:"none", padding:0, cursor:"pointer", fontSize:12, fontWeight:700, color:cc, letterSpacing:"-0.01em" }}>
+                      Leer completo →
+                    </button>
+                  )}
                 </div>
 
                 {/* Remitente + fecha */}
@@ -16461,6 +16499,62 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
           </>
         )}
       </div>
+
+      {openReco && (() => {
+        const rr = openReco;
+        const oPara = getAvatar(rr.para_id);
+        const oDe = getAvatar(rr.de_id);
+        const oEsGrupo = !rr.para_id && rr.para_grupo;
+        const oG = oEsGrupo ? grupoData.find(g => g.id === rr.para_grupo) : null;
+        const oCc = oEsGrupo ? (oG?.color || C.primary) : (CUERDAS[oPara?.cuerda] || C.primary);
+        const oCat = RECO_CATS.find(c => c.id === rr.categoria);
+        const oFecha = rr.created_at ? new Date(rr.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" }) : "";
+        return (
+          <div onClick={() => setOpenReco(null)} style={{ position: "fixed", inset: 0, background: "rgba(8,8,20,0.55)", backdropFilter: "blur(4px)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: "white", borderRadius: 20, maxWidth: 460, width: "100%", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 24px 64px rgba(0,0,0,0.3)" }}>
+              <div style={{ height: 4, background: `linear-gradient(90deg, transparent, ${oCc}, transparent)` }} />
+              <div style={{ padding: "20px 22px 22px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 18 }}>🏆</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.01em" }}>Reconocimiento</span>
+                  </div>
+                  <button onClick={() => setOpenReco(null)} aria-label="Cerrar" style={{ width: 30, height: 30, borderRadius: 10, border: "1px solid rgba(60,60,67,0.12)", background: "white", color: "#8a8a90", fontSize: 16, cursor: "pointer" }}>✕</button>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 13, marginBottom: 14 }}>
+                  <div style={{ width: 52, height: 52, borderRadius: oEsGrupo ? 15 : "50%", background: `linear-gradient(145deg, ${oCc}, ${oCc}cc)`, border: "2.5px solid white", boxShadow: `0 5px 14px ${oCc}48`, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: oEsGrupo ? 24 : 19, fontWeight: 700, overflow: "hidden", flexShrink: 0 }}>
+                    {oEsGrupo ? (oG?.icon || "👥") : oPara?.foto_url ? <img src={oPara.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(rr.para_nombre || "?")}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "#b0b0b6", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 1 }}>Para</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.025em", lineHeight: 1.15 }}>{rr.para_nombre}</div>
+                    {oCat && (
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700, color: oCc, background: oCc + "14", borderRadius: 20, padding: "2px 10px", marginTop: 4, border: `1px solid ${oCc}22` }}>
+                        <span style={{ fontSize: 12 }}>{oCat.icon}</span> {oCat.label}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ position: "relative", paddingLeft: 14, marginBottom: 16 }}>
+                  <div style={{ position: "absolute", left: 0, top: 2, bottom: 2, width: 3, borderRadius: 2, background: oCc, opacity: 0.35 }} />
+                  <div style={{ fontSize: 14.5, color: "#3c3c43", lineHeight: 1.7, letterSpacing: "-0.01em", whiteSpace: "pre-wrap" }}>
+                    {rr.mensaje}
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 12, borderTop: "1px solid rgba(60,60,67,0.08)" }}>
+                  <div style={{ width: 26, height: 26, borderRadius: "50%", background: `linear-gradient(145deg, ${CUERDAS[oDe?.cuerda] || C.gray}, ${CUERDAS[oDe?.cuerda] || C.gray}cc)`, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 11, fontWeight: 700, overflow: "hidden", flexShrink: 0 }}>
+                    {oDe?.foto_url ? <img src={oDe.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(rr.de_nombre || "?")}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#8a8a90", fontWeight: 500 }}>
+                    de <span style={{ fontWeight: 700, color: "#3c3c43" }}>{rr.de_nombre}</span>
+                    <span style={{ opacity: 0.7 }}> · {oFecha}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }
