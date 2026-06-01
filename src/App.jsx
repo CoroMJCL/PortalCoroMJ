@@ -4625,7 +4625,27 @@ function DashboardVisita({ user, pautas, setSection, isAdmin, evangelio, comunid
   const now = new Date();
   const hora = now.getHours();
   const saludo = hora < 12 ? "Buenos días" : hora < 19 ? "Buenas tardes" : "Buenas noches";
-  const primerNombre = user?.nombre?.split(" ")[0] || "Visitante";
+
+  // Nombre personalizado del invitado (por dispositivo, ya que la cuenta es compartida)
+  const esInvitadoReal = esVisita(user);
+  const [invitadoNombre, setInvitadoNombre] = useState(() => { try { return localStorage.getItem("invitado_nombre") || ""; } catch { return ""; } });
+  const [askName, setAskName] = useState(false);
+  const [draftNombre, setDraftNombre] = useState("");
+
+  useEffect(() => {
+    if (esInvitadoReal && !invitadoNombre) setAskName(true);
+  }, [esInvitadoReal, invitadoNombre]);
+
+  function guardarNombre() {
+    const n = draftNombre.trim();
+    if (n) { try { localStorage.setItem("invitado_nombre", n); } catch {} setInvitadoNombre(n); }
+    setAskName(false);
+  }
+
+  const nombreMostrar = esInvitadoReal
+    ? (invitadoNombre ? invitadoNombre.split(" ")[0] : "")
+    : (user?.nombre?.split(" ")[0] || "Visitante");
+  const primerNombre = nombreMostrar;
 
   return (
     <div style={{ maxWidth: 680 }}>
@@ -4639,6 +4659,44 @@ function DashboardVisita({ user, pautas, setSection, isAdmin, evangelio, comunid
         .vp-tappable { transition: opacity 0.15s; }
         .vp-tappable:hover { opacity:0.82; }
       `}</style>
+
+      {/* ── Popup: pedir nombre al invitado ── */}
+      {askName && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(8,12,24,0.6)", backdropFilter:"blur(5px)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:18 }}>
+          <div style={{ background:"white", borderRadius:22, maxWidth:420, width:"100%", overflow:"hidden", boxShadow:"0 24px 70px rgba(0,0,0,0.35)" }}>
+            <div style={{ background:"linear-gradient(145deg,#0a1628 0%,#0d2d52 60%,#0f3d6e 100%)", padding:"22px 24px 20px", position:"relative", overflow:"hidden" }}>
+              <div style={{ position:"absolute", top:-30, right:-20, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,0.04)" }} />
+              <div style={{ position:"relative", zIndex:1 }}>
+                <div style={{ fontSize:30, marginBottom:6 }}>🎶</div>
+                <div style={{ fontFamily:"var(--font-display)", fontSize:20, fontWeight:700, color:"white", letterSpacing:"-0.02em", lineHeight:1.2 }}>
+                  ¡Bienvenido/a al coro!
+                </div>
+                <div style={{ fontSize:13, color:"rgba(255,255,255,0.78)", lineHeight:1.55, marginTop:6 }}>
+                  Nos alegra que sumes tu voz a esta celebración. Cuéntanos tu nombre para saludarte.
+                </div>
+              </div>
+            </div>
+            <div style={{ padding:"20px 24px 22px" }}>
+              <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#8a8a90", letterSpacing:"0.05em", textTransform:"uppercase", marginBottom:7 }}>Tu nombre</label>
+              <input
+                autoFocus
+                value={draftNombre}
+                onChange={(e) => setDraftNombre(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") guardarNombre(); }}
+                placeholder="Ej: María José"
+                style={{ width:"100%", boxSizing:"border-box", padding:"11px 14px", borderRadius:12, border:"1px solid rgba(60,60,67,0.2)", fontSize:15, outline:"none", color:"#1c1c1e", fontFamily:"inherit" }}
+              />
+              <button onClick={guardarNombre}
+                style={{ width:"100%", marginTop:14, background:"linear-gradient(135deg,#1d6fc7,#1a4d8f)", border:"none", borderRadius:13, padding:"12px 0", fontSize:14, fontWeight:700, color:"white", cursor:"pointer" }}>
+                {draftNombre.trim() ? "Entrar al portal" : "Entrar como invitado/a"}
+              </button>
+              <div style={{ fontSize:10.5, color:"#b0b0b5", textAlign:"center", marginTop:10, lineHeight:1.5 }}>
+                Tu nombre se guarda solo en este dispositivo para personalizar tu bienvenida.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Hero compacto iOS ── */}
       <div className="vc" style={{
@@ -4654,8 +4712,21 @@ function DashboardVisita({ user, pautas, setSection, isAdmin, evangelio, comunid
             Portal Litúrgico · Invitado
           </div>
           <div style={{ fontFamily:"var(--font-display)", fontSize:20, fontWeight:700, color:"white", letterSpacing:"-0.02em", lineHeight:1.2 }}>
-            {saludo}, {primerNombre}
+            {primerNombre ? `${saludo}, ${primerNombre}` : "¡Bienvenido/a!"}
           </div>
+          {esInvitadoReal && (
+            <div style={{ fontSize:12.5, color:"rgba(255,255,255,0.72)", lineHeight:1.55, marginTop:6, maxWidth:520 }}>
+              {invitadoNombre
+                ? `Gracias por sumar tu voz a este coro, ${primerNombre}. Tu entrega y tu canto hacen más bella cada celebración. 🎶`
+                : "Gracias por sumar tu voz a este coro. Tu canto hace más bella cada celebración. 🎶"}
+            </div>
+          )}
+          {esInvitadoReal && invitadoNombre && (
+            <button onClick={() => { setDraftNombre(invitadoNombre); setAskName(true); }}
+              style={{ marginTop:8, background:"none", border:"none", padding:0, cursor:"pointer", fontSize:11, color:"rgba(255,255,255,0.45)", textDecoration:"underline" }}>
+              ¿No eres tú? Cambiar nombre
+            </button>
+          )}
         </div>
       </div>
 
@@ -4932,7 +5003,8 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
   const cantoActivo = cantos.find((c) => c.nombre === cantoSel) || (cantoSel ? map[cantoSel] : null);
   const cActiva = miCuerda ? VOCES_ENSAYO.find((v) => v.id === miCuerda) : null;
   const accent = cActiva ? cActiva.color : C.primary;
-  const nombre1 = (user?.nombre || "Cantor").split(" ")[0];
+  const _guestNombre = (() => { try { return localStorage.getItem("invitado_nombre") || ""; } catch { return ""; } })();
+  const nombre1 = (esVisita(user) && _guestNombre ? _guestNombre : (user?.nombre || "Cantor")).split(" ")[0];
 
   function abrirCanto(c) {
     setCantoSel(c.nombre);
@@ -13523,11 +13595,13 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   }, [deepPautaId, pautas]);
 
   // Form nueva pauta
+  const COROS = ["Coro Misioneros de Jesús", "Coro Parroquial Cristo Resucitado"];
   const emptyPauta = {
     titulo: "",
     fecha: "",
     hora: "",
     lugar: "",
+    coro: "Coro Misioneros de Jesús",
     tipo_celebracion: "Misa Dominical",
     notas: "",
     tipo: "grupo", // "grupo" | "parroquial"
@@ -13600,6 +13674,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
         fecha: form.fecha,
         hora: form.hora,
         lugar: form.lugar.trim(),
+        coro: form.coro || "Coro Misioneros de Jesús",
         tipo_celebracion: form.tipo_celebracion,
         notas: form.notas.trim(),
         canciones: JSON.stringify(canciones),
@@ -13649,6 +13724,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
         fecha: form.fecha || pauta.fecha,
         hora: form.hora || pauta.hora,
         lugar: form.lugar ?? pauta.lugar,
+        coro: form.coro || pauta.coro || "Coro Misioneros de Jesús",
         tipo_celebracion: form.tipo_celebracion || pauta.tipo_celebracion,
         notas: form.notas ?? pauta.notas,
         canciones: JSON.stringify(canciones),
@@ -13727,7 +13803,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       { weekday: "long", day: "numeric", month: "long", year: "numeric" }
     );
     const qrLink = `https://343mhn.csb.app/pauta-publica.html?pauta=${pauta.id}`;
-    const texto = `🎼 *Coro Misioneros de Jesús*\n\nSe ha publicado la *Pauta de Misa* para:\n📅 *${fechaFmt}*\n🕐 *${
+    const texto = `🎼 *${pauta.coro || "Coro Misioneros de Jesús"}*\n\nSe ha publicado la *Pauta de Misa* para:\n📅 *${fechaFmt}*\n🕐 *${
       pauta.hora
     } Hrs*\n📍 ${pauta.lugar || "lugar por confirmar"}\n\n📋 _${
       pauta.titulo
@@ -13744,6 +13820,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       fecha: pauta.fecha,
       hora: pauta.hora,
       lugar: pauta.lugar || "",
+      coro: pauta.coro || "Coro Misioneros de Jesús",
       tipo_celebracion: pauta.tipo_celebracion || "Misa Dominical",
       notas: pauta.notas || "",
       tipo: pauta.tipo || "grupo",
@@ -14024,6 +14101,31 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
           <div
             style={{ display: "flex", flexDirection: "column", gap: 12 }}
           >
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: C.gray,
+                  marginBottom: 4,
+                }}
+              >
+                Coro que canta
+              </label>
+              <select
+                value={form.coro || "Coro Misioneros de Jesús"}
+                onChange={(e) => setForm((p) => ({ ...p, coro: e.target.value }))}
+                style={inp}
+              >
+                {COROS.map((co) => (
+                  <option key={co} value={co}>{co}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: 10, color: C.gray, marginTop: 4 }}>
+                Para pautas de invitados elige el coro correspondiente (ej: Coro Parroquial Cristo Resucitado).
+              </div>
+            </div>
             <div>
               <label
                 style={{
@@ -14545,7 +14647,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     color: "#2d6a4f",
                   }}
                 >
-                  Coro Misioneros de Jesús
+                  {selected.coro || "Coro Misioneros de Jesús"}
                 </div>
                 <div
                   style={{
@@ -14992,6 +15094,11 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   </div>
                   <div style={{ fontSize: 11, color: C.primary, marginTop: 4, display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
                     {c.length} canciones · {p.tipo_celebracion}
+                    {p.coro && p.coro !== "Coro Misioneros de Jesús" && (
+                      <span style={{ background:"#fef3c7", color:"#92400e", borderRadius:10, padding:"1px 8px", fontWeight:700, fontSize:10 }}>
+                        🎶 {p.coro}
+                      </span>
+                    )}
                     {p.tipo === "parroquial" && (
                       <span style={{ background:"#e0f2fe", color:"#0369a1", borderRadius:10, padding:"1px 8px", fontWeight:700, fontSize:10 }}>
                         ⛪ Parroquial
@@ -21165,6 +21272,8 @@ ALTER TABLE pautas_misa
 -- Visibilidad de columnas URL por pauta
 ALTER TABLE pautas_misa ADD COLUMN IF NOT EXISTS mostrar_col_letra BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE pautas_misa ADD COLUMN IF NOT EXISTS mostrar_col_audio BOOLEAN NOT NULL DEFAULT false;
+-- Coro que canta la pauta (para distinguir pautas de invitados):
+ALTER TABLE pautas_misa ADD COLUMN IF NOT EXISTS coro TEXT DEFAULT 'Coro Misioneros de Jesús';
 
 -- 2. Crear el usuario invitado en Supabase Auth
 -- Ve a Supabase > Authentication > Users > Add User:
