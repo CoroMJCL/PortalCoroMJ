@@ -964,7 +964,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
         {NAV.filter((item) => {
           const isVisita = esVisita(user);
           if (isVisita) {
-            return ["material_ensayo"].includes(item.id);
+            return ["dashboard", "material_ensayo"].includes(item.id);
           }
           if (item.id === "material_ensayo") return false;
           if (item.id === "cantos_pdf" || item.id === "audios") return false;
@@ -974,6 +974,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
         }).map((item) => {
           const isVisita = esVisita(user);
           const VISITA_STYLES = {
+            dashboard: { bg:"#0f3d6e", color:"white", icon:"⛪" },
             material_ensayo: { bg:"#1c4a8a", color:"white", icon:"🎼" },
           };
           const vs = isVisita ? VISITA_STYLES[item.id] : null;
@@ -1882,7 +1883,7 @@ export default function App() {
     setAuthToken(data.access_token);
     setUser(p);
     setView("app");
-    if (esVisita(p)) setSection("material_ensayo");
+    if (esVisita(p)) setSection("dashboard");
     registrarVisita(p, data.access_token);
     // Mostrar modal solo si no tiene permiso aún y no es usuario Visita
     setTimeout(() => {
@@ -2215,7 +2216,7 @@ export default function App() {
           {NAV.filter((item) => {
             const isVisita = esVisita(user);
             if (isVisita) {
-              return ["material_ensayo"].includes(item.id);
+              return ["dashboard", "material_ensayo"].includes(item.id);
             }
             // Ocultar material_ensayo, cantos_pdf, audios para no-visitas
             if (item.id === "material_ensayo") return false;
@@ -2226,6 +2227,7 @@ export default function App() {
           }).map((item) => {
             const isVisita = esVisita(user);
             const VISITA_STYLES = {
+              dashboard: { bg:"#0f3d6e", icon:"⛪" },
               material_ensayo: { bg:"#1c4a8a", icon:"🎼" },
             };
             const vs = isVisita ? VISITA_STYLES[item.id] : null;
@@ -3831,18 +3833,18 @@ function VocalizacionWidget({ isAdmin }) {
 //  WIDGET FOTOGRAFÍA DESTACADA DE MISA (exclusivo perfil Invitado)
 // ═══════════════════════════════════════════════════════════════
 const FOTO_MISA_KEY      = "visita_foto_destacada_url";
-const FOTO_MISA_META_KEY = "visita_foto_destacada_meta"; // JSON: {titulo, fecha, lugar}
+const FOTO_MISA_META_KEY = "visita_foto_destacada_meta"; // JSON: {titulo, descripcion, horario, fecha, lugar}
 
 function FotoDestacadaMisaWidget({ isAdmin }) {
   const [savedUrl, setSavedUrl]       = useState("");
-  const [meta, setMeta]               = useState({ titulo: "", fecha: "", lugar: "" });
+  const [meta, setMeta]               = useState({ titulo: "", descripcion: "", horario: "", fecha: "", lugar: "" });
   const [loadedFromDB, setLoadedFromDB] = useState(false);
   const [uploading, setUploading]     = useState(false);
   const [saved, setSaved]             = useState(false);
   const [imgError, setImgError]       = useState(false);
   const [dragOver, setDragOver]       = useState(false);
   const [editingMeta, setEditingMeta] = useState(false);
-  const [draftMeta, setDraftMeta]     = useState({ titulo: "", fecha: "", lugar: "" });
+  const [draftMeta, setDraftMeta]     = useState({ titulo: "", descripcion: "", horario: "", fecha: "", lugar: "" });
   const [savingMeta, setSavingMeta]   = useState(false);
   const fileInputRef = useRef(null);
 
@@ -3853,7 +3855,7 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
     ]).then(([url, metaRaw]) => {
       if (url) setSavedUrl(url);
       if (metaRaw) {
-        try { setMeta(JSON.parse(metaRaw)); } catch {}
+        try { setMeta({ titulo: "", descripcion: "", horario: "", fecha: "", lugar: "", ...JSON.parse(metaRaw) }); } catch {}
       }
       setLoadedFromDB(true);
     });
@@ -3891,7 +3893,13 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
 
   async function saveMeta() {
     setSavingMeta(true);
-    const newMeta = { titulo: draftMeta.titulo.trim(), fecha: draftMeta.fecha.trim(), lugar: draftMeta.lugar.trim() };
+    const newMeta = {
+      titulo: draftMeta.titulo.trim(),
+      descripcion: (draftMeta.descripcion || "").trim(),
+      horario: (draftMeta.horario || "").trim(),
+      fecha: draftMeta.fecha.trim(),
+      lugar: draftMeta.lugar.trim(),
+    };
     await setConfig(FOTO_MISA_META_KEY, JSON.stringify(newMeta));
     setMeta(newMeta);
     setEditingMeta(false);
@@ -3917,7 +3925,7 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
   if (!loadedFromDB) return null;
   if (!savedUrl && !isAdmin) return null;
 
-  const hasMeta = meta.titulo || meta.fecha || meta.lugar;
+  const hasMeta = meta.titulo || meta.descripcion || meta.horario || meta.fecha || meta.lugar;
 
   return (
     <div style={{ marginBottom: 20 }}>
@@ -3994,12 +4002,32 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
                     {meta.titulo}
                   </div>
                 )}
+                {meta.descripcion && (
+                  <div style={{
+                    fontSize: 13, fontWeight: 500,
+                    color: "rgba(255,255,255,0.92)",
+                    lineHeight: 1.5,
+                    marginBottom: 10,
+                    textShadow: "0 1px 8px rgba(0,0,0,0.7)",
+                    maxWidth: 520,
+                  }}>
+                    {meta.descripcion}
+                  </div>
+                )}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px" }}>
                   {meta.fecha && (
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <span style={{ fontSize: 13, opacity: 0.8 }}>📅</span>
                       <span style={{ fontSize: 13, fontWeight: 600, color: "#fef3c7", textShadow: "0 1px 6px rgba(0,0,0,0.6)", textTransform: "capitalize" }}>
                         {fmtFecha(meta.fecha)}
+                      </span>
+                    </div>
+                  )}
+                  {meta.horario && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13, opacity: 0.8 }}>🕐</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#fef3c7", textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>
+                        {meta.horario}
                       </span>
                     </div>
                   )}
@@ -4054,8 +4082,8 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
               position: "absolute", inset: 0,
               background: "rgba(8,8,20,0.88)", backdropFilter: "blur(6px)",
               borderRadius: 22, display: "flex", flexDirection: "column",
-              justifyContent: "center", alignItems: "center",
-              padding: "32px 28px", gap: 16, zIndex: 10,
+              justifyContent: "flex-start", alignItems: "center",
+              padding: "24px 28px", gap: 14, zIndex: 10, overflowY: "auto",
             }}>
               <div style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, color: "white", marginBottom: 4 }}>
                 ✏️ Información de la Celebración
@@ -4072,6 +4100,18 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
                     style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, padding: "9px 13px", fontSize: 13, color: "white", outline: "none", boxSizing: "border-box" }}
                   />
                 </div>
+                {/* Descripción / tipo de celebración */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 5 }}>Tipo de celebración / descripción</div>
+                  <textarea
+                    className="afiche-meta-input"
+                    placeholder="Ej: Misa solemne en honor a la Virgen del Carmen, presidida por el párroco, con procesión posterior."
+                    value={draftMeta.descripcion}
+                    onChange={(e) => setDraftMeta(d => ({ ...d, descripcion: e.target.value }))}
+                    rows={2}
+                    style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, padding: "9px 13px", fontSize: 13, color: "white", outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", lineHeight: 1.5 }}
+                  />
+                </div>
                 {/* Fecha */}
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 5 }}>Fecha</div>
@@ -4082,12 +4122,23 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
                     style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, padding: "9px 13px", fontSize: 13, color: "white", outline: "none", boxSizing: "border-box", colorScheme: "dark" }}
                   />
                 </div>
+                {/* Horario */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 5 }}>Horario</div>
+                  <input
+                    className="afiche-meta-input"
+                    placeholder="Ej: 11:00 Hrs · Llegada del coro 10:30"
+                    value={draftMeta.horario}
+                    onChange={(e) => setDraftMeta(d => ({ ...d, horario: e.target.value }))}
+                    style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, padding: "9px 13px", fontSize: 13, color: "white", outline: "none", boxSizing: "border-box" }}
+                  />
+                </div>
                 {/* Lugar */}
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 5 }}>Lugar</div>
                   <input
                     className="afiche-meta-input"
-                    placeholder="Ej: Parroquia San Pedro · 11:00 Hrs"
+                    placeholder="Ej: Parroquia San Pedro, Las Condes"
                     value={draftMeta.lugar}
                     onChange={(e) => setDraftMeta(d => ({ ...d, lugar: e.target.value }))}
                     style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, padding: "9px 13px", fontSize: 13, color: "white", outline: "none", boxSizing: "border-box" }}
@@ -4106,7 +4157,7 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
                 >Cancelar</button>
                 {hasMeta && (
                   <button
-                    onClick={async () => { const empty = {titulo:"",fecha:"",lugar:""}; await setConfig(FOTO_MISA_META_KEY, JSON.stringify(empty)); setMeta(empty); setEditingMeta(false); }}
+                    onClick={async () => { const empty = {titulo:"",descripcion:"",horario:"",fecha:"",lugar:""}; await setConfig(FOTO_MISA_META_KEY, JSON.stringify(empty)); setMeta(empty); setEditingMeta(false); }}
                     style={{ background: "rgba(220,38,38,0.6)", border: "1px solid rgba(220,38,38,0.4)", borderRadius: 12, padding: "10px 14px", fontSize: 12, fontWeight: 600, color: "white", cursor: "pointer" }}
                   >🗑 Quitar texto</button>
                 )}
@@ -4255,6 +4306,282 @@ function GaleriaWidget({ fotos, setSection, isAdmin }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════
+//  AGENDA INVITADO — Agenda propia del módulo (ensayos + misa) con mapa
+//  NO usa Google Calendar: se guarda en la tabla `config` (clave única).
+//  Pensada para misas con otros coros, gestionada por el Admin.
+// ══════════════════════════════════════════════════════════════════════
+const AGENDA_INVITADO_KEY = "visita_agenda_invitado"; // JSON: [{id,tipo,titulo,fecha,hora,lugar,direccion}]
+
+function AgendaInvitado({ isAdmin }) {
+  const [eventos, setEventos]   = useState([]);
+  const [loaded, setLoaded]     = useState(false);
+  const [selId, setSelId]       = useState(null);     // evento seleccionado para el mapa
+  const [editing, setEditing]   = useState(null);     // evento en edición (o "nuevo")
+  const [saving, setSaving]     = useState(false);
+  const blank = { id: "", tipo: "ensayo", titulo: "", fecha: "", hora: "", lugar: "", direccion: "" };
+  const [draft, setDraft]       = useState(blank);
+
+  useEffect(() => {
+    getConfig(AGENDA_INVITADO_KEY).then((raw) => {
+      if (raw) { try { setEventos(JSON.parse(raw) || []); } catch { setEventos([]); } }
+      setLoaded(true);
+    });
+  }, []);
+
+  async function persistir(lista) {
+    setEventos(lista);
+    await setConfig(AGENDA_INVITADO_KEY, JSON.stringify(lista));
+  }
+
+  function abrirNuevo() {
+    setDraft({ ...blank, id: (crypto?.randomUUID?.() || String(Date.now())) });
+    setEditing("nuevo");
+  }
+  function abrirEditar(ev) { setDraft({ ...blank, ...ev }); setEditing(ev.id); }
+
+  async function guardar() {
+    if (!draft.titulo.trim() && !draft.fecha) { alert("Indica al menos un título o una fecha."); return; }
+    setSaving(true);
+    const limpio = {
+      id: draft.id || (crypto?.randomUUID?.() || String(Date.now())),
+      tipo: draft.tipo || "ensayo",
+      titulo: (draft.titulo || "").trim(),
+      fecha: (draft.fecha || "").trim(),
+      hora: (draft.hora || "").trim(),
+      lugar: (draft.lugar || "").trim(),
+      direccion: (draft.direccion || "").trim(),
+    };
+    const existe = eventos.some((e) => e.id === limpio.id);
+    const lista = existe ? eventos.map((e) => (e.id === limpio.id ? limpio : e)) : [...eventos, limpio];
+    await persistir(lista);
+    setEditing(null);
+    setSaving(false);
+  }
+
+  async function eliminar(id) {
+    if (!confirm("¿Eliminar este evento de la agenda?")) return;
+    await persistir(eventos.filter((e) => e.id !== id));
+    if (selId === id) setSelId(null);
+  }
+
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const ordenados = [...eventos].sort((a, b) => {
+    const fa = a.fecha ? new Date(a.fecha + "T" + (a.hora || "00:00")) : new Date(8640000000000000);
+    const fb = b.fecha ? new Date(b.fecha + "T" + (b.hora || "00:00")) : new Date(8640000000000000);
+    return fa - fb;
+  });
+  const futuros = ordenados.filter((e) => !e.fecha || new Date(e.fecha + "T23:59") >= hoy);
+  const visibles = isAdmin ? ordenados : futuros;
+
+  // Evento del mapa: el seleccionado, o el próximo con dirección
+  const selEvento = visibles.find((e) => e.id === selId)
+    || visibles.find((e) => e.direccion)
+    || null;
+
+  const TIPOS = {
+    ensayo: { label: "Ensayo", emoji: "🎼", color: "#1c4a8a", light: "rgba(28,74,138,0.10)" },
+    misa:   { label: "Misa",   emoji: "✝️", color: "#d97706", light: "rgba(217,119,6,0.12)" },
+  };
+  const t = (tipo) => TIPOS[tipo] || TIPOS.ensayo;
+
+  function fmtFecha(f) {
+    if (!f) return "Fecha por confirmar";
+    try {
+      return new Date(f + "T00:00:00").toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "short" });
+    } catch { return f; }
+  }
+  const mapaSrc = (dir) => `https://www.google.com/maps?q=${encodeURIComponent(dir)}&z=15&output=embed`;
+  const mapaLink = (dir) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dir)}`;
+
+  if (!loaded) return null;
+  if (visibles.length === 0 && !isAdmin) return null;
+
+  const inputBase = { width: "100%", boxSizing: "border-box", background: "white", border: "1px solid rgba(60,60,67,0.18)", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, color: "#1c1c1e", outline: "none", fontFamily: "inherit" };
+  const lblBase = { fontSize: 11, fontWeight: 600, color: "#8e8e93", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 5, display: "block" };
+
+  return (
+    <div style={{
+      background: "white", borderRadius: 16, padding: "14px 16px 16px",
+      border: "1px solid rgba(60,60,67,0.1)", boxShadow: "0 1px 6px rgba(0,0,0,0.05)",
+      position: "relative",
+    }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: "linear-gradient(145deg,#152d4a,#1e3a5f)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ fontSize: 15, color: "white" }}>🗓️</span>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1c1c1e", letterSpacing: "-0.016em" }}>Agenda del Coro</div>
+          <div style={{ fontSize: 11, color: "#8e8e93" }}>Ensayos y misa · agenda propia de esta misión</div>
+        </div>
+        {isAdmin && (
+          <button onClick={abrirNuevo} style={{ flexShrink: 0, background: "rgba(28,74,138,0.10)", border: "1px solid rgba(28,74,138,0.25)", borderRadius: 10, padding: "6px 12px", fontSize: 12, fontWeight: 700, color: "#1c4a8a", cursor: "pointer" }}>+ Agregar</button>
+        )}
+      </div>
+
+      {/* Lista de eventos */}
+      {visibles.length === 0 ? (
+        <div style={{ background: "rgba(242,242,247,0.7)", borderRadius: 12, padding: "16px 14px", textAlign: "center", color: "#8e8e93", fontSize: 12.5 }}>
+          Aún no hay ensayos ni misa programados.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {visibles.map((ev) => {
+            const ti = t(ev.tipo);
+            const activo = selEvento && selEvento.id === ev.id;
+            return (
+              <div key={ev.id}
+                onClick={() => ev.direccion && setSelId(ev.id)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  background: activo ? ti.light : "rgba(242,242,247,0.55)",
+                  border: `1px solid ${activo ? ti.color + "55" : "rgba(60,60,67,0.08)"}`,
+                  borderRadius: 12, padding: "10px 12px",
+                  cursor: ev.direccion ? "pointer" : "default",
+                  transition: "background 0.15s, border-color 0.15s",
+                }}>
+                {/* Pastilla de fecha */}
+                <div style={{ width: 42, flexShrink: 0, textAlign: "center", background: "white", border: "1px solid rgba(60,60,67,0.1)", borderRadius: 9, padding: "5px 0" }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: ti.color, lineHeight: 1 }}>
+                    {ev.fecha ? new Date(ev.fecha + "T00:00:00").getDate() : "—"}
+                  </div>
+                  <div style={{ fontSize: 8, color: "#8e8e93", textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 2 }}>
+                    {ev.fecha ? new Date(ev.fecha + "T00:00:00").toLocaleDateString("es-CL", { month: "short" }) : ""}
+                  </div>
+                </div>
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                    <span style={{ fontSize: 9.5, fontWeight: 800, color: ti.color, background: ti.light, borderRadius: 6, padding: "1px 7px", letterSpacing: "0.05em", textTransform: "uppercase" }}>{ti.emoji} {ti.label}</span>
+                  </div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "#1c1c1e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {ev.titulo || ti.label}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#8e8e93", marginTop: 1, textTransform: "capitalize" }}>
+                    {fmtFecha(ev.fecha)}{ev.hora ? ` · ${ev.hora}` : ""}{ev.lugar ? ` · ${ev.lugar}` : ""}
+                  </div>
+                </div>
+                {/* Acciones */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                  {ev.direccion && (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: ti.color }}>📍 Mapa</span>
+                  )}
+                  {isAdmin && (
+                    <>
+                      <button onClick={(e) => { e.stopPropagation(); abrirEditar(ev); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: 2 }} title="Editar">✏️</button>
+                      <button onClick={(e) => { e.stopPropagation(); eliminar(ev.id); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: 2 }} title="Eliminar">🗑</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Mapa del evento seleccionado */}
+      {selEvento && selEvento.direccion && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.01em" }}>
+              📍 {selEvento.titulo || t(selEvento.tipo).label} — {selEvento.direccion}
+            </div>
+            <a href={mapaLink(selEvento.direccion)} target="_blank" rel="noopener" style={{ fontSize: 11, fontWeight: 600, color: "#1c4a8a", textDecoration: "none", flexShrink: 0, marginLeft: 8 }}>
+              Cómo llegar ›
+            </a>
+          </div>
+          <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid rgba(60,60,67,0.12)" }}>
+            <iframe
+              key={selEvento.id}
+              title="Mapa del evento"
+              src={mapaSrc(selEvento.direccion)}
+              width="100%" height="200"
+              style={{ border: 0, display: "block" }}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Modal de edición (solo Admin) */}
+      {isAdmin && editing && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(8,8,20,0.55)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => !saving && setEditing(null)}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "white", borderRadius: 18, padding: "20px 20px 18px", width: "100%", maxWidth: 460, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 64px rgba(0,0,0,0.3)" }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#1c1c1e", marginBottom: 16, letterSpacing: "-0.02em" }}>
+              {editing === "nuevo" ? "🗓️ Nuevo evento" : "✏️ Editar evento"}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {/* Tipo */}
+              <div>
+                <label style={lblBase}>Tipo</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {["ensayo", "misa"].map((tp) => {
+                    const ti = t(tp); const sel = draft.tipo === tp;
+                    return (
+                      <button key={tp} onClick={() => setDraft((d) => ({ ...d, tipo: tp }))}
+                        style={{ flex: 1, padding: "9px 0", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                          border: `1.5px solid ${sel ? ti.color : "rgba(60,60,67,0.18)"}`,
+                          background: sel ? ti.light : "white", color: sel ? ti.color : "#8e8e93" }}>
+                        {ti.emoji} {ti.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Título */}
+              <div>
+                <label style={lblBase}>Título</label>
+                <input style={inputBase} placeholder="Ej: Ensayo general / Misa Virgen del Carmen"
+                  value={draft.titulo} onChange={(e) => setDraft((d) => ({ ...d, titulo: e.target.value }))} />
+              </div>
+              {/* Fecha + Hora */}
+              <div style={{ display: "flex", gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={lblBase}>Fecha</label>
+                  <input type="date" style={inputBase} value={draft.fecha} onChange={(e) => setDraft((d) => ({ ...d, fecha: e.target.value }))} />
+                </div>
+                <div style={{ width: 120 }}>
+                  <label style={lblBase}>Hora</label>
+                  <input type="time" style={inputBase} value={draft.hora} onChange={(e) => setDraft((d) => ({ ...d, hora: e.target.value }))} />
+                </div>
+              </div>
+              {/* Lugar */}
+              <div>
+                <label style={lblBase}>Lugar (nombre)</label>
+                <input style={inputBase} placeholder="Ej: Parroquia San Pedro"
+                  value={draft.lugar} onChange={(e) => setDraft((d) => ({ ...d, lugar: e.target.value }))} />
+              </div>
+              {/* Dirección */}
+              <div>
+                <label style={lblBase}>Dirección (para el mapa)</label>
+                <input style={inputBase} placeholder="Ej: Av. Apoquindo 1234, Las Condes, Santiago"
+                  value={draft.direccion} onChange={(e) => setDraft((d) => ({ ...d, direccion: e.target.value }))} />
+                <div style={{ fontSize: 10.5, color: "#a0a0a5", marginTop: 4 }}>
+                  Escribe la dirección o el nombre del lugar tal como aparece en Google Maps.
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+              <button onClick={guardar} disabled={saving}
+                style={{ flex: 1, background: "linear-gradient(135deg,#1d6fc7,#1a4d8f)", border: "none", borderRadius: 12, padding: "11px 0", fontSize: 13.5, fontWeight: 700, color: "white", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
+                {saving ? "Guardando…" : "✅ Guardar"}
+              </button>
+              <button onClick={() => setEditing(null)} disabled={saving}
+                style={{ background: "rgba(60,60,67,0.08)", border: "1px solid rgba(60,60,67,0.15)", borderRadius: 12, padding: "11px 18px", fontSize: 13.5, fontWeight: 600, color: "#3c3c43", cursor: "pointer" }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
 //  DASHBOARD VISITA — Pantalla de bienvenida premium para usuario invitado
 // ══════════════════════════════════════════════════════════════════════
 function DashboardVisita({ user, pautas, setSection, isAdmin, evangelio, comunidades }) {
@@ -4340,18 +4667,26 @@ function DashboardVisita({ user, pautas, setSection, isAdmin, evangelio, comunid
           </svg>
         </div>
       ) : (
-        <div className="vc" style={{
+        <div className="vc vp-tappable" onClick={() => setSection("pauta_misa")} style={{
           background:"rgba(242,242,247,0.7)", borderRadius:14, padding:"11px 14px", marginBottom:10,
-          border:"1px solid rgba(60,60,67,0.1)", display:"flex", alignItems:"center", gap:10,
+          border:"1px solid rgba(60,60,67,0.1)", display:"flex", alignItems:"center", gap:10, cursor:"pointer",
         }}>
           <div style={{ width:6, height:6, borderRadius:"50%", background:"rgba(142,142,147,0.5)", flexShrink:0 }} />
-          <span style={{ fontSize:12, color:"#8e8e93" }}>Sin pautas parroquiales publicadas</span>
+          <span style={{ flex:1, fontSize:12, color:"#8e8e93" }}>Sin pautas parroquiales publicadas · toca para ver pautas</span>
+          <svg width="7" height="12" viewBox="0 0 7 12" fill="none" style={{ flexShrink:0, opacity:0.3 }}>
+            <path d="M1 1l5 5-5 5" stroke="#1c1c1e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </div>
       )}
 
       {/* ── Foto Destacada ── */}
       <div className="vc" style={{ marginBottom:10 }}>
         <FotoDestacadaMisaWidget isAdmin={isAdmin} />
+      </div>
+
+      {/* ── Agenda propia (ensayos + misa) con mapa ── */}
+      <div className="vc" style={{ marginBottom:10 }}>
+        <AgendaInvitado isAdmin={isAdmin} />
       </div>
 
       {/* ── Video Destacado ── */}
@@ -4452,11 +4787,11 @@ function DashboardVisita({ user, pautas, setSection, isAdmin, evangelio, comunid
 // ══════════════════════════════════════════════════════════════════════
 function MaterialEnsayo({ docs, user, catFiltroInicial }) {
   const CUERDAS_EST = [
-    { id: "Soprano",      emoji: "🎵", color: "#D4537E", colorLight: "#fbeaf0", desc: "Voz femenina aguda" },
-    { id: "Contralto",    emoji: "🎶", color: "#0e7490", colorLight: "#e0f2f7", desc: "Voz femenina grave" },
-    { id: "Tenor",        emoji: "🎼", color: "#3b82f6", colorLight: "#e8f1fc", desc: "Voz masculina aguda" },
-    { id: "Bajo",         emoji: "🎹", color: "#f59e0b", colorLight: "#fef3e2", desc: "Voz masculina grave" },
-    { id: "Instrumentos", emoji: "🎸", color: "#0a7e6e", colorLight: "#e6f4f1", desc: "Guitarra, teclado y más" },
+    { id: "Soprano",      emoji: "🎵", color: "#D4537E", colorLight: "#fbeaf0", desc: "" },
+    { id: "Contralto",    emoji: "🎶", color: "#0e7490", colorLight: "#e0f2f7", desc: "" },
+    { id: "Tenor",        emoji: "🎼", color: "#3b82f6", colorLight: "#e8f1fc", desc: "" },
+    { id: "Bajo",         emoji: "🎹", color: "#f59e0b", colorLight: "#fef3e2", desc: "" },
+    { id: "Instrumentos", emoji: "🎸", color: "#0a7e6e", colorLight: "#e6f4f1", desc: "" },
   ];
   const [cuerdaSel, setCuerdaSel] = useState(null);
   const [search, setSearch] = useState("");
@@ -4539,7 +4874,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                 <div style={{ position: "absolute", top: -30, right: -20, width: 100, height: 100, borderRadius: "50%", background: `radial-gradient(circle, ${c.color}1a 0%, transparent 70%)`, pointerEvents: "none" }} />
                 <div style={{ width: 48, height: 48, borderRadius: 14, background: `linear-gradient(145deg, ${c.color}, ${c.color}cc)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 12, boxShadow: `0 5px 14px ${c.color}45` }}>{c.emoji}</div>
                 <div style={{ fontSize: 17, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.02em" }}>{c.id}</div>
-                <div style={{ fontSize: 12, color: "#8a8a90", marginTop: 2 }}>{c.desc}</div>
+                {c.desc && <div style={{ fontSize: 12, color: "#8a8a90", marginTop: 2 }}>{c.desc}</div>}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
                   <span style={{ fontSize: 11.5, fontWeight: 700, color: c.color, background: `${c.color}14`, borderRadius: 20, padding: "3px 11px" }}>
                     {n} {n === 1 ? "archivo" : "archivos"}
@@ -10820,6 +11155,25 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
           </div>
         </div>
         <FotoDestacadaMisaWidget isAdmin={true} />
+      </div>
+
+      {/* ── AGENDA INVITADO (ensayos + misa, con mapa) ── */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
+          paddingBottom: 12, borderBottom: `2px solid ${C.border}`,
+        }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 12, flexShrink: 0,
+            background: "linear-gradient(135deg,#152d4a,#1e3a5f)",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
+          }}>🗓️</div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.dark }}>Agenda del Coro Invitado</div>
+            <div style={{ fontSize: 11, color: C.gray }}>Programa ensayos y misa de esta misión. Agenda propia (no usa Google Calendar).</div>
+          </div>
+        </div>
+        <AgendaInvitado isAdmin={true} />
       </div>
 
       {/* Header explicativo */}
