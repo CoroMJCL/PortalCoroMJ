@@ -4818,14 +4818,22 @@ const MOMENTOS_ENSAYO = ["Entrada","Acto Penitencial","Gloria","Salmo","Aleluya"
 const _normME = (s) => (s || "").trim().toLowerCase();
 
 function tipoDocEnsayo(d) {
+  const n = _normME(d.nombre);
+  const u = (d.url || d.archivo_url || "").toLowerCase();
+  // 1) Extensión real del archivo (lo más confiable)
+  if (/\.(mp3|m4a|wav|ogg|aac|flac)(\?|$)/.test(u)) return "audio";
+  if (/\.(mp4|webm|mov|m4v|ogv)(\?|$)/.test(u)) return "video";
+  if (/\.pdf(\?|$)/.test(u)) return n.includes("partitura") ? "partitura" : "letra";
+  if (u.includes("youtube") || u.includes("youtu.be")) return "video";
+  // 2) Nombre con etiqueta clara de letra/partitura (corrige categoría mal puesta)
+  if (n.includes("partitura")) return "partitura";
+  if (n.includes("letra")) return "letra";
+  // 3) Categoría declarada
   const c = _normME(d.categoria);
   if (c.includes("audio")) return "audio";
-  if (c.includes("letra")) return "letra";
-  if (c.includes("partitura")) return "partitura";
   if (c.includes("video")) return "video";
-  const u = (d.url || d.archivo_url || "").toLowerCase();
-  if (/\.(mp3|m4a|wav|ogg|aac)(\?|$)/.test(u)) return "audio";
-  if (u.includes("youtube") || u.includes("youtu.be") || /\.(mp4|mov|webm)(\?|$)/.test(u)) return "video";
+  if (c.includes("partitura")) return "partitura";
+  if (c.includes("letra")) return "letra";
   return "otro";
 }
 function vozDocEnsayo(d) {
@@ -4837,24 +4845,32 @@ function vozDocEnsayo(d) {
 function urlDoc(d) { return d.url || d.archivo_url || "#"; }
 
 // Deriva el nombre real del canto: usa el campo `canto` o, si está vacío,
-// quita del nombre un sufijo de voz/general (ej: "Señor ten piedad - Contralto" → "Señor ten piedad")
+// quita del nombre los sufijos de voz, categoría o "general" (uno o varios),
+// ej: "Chile Una Mesa para Todos - Letras — General" → "Chile Una Mesa para Todos"
 function cantoBaseEnsayo(d) {
   if (d.canto && d.canto.trim()) return d.canto.trim();
   let n = (d.nombre || "").trim();
   if (!n) return "General";
-  const suf = /\s*[-–—·:|]\s*(sopranos?|contraltos?|altos?|tenores?|tenor|bajos?|bar[íi]tonos?|instrumentos?|instrumental|general|geneal|generales|todas?|todos?|mezcla|coro|voces)\s*$/i;
-  const limpio = n.replace(suf, "").trim();
-  return limpio || n;
+  const suf = /\s*[-–—·:|]\s*(sopranos?|contraltos?|altos?|tenores?|tenor|bajos?|bar[íi]tonos?|instrumentos?|instrumental|general(es)?|geneal|letras?|partituras?|acordes?|audios?|pista|voces|voz|coro|mezcla|todas?|todos?)\s*$/i;
+  let prev;
+  do { prev = n; n = n.replace(suf, "").trim(); } while (n !== prev && n.length);
+  return n || (d.nombre || "").trim() || "General";
 }
 
-// Convierte un enlace de Google Drive en una URL de audio reproducible directa
+// Convierte SOLO enlaces de Google Drive a una URL reproducible.
+// Las URLs directas (mp3/mp4/Supabase/etc) se devuelven intactas.
 function audioSrcEnsayo(url) {
   if (!url) return url;
+  const esDrive = /(?:drive|docs)\.google\.com/i.test(url);
+  if (!esDrive) return url;
   let id = null;
   let m = url.match(/\/d\/([a-zA-Z0-9_-]+)/); if (m) id = m[1];
   if (!id) { m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/); if (m) id = m[1]; }
-  if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
+  if (id) return `https://drive.google.com/uc?export=download&confirm=t&id=${id}`;
   return url;
+}
+function esVideoEnsayo(url) {
+  return /\.(mp4|webm|mov|m4v|ogv)(\?|$)/i.test(url || "");
 }
 
 // ── Reproductor de práctica: velocidad (sin cambiar tono) + bucle A–B ──
@@ -4868,13 +4884,14 @@ function ReproductorPractica({ src, accent, onFirstPlay }) {
   const [A, setA] = useState(null);
   const [B, setB] = useState(null);
   const [loop, setLoop] = useState(false);
+  const [loadErr, setLoadErr] = useState(false);
   const loopRef = useRef(loop), aRef = useRef(A), bRef = useRef(B);
   useEffect(() => { loopRef.current = loop; }, [loop]);
   useEffect(() => { aRef.current = A; }, [A]);
   useEffect(() => { bRef.current = B; }, [B]);
 
   useEffect(() => {
-    setPlaying(false); setCur(0); setA(null); setB(null); setLoop(false);
+    setPlaying(false); setCur(0); setA(null); setB(null); setLoop(false); setLoadErr(false);
     const a = audioRef.current;
     if (a) { try { a.pause(); a.currentTime = 0; } catch {} }
   }, [src]);
@@ -4922,7 +4939,7 @@ function ReproductorPractica({ src, accent, onFirstPlay }) {
 
   return (
     <div style={{ background: "white", borderRadius: 14, border: "1px solid rgba(60,60,67,0.1)", padding: "13px 14px", marginTop: 12 }}>
-      <audio ref={audioRef} src={realSrc} onTimeUpdate={onTime} onLoadedMetadata={onLoaded} onEnded={() => setPlaying(false)} preload="metadata" />
+      <audio ref={audioRef} src={realSrc} onTimeUpdate={onTime} onLoadedMetadata={onLoaded} onEnded={() => setPlaying(false)} onError={() => setLoadErr(true)} preload="metadata" />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <button onClick={toggle} aria-label={playing ? "Pausar" : "Reproducir"}
           style={{ width: 44, height: 44, borderRadius: "50%", flexShrink: 0, border: "none", cursor: "pointer", background: ac, color: "white", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -4977,6 +4994,12 @@ function ReproductorPractica({ src, accent, onFirstPlay }) {
       <div style={{ fontSize: 10.5, color: "#b0b0b5", marginTop: 8 }}>
         Baja la velocidad para aprender un pasaje; fija A y B para repetir solo ese tramo.
       </div>
+      {loadErr && (
+        <div style={{ marginTop: 10, background: "#fff4f4", border: "1px solid #f3c2c2", borderRadius: 10, padding: "10px 12px", fontSize: 11.5, color: "#9b2c2c", lineHeight: 1.5 }}>
+          No se pudo cargar este audio. Verifica que el archivo esté compartido como <strong>“Cualquiera con el enlace”</strong> en Google Drive.{" "}
+          <a href={src} target="_blank" rel="noopener noreferrer" style={{ color: "#9b2c2c", fontWeight: 700 }}>Abrir el archivo ↗</a>
+        </div>
+      )}
     </div>
   );
 }
@@ -5156,7 +5179,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
   const [search, setSearch] = useState("");
   const [cantoSel, setCantoSel] = useState(null);
   const [trackId, setTrackId] = useState(null);
-  const [proyAbierto, setProyAbierto] = useState(false);
+  const [proyAbierto, setProyAbierto] = useState(true);
   const [progreso, setProgreso] = useState(() => { try { return JSON.parse(localStorage.getItem("me_progreso") || "{}"); } catch { return {}; } });
 
   useEffect(() => { try { if (miCuerda) localStorage.setItem("me_mi_cuerda", miCuerda); } catch {} }, [miCuerda]);
@@ -5203,7 +5226,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
 
   function abrirCanto(c) {
     setCantoSel(c.key);
-    setProyAbierto(false);
+    setProyAbierto(true);
     const aud = audiosDe(c);
     let pick = aud.find((a) => a.voz && a.voz.id === miCuerda) || aud.find((a) => !a.voz) || aud[0];
     setTrackId(pick ? pick.doc.id : null);
@@ -5409,7 +5432,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                     );
                   })}
                 </div>
-                <ReproductorPractica src={audioSrcEnsayo(urlDoc(track.doc))} accent={trackAccent} onFirstPlay={() => setProyAbierto(true)} />
+                <ReproductorPractica src={urlDoc(track.doc)} accent={trackAccent} onFirstPlay={() => setProyAbierto(true)} />
                 <div style={{ marginTop: 8, textAlign: "right" }}>
                   <a href={urlDoc(track.doc)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: C.primary, textDecoration: "none", fontWeight: 600 }}>↓ Descargar esta pista</a>
                 </div>
@@ -5447,7 +5470,28 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
             return (
               <div key={sec.tipo} style={{ background: "white", borderRadius: 16, border: "1px solid rgba(60,60,67,0.1)", overflow: "hidden", marginBottom: 12 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 800, color: "#1c1c1e", padding: "13px 15px 9px" }}>{sec.icon} {sec.titulo}</div>
-                {items.map((d, i) => (
+                {items.map((d, i) => {
+                  if (sec.tipo === "video") {
+                    const u = urlDoc(d);
+                    const isDrive = /(?:drive|docs)\.google\.com/i.test(u);
+                    const ytm = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{6,})/);
+                    return (
+                      <div key={d.id} style={{ borderTop: "1px solid rgba(60,60,67,0.07)", padding: "12px 15px" }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#1c1c1e", marginBottom: 8 }}>{d.nombre}</div>
+                        {ytm ? (
+                          <iframe src={`https://www.youtube.com/embed/${ytm[1]}`} style={{ width: "100%", height: 300, border: 0, borderRadius: 12 }} allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title={d.nombre} />
+                        ) : isDrive ? (
+                          <iframe src={drivePreviewUrl(u)} style={{ width: "100%", height: 320, border: 0, borderRadius: 12, background: "#000" }} allow="autoplay" allowFullScreen title={d.nombre} />
+                        ) : (
+                          <video controls src={u} preload="metadata" style={{ width: "100%", maxHeight: 400, borderRadius: 12, background: "#000", display: "block" }} />
+                        )}
+                        <div style={{ textAlign: "right", marginTop: 6 }}>
+                          <a href={u} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: accent, textDecoration: "none", fontWeight: 600 }}>Abrir aparte ↗</a>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
                   <a key={d.id} href={urlDoc(d)} target="_blank" rel="noopener noreferrer" className="me-row"
                     style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 15px", textDecoration: "none", borderTop: "1px solid rgba(60,60,67,0.07)" }}
                     onMouseOver={(e) => e.currentTarget.style.background = `${accent}0a`}
@@ -5460,10 +5504,11 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                       </div>
                     </div>
                     <span style={{ flexShrink: 0, width: 30, height: 30, borderRadius: "50%", background: `${accent}14`, color: accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>
-                      {sec.tipo === "video" ? "▶" : "↓"}
+                      ↓
                     </span>
                   </a>
-                ))}
+                  );
+                })}
               </div>
             );
           })}
@@ -11866,11 +11911,11 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
                     {iconCat(d.categoria)}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: C.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {d.canto ? <span style={{ color: C.primary }}>{d.canto} · </span> : null}{d.nombre}
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {cantoBaseEnsayo(d)}
                     </div>
                     <div style={{ fontSize: 11, color: C.gray }}>
-                      <Badge>{d.categoria}</Badge>
+                      <Badge>{({ audio: "🎧 Audio", letra: "📝 Letra", partitura: "🎼 Partitura", video: "🎬 Video" })[tipoDocEnsayo(d)] || d.categoria}</Badge>
                       {d.cuerda_mat ? " · " + (d.cuerda_mat === "Todas" ? "Todas las voces" : d.cuerda_mat) : ""}
                       {d.momento ? " · " + d.momento : ""}
                       {d.size ? " · " + d.size : ""}
