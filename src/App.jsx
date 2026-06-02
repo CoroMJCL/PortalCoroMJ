@@ -4836,6 +4836,27 @@ function vozDocEnsayo(d) {
 }
 function urlDoc(d) { return d.url || d.archivo_url || "#"; }
 
+// Deriva el nombre real del canto: usa el campo `canto` o, si está vacío,
+// quita del nombre un sufijo de voz/general (ej: "Señor ten piedad - Contralto" → "Señor ten piedad")
+function cantoBaseEnsayo(d) {
+  if (d.canto && d.canto.trim()) return d.canto.trim();
+  let n = (d.nombre || "").trim();
+  if (!n) return "General";
+  const suf = /\s*[-–—·:|]\s*(sopranos?|contraltos?|altos?|tenores?|tenor|bajos?|bar[íi]tonos?|instrumentos?|instrumental|general|geneal|generales|todas?|todos?|mezcla|coro|voces)\s*$/i;
+  const limpio = n.replace(suf, "").trim();
+  return limpio || n;
+}
+
+// Convierte un enlace de Google Drive en una URL de audio reproducible directa
+function audioSrcEnsayo(url) {
+  if (!url) return url;
+  let id = null;
+  let m = url.match(/\/d\/([a-zA-Z0-9_-]+)/); if (m) id = m[1];
+  if (!id) { m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/); if (m) id = m[1]; }
+  if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
+  return url;
+}
+
 // ── Reproductor de práctica: velocidad (sin cambiar tono) + bucle A–B ──
 function ReproductorPractica({ src, accent, onFirstPlay }) {
   const audioRef = useRef(null);
@@ -4897,10 +4918,11 @@ function ReproductorPractica({ src, accent, onFirstPlay }) {
 
   const pct = dur ? Math.max(0, Math.min(100, (cur / dur) * 100)) : 0;
   const ac = accent || "#1c4a8a";
+  const realSrc = audioSrcEnsayo(src);
 
   return (
     <div style={{ background: "white", borderRadius: 14, border: "1px solid rgba(60,60,67,0.1)", padding: "13px 14px", marginTop: 12 }}>
-      <audio ref={audioRef} src={src} onTimeUpdate={onTime} onLoadedMetadata={onLoaded} onEnded={() => setPlaying(false)} preload="metadata" />
+      <audio ref={audioRef} src={realSrc} onTimeUpdate={onTime} onLoadedMetadata={onLoaded} onEnded={() => setPlaying(false)} preload="metadata" />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <button onClick={toggle} aria-label={playing ? "Pausar" : "Reproducir"}
           style={{ width: 44, height: 44, borderRadius: "50%", flexShrink: 0, border: "none", cursor: "pointer", background: ac, color: "white", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -5143,11 +5165,12 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
   // Agrupar archivos por canto
   const map = {};
   (docs || []).forEach((d) => {
-    const name = (d.canto && d.canto.trim()) ? d.canto.trim() : ((d.nombre && d.nombre.trim()) ? d.nombre.trim() : "General");
-    if (!map[name]) map[name] = { nombre: name, momento: "", orden: 9999, files: [] };
-    map[name].files.push(d);
-    if (d.momento && !map[name].momento) map[name].momento = d.momento;
-    if (d.orden != null && d.orden !== "" && !isNaN(+d.orden)) map[name].orden = Math.min(map[name].orden, +d.orden);
+    const display = cantoBaseEnsayo(d);
+    const key = norm(display);
+    if (!map[key]) map[key] = { key, nombre: display, momento: "", orden: 9999, files: [] };
+    map[key].files.push(d);
+    if (d.momento && !map[key].momento) map[key].momento = d.momento;
+    if (d.orden != null && d.orden !== "" && !isNaN(+d.orden)) map[key].orden = Math.min(map[key].orden, +d.orden);
   });
   const MOM_ORDER = { "entrada": 1, "acto penitencial": 2, "señor ten piedad": 2, "gloria": 3, "salmo": 4, "aleluya": 5, "ofertorio": 6, "santo": 7, "cordero": 8, "cordero de dios": 8, "comunión": 9, "comunion": 9, "salida": 10, "final": 10 };
   let cantos = Object.values(map).sort((a, b) => {
@@ -5172,19 +5195,29 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
   const tieneVozAlgo = (c, vozId) => c.files.some((f) => vozDocEnsayo(f) === vozId || vozDocEnsayo(f) === "Todas");
   const docsTipo = (c, tipo) => c.files.filter((f) => tipoDocEnsayo(f) === tipo && (miCuerda === "" || vozDocEnsayo(f) === miCuerda || vozDocEnsayo(f) === "Todas"));
 
-  const cantoActivo = cantos.find((c) => c.nombre === cantoSel) || (cantoSel ? map[cantoSel] : null);
+  const cantoActivo = cantos.find((c) => c.key === cantoSel) || (cantoSel ? map[cantoSel] : null);
   const cActiva = miCuerda ? VOCES_ENSAYO.find((v) => v.id === miCuerda) : null;
   const accent = cActiva ? cActiva.color : C.primary;
   const _guestNombre = (() => { try { return localStorage.getItem("invitado_nombre") || ""; } catch { return ""; } })();
   const nombre1 = (esVisita(user) && _guestNombre ? _guestNombre : (user?.nombre || "Cantor")).split(" ")[0];
 
   function abrirCanto(c) {
-    setCantoSel(c.nombre);
+    setCantoSel(c.key);
     setProyAbierto(false);
     const aud = audiosDe(c);
     let pick = aud.find((a) => a.voz && a.voz.id === miCuerda) || aud.find((a) => !a.voz) || aud[0];
     setTrackId(pick ? pick.doc.id : null);
   }
+
+  // Al cambiar de cuerda con un canto abierto, seleccionar la pista de esa cuerda
+  useEffect(() => {
+    if (!cantoSel) return;
+    const c = cantos.find((x) => x.key === cantoSel);
+    if (!c) return;
+    const aud = audiosDe(c);
+    const mine = aud.find((a) => a.voz && a.voz.id === miCuerda);
+    if (mine) setTrackId(mine.doc.id);
+  }, [miCuerda]);
 
   const ESTADOS = [
     { id: "pendiente", label: "Pendiente", color: "#8a8a90", bg: "#f1f1f3" },
@@ -5265,7 +5298,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                 const tienePart = c.files.some((f) => tipoDocEnsayo(f) === "partitura");
                 const tieneVideo = c.files.some((f) => tipoDocEnsayo(f) === "video");
                 return (
-                  <button key={c.nombre} className="me-tile" onClick={() => abrirCanto(c)}
+                  <button key={c.key} className="me-tile" onClick={() => abrirCanto(c)}
                     style={{ textAlign: "left", cursor: "pointer", background: "white", border: "1px solid rgba(60,60,67,0.1)", borderRadius: 16, padding: "14px 15px", boxShadow: "0 2px 8px rgba(30,58,95,0.06)", animationDelay: `${i * 0.03}s`, position: "relative" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                       {c.momento ? (
@@ -5307,10 +5340,10 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
             <button onClick={() => { setCantoSel(null); setTrackId(null); }} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "white", border: "1px solid rgba(60,60,67,0.12)", borderRadius: 11, padding: "8px 13px", cursor: "pointer", fontSize: 12.5, color: C.primary, fontWeight: 600 }}>
               ‹ Repertorio
             </button>
-            <select value={cantoActivo.nombre} onChange={(e) => { const c = cantos.find((x) => x.nombre === e.target.value); if (c) abrirCanto(c); }}
+            <select value={cantoActivo.key} onChange={(e) => { const c = cantos.find((x) => x.key === e.target.value); if (c) abrirCanto(c); }}
               style={{ flex: 1, minWidth: 160, padding: "8px 12px", borderRadius: 11, border: "1px solid rgba(60,60,67,0.12)", fontSize: 12.5, color: "#1c1c1e", background: "white", outline: "none", fontFamily: "inherit", fontWeight: 600 }}>
               {cantos.map((c) => (
-                <option key={c.nombre} value={c.nombre}>{c.momento ? `${c.momento} · ` : ""}{c.nombre}</option>
+                <option key={c.key} value={c.key}>{c.momento ? `${c.momento} · ` : ""}{c.nombre}</option>
               ))}
             </select>
           </div>
@@ -5356,7 +5389,10 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
             const trackAccent = track.voz ? track.voz.color : C.primary;
             return (
               <div style={{ background: "white", borderRadius: 16, border: "1px solid rgba(60,60,67,0.1)", padding: "14px 16px", marginBottom: 12 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 800, color: "#1c1c1e", marginBottom: 9 }}>🎧 Pistas por voz</div>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: "#1c1c1e", marginBottom: 4 }}>🎧 Pistas por voz</div>
+                <div style={{ fontSize: 10.5, color: "#b0b0b5", marginBottom: 9 }}>
+                  Tu cuerda viene seleccionada; toca otra voz para acompañarte con ella.
+                </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {aud.map((a) => {
                     const on = track.doc.id === a.doc.id;
@@ -5373,7 +5409,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                     );
                   })}
                 </div>
-                <ReproductorPractica src={urlDoc(track.doc)} accent={trackAccent} onFirstPlay={() => setProyAbierto(true)} />
+                <ReproductorPractica src={audioSrcEnsayo(urlDoc(track.doc))} accent={trackAccent} onFirstPlay={() => setProyAbierto(true)} />
                 <div style={{ marginTop: 8, textAlign: "right" }}>
                   <a href={urlDoc(track.doc)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: C.primary, textDecoration: "none", fontWeight: 600 }}>↓ Descargar esta pista</a>
                 </div>
@@ -11587,14 +11623,27 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
     letterSpacing: "-0.016em", WebkitAppearance: "none",
   };
 
+  function nombreAuto(f) {
+    const base = (f.canto || "").trim();
+    if (!base) return (f.nombre || "").trim();
+    let suf = "";
+    if (f.cuerda_mat && f.cuerda_mat !== "Todas") suf = ` — ${f.cuerda_mat}`;
+    else if (f.categoria === "Letras") suf = " — Letra";
+    else if (f.categoria === "Partituras") suf = " — Partitura";
+    else if (f.categoria === "Video") suf = " — Video";
+    else if (f.categoria === "Audio") suf = " — General";
+    return (base + suf).trim();
+  }
+
   function limpiarBody(f) {
     const b = { ...f };
     if (b.orden === "" || b.orden == null) b.orden = null; else b.orden = parseInt(b.orden, 10);
+    b.nombre = nombreAuto(f);
     return b;
   }
 
   async function submit() {
-    if (!form.nombre || !form.url) return;
+    if (!form.canto || !form.url) return;
     setSaving(true);
     try {
       await supabase("material_ensayo", { method: "POST", body: limpiarBody(form) });
@@ -11702,7 +11751,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
             Nuevo material para Invitado
           </div>
           <div style={{ background: "rgba(14,165,233,0.08)", border: "1px solid rgba(14,165,233,0.2)", borderRadius: 10, padding: "9px 12px", marginBottom: 12, fontSize: 11, color: C.dark, lineHeight: 1.6 }}>
-            💡 Organiza por <strong>canto</strong>: sube un archivo por voz indicando el mismo nombre de canto y eligiendo la <strong>Cuerda/Voz</strong> y la <strong>Categoría</strong> (Audio, Letras, Partituras, Video). Así cada integrante ve y reproduce su propia pista.
+            💡 Organiza por <strong>canto</strong>: sube un archivo por voz con el <strong>mismo Canto</strong>, eligiendo la <strong>Cuerda/Voz</strong> y la <strong>Categoría</strong> (Audio, Letras, Partituras, Video). El nombre se arma solo (ej: "Reina de Chile — Tenor").
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 0.7fr", gap: 10, marginBottom: 10 }}>
             <div>
@@ -11722,16 +11771,11 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
                 placeholder="1" style={inp} />
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-            <div>
-              <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Nombre del archivo / pista *</label>
-              <input value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))}
-                placeholder="Ej: Reina de Chile — Tenor" style={inp} />
-            </div>
-            <div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
+            <div style={{ gridColumn: "1 / -1" }}>
               <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>URL del archivo *</label>
               <input value={form.url} onChange={e => setForm(p => ({ ...p, url: e.target.value }))}
-                placeholder="https://..." style={inp} />
+                placeholder="https://… (enlace del audio/PDF)" style={inp} />
             </div>
             <div>
               <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Categoría</label>
@@ -11766,7 +11810,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
               </div>
             </div>
           )}
-          <Btn onClick={submit} disabled={saving || !form.nombre || !form.url}>
+          <Btn onClick={submit} disabled={saving || !form.canto || !form.url}>
             {saving ? "Guardando…" : "💾 Guardar material"}
           </Btn>
         </Card>
@@ -11793,15 +11837,14 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
                     <input type="number" value={editForm.orden} onChange={e => setEditForm(p => ({ ...p, orden: e.target.value }))} style={inp} placeholder="Orden" />
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <input value={editForm.nombre} onChange={e => setEditForm(p => ({ ...p, nombre: e.target.value }))} style={inp} placeholder="Nombre / pista" />
-                    <input value={editForm.url} onChange={e => setEditForm(p => ({ ...p, url: e.target.value }))} style={inp} placeholder="URL" />
+                    <input value={editForm.url} onChange={e => setEditForm(p => ({ ...p, url: e.target.value }))} style={{ ...inp, gridColumn: "1 / -1" }} placeholder="URL del archivo" />
                     <select value={editForm.categoria} onChange={e => setEditForm(p => ({ ...p, categoria: e.target.value }))} style={inp}>
                       {CATS.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                     <select value={editForm.cuerda_mat} onChange={e => setEditForm(p => ({ ...p, cuerda_mat: e.target.value }))} style={inp}>
                       {CUERDAS_MAT.map(c => <option key={c} value={c}>{c === "Todas" ? "Todas las cuerdas" : c}</option>)}
                     </select>
-                    <input value={editForm.size} onChange={e => setEditForm(p => ({ ...p, size: e.target.value }))} style={inp} placeholder="Tamaño" />
+                    <input value={editForm.size} onChange={e => setEditForm(p => ({ ...p, size: e.target.value }))} style={{ ...inp, gridColumn: "1 / -1" }} placeholder="Tamaño (opcional)" />
                   </div>
                   <input value={editForm.descripcion} onChange={e => setEditForm(p => ({ ...p, descripcion: e.target.value }))} style={{ ...inp, marginBottom: 10 }} placeholder="Descripción" />
                   {(editForm.categoria === "Letras" || editForm.categoria === "Partituras") && (
