@@ -4837,8 +4837,9 @@ function vozDocEnsayo(d) {
 function urlDoc(d) { return d.url || d.archivo_url || "#"; }
 
 // ── Reproductor de práctica: velocidad (sin cambiar tono) + bucle A–B ──
-function ReproductorPractica({ src, accent }) {
+function ReproductorPractica({ src, accent, onFirstPlay }) {
   const audioRef = useRef(null);
+  const playedOnceRef = useRef(false);
   const [playing, setPlaying] = useState(false);
   const [cur, setCur] = useState(0);
   const [dur, setDur] = useState(0);
@@ -4869,7 +4870,11 @@ function ReproductorPractica({ src, accent }) {
   function toggle() {
     const a = audioRef.current; if (!a) return;
     if (playing) { a.pause(); setPlaying(false); }
-    else { const p = a.play(); if (p && p.then) p.then(() => setPlaying(true)).catch(() => {}); else setPlaying(true); }
+    else {
+      const p = a.play();
+      const started = () => { setPlaying(true); if (!playedOnceRef.current) { playedOnceRef.current = true; onFirstPlay && onFirstPlay(); } };
+      if (p && p.then) p.then(started).catch(() => {}); else started();
+    }
   }
   function onTime() {
     const a = audioRef.current; if (!a) return;
@@ -4957,12 +4962,179 @@ function ReproductorPractica({ src, accent }) {
 // ══════════════════════════════════════════════════════════════════════
 //  SALA DE ENSAYO — repertorio por canto + pistas por voz (perfil Invitado)
 // ══════════════════════════════════════════════════════════════════════
+// ── Proyector de letra/PDF para la Sala de Ensayo (con transposición latina) ──
+function ProyectorLetraEnsayo({ docs, cantoNombre, accent }) {
+  const ac = accent || "#1c4a8a";
+  const letras = (docs || []).filter((d) => tipoDocEnsayo(d) === "letra");
+  const parts = (docs || []).filter((d) => tipoDocEnsayo(d) === "partitura");
+  const ordered = [...letras, ...parts];
+
+  const [selId, setSelId] = useState(ordered[0] ? ordered[0].id : null);
+  const sel = ordered.find((d) => d.id === selId) || ordered[0] || null;
+  const [tab, setTab] = useState("pdf");
+  const [semis, setSemis] = useState(0);
+  const [latino, setLatino] = useState(true);
+  const [texto, setTexto] = useState(sel && sel.letra_texto ? sel.letra_texto : "");
+  const [extrayendo, setExtrayendo] = useState(false);
+  const [errExtrae, setErrExtrae] = useState(false);
+
+  useEffect(() => {
+    setSemis(0);
+    setErrExtrae(false);
+    setExtrayendo(false);
+    setTexto(sel && sel.letra_texto ? sel.letra_texto : "");
+    setTab("pdf");
+  }, [selId]);
+
+  function fileIdDe(url) {
+    if (!url) return null;
+    let m = url.match(/\/d\/([a-zA-Z0-9_-]+)/); if (m) return m[1];
+    m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/); if (m) return m[1];
+    return null;
+  }
+
+  async function extraer() {
+    const fid = fileIdDe(sel && sel.url);
+    if (!fid) { setErrExtrae(true); return; }
+    setExtrayendo(true); setErrExtrae(false);
+    const PROMPT = `Eres un experto en música litúrgica católica latinoamericana.
+Esta es una imagen de una partitura/canción. Extrae la letra completa y los acordes, y formatea en el estilo de lacuerda.net.
+
+REGLAS ESTRICTAS:
+- Los acordes van en la línea ENCIMA de la sílaba correspondiente, usando espacios para alinear.
+- Usa acordes en formato americano (C, Dm, Em, F, G, Am, Bm, G7, etc.).
+- Marca las secciones: INTRO, ESTROFA 1, ESTROFA 2, CORO, PUENTE, FINAL.
+- Si los acordes aparecen en español (DO, RE, MI, FA, SOL, LA, SI), conviértelos: SOL=G, RE=D, MIm=Em, LAm=Am, SIm=Bm, DO=C, FA=F, SOL7=G7, RE7=D7.
+- Devuelve ÚNICAMENTE el texto formateado, sin explicaciones, sin markdown, sin comillas.`;
+    try {
+      const imageUrl = `https://drive.google.com/thumbnail?id=${fid}&sz=w1600`;
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 4000,
+          messages: [{ role: "user", content: [
+            { type: "image", source: { type: "url", url: imageUrl } },
+            { type: "text", text: PROMPT },
+          ] }],
+        }),
+      });
+      if (!response.ok) throw new Error("api");
+      const data = await response.json();
+      const t = (data.content || []).map((b) => b.text || "").join("").trim();
+      if (t && t.length > 20) { setTexto(t); setTab("acordes"); } else throw new Error("vacio");
+    } catch (e) { setErrExtrae(true); }
+    setExtrayendo(false);
+  }
+
+  if (ordered.length === 0) {
+    return (
+      <div style={{ background: "rgba(242,242,247,0.7)", borderRadius: 12, padding: "14px", textAlign: "center", color: "#8a8a90", fontSize: 12.5 }}>
+        📄 Aún no hay letra ni partitura cargada para este canto.
+      </div>
+    );
+  }
+
+  const previewSrc = drivePreviewUrl(sel.url || "") || sel.url;
+  const tonoBase = "C";
+  const idxBase = NOTAS_CROMATICAS.indexOf(tonoBase);
+  const tonoActual = NOTAS_CROMATICAS[((idxBase + semis) % 12 + 12) % 12];
+  const tonoDisplay = latino ? notaLatina(tonoActual) : tonoActual;
+  const bloques = parsearLetra(transponerTextoCompleto(texto, semis));
+  const acordeReSolo = /[A-G][#b]?(m|maj|min|dim|aug|sus|add|M|7|9|11|13)?\d*(\/[A-G][#b]?)?/g;
+  const soloAcordesLatino = (linea) => linea.replace(acordeReSolo, (m) => mostrarAcorde(m, latino));
+
+  const inpSel = { padding: "8px 11px", borderRadius: 10, border: "1px solid rgba(60,60,67,0.18)", fontSize: 13, outline: "none", background: "white", color: "#1c1c1e", fontFamily: "inherit" };
+
+  return (
+    <div style={{ background: "white", borderRadius: 14, border: "1px solid rgba(60,60,67,0.1)", overflow: "hidden" }}>
+      {/* Selector de canción/letra + tabs */}
+      <div style={{ padding: "12px 14px", borderBottom: "1px solid rgba(60,60,67,0.08)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c1c1e" }}>📄 Proyectar letra</span>
+          {ordered.length > 1 && (
+            <select value={selId || ""} onChange={(e) => setSelId(e.target.value)} style={{ ...inpSel, flex: 1, minWidth: 160 }}>
+              {ordered.map((d) => (
+                <option key={d.id} value={d.id}>{tipoDocEnsayo(d) === "partitura" ? "🎼 " : "📝 "}{d.nombre}</option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+          <button onClick={() => setTab("pdf")} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 9, cursor: "pointer", border: `1.5px solid ${tab === "pdf" ? ac : "rgba(60,60,67,0.18)"}`, background: tab === "pdf" ? `${ac}12` : "white", color: tab === "pdf" ? ac : "#8a8a90", fontWeight: tab === "pdf" ? 700 : 500 }}>📄 PDF original</button>
+          <button onClick={() => setTab("acordes")} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 9, cursor: "pointer", border: `1.5px solid ${tab === "acordes" ? ac : "rgba(60,60,67,0.18)"}`, background: tab === "acordes" ? `${ac}12` : "white", color: tab === "acordes" ? ac : "#8a8a90", fontWeight: tab === "acordes" ? 700 : 500 }}>🎵 Letra y acordes</button>
+          <a href={sel.url} target="_blank" rel="noopener noreferrer" style={{ marginLeft: "auto", fontSize: 11, color: ac, textDecoration: "none", fontWeight: 600, alignSelf: "center" }}>Pantalla completa ↗</a>
+        </div>
+      </div>
+
+      {tab === "pdf" ? (
+        <div style={{ background: "#1c1c22" }}>
+          <iframe key={sel.id} title="Letra / partitura" src={previewSrc} style={{ width: "100%", height: 460, border: 0, display: "block" }} allow="autoplay" />
+        </div>
+      ) : (
+        <div style={{ padding: "14px 16px" }}>
+          {/* Controles de transposición */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid rgba(60,60,67,0.08)" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#8a8a90", textTransform: "uppercase", letterSpacing: "0.05em" }}>Tono</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button onClick={() => setSemis((s) => s - 1)} aria-label="Bajar medio tono" style={{ width: 30, height: 30, borderRadius: 9, border: "1px solid rgba(60,60,67,0.2)", background: "white", cursor: "pointer", fontSize: 16, color: "#3c3c43" }}>♭</button>
+              <span style={{ minWidth: 70, textAlign: "center", fontSize: 14, fontWeight: 800, color: ac }}>{tonoDisplay}{semis !== 0 ? ` (${semis > 0 ? "+" : ""}${semis})` : ""}</span>
+              <button onClick={() => setSemis((s) => s + 1)} aria-label="Subir medio tono" style={{ width: 30, height: 30, borderRadius: 9, border: "1px solid rgba(60,60,67,0.2)", background: "white", cursor: "pointer", fontSize: 16, color: "#3c3c43" }}>♯</button>
+              {semis !== 0 && <button onClick={() => setSemis(0)} style={{ fontSize: 11, padding: "5px 9px", borderRadius: 8, border: "1px solid rgba(60,60,67,0.2)", background: "white", cursor: "pointer", color: "#8a8a90" }}>Original</button>}
+            </div>
+            <button onClick={() => setLatino((v) => !v)} style={{ marginLeft: "auto", fontSize: 11, padding: "6px 11px", borderRadius: 8, border: `1px solid ${latino ? ac : "rgba(60,60,67,0.2)"}`, background: latino ? `${ac}12` : "white", color: latino ? ac : "#8a8a90", cursor: "pointer", fontWeight: 700 }}>
+              {latino ? "Do Re Mi (latino)" : "C D E (inglés)"}
+            </button>
+          </div>
+
+          {extrayendo ? (
+            <div style={{ textAlign: "center", padding: "30px 0", color: "#8a8a90", fontSize: 13 }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>🎼</div>
+              Extrayendo letra y acordes con IA…
+            </div>
+          ) : texto ? (
+            <div style={{ fontFamily: "monospace" }}>
+              {bloques.map((b, i) => {
+                if (b.tipo === "vacio") return <div key={i} style={{ height: 10 }} />;
+                if (b.tipo === "seccion") return <div key={i} style={{ fontWeight: 800, color: ac, marginTop: 12, marginBottom: 4, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em", fontFamily: "var(--font-sans)" }}>{b.texto}</div>;
+                if (b.tipo === "par") return <ParAcordeletra key={i} acordes={b.acordes} letra={b.letra} colorAcorde="#d6336c" formatoLatino={latino} />;
+                if (b.tipo === "soloAcordes") return <div key={i} style={{ fontSize: 13, fontWeight: 700, color: "#d6336c", whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{soloAcordesLatino(b.acordes)}</div>;
+                return <div key={i} style={{ fontSize: 14, color: "#222", lineHeight: 1.9, whiteSpace: "pre-wrap" }}>{b.texto}</div>;
+              })}
+            </div>
+          ) : (
+            <div style={{ textAlign: "center", padding: "24px 10px" }}>
+              {errExtrae ? (
+                <div style={{ fontSize: 12.5, color: "#8a8a90", lineHeight: 1.6 }}>
+                  No se pudo extraer automáticamente. Usa la pestaña <strong>📄 PDF original</strong> para proyectar la letra,
+                  o pega la letra con acordes desde el panel de administración del material.
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 12.5, color: "#8a8a90", marginBottom: 12, lineHeight: 1.6 }}>
+                    Esta letra está como PDF. Puedes extraer la letra y acordes para transponerlos en notación latina.
+                  </div>
+                  <button onClick={extraer} style={{ fontSize: 13, fontWeight: 700, color: "white", background: ac, border: "none", borderRadius: 11, padding: "10px 18px", cursor: "pointer" }}>
+                    ✨ Extraer letra y acordes
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MaterialEnsayo({ docs, user, catFiltroInicial }) {
   const norm = _normME;
   const [miCuerda, setMiCuerda] = useState(() => { try { return localStorage.getItem("me_mi_cuerda") || ""; } catch { return ""; } });
   const [search, setSearch] = useState("");
   const [cantoSel, setCantoSel] = useState(null);
   const [trackId, setTrackId] = useState(null);
+  const [proyAbierto, setProyAbierto] = useState(false);
   const [progreso, setProgreso] = useState(() => { try { return JSON.parse(localStorage.getItem("me_progreso") || "{}"); } catch { return {}; } });
 
   useEffect(() => { try { if (miCuerda) localStorage.setItem("me_mi_cuerda", miCuerda); } catch {} }, [miCuerda]);
@@ -5008,6 +5180,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
 
   function abrirCanto(c) {
     setCantoSel(c.nombre);
+    setProyAbierto(false);
     const aud = audiosDe(c);
     let pick = aud.find((a) => a.voz && a.voz.id === miCuerda) || aud.find((a) => !a.voz) || aud[0];
     setTrackId(pick ? pick.doc.id : null);
@@ -5130,9 +5303,17 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
       ) : (
         /* ── Detalle de un canto ── */
         <div className="me-fade">
-          <button onClick={() => { setCantoSel(null); setTrackId(null); }} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "white", border: "1px solid rgba(60,60,67,0.12)", borderRadius: 11, padding: "8px 13px", cursor: "pointer", fontSize: 12.5, color: C.primary, fontWeight: 600, marginBottom: 12 }}>
-            ‹ Repertorio
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+            <button onClick={() => { setCantoSel(null); setTrackId(null); }} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "white", border: "1px solid rgba(60,60,67,0.12)", borderRadius: 11, padding: "8px 13px", cursor: "pointer", fontSize: 12.5, color: C.primary, fontWeight: 600 }}>
+              ‹ Repertorio
+            </button>
+            <select value={cantoActivo.nombre} onChange={(e) => { const c = cantos.find((x) => x.nombre === e.target.value); if (c) abrirCanto(c); }}
+              style={{ flex: 1, minWidth: 160, padding: "8px 12px", borderRadius: 11, border: "1px solid rgba(60,60,67,0.12)", fontSize: 12.5, color: "#1c1c1e", background: "white", outline: "none", fontFamily: "inherit", fontWeight: 600 }}>
+              {cantos.map((c) => (
+                <option key={c.nombre} value={c.nombre}>{c.momento ? `${c.momento} · ` : ""}{c.nombre}</option>
+              ))}
+            </select>
+          </div>
 
           <div style={{ background: "white", borderRadius: 16, border: "1px solid rgba(60,60,67,0.1)", padding: "16px 16px 14px", marginBottom: 12 }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
@@ -5159,9 +5340,15 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
           {(() => {
             const aud = audiosDe(cantoActivo);
             if (aud.length === 0) {
+              const proyDocs = cantoActivo.files.filter((d) => tipoDocEnsayo(d) === "letra" || tipoDocEnsayo(d) === "partitura");
               return (
-                <div style={{ background: "white", borderRadius: 16, border: "1px solid rgba(60,60,67,0.1)", padding: "18px 16px", marginBottom: 12, textAlign: "center", color: "#8a8a90", fontSize: 12.5 }}>
-                  🎧 Aún no hay pistas de audio para este canto.
+                <div style={{ background: "white", borderRadius: 16, border: "1px solid rgba(60,60,67,0.1)", padding: "16px", marginBottom: 12 }}>
+                  <div style={{ textAlign: "center", color: "#8a8a90", fontSize: 12.5, marginBottom: proyDocs.length ? 14 : 0 }}>
+                    🎧 Aún no hay pistas de audio para este canto.
+                  </div>
+                  {proyDocs.length > 0 && (
+                    <ProyectorLetraEnsayo docs={proyDocs} cantoNombre={cantoActivo.nombre} accent={C.primary} />
+                  )}
                 </div>
               );
             }
@@ -5186,10 +5373,28 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                     );
                   })}
                 </div>
-                <ReproductorPractica src={urlDoc(track.doc)} accent={trackAccent} />
+                <ReproductorPractica src={urlDoc(track.doc)} accent={trackAccent} onFirstPlay={() => setProyAbierto(true)} />
                 <div style={{ marginTop: 8, textAlign: "right" }}>
                   <a href={urlDoc(track.doc)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: C.primary, textDecoration: "none", fontWeight: 600 }}>↓ Descargar esta pista</a>
                 </div>
+
+                {/* Proyector de letra / PDF (se abre al reproducir) */}
+                {(() => {
+                  const proyDocs = cantoActivo.files.filter((d) => tipoDocEnsayo(d) === "letra" || tipoDocEnsayo(d) === "partitura");
+                  if (proyDocs.length === 0) return null;
+                  return (
+                    <div style={{ marginTop: 12, borderTop: "1px solid rgba(60,60,67,0.08)", paddingTop: 12 }}>
+                      <button onClick={() => setProyAbierto((o) => !o)}
+                        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: proyAbierto ? `${trackAccent}10` : "rgba(242,242,247,0.7)", border: `1px solid ${proyAbierto ? trackAccent + "33" : "rgba(60,60,67,0.1)"}`, borderRadius: 11, padding: "10px 13px", cursor: "pointer" }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1c1c1e" }}>📄 {proyAbierto ? "Ocultar letra" : "Proyectar letra mientras cantas"}</span>
+                        <span style={{ fontSize: 12, color: trackAccent, fontWeight: 700 }}>{proyAbierto ? "▲" : "▼"}</span>
+                      </button>
+                      <div style={{ display: proyAbierto ? "block" : "none", marginTop: 10 }}>
+                        <ProyectorLetraEnsayo docs={proyDocs} cantoNombre={cantoActivo.nombre} accent={trackAccent} />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}
@@ -11368,7 +11573,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
   const CATS = ["Repertorio", "Partituras", "Letras", "Audio", "Video", "Comunicados", "Otro"];
   const CUERDAS_MAT = ["Todas", "Soprano", "Contralto", "Tenor", "Bajo", "Instrumentos"];
   const MOMENTOS = ["", "Entrada", "Acto Penitencial", "Gloria", "Salmo", "Aleluya", "Ofertorio", "Santo", "Cordero", "Comunión", "Salida", "Otro"];
-  const [form, setForm] = useState({ nombre: "", canto: "", momento: "", orden: "", url: "", categoria: "Audio", cuerda_mat: "Todas", descripcion: "", size: "" });
+  const [form, setForm] = useState({ nombre: "", canto: "", momento: "", orden: "", url: "", categoria: "Audio", cuerda_mat: "Todas", descripcion: "", size: "", letra_texto: "" });
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -11393,7 +11598,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
     setSaving(true);
     try {
       await supabase("material_ensayo", { method: "POST", body: limpiarBody(form) });
-      setForm({ nombre: "", canto: "", momento: "", orden: "", url: "", categoria: "Audio", cuerda_mat: "Todas", descripcion: "", size: "" });
+      setForm({ nombre: "", canto: "", momento: "", orden: "", url: "", categoria: "Audio", cuerda_mat: "Todas", descripcion: "", size: "", letra_texto: "" });
       setShowForm(false);
       onReload();
     } catch (e) { alert("Error: " + e.message); }
@@ -11412,7 +11617,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
 
   function startEdit(d) {
     setEditId(d.id);
-    setEditForm({ nombre: d.nombre || "", canto: d.canto || "", momento: d.momento || "", orden: (d.orden ?? "") === null ? "" : (d.orden ?? ""), url: d.url || "", categoria: d.categoria || "Audio", cuerda_mat: d.cuerda_mat || "Todas", descripcion: d.descripcion || "", size: d.size || "" });
+    setEditForm({ nombre: d.nombre || "", canto: d.canto || "", momento: d.momento || "", orden: (d.orden ?? "") === null ? "" : (d.orden ?? ""), url: d.url || "", categoria: d.categoria || "Audio", cuerda_mat: d.cuerda_mat || "Todas", descripcion: d.descripcion || "", size: d.size || "", letra_texto: d.letra_texto || "" });
   }
 
   const iconCat = (cat) => {
@@ -11551,6 +11756,16 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
             <input value={form.descripcion} onChange={e => setForm(p => ({ ...p, descripcion: e.target.value }))}
               placeholder="Descripción breve del material" style={inp} />
           </div>
+          {(form.categoria === "Letras" || form.categoria === "Partituras") && (
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Letra con acordes (opcional · para transponer)</label>
+              <textarea value={form.letra_texto} onChange={e => setForm(p => ({ ...p, letra_texto: e.target.value }))}
+                rows={4} placeholder={"Pega la letra con acordes (estilo lacuerda.net), p.ej:\nEm        Bm\nA le lu i i ia,\nEm    Si7"} style={{ ...inp, resize: "vertical", fontFamily: "monospace", fontSize: 12.5, lineHeight: 1.5 }} />
+              <div style={{ fontSize: 10, color: C.gray, marginTop: 4 }}>
+                Si lo dejas vacío, en la Sala de Ensayo se puede extraer automáticamente desde el PDF (solo Google Drive).
+              </div>
+            </div>
+          )}
           <Btn onClick={submit} disabled={saving || !form.nombre || !form.url}>
             {saving ? "Guardando…" : "💾 Guardar material"}
           </Btn>
@@ -11589,6 +11804,10 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
                     <input value={editForm.size} onChange={e => setEditForm(p => ({ ...p, size: e.target.value }))} style={inp} placeholder="Tamaño" />
                   </div>
                   <input value={editForm.descripcion} onChange={e => setEditForm(p => ({ ...p, descripcion: e.target.value }))} style={{ ...inp, marginBottom: 10 }} placeholder="Descripción" />
+                  {(editForm.categoria === "Letras" || editForm.categoria === "Partituras") && (
+                    <textarea value={editForm.letra_texto} onChange={e => setEditForm(p => ({ ...p, letra_texto: e.target.value }))}
+                      rows={4} placeholder="Letra con acordes (opcional, para transponer)" style={{ ...inp, marginBottom: 10, resize: "vertical", fontFamily: "monospace", fontSize: 12.5, lineHeight: 1.5 }} />
+                  )}
                   <div style={{ display: "flex", gap: 8 }}>
                     <Btn onClick={() => saveEdit(d.id)} disabled={editSaving}>{editSaving ? "…" : "💾 Guardar"}</Btn>
                     <Btn variant="ghost" onClick={() => setEditId(null)}>Cancelar</Btn>
@@ -21310,6 +21529,7 @@ CREATE POLICY "Acceso total" ON config FOR ALL USING (true) WITH CHECK (true);
 ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS canto   TEXT;
 ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS momento TEXT;
 ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS orden   INTEGER;
+ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS letra_texto TEXT;
 -- Cómo cargar: por cada canto sube un archivo por voz, repitiendo el mismo
 -- "canto" y eligiendo Cuerda/Voz (Soprano/Contralto/Tenor/Bajo/Instrumentos o Todas)
 -- y Categoría (Audio = pista de práctica, Letras, Partituras, Video).
