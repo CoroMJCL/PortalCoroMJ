@@ -5004,6 +5004,56 @@ function ReproductorPractica({ src, accent, onFirstPlay }) {
   );
 }
 
+function driveIdEnsayo(url) {
+  if (!url) return null;
+  let m = url.match(/\/d\/([a-zA-Z0-9_-]+)/); if (m) return m[1];
+  m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/); if (m) return m[1];
+  return null;
+}
+
+// Elige el reproductor correcto según el origen del archivo:
+//  · Google Drive  → reproductor propio de Drive (iframe /preview) — reproduce seguro
+//  · YouTube       → embed de YouTube
+//  · Video directo → <video> con velocidad/bucle nativos
+//  · Audio directo → reproductor propio con velocidad y bucle A–B
+function ReproductorPista({ doc, accent, onFirstPlay }) {
+  const url = urlDoc(doc);
+  const tipo = tipoDocEnsayo(doc);
+  const ac = accent || "#1c4a8a";
+  const esDrive = /(?:drive|docs)\.google\.com/i.test(url || "");
+  const ytm = (url || "").match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{6,})/);
+
+  if (ytm) {
+    return (
+      <div style={{ marginTop: 12 }}>
+        <iframe src={`https://www.youtube.com/embed/${ytm[1]}`} style={{ width: "100%", height: 300, border: 0, borderRadius: 12 }} allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="Pista" />
+      </div>
+    );
+  }
+  if (esDrive) {
+    const id = driveIdEnsayo(url);
+    const esVideo = tipo === "video";
+    return (
+      <div style={{ marginTop: 12 }}>
+        <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid rgba(60,60,67,0.12)", background: esVideo ? "#000" : "#fafafa" }}>
+          <iframe src={`https://drive.google.com/file/d/${id}/preview`} style={{ width: "100%", height: esVideo ? 340 : 90, border: 0, display: "block" }} allow="autoplay" title="Pista" />
+        </div>
+        <div style={{ fontSize: 10.5, color: "#b0b0b5", marginTop: 6 }}>
+          Reproductor de Google Drive. Para velocidad y bucle A–B, sube el archivo como URL directa (mp3/mp4) o a Supabase.
+        </div>
+      </div>
+    );
+  }
+  if (esVideoEnsayo(url)) {
+    return (
+      <div style={{ marginTop: 12 }}>
+        <video controls src={url} preload="metadata" style={{ width: "100%", maxHeight: 360, borderRadius: 12, background: "#000", display: "block" }} />
+      </div>
+    );
+  }
+  return <ReproductorPractica src={url} accent={ac} onFirstPlay={onFirstPlay} />;
+}
+
 // ══════════════════════════════════════════════════════════════════════
 //  SALA DE ENSAYO — repertorio por canto + pistas por voz (perfil Invitado)
 // ══════════════════════════════════════════════════════════════════════
@@ -5204,17 +5254,18 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
   });
   if (search) cantos = cantos.filter((c) => norm(c.nombre).includes(norm(search)));
 
+  const esPista = (f) => { const t = tipoDocEnsayo(f); return t === "audio" || t === "video"; };
   const audiosDe = (c) => {
     const res = [];
     VOCES_ENSAYO.forEach((v) => {
-      const d = c.files.find((f) => tipoDocEnsayo(f) === "audio" && vozDocEnsayo(f) === v.id);
+      const d = c.files.find((f) => esPista(f) && vozDocEnsayo(f) === v.id);
       if (d) res.push({ voz: v, doc: d });
     });
-    const mezcla = c.files.find((f) => tipoDocEnsayo(f) === "audio" && vozDocEnsayo(f) === "Todas");
+    const mezcla = c.files.find((f) => esPista(f) && vozDocEnsayo(f) === "Todas");
     if (mezcla) res.push({ voz: null, doc: mezcla });
     return res;
   };
-  const tieneVozAudio = (c, vozId) => c.files.some((f) => tipoDocEnsayo(f) === "audio" && (vozDocEnsayo(f) === vozId || vozDocEnsayo(f) === "Todas"));
+  const tieneVozAudio = (c, vozId) => c.files.some((f) => esPista(f) && (vozDocEnsayo(f) === vozId || vozDocEnsayo(f) === "Todas"));
   const tieneVozAlgo = (c, vozId) => c.files.some((f) => vozDocEnsayo(f) === vozId || vozDocEnsayo(f) === "Todas");
   const docsTipo = (c, tipo) => c.files.filter((f) => tipoDocEnsayo(f) === tipo && (miCuerda === "" || vozDocEnsayo(f) === miCuerda || vozDocEnsayo(f) === "Todas"));
 
@@ -5432,7 +5483,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                     );
                   })}
                 </div>
-                <ReproductorPractica src={urlDoc(track.doc)} accent={trackAccent} onFirstPlay={() => setProyAbierto(true)} />
+                <ReproductorPista doc={track.doc} accent={trackAccent} onFirstPlay={() => setProyAbierto(true)} />
                 <div style={{ marginTop: 8, textAlign: "right" }}>
                   <a href={urlDoc(track.doc)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: C.primary, textDecoration: "none", fontWeight: 600 }}>↓ Descargar esta pista</a>
                 </div>
@@ -5458,11 +5509,10 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
             );
           })()}
 
-          {/* Letra / Partitura / Video */}
+          {/* Letra / Partitura / Otro */}
           {[
             { tipo: "letra", titulo: "Letra", icon: "📝" },
             { tipo: "partitura", titulo: "Partitura", icon: "🎼" },
-            { tipo: "video", titulo: "Video de referencia", icon: "🎬" },
             { tipo: "otro", titulo: "Otro material", icon: "📄" },
           ].map((sec) => {
             const items = docsTipo(cantoActivo, sec.tipo);
@@ -5513,6 +5563,78 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
             );
           })}
         </div>
+      )}
+    </div>
+  );
+}
+
+function CuotaRecordatorioWidget({ members, user, setSection }) {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const [cuotas, pagos, mc] = await Promise.all([
+          finDbGet("fin_cuotas").catch(() => []),
+          finDbGet("fin_pagos").catch(() => []),
+          finDbGet("fin_miembros_cuotas").catch(() => []),
+        ]);
+        if (vivo) setData({ cuotas: cuotas || [], pagos: pagos || [], mc: mc || [] });
+      } catch { if (vivo) setData({ cuotas: [], pagos: [], mc: [] }); }
+    })();
+    return () => { vivo = false; };
+  }, []);
+
+  if (!data || !finMesVigente()) return null;
+
+  const mes = finCurrentMesIso();
+  const inscritosIds = new Set((data.mc || []).map((m) => m.integrante_id));
+  const inscritos = (members || []).filter((m) => inscritosIds.has(m.id));
+  if (inscritos.length === 0) return null;
+
+  const pagaron = new Set((data.pagos || []).filter((p) => p.mes === mes && (p.tipo === "cuota" || !p.tipo)).map((p) => p.integrante_id));
+  const pendientes = inscritos.filter((m) => !pagaron.has(m.id));
+  if (pendientes.length === 0) return null; // todos pagaron → el aviso desaparece
+
+  const total = inscritos.length;
+  const pagados = total - pendientes.length;
+  const pct = total ? Math.round((pagados / total) * 100) : 0;
+  const cuotaMes = (data.cuotas || []).find((c) => c.mes === mes);
+  const valor = cuotaMes?.valor;
+  const yoPague = pagaron.has(user?.id);
+  const esGestor = esCuerdaAdmin(user) || esCuerdaContador(user);
+
+  return (
+    <div style={{
+      background: "linear-gradient(135deg,#fff7ed,#fef3c7)",
+      border: "1px solid #fcd9a6", borderRadius: 16, padding: "14px 16px", marginBottom: 16,
+      display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
+    }}>
+      <div style={{ width: 44, height: 44, borderRadius: 13, flexShrink: 0, background: "linear-gradient(135deg,#d97706,#b45309)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 4px 12px rgba(180,83,9,0.28)" }}>💰</div>
+      <div style={{ flex: 1, minWidth: 200 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: "#b45309", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 1 }}>
+          Cuota de {finMesLabel(mes)}
+        </div>
+        <div style={{ fontSize: 14.5, fontWeight: 700, color: "#7c2d12", letterSpacing: "-0.01em" }}>
+          {yoPague
+            ? `¡Gracias, ya pagaste! Aún faltan ${pendientes.length} por pagar.`
+            : `Recuerda pagar tu cuota del coro${valor ? ` (${finFmtCLP(valor)})` : ""}.`}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+          <div style={{ flex: 1, maxWidth: 220, height: 7, borderRadius: 6, background: "rgba(180,83,9,0.15)", overflow: "hidden" }}>
+            <div style={{ width: `${pct}%`, height: "100%", borderRadius: 6, background: "linear-gradient(90deg,#f59e0b,#b45309)" }} />
+          </div>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: "#92400e" }}>
+            {pagados}/{total} al día · faltan {pendientes.length}
+          </span>
+        </div>
+      </div>
+      {esGestor && (
+        <button onClick={() => setSection("finanzas")}
+          style={{ flexShrink: 0, background: "white", border: "1px solid #fcd9a6", borderRadius: 11, padding: "8px 14px", fontSize: 12, fontWeight: 700, color: "#b45309", cursor: "pointer" }}>
+          Gestionar cuotas →
+        </button>
       )}
     </div>
   );
@@ -5781,6 +5903,9 @@ function Dashboard({
           </span>
         </div>
       ))}
+
+      {/* ── Recordatorio de cuota del mes (desaparece cuando todos pagan) ── */}
+      <CuotaRecordatorioWidget members={members} user={user} setSection={setSection} />
 
       {/* ── Stats con foto de usuario ── */}
       <div
@@ -11660,6 +11785,9 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editSaving, setEditSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [liberando, setLiberando] = useState(false);
+  const fileRef = useRef(null);
 
   const inp = {
     padding: "9px 12px", borderRadius: 12,
@@ -11697,6 +11825,63 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
       onReload();
     } catch (e) { alert("Error: " + e.message); }
     setSaving(false);
+  }
+
+  // Subir archivo (mp3/mp4/pdf) directo al almacenamiento de Supabase
+  async function subirArchivo(file) {
+    if (!file) return;
+    const okTipos = ["audio/", "video/", "application/pdf"];
+    if (!okTipos.some((t) => (file.type || "").startsWith(t) || file.type === t)) {
+      alert("Sube un archivo de audio (mp3), video (mp4) o PDF.");
+      return;
+    }
+    if (file.size > 45 * 1024 * 1024) { alert("El archivo no puede superar 45 MB. Comprime el audio (96 kbps mono) y reintenta."); return; }
+    setUploading(true);
+    try {
+      const safe = file.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `ensayo/${Date.now()}_${safe}`;
+      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
+        method: "POST",
+        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" },
+        body: file,
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const url = `${SUPABASE_URL}/storage/v1/object/public/publico/${path}`;
+      const mb = (file.size / (1024 * 1024));
+      setForm((p) => ({ ...p, url, size: `${mb < 1 ? Math.round(mb * 1024) + " KB" : mb.toFixed(1) + " MB"}` }));
+    } catch (e) { alert("Error al subir: " + e.message); }
+    setUploading(false);
+  }
+
+  // Borra un objeto del storage si la URL es de Supabase
+  async function borrarStorage(url) {
+    const pref = `${SUPABASE_URL}/storage/v1/object/public/publico/`;
+    if (!url || !url.startsWith(pref)) return;
+    const path = url.slice(pref.length);
+    try {
+      await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
+        method: "DELETE",
+        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+      });
+    } catch (e) { /* continuar */ }
+  }
+
+  // Libera espacio: borra TODO el material de ensayo (registros + archivos subidos a Supabase)
+  async function liberarEspacio() {
+    const lista = materialEnsayo || [];
+    const subidos = lista.filter((d) => (d.url || "").includes("/storage/v1/object/public/publico/")).length;
+    const msg = `Esto borrará el material de ensayo de esta misa:\n\n• ${lista.length} archivo(s) en total\n• ${subidos} subido(s) a Supabase (se liberará su espacio)\n\nLos enlaces de Google Drive NO se tocan en Drive. Asegúrate de tener respaldo.\n\n¿Continuar?`;
+    if (!window.confirm(msg)) return;
+    setLiberando(true);
+    try {
+      for (const d of lista) {
+        await borrarStorage(d.url);
+        await deleteRecord("material_ensayo", d.id);
+      }
+      alert("Listo. Espacio liberado y repertorio vaciado para la próxima misa.");
+      onReload();
+    } catch (e) { alert("Error al liberar: " + e.message); }
+    setLiberando(false);
   }
 
   async function saveEdit(id) {
@@ -11782,11 +11967,20 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
         </div>
       </div>
 
-      {/* Botón agregar */}
-      <div style={{ marginBottom: 14 }}>
+      {/* Botón agregar + liberar espacio */}
+      <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <Btn onClick={() => setShowForm(!showForm)}>
           {showForm ? "✕ Cancelar" : "＋ Agregar material"}
         </Btn>
+        {(materialEnsayo || []).length > 0 && (
+          <button onClick={liberarEspacio} disabled={liberando}
+            style={{ fontSize: 12, fontWeight: 700, color: "#9b2c2c", background: "#fff4f4", border: "1px solid #f3c2c2", borderRadius: 10, padding: "9px 14px", cursor: liberando ? "default" : "pointer" }}>
+            {liberando ? "Liberando…" : "🧹 Liberar espacio (vaciar misa)"}
+          </button>
+        )}
+      </div>
+      <div style={{ fontSize: 11, color: C.gray, marginBottom: 14, marginTop: -4 }}>
+        Cuando termine la misa, usa “Liberar espacio” para borrar los archivos subidos y dejar todo listo para la próxima (tus respaldos en Drive no se tocan).
       </div>
 
       {/* Formulario nuevo */}
@@ -11818,9 +12012,23 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
             <div style={{ gridColumn: "1 / -1" }}>
-              <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>URL del archivo *</label>
+              <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Archivo (audio, video o PDF) *</label>
               <input value={form.url} onChange={e => setForm(p => ({ ...p, url: e.target.value }))}
-                placeholder="https://… (enlace del audio/PDF)" style={inp} />
+                placeholder="https://… (pega un enlace o sube un archivo abajo)" style={inp} />
+              <input ref={fileRef} type="file" accept="audio/*,video/*,application/pdf" style={{ display: "none" }}
+                onChange={async (e) => { const f = e.target.files[0]; await subirArchivo(f); e.target.value = ""; }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, flexWrap: "wrap" }}>
+                <button type="button" onClick={() => fileRef.current && fileRef.current.click()} disabled={uploading}
+                  style={{ fontSize: 12, fontWeight: 700, color: "white", background: uploading ? "#9aa" : C.primary, border: "none", borderRadius: 10, padding: "8px 14px", cursor: uploading ? "default" : "pointer" }}>
+                  {uploading ? "Subiendo…" : "⬆️ Subir archivo desde mi equipo"}
+                </button>
+                {form.url && form.url.includes("/storage/v1/object/public/publico/") && (
+                  <span style={{ fontSize: 11, color: "#15803d", fontWeight: 600 }}>✓ Subido a tu app{form.size ? ` · ${form.size}` : ""}</span>
+                )}
+              </div>
+              <div style={{ fontSize: 10, color: C.gray, marginTop: 4 }}>
+                Lo subido a tu app suena en el reproductor con velocidad y bucle. Para no llenar el espacio, usa “Liberar espacio” cuando termine la misa.
+              </div>
             </div>
             <div>
               <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Categoría</label>
