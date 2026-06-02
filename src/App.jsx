@@ -1238,6 +1238,7 @@ export default function App() {
   const [reconocimientos, setReconocimientos] = useState([]);
   const [materialEnsayo, setMaterialEnsayo] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
+  const [firstLoadDone, setFirstLoadDone] = useState(false);
 
   const [evangelio, setEvangelio] = useState(null);
   const [santoral, setSantoral] = useState(null);
@@ -1301,6 +1302,7 @@ export default function App() {
       console.error("Error cargando datos:", e);
     }
     setDbLoading(false);
+    setFirstLoadDone(true);
   }
 
   // Detectar token de recuperación en la URL al montar (por si _initialView no lo capturó)
@@ -2609,7 +2611,7 @@ export default function App() {
             WebkitOverflowScrolling: "touch",
           }}
         >
-          {dbLoading ? (
+          {dbLoading && !firstLoadDone ? (
             <Spinner />
           ) : (
             <>
@@ -5491,16 +5493,22 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                 {/* Proyector de letra / PDF (se abre al reproducir) */}
                 {(() => {
                   const proyDocs = cantoActivo.files.filter((d) => tipoDocEnsayo(d) === "letra" || tipoDocEnsayo(d) === "partitura");
-                  if (proyDocs.length === 0) return null;
                   return (
                     <div style={{ marginTop: 12, borderTop: "1px solid rgba(60,60,67,0.08)", paddingTop: 12 }}>
                       <button onClick={() => setProyAbierto((o) => !o)}
                         style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: proyAbierto ? `${trackAccent}10` : "rgba(242,242,247,0.7)", border: `1px solid ${proyAbierto ? trackAccent + "33" : "rgba(60,60,67,0.1)"}`, borderRadius: 11, padding: "10px 13px", cursor: "pointer" }}>
-                        <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1c1c1e" }}>📄 {proyAbierto ? "Ocultar letra" : "Proyectar letra mientras cantas"}</span>
+                        <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1c1c1e" }}>📄 {proyAbierto ? "Ocultar letra" : "Letra y acordes"}</span>
                         <span style={{ fontSize: 12, color: trackAccent, fontWeight: 700 }}>{proyAbierto ? "▲" : "▼"}</span>
                       </button>
                       <div style={{ display: proyAbierto ? "block" : "none", marginTop: 10 }}>
-                        <ProyectorLetraEnsayo docs={proyDocs} cantoNombre={cantoActivo.nombre} accent={trackAccent} />
+                        {proyDocs.length > 0 ? (
+                          <ProyectorLetraEnsayo docs={proyDocs} cantoNombre={cantoActivo.nombre} accent={trackAccent} />
+                        ) : (
+                          <div style={{ background: "rgba(242,242,247,0.7)", borderRadius: 12, padding: "16px", textAlign: "center", color: "#8a8a90", fontSize: 12.5, lineHeight: 1.6 }}>
+                            📄 Aún no hay letra para este canto.<br />
+                            El encargado puede subirla en PDF desde <strong>Administración → Material Ensayo</strong> (categoría “Letras”). Una vez subida, aparece aquí para proyectar y transponer los acordes.
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
