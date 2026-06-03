@@ -4846,17 +4846,18 @@ function vozDocEnsayo(d) {
 }
 function urlDoc(d) { return d.url || d.archivo_url || "#"; }
 
-// Deriva el nombre real del canto: usa el campo `canto` o, si está vacío,
-// quita del nombre los sufijos de voz, categoría o "general" (uno o varios),
-// ej: "Chile Una Mesa para Todos - Letras — General" → "Chile Una Mesa para Todos"
+// Deriva el nombre real del canto: toma el campo `canto` (o el nombre) y le
+// quita los sufijos de voz, categoría o "general" (uno o varios),
+// ej: "Señor, ten piedad - Bajo" → "Señor, ten piedad"
+//     "Chile Una Mesa para Todos - Letras — General" → "Chile Una Mesa para Todos"
 function cantoBaseEnsayo(d) {
-  if (d.canto && d.canto.trim()) return d.canto.trim();
-  let n = (d.nombre || "").trim();
+  const base = (d.canto && d.canto.trim()) ? d.canto.trim() : (d.nombre || "").trim();
+  let n = base;
   if (!n) return "General";
-  const suf = /\s*[-–—·:|]\s*(sopranos?|contraltos?|altos?|tenores?|tenor|bajos?|bar[íi]tonos?|instrumentos?|instrumental|general(es)?|geneal|letras?|partituras?|acordes?|audios?|pista|voces|voz|coro|mezcla|todas?|todos?)\s*$/i;
+  const suf = /\s*[-–—·:|]\s*(sopranos?|contraltos?|altos?|tenores?|tenor|bajos?|bar[íi]tonos?|instrumentos?|instrumental|general(es)?|geneal|letras?|letra|partituras?|acordes?|audios?|pista|voces|voz|coro|mezcla|todas?|todos?)\s*$/i;
   let prev;
   do { prev = n; n = n.replace(suf, "").trim(); } while (n !== prev && n.length);
-  return n || (d.nombre || "").trim() || "General";
+  return n || base || "General";
 }
 
 // Convierte SOLO enlaces de Google Drive a una URL reproducible.
