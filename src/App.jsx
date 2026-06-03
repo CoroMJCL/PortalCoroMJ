@@ -967,8 +967,9 @@ function MobileMenu({ section, setSection, onClose, user }) {
           if (isVisita) {
             return ["dashboard", "material_ensayo"].includes(item.id);
           }
-          if (item.id === "material_ensayo" && !esCuerdaAdmin(user)) return false;
           if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
+          if (item.id === "cancionero") return false;
+            if (item.id === "musica") return false;
           if (item.id === "cantos_pdf" || item.id === "audios") return false;
           if (item.id === "admin" && !esCuerdaAdmin(user)) return false;
           if (item.id === "finanzas" && !esCuerdaAdmin(user) && !esCuerdaContador(user)) return false;
@@ -2222,9 +2223,12 @@ export default function App() {
             if (isVisita) {
               return ["dashboard", "material_ensayo"].includes(item.id);
             }
-            // Sala de Ensayo y Vista Invitado: visibles solo para Admin
-            if (item.id === "material_ensayo" && !esCuerdaAdmin(user)) return false;
+            // Sala de Ensayo: visible a TODOS los integrantes (el admin la habilita/deshabilita dentro)
+            // Vista Invitado: solo Admin
             if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
+            // Canto Digital ahora vive dentro de la Sala de Ensayo
+            if (item.id === "cancionero") return false;
+            if (item.id === "musica") return false;
             if (item.id === "cantos_pdf" || item.id === "audios") return false;
             if (item.id === "admin" && user?.cuerda !== "Admin") return false;
             if (item.id === "finanzas" && !esCuerdaAdmin(user) && !esCuerdaContador(user)) return false;
@@ -2754,8 +2758,11 @@ export default function App() {
               {section === "info_gastos" && (
                 <InfoGastos user={user} members={members} />
               )}
-              {section === "material_ensayo" && (esVisita(user) || esCuerdaAdmin(user)) && (
+              {section === "material_ensayo" && esVisita(user) && (
                 <MaterialEnsayo docs={materialEnsayo} user={user} />
+              )}
+              {section === "material_ensayo" && !esVisita(user) && (
+                <SalaEnsayoMiembro docs={materialEnsayo} user={user} isAdmin={esCuerdaAdmin(user)} podcasts={podcasts} onReload={loadData} />
               )}
               {section === "vista_invitado" && esCuerdaAdmin(user) && (
                 <div>
@@ -5618,6 +5625,151 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
   );
 }
 
+function PartiturasEnsayo({ docs }) {
+  const parts = (docs || []).filter((d) => tipoDocEnsayo(d) === "partitura");
+  const [selId, setSelId] = useState(parts[0] ? parts[0].id : null);
+  const AZUL = "#0a5ac8";
+
+  if (parts.length === 0) {
+    return (
+      <div style={{ background: "rgba(242,242,247,0.7)", borderRadius: 16, padding: "32px 22px", textAlign: "center", color: "#8a8a90", fontSize: 13.5, lineHeight: 1.6 }}>
+        🎼 Aún no hay partituras cargadas.<br />
+        El encargado puede subirlas en PDF desde <strong>Administración → Material Ensayo</strong> eligiendo la categoría <strong>“Partitura”</strong>.
+      </div>
+    );
+  }
+
+  const sel = parts.find((p) => p.id === selId) || parts[0];
+  const src = drivePreviewUrl(sel.url || "") || sel.url;
+
+  return (
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontSize: 11, fontWeight: 700, color: "#8a8a90", letterSpacing: "0.04em", textTransform: "uppercase", display: "block", marginBottom: 5 }}>Elige la partitura</label>
+        <select value={sel.id} onChange={(e) => setSelId(e.target.value)}
+          style={{ width: "100%", maxWidth: 420, padding: "11px 13px", borderRadius: 12, border: "1px solid rgba(60,60,67,0.2)", fontSize: 14, fontWeight: 600, color: "#1c1c1e", background: "white", outline: "none", cursor: "pointer" }}>
+          {parts.map((p) => (
+            <option key={p.id} value={p.id}>{cantoBaseEnsayo(p)}</option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ background: "white", borderRadius: 16, border: "1px solid rgba(60,60,67,0.1)", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 15px", borderBottom: "1px solid rgba(60,60,67,0.08)", flexWrap: "wrap" }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.01em" }}>🎼 {cantoBaseEnsayo(sel)}</div>
+          <a href={sel.url} target="_blank" rel="noopener"
+            style={{ fontSize: 12.5, fontWeight: 700, color: "white", background: AZUL, borderRadius: 10, padding: "8px 14px", textDecoration: "none" }}>
+            ↓ Descargar / abrir
+          </a>
+        </div>
+        <div style={{ background: "#1c1c22" }}>
+          <iframe key={sel.id} title="Partitura" src={src} style={{ width: "100%", height: 620, border: 0, display: "block" }} />
+        </div>
+      </div>
+
+      <div style={{ fontSize: 11, color: "#b0b0b5", marginTop: 10, lineHeight: 1.5 }}>
+        ¿Quieres escuchar tu voz mientras lees la partitura? Las pistas por voz están en la pestaña <strong>Repertorio</strong>.
+      </div>
+    </div>
+  );
+}
+
+function SalaEnsayoMiembro({ docs, user, isAdmin, podcasts, onReload }) {
+  const [tab, setTab] = useState("repertorio");
+  const [habil, setHabil] = useState(null);
+  const [guardando, setGuardando] = useState(false);
+  const AZUL = "#0a5ac8";
+
+  useEffect(() => {
+    (async () => {
+      try { const c = await getConfig("sala_ensayo_habilitada"); setHabil(c === null ? true : (c === "true" || c === true)); }
+      catch { setHabil(true); }
+    })();
+  }, []);
+
+  async function toggle() {
+    const nuevo = !habil;
+    setGuardando(true);
+    setHabil(nuevo);
+    try { await setConfig("sala_ensayo_habilitada", nuevo ? "true" : "false"); } catch {}
+    setGuardando(false);
+  }
+
+  if (habil === null) {
+    return <div style={{ maxWidth: 1100, padding: "48px 0", textAlign: "center", color: "#8a8a90", fontSize: 14 }}>Cargando sala de ensayo…</div>;
+  }
+
+  // Cerrada para integrantes (solo el admin puede entrar mientras prepara material)
+  if (!habil && !isAdmin) {
+    return (
+      <div style={{ maxWidth: 720, margin: "0 auto", padding: "60px 24px", textAlign: "center" }}>
+        <div style={{ width: 72, height: 72, borderRadius: 22, margin: "0 auto 18px", background: "rgba(10,90,200,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34 }}>🔒</div>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: "#1c1c1e", margin: "0 0 8px", letterSpacing: "-0.02em" }}>La Sala de Ensayo está cerrada</h2>
+        <p style={{ fontSize: 14.5, color: "#6a6a70", lineHeight: 1.6, maxWidth: 460, margin: "0 auto" }}>
+          El encargado del coro está preparando el material. En cuanto esté listo, la habilitará y podrás acceder a las pistas, letras y al Canto Digital.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 1100 }}>
+      {/* Header premium */}
+      <div style={{ background: `linear-gradient(135deg,${AZUL},#0847a0)`, borderRadius: 22, padding: "22px 24px", marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", boxShadow: "0 12px 32px rgba(10,90,200,0.28)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 15 }}>
+          <div style={{ width: 52, height: 52, borderRadius: 15, background: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, flexShrink: 0 }}>🎼</div>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 800, color: "rgba(255,255,255,0.75)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>Sala de Ensayo</div>
+            <div style={{ fontSize: 21, fontWeight: 800, color: "white", letterSpacing: "-0.02em", lineHeight: 1.15 }}>Repertorio del coro</div>
+            <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.82)", marginTop: 2 }}>Estudia tu voz, sigue la letra y cambia el tono.</div>
+          </div>
+        </div>
+        {isAdmin && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,255,255,0.14)", borderRadius: 13, padding: "8px 13px" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "white" }}>{habil ? "Abierta a integrantes" : "Cerrada a integrantes"}</span>
+            <button onClick={toggle} disabled={guardando} aria-label="Habilitar sala"
+              style={{ width: 46, height: 26, borderRadius: 20, border: "none", cursor: guardando ? "default" : "pointer", background: habil ? "#34d399" : "rgba(255,255,255,0.4)", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+              <span style={{ position: "absolute", top: 3, left: habil ? 23 : 3, width: 20, height: 20, borderRadius: "50%", background: "white", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {!habil && isAdmin && (
+        <div style={{ background: "#fff7ed", border: "1px solid #fcd9a6", borderRadius: 12, padding: "11px 15px", marginBottom: 16, fontSize: 12.5, color: "#92400e" }}>
+          La sala está <strong>cerrada para los integrantes</strong> — solo tú la ves mientras preparas el material. Activa el interruptor de arriba cuando quieras abrirla a todos.
+        </div>
+      )}
+
+      {/* Pestañas */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+        {[{ id: "repertorio", label: "🎧 Repertorio" }, { id: "cancionero", label: "♫ Canto Digital" }, { id: "partituras", label: "🎼 Partituras" }, { id: "vocalizacion", label: "🎙 Vocalización" }, { id: "musica", label: "♪ Música" }].map((t) => {
+          const on = tab === t.id;
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              style={{ fontSize: 13.5, fontWeight: 700, padding: "9px 16px", borderRadius: 12, cursor: "pointer", border: `1.5px solid ${on ? AZUL : "rgba(60,60,67,0.15)"}`, background: on ? AZUL : "white", color: on ? "white" : "#6a6a70" }}>
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "repertorio" && <MaterialEnsayo docs={docs} user={user} />}
+      {tab === "cancionero" && <Cancionero user={user} />}
+      {tab === "partituras" && <PartiturasEnsayo docs={docs} />}
+      {tab === "vocalizacion" && (
+        <div>
+          <div style={{ fontSize: 12.5, color: "#6a6a70", marginBottom: 12, lineHeight: 1.5 }}>
+            🎙 Ejercicios de canto y calentamiento de voz. Escúchalos como un podcast antes de ensayar.
+          </div>
+          <Podcast podcasts={podcasts} onReload={onReload} user={user} />
+        </div>
+      )}
+      {tab === "musica" && <Musica />}
+    </div>
+  );
+}
+
 function CuotaRecordatorioWidget({ members, user, setSection }) {
   const [data, setData] = useState(null);
 
@@ -5657,32 +5809,34 @@ function CuotaRecordatorioWidget({ members, user, setSection }) {
 
   return (
     <div style={{
-      background: "linear-gradient(135deg,#fff7ed,#fef3c7)",
-      border: "1px solid #fcd9a6", borderRadius: 16, padding: "14px 16px", marginBottom: 16,
-      display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
+      background: "linear-gradient(180deg,#f5f9ff,#eaf2ff)",
+      border: "1px solid #cfe0fb", borderRadius: 18, padding: "16px 18px", marginBottom: 16,
+      display: "flex", alignItems: "center", gap: 15, flexWrap: "wrap",
     }}>
-      <div style={{ width: 44, height: 44, borderRadius: 13, flexShrink: 0, background: "linear-gradient(135deg,#d97706,#b45309)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 4px 12px rgba(180,83,9,0.28)" }}>💰</div>
-      <div style={{ flex: 1, minWidth: 200 }}>
-        <div style={{ fontSize: 10, fontWeight: 800, color: "#b45309", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 1 }}>
-          Cuota de {finMesLabel(mes)}
+      <div style={{ width: 46, height: 46, borderRadius: 14, flexShrink: 0, background: "linear-gradient(135deg,#0a5ac8,#0847a0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 6px 16px rgba(10,90,200,0.32)" }}>
+        {yoPague ? "✓" : "🪙"}
+      </div>
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: "#0a5ac8", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 2 }}>
+          Cuota del coro · {finMesLabel(mes)}
         </div>
-        <div style={{ fontSize: 14.5, fontWeight: 700, color: "#7c2d12", letterSpacing: "-0.01em" }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: "#0b2a52", letterSpacing: "-0.01em", lineHeight: 1.3 }}>
           {yoPague
-            ? `¡Gracias, ya pagaste! Aún faltan ${pendientes.length} por pagar.`
-            : `Recuerda pagar tu cuota del coro${valor ? ` (${finFmtCLP(valor)})` : ""}.`}
+            ? `Estás al día. Aún faltan ${pendientes.length} ${pendientes.length === 1 ? "integrante" : "integrantes"} por pagar.`
+            : `Tienes tu cuota de ${finMesLabel(mes)} pendiente${valor ? ` — ${finFmtCLP(valor)}` : ""}. ¡Ponte al día!`}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
-          <div style={{ flex: 1, maxWidth: 220, height: 7, borderRadius: 6, background: "rgba(180,83,9,0.15)", overflow: "hidden" }}>
-            <div style={{ width: `${pct}%`, height: "100%", borderRadius: 6, background: "linear-gradient(90deg,#f59e0b,#b45309)" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 9 }}>
+          <div style={{ flex: 1, maxWidth: 240, height: 7, borderRadius: 6, background: "rgba(10,90,200,0.14)", overflow: "hidden" }}>
+            <div style={{ width: `${pct}%`, height: "100%", borderRadius: 6, background: "linear-gradient(90deg,#3b82f6,#0a5ac8)" }} />
           </div>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: "#92400e" }}>
-            {pagados}/{total} al día · faltan {pendientes.length}
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: "#0a5ac8" }}>
+            {pagados}/{total} al día
           </span>
         </div>
       </div>
       {esGestor && (
         <button onClick={() => setSection("finanzas")}
-          style={{ flexShrink: 0, background: "white", border: "1px solid #fcd9a6", borderRadius: 11, padding: "8px 14px", fontSize: 12, fontWeight: 700, color: "#b45309", cursor: "pointer" }}>
+          style={{ flexShrink: 0, background: "#0a5ac8", border: "none", borderRadius: 12, padding: "9px 15px", fontSize: 12.5, fontWeight: 700, color: "white", cursor: "pointer", boxShadow: "0 4px 12px rgba(10,90,200,0.28)" }}>
           Gestionar cuotas →
         </button>
       )}
@@ -6164,23 +6318,19 @@ function Dashboard({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 12,
-            padding: 14,
+            gap: 13,
+            padding: 15,
             position: "relative",
-            border: hayDocNuevo ? `1.5px solid ${C.gold}` : undefined,
-            background: hayDocNuevo ? "linear-gradient(135deg,#fffdf5,#fef6e0)" : undefined,
-            boxShadow: hayDocNuevo ? `0 6px 22px ${C.gold}33` : undefined,
+            border: hayDocNuevo ? `1px solid ${C.gold}55` : undefined,
+            background: hayDocNuevo ? "linear-gradient(180deg,#fffefb,#fffaf0)" : undefined,
           }}
         >
-          {hayDocNuevo && (
-            <span style={{ position: "absolute", top: 10, right: 12, fontSize: 9.5, fontWeight: 800, color: "#fff", background: C.gold, borderRadius: 20, padding: "2px 8px", letterSpacing: "0.04em", boxShadow: `0 2px 6px ${C.gold}66` }}>✨ NUEVO</span>
-          )}
           <div
             style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              background: C.gold + "15",
+              width: 44,
+              height: 44,
+              borderRadius: 13,
+              background: hayDocNuevo ? "linear-gradient(135deg,#fef3c7,#fde9b0)" : "rgba(10,90,200,0.08)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -6188,26 +6338,34 @@ function Dashboard({
               position: "relative",
             }}
           >
-            <img src="data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAIIAZEDASIAAhEBAxEB/8QAHQABAAICAwEBAAAAAAAAAAAAAAYIAwcEBQkBAv/EAE8QAAECAgQEEwQIBQQBBQEAAAABAgMEBQYHETRzsdEIEhUXGDE3QVFUVVZxdJGSk5TBIVJi0hMiMjZhcoGyFDNCU5UjQ6HT4RZGY4Wi8P/EABsBAQACAwEBAAAAAAAAAAAAAAACBQEEBgcD/8QAPREAAQICBAoIBAcAAwEAAAAAAAECAwQFERIxBhMUFSFBUVKR0fAVImEHMnGBQqGxweFiI4Ki8f/aAAwDAQACEQMRAD8AuKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAF6AAAC8AAXi8AAXi8AAXi8AAXi8AAXi8AAXi8AAXi8AAXi8AAXi8AAXi8AAXgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHx7ka1XOVERPaqqfTSmiqrvM0BV2Wq9RsV0KbpTTLGiMW5zILdtEXe0y+zoRT5RoqQmK9fkbchJPnphsBl6nBtR0QEpRM5GouqUtCn48JVY+birfCRfgRPtXcO10moZ22i0aZirE/9QPg3/0woTERP+DXireqqvtU+Kc3Gno0Ra66j1uSwekJRiNSGjl1qla8Sea8FovOaZ7jMw14LRecsz3GZiBg11jxV/8ApTcxbJ+E30QnmvBaLzlme4zMNeC0XnLM9xmYgYMdPE2lGLJPwm+iE814LRecsz3GZhrwWi85ZnuMzEDA6eJtKMWSfhN9EJ5rwWi85ZnuMzDXgtF5yzPcZmIGB08TaUYsk/Cb6ITzXgtF5yzPcZmGvBaLzlme4zMQMDp4m0oxZJ+E30QnmvBaLzlme4zMNeC0XnLM9xmYgYHTxNpRiyT8JvohPNeC0XnLM9xmYa8FovOWZ7jMxAwOnibSjFkn4TfRCea8FovOWZ7jMw14LRecsz3GZiBgdPE2lGLJPwm+iE814LRecsz3GZhrwWi85ZnuMzEDA6eJtKMWSfhN9EJ5rwWi85ZnuMzDXgtF5yzPcZmIGB08TaUYsk/Cb6ITzXgtF5yzPcZmGu/aLzlme4zMQMJtjp4m0oxZJ+E30Q2lVG3qttBVglpmn56LStHPdpI8BzWo5G+81URPahbarVOUXWKhZamKIm2TUnMs08N7V7UXgVNpUXaPOinPsQulSa2IWqUrZ5TKNvfM0PMPRZqUv/TTs4HZd8tZGccxKnrWhx+ENBMiuV8s1EcnyTMi/wBl9QdXVanqKrLQctTNDzcOak5lmmhvavaipvKi+xUXaO0vLxFRUrQ8+VFaqot4ABkwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAF2io+i3ivfabDY5yq1kjDRqcHtVS3BUTRabqCdShepXUpo670OpwOSuk03O5Gnz6xrnxGsYl7nLcififDLI4dAxjcpzR6vWcjUqkeKu7UGpNI8Vd2pnJiqn50ycKEkaTRpENSaR4q7tTONSaR4q7tTOS/TJ7yDTJ7yGbKGbKEQ1JpHiru1M41JpHiru1M5L9MnvINMnvILKCyhENSaR4q7tTONSaR4q7tTOS/TJ7yDTJ7yCygsoRDUmkeKu7UzjUmkeKu7Uzkv0ye8g0ye8gsoLKEQ1JpHiru1M41JpHiru1M5L9MnvINMnvILKCyhENSaR4q7tTONSaR4q7tTOS/TJ7yDTJ7yCygsoRDUmkeKu7UzjUmkeKu7Uzkv0ye8g0ye8gsoLKEQ1JpHiru1M41JpHiru1M5L9MnvINMnvILKCyhENSaR4q7tTONSaR4q7tTOS/TJ7yDTJ7yCygsoa7rLJzUrCgOmISw0e5US9U9p0txMrRlRYEl7UX67troQhpsQ8yFHOpZjKbEsVtRpazumVdDV8zRUw5P4uTV3sd8beB/47+0peKqVYaJrTQErTdCzTZmTmW6Zjk20Xfa5N5yL7FTePNk2BYtadS1nNO/SwXPmaJmHJ/GSau9jt7Tt4Hom/v7S711jKzaw1suuOUpqhUmkWNBT8fP+y/l59OnqjWKia1UDLU3Qs2yak5ht7XNX2ou+1ybzkX2Kinb3lyioqVocG5qtVUVKlPoAMmAAAAAAAAAAAAAAAAAAAAAAAAAAAAu0VD0We6inUoXqW8XaKh6LPdRTqUL1K6lNHXeh1WBvef8A1XkagMsjh0DGNymIyyOHQMY3KcyerE4UhNIYdHxi5SbKQmkMOj4xcp9FuJuuMAvAIVqQqF4vAFaioXi8AVqKheLwBWoqF4vAFaioXi8AVqKheLwBWoqF4vAFaioXi8AVqKheLwBWpio6+m/swfzLkOtOypz7MDpU6024fZKeb+KoABM16yf2MWm0tZ1T308BXzFFTDk/jJO/2PTa07eB6Jv7+0u8XmqhWOia1UBLU3Qs02ZlJht7XJttXfa5N5yL7FQ82ifWM2mUvZ3T308u50ejJhyfxkmrvqxE2tMnA9E39/aX8N2VmlhrZdcc7TVCpNJ00JPx8/7L/Xn06ap9ZKJrXQEtTdCzTZiUjt9ipttcm21ybzkX2Kh3CF0ioqVocG5qtWpUqU+gAyYAAAAAAAAAAAAAAAAAAAAAUqHos91FOpQvUt4pUPRZ7qKdShepXUpo670OqwN7zTyryNQGWRw6BjG5TEZZHDoGMblOZPVicKQmkMOj4xcpNlITSGHR8YuUm64m4wAAiQAAAAAAAAAddTP+3+pxJFUbNQ1cqIl+2pyqZ/2v1OvQ2mJWxCmmVsx1U776aCntWKztOonorY0y57Ps7SfiYD9wocSK5EhsVyhkNGZ6zMWYfGRG1HModF+kiLvXXHPm8Fi/kU+SkBsvB0iLeq+1y8Kn2bwWL+RT4K606ssIUNYcKyp0SndyOCQ/wAp0h3clgkL8p9o3ZNKR7f6GY4tIwEiwFeifXb7b/wOUfHpexyLvoa7VVFrQsojEe1UUj34od7KxPpZdj+FPadGvsU7ailvk0/BVQ+8ZMxWyS1PqPxTP8hn5vRTroKo2Ixy7SKl52NM/wAhn5vRTrN4zDuITa1Rqzuf4+W99e6p8/jpa/7a9inT3LwL2BEW9PYu2YWC1D6ddi6iQp7UATaBrlogAAAAAAAAAJNVPAouM9CMkmqngUXGehlpNl5+a14HBxi5FI2SSteBwcYuRSNh15h14306UL2WM7l1XepMKJ76dKF7LGdy6rvUmFtQ/bduOHw40WF5l5EvABfnmoAAAAAAAAAUqHos91FOpQvUt4pUPRZ7qKdShepXUpo670OqwN7zTyryNQGWRw6BjG5TEZZHDoGMblOZPVicKQmkMOj4xcpNlITSGHR8YuUm64m4wAAiQAAAAAAAAAOtpn/a/U4sk1r5mG1yIqKvtRTlUztwk6TjSGFw+k2mrVDKmMlcx6HbJKyyLekBl/QZUuRLmoiJ+ABqotZata1tyAxzeCxfyKZDHN4LF/IplLw/sqdEd5JYHC/KdGdtKTEFsrDa6I1qo25UVTYjJWhVySoj8+o5ZjmHpDgPc5fZcY3zss3/AHL+hLzrp2adMLpURWw03uE+TIaqpuRpljGrUtanHU7mjmqyThou/wC06mBCdHioxu/trwId61Ea1GptIlx9IypVUa0iytVccKmf5DPzeinXwP50P8yHYUz/ACGfm9FOvgfzof5kMw7j5TXx/Q725OBD7cnAgBrVlxmC7YABgAAAAAAAAAEmqngUXGehGSTVTwKLjPQy0my8/Na8Dg4xcikbJJWvA4OMXIpGw68w68b6dKF7LGdy6rvUmFE99OlC9ljO5dV3qTC2oftu3HD4caLC8y8iXgAvzzUAAAAAAAAAKVD0We6inUoXqW8UqHos91FOpQvUrqU0dd6HVYG95p5V5GoDLI4dAxjcpiMsjh0DGNynMnqxOFITSGHR8YuUmykJpDDo+MXKTdcTcYAARIAAAAAAAAAHW019qF0KcaQVP4yH0ncvY1/2mo67hQ+JDhot6Mai8KIfVIiI2o03yqui26z9gA+SG6DHNYLF/KpkC+1Ll2gmYiqVpUR28+Eg+ihf229g+ihf229h9+mK3qDtoj5ngS0eLdpYa3cKndIxibTG9h+jCxtR9GyKJ2lMEpLNl2Lct7l21M4B8VVVWtTdaxGpUhwaZ/kM/N6KddLr/rw/b/Uh3zmtclzmovSh+UhQkW9IbL+g+rYllKjUjSqxIltFP2AD5G6AAAAAAAAAAAACTVTwKLjPQjJJqp4FFxnoZaTZefmteBwcYuRSNkkrXgcHGLkUjYdeYdeN9OlC9ljO5dV3qTCie+nSheyxncuq71JhbUP23bjh8ONFheZeRLwAX55qAAAAAAAAAFKh6LPdRTqUL1LeKVD0We6inUoXqV1KaOu9DqsDe808q8jUBlkcOgYxuUxGWRw6BjG5TmT1YnCkJpDDo+MXKTZSE0hh0fGLlJuuJuMAAIkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASaqeBRcZ6EZJNVPAouM9DLSbLz81rwODjFyKRskla8Dg4xcikbDrzDrxvp0oXssZ3Lqu9SYUT306UL2WM7l1XepMLah+27ccPhxosLzLyJeAC/PNQAAAAAAAAApUPRZ7qKdShepbxSoeiz3UU6lC9SupTR13odVgb3mnlXkagMsjh0DGNymIyyOHQMY3KcyerE4UhNIYdHxi5SbKQmkMOj4xcpN1xNxgABEgAAAAAAAAAAAAAAAAAAAAAAAAAXaAAODTKf6cJfiXIdWu2d9MwkjQXQ9/e6TontVj1a5FRUNmEtbaipnWKkS1rPgAPqaYAAAAAAAAAAAAAAMoSyy+vlN2f1jZS1ERdNCfcyalXr/pzDOBeBU3nbadCqi3qs4rtQ1equwqYoePei/VjQXL9eC/fa5P8A+vPOkldmFe6aqBWOHS1ExVWGtzJmWcv+nMQ7/suThTbR22i/gqou7KzKwlqW4o6Yohs63pIeZ6cfop6IofSMWbV2oavVXYVL0RGRb0RseCq/Xgv32uT13yTl01yOStDz6Ix0NysclSoAAZIgAAAAAAAABSoeiz3UU6lC9S3ilQ9Fnuop1KF6ldSmjrvQ6rA3vNPKvI1AZZHDoGMblMRlkcOgYxuU5k9WJwpCaQw6PjFyk2UhNIYdHxi5SbribjAACJAAAAAAAAAAAAAAAAAAAAAAAAAAAAGCZlocdPrIqO95DOAiqlxFzUclSnUuo6O1yo1WOThvuPmp8zwM7x24Pp0zjW6lCOo1Pmfg7w1Pmfg7x24M9M4x1GEdRqfM/B3hqdM/B3jtwOmcOowjqNT5n4O8NTpn4O8duB0zh1GEdRqfM/B3hqdM/B3jtwOmcOowjqNT5n4O8cyRq9SM5DdEgpCVGrct77jlkmqngUXGehlIrlJNkISqQ2eq9SMnDa+MkK5y3Jc+84mp8zwM7xO614HBxi5FI2YdFchhZGEinaWY1srJUGscOlqJisVi/UmJZ7v9OOz3XJkXbRf1Rb5VRpmHWGrVH01BgvgsnIDYqMet6tv3jz5306UL2WM7l1XupMLeioznqrVuOGwxkIMGHDjNT8SqqLuqJeAC6ODAAAAAAAAAClQ9Fnuop1KF6lvFKh6LPdRTqUL1K6lNHXeh1WBveaeVeRqAyyOHQMY3KYjLI4dAxjcpzJ6sThSE0hh0fGLlJspCaQw6PjFyk3XE3GAAESAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABJqp4FFxnoRkk1U8Ci4z0MtJsvPzWvA4OMXIpGySVrwODjFyKRsOvMOvG+nSheyxncuq71JhRPfTpQvZYzuXVd6kwtqH7btxw+HGiwvMvIl4AL881AAAAAAAAAClQ9Fnuop1KF6lvFKh6LPdRTqUL1K6lNHXeh1WBveaeVeRqAyyOHQMY3KYjLI4dAxjcpzJ6sThSE0hh0fGLlJspCaQw6PjFyk3XE3GAAESAAAAAAAAABwaWixISQ/o3q2+++44P8AFzP95/8Awcumf9v9ThS8P6WK2Hfdpt+42obUsIpUzD39MqIp+2zsyi/zVXpRDkwKSdpkSMxFThTbC0a7+mKn6ocKLDdCiKx6XKhhLDrjDlmIOdTv0c1zUc1UVF9qKhjmXK2XiOatyo1VRTiUREVWvhqvsT2ocqbwSL+VT4q2p1RYNidJCtHUfxUz/ff/AMD+Kmf77/8AgxHOgUf9LBbE+lu0yX3aX/ybDrLbyph9LEWpqmFk7Mt/3Ed+ZDkwaSavsis0v4ptH4iUbET7D2u6fYcKIx0N6seioqbxipjrj7W48G879jmvajmqiou+h9Opo2YWFESE5fqOX2fgp2x8HNqUsYEZIraziUpFiQoLVhvVqq669Dr/AOLm/wC+/wD4ObTODs/N6HWQ26eI1t9163Xn1holnOV829yRakUzfxc3/ff/AMBJuavS+O66/fuOVqX/APP/APj/AMjUtL/5/wD+P/Jm2wdDMf5TsU2kvA2vYDWLZAAAAAAAAAASaqeBRcZ6EZJNVPAouM9DLSbLz81rwODjFyKRskla8Dg4xcikbDrzDrxvp0oXssZ3Lqu9SYUT306UL2WM7l1XepMLah+27ccPhxosLzLyJeAC/PNQAAAAAAAAApUPRZ7qKdShepbxSoeiz3UU6lC9SupTR13odVgb3mnlXkagMsjh0DGNymIyyOHQMY3KcyerE4UhNIYdHxi5SbKQmkMOj4xcpN1xNxgABEgAAAAAAAAAddTP+3+pxJFUbNQ1cqIl+2pyqZ/2v1OvQ2mJWxCmmVsx1U776aCntWKztOonorY0y57Ps7SfiYD9wocSK5EhsVyhkNGZ6zMWYfGRG1HModF+kiLvXXHPm8Fi/kU+SkBsvB0iLeq+1y8Kn2bwWL+RT4K606ssIUNYcKyp0SndyOCQ/wAp0h3clgkL8p9o3ZNKR7f6GY4tIwEiwFeifXb7b/wOUfHpexyLvoa7VVFrQsojEe1UUj34od7KxPpZdj+FPadGvsU7ailvk0/BVQ+8ZMxWyS1PqPxTP8hn5vRTroKo2Ixy7SKl52NM/wAhn5vRTrN4zDuITa1Rqzuf4+W99e6p8/jpa/7a9inT3LwL2BEW9PYu2YWC1D6ddi6iQp7UATaBrlogAAAAAAAAAJNVPAouM9CMkmqngUXGehlpNl5+a14HBxi5FI2SSteBwcYuRSNh15h14306UL2WM7l1XepMKJ76dKF7LGdy6rvUmFtQ/bduOHw40WF5l5EvABfnmoAAAAAAAAAUqHos91FOpQvUt4pUPRZ7qKdShepXUpo670OqwN7zTyryNQGWRw6BjG5TEZZHDoGMblOZPVicKQmkMOj4xcpNlITSGHR8YuUm64m4wAAiQAAAAAAAAAOtpn/a/U4sk1r5mG1yIqKvtRTlUztwk6TjSGFw+k2mrVDKmMlcx6HbJKyyLekBl/QZUuRLmoiJ+ABqotZata1tyAxzeCxfyKZDHN4LF/IplLw/sqdEd5JYHC/KdGdtKTEFsrDa6I1qo25UVTYjJWhVySoj8+o5ZjmHpDgPc5fZcY3zss3/AHL+hLzrp2adMLpURWw03uE+TIaqpuRpljGrUtanHU7mjmqyThou/wC06mBCdHioxu/trwId61Ea1GptIlx9IypVUa0iytVccKmf5DPzeinXwP50P8yHYUz/ACGfm9FOvgfzof5kMw7j5TXx/Q725OBD7cnAgBrVlxmC7YABgAAAAAAAAAEmqngUXGehGSTVTwKLjPQy0my8/Na8Dg4xcikbJJWvA4OMXIpGw68w68b6dKF7LGdy6rvUmFE99OlC9ljO5dV3qTC2oftu3HD4caLC8y8iXgAvzzUAAAAAAAAAKVD0We6inUoXqW8UqHos91FOpQvUrqU0dd6HVYG95p5V5GoDLI4dAxjcpiMsjh0DGNynMnqxOFITSGHR8YuUmykJpDDo+MXKTdcTcYAARIAAAAAAAAAHW019qF0KcaQVP4yH0ncvY1/2mo67hQ+JDhot6Mai8KIfVIiI2o03yqui26z9gA+SG6DHNYLF/KpkC+1Ll2gmYiqVpUR28+Eg+ihf229g+ihf229h9+mK3qDtoj5ngS0eLdpYa3cKndIxibTG9h+jCxtR9GyKJ2lMEpLNl2Lct7l21M4B8VVVWtTdaxGpUhwaZ/kM/N6KddLr/rw/b/Uh3zmtclzmovSh+UhQkW9IbL+g+rYllKjUjSqxIltFP2AD5G6AAAAAAAAAAAACTVTwKLjPQjJJqp4FFxnoZaTZefmteBwcYuRSNkkrXgcHGLkUjYdeYdeN9OlC9ljO5dV3qTCie+nSheyxncuq71JhbUP23bjh8ONFheZeRLwAX55qAAAAAAAAAFKh6LPdRTqUL1LeKVD0We6inUoXqV1KaOu9DqsDe808q8jUBlkcOgYxuUxGWRw6BjG5TmT1YnCkJpDDo+MXKTZSE0hh0fGLlJuuJuMAAIkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASaqeBRcZ6EZJNVPAouM9DLSbLz81rwODjFyKRskla8Dg4xcikbDrzDrxvp0oXssZ3Lqu9SYUT306UL2WM7l1XepMLah+27ccPhxosLzLyJeAC/PNQAAAAAAAAApUPRZ7qKdShepbxSoeiz3UU6lC9SupTR13odVgb3mnlXkagMsjh0DGNymIyyOHQMY3KcyerE4UhNIYdHxi5SbKQmkMOj4xcpN1xNxgABEgAAAAAAAAAAAAAAAAAAAAAAAAAXaAAODTKf6cJfiXIdWu2d9MwkjQXQ9/e6TontVj1a5FRUNmEtbaipnWKkS1rPgAPqaYAAAAAAAAAAAAAAMoSyy+vlN2f1jZS1ERdNCfcyalXr/pzDOBeBU3nbadCqi3qs4rtQ1equwqYoePei/VjQXL9eC/fa5P8A+vPOkldmFe6aqBWOHS1ExVWGtzJmWcv+nMQ7/suThTbR22i/gqou7KzKwlqW4o6Yohs63pIeZ6cfop6IofSMWbV2oavVXYVL0RGRb0RseCq/Xgv32uT13yTl01yOStDz6Ix0NysclSoAAZIgAAAAAAAABSoeiz3UU6lC9S3ilQ9Fnuop1KF6ldSmjrvQ6rA3vNPKvI1AZZHDoGMblMRlkcOgYxuU5k9WJwpCaQw6PjFyk2UhNIYdHxi5SbribjAACJAAAAAAAAAAAAAAAAAAAAAAAAAAAAGCZlocdPrIqO95DOAiqlxFzUclSnUuo6O1yo1WOThvuPmp8zwM7x24Pp0zjW6lCOo1Pmfg7w1Pmfg7x24M9M4x1GEdRqfM/B3hqdM/B3jtwOmcOowjqNT5n4O8NTpn4O8duB0zh1GEdRqfM/B3hqdM/B3jtwOmcOowjqNT5n4O8cyRq9SM5DdEgpCVGrct77jlkmqngUXGehlIrlJNkISqQ2eq9SMnDa+MkK5y3Jc+84mp8zwM7xO614HBxi5FI2YdFchhZGEinaWY1srJUGscOlqJisVi/UmJZ7v9OOz3XJkXbRf1Rb5VRpmHWGrVH01BgvgsnIDYqMet6tv3jz5306UL2WM7l1XupMLeioznqrVuOGwxkIMGHDjNT8SqqLuqJeAC6ODAAAAAAAAAClQ9Fnuop1KF6lvFKh6LPdRTqUL1K6lNHXeh1WBveaeVeRqAyyOHQMY3KYjLI4dAxjcpzJ6sThSE0hh0fGLlJspCaQw6PjFyk3XE3GAAESAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABJqp4FFxnoRkk1U8Ci4z0MtJsvPzWvA4OMXIpGySVrwODjFyKRsOvMOvG+nSheyxncuq71JhRPfTpQvZYzuXVd6kwtqH7btxw+HGiwvMvIl4AL881AAAAAAAAAClQ9Fnuop1KF6lvFKh6LPdRTqUL1K6lNHXeh1WBveaeVeRqAyyOHQMY3KYjLI4dAxjcpzJ6sThSE0hh0fGLlJspCaQw6PjFyk3XE3GAAESAAAAAAAAAAAAAAAAAAAAAAAAAALtAABwaZT/ThL8S5Dq12zvpmEkaC6Hv73SdE9qserXIqKhswlrbUVM6xUiWtZ8AB9TTAAAAAAAAAAAAAABlCWWX18puz+sbKWoiLpoT7mTUq9f9OYZwLwKm87bToVUW9VnFdqGr1V2FTFDx70X6saC5frwX77XJ/gXnnSSuzCvdNVArHDpaiYqrDW5kzLOX/TmId/2XJwpto7bRfwVUXdlZlYS1LcUdMUQ2db0kPM9OP0U9EUPpGLNq7UNXqrsKl6IjIt6I2PBVfrwX77XJ675J66a5HJWh59EY6G5WOSpUVUX2KZAAyZAAAAAAAAAUqHos91FOpQvUt4pUPRZ7qKdShepXUpo670OqwN7zTyryNQGWRw6BjG5TEZZHDoGMblOZPVicKQmkMOj4xcpNlITSGHR8YuUm64m4wAAiQAAAAAAAAAddTP+3+pxJFUbNQ1cqIl+2pyqZ/2v1OvQ2mJWxCmmVsx1U776aCntWKztOonorY0y57Ps7SfiYD9wocSK5EhsVyhkNGZ6zMWYfGRG1HModF+kiLvXXHPm8Fi/kU+SkBsvB0iLeq+1y8Kn2bwWL+RT4K606ssIUNYcKyp0SndyOCQ/wAp0h3clgkL8p9o3ZNKR7f6GY4tIwEiwFeifXb7b/wOUfHpexyLvoa7VVFrQsojEe1UUj34od7KxPpZdj+FPadGvsU7ailvk0/BVQ+8ZMxWyS1PqPxTP8hn5vRTroKo2Ixy7SKl52NM/wAhn5vRTrN4zDuITa1Rqzuf4+W99e6p8/jpa/7a9inT3LwL2BEW9PYu2YWC1D6ddi6iQp7UATaBrlogAAAAAAAAAJNVPAouM9CMkmqngUXGehlpNl5+a14HBxi5FI2SSteBwcYuRSNh15h14306UL2WM7l1XepMKJ76dKF7LGdy6rvUmFtQ/bduOHw40WF5l5EvABfnmoAAAAAAAAAUqHos91FOpQvUt4pUPRZ7qKdShepXUpo670OqwN7zTyryNQGWRw6BjG5TEZZHDoGMblOZPVicKQmkMOj4xcpNlITSGHR8YuUm64m4wAAiQAAAAAAAAAOtpn/a/U4sk1r5mG1yIqKvtRTlUztwk6TjSGFw+k2mrVDKmMlcx6HbJKyyLekBl/QZUuRLmoiJ+ABqotZata1tyAxzeCxfyKZDHN4LF/IplLw/sqdEd5JYHC/KdGdtKTEFsrDa6I1qo25UVTYjJWhVySoj8+o5ZjmHpDgPc5fZcY3zss3/AHL+hLzrp2adMLpURWw03uE+TIaqpuRpljGrUtanHU7mjmqyThou/wC06mBCdHioxu/trwId61Ea1GptIlx9IypVUa0iytVccKmf5DPzeinXwP50P8yHYUz/ACGfm9FOvgfzof5kMw7j5TXx/Q725OBD7cnAgBrVlxmC7YABgAAAAAAAAAEmqngUXGehGSTVTwKLjPQy0my8/Na8Dg4xcikbJJWvA4OMXIpGw68w68b6dKF7LGdy6rvUmFE99OlC9ljO5dV3qTC2oftu3HD4caLC8y8iXgAvzzUAAAAAAAAAKVD0We6inUoXqW8UqHos91FOpQvUrqU0dd6HVYG95p5V5GoDLI4dAxjcpiMsjh0DGNynMnqxOFITSGHR8YuUmykJpDDo+MXKTdcTcYAARIAAAAAAAAAHW019qF0KcaQVP4yH0ncvY1/2mo67hQ+JDhot6Mai8KIfVIiI2o03yqui26z9gA+SG6DHNYLF/KpkC+1Ll2gmYiqVpUR28+Eg+ihf229g+ihf229h9+mK3qDtoj5ngS0eLdpYa3cKndIxibTG9h+jCxtR9GyKJ2lMEpLNl2Lct7l21M4B8VVVWtTdaxGpUhwaZ/kM/N6KddLr/rw/b/Uh3zmtclzmovSh+UhQkW9IbL+g+rYllKjUjSqxIltFP2AD5G6AAAAAAAAAAAACTVTwKLjPQjJJqp4FFxnoZaTZefmteBwcYuRSNkkrXgcHGLkUjYdeYdeN9OlC9ljO5dV3qTCie+nSheyxncuq71JhbUP23bjh8ONFheZeRLwAX55qAAAAAAAAAFKh6LPdRTqUL1LeKVD0We6inUoXqV1KaOu9DqsDe808q8jUBlkcOgYxuUxGWRw6BjG5TmT1YnCkJpDDo+MXKTZSE0hh0fGLlJuuJuMAAIkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASaqeBRcZ6EZJNVPAouM9DLSbLz81rwODjFyKRskla8Dg4xcikbDrzDrxvp0oXssZ3Lqu9SYUT306UL2WM7l1XepMLah+27ccPhxosLzLyJeAC/PNQAAAAAAAAApUPRZ7qKdShepbxSoeiz3UU6lC9SupTR13odVgb3mnlXkagMsjh0DGNymIyyOHQMY3KcyerE4UhNIYdHxi5SbKQmkMOj4xcpN1xNxgABEgAAAAAAAAAAAAAAAAAAAAAAAAAXaAAODTKf6cJfiXIdWu2d9MwkjQXQ9/e6TontVj1a5FRUNmEtbaipnWKkS1rPgAPqaYAAAAAAAAAAAAAAMoSyy+vlN2f1jZS1ERdNCfcyalXr/pzDOBeBU3nbadCqi3qs4rtQ1equwqYoePei/VjQXL9eC/fa5P8A+vPOkldmFe6aqBWOHS1ExVWGtzJmWcv+nMQ7/suThTbR22i/gqou7KzKwlqW4o6Yohs63pIeZ6cfop6IofSMWbV2oavVXYVL0RGRb0RseCq/Xgv32uT13yTl01yOStDz6Ix0NysclSoAAZIgAAAAAAAABSoeiz3UU6lC9S3ilQ9Fnuop1KF6ldSmjrvQ6rA3vNPKvI1AZZHDoGMblMRlkcOgYxuU5k9WJwpCaQw6PjFyk2UhNIYdHxi5SbribjAACJAAAAAAAAAAAAAAAAAAAAAAAAAAAAGCZlocdPrIqO95DOAiqlxFzUclSnUuo6O1yo1WOThvuPmp8zwM7x24Pp0zjW6lCOo1Pmfg7w1Pmfg7x24M9M4x1GEdRqfM/B3hqdM/B3jtwOmcOowjqNT5n4O8NTpn4O8duB0zh1GEdRqfM/B3hqdM/B3jtwOmcOowjqNT5n4O8cyRq9SM5DdEgpCVGrct77jlkmqngUXGehlIrlJNkISqQ2eq9SMnDa+MkK5y3Jc+84mp8zwM7xO614HBxi5FI2YdFchhZGEinaWY1srJUGscOlqJisVi/UmJZ7v9OOz3XJkXbRf1Rb5VRpmHWGrVH01BgvgsnIDYqMet6tv3jz5306UL2WM7l1XupMLeioznqrVuOGwxkIMGHDjNT8SqqLuqJeAC6ODAAAAAAAAAClQ9Fnuop1KF6lvFKh6LPdRTqUL1K6lNHXeh1WBveaeVeRqAyyOHQMY3KYjLI4dAxjcpzJ6sThSE0hh0fGLlJspCaQw6PjFyk3XE3GAAESAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABJqp4FFxnoRkk1U8Ci4z0MtJsvPzWvA4OMXIpGySVrwODjFyKRsOvMOvG+nSheyxncuq71JhRPfTpQvZYzuXVd6kwtqH7btxw+HGiwvMvIl4AL881AAAAAAAAAClQ9Fnuop1KF6lvFKh6LPdRTqUL1K6lNHXeh1WBveaeVeRqAyyOHQMY3KYjLI4dAxjcpzJ6sThSE0hh0fGLlJspCaQw6PjFyk3XE3GAAESAAAAAAAAAAAAAAAAAAAAAAAAAALtAABwaZT/ThL8S5Dq12zvpmEkaC6Hv73SdE9qserXIqKhswlrbUVM6xUiWtZ8AB9TTAAAAAAAAAAAAAABlCWWX18puz+sbKWoiLpoT7mTUq9f9OYZwLwKm87bToVUW9VnFdqGr1V2FTFDx70X6saC5frwX77XJ/gXnnSSuzCvdNVArHDpaiYqrDW5kzLOX/TmId/2XJwpto7bRfwVUXdlZlYS1LcUdMUQ2db0kPM9OP0U9EUPpGLNq7UNXqrsKl6IjIt6I2PBVfrwX77XJ675J66a5HJWh59EY6G5WOSpUVUX2KZAAyZAAAAAAAAAUqHos91FOpQvUt4pUPRZ7qKdShepXUpo670OqwN7zTyryNQGWRw6BjG5TEZZHDoGMblOZPVicKQmkMOj4xcpNlITSGHR8YuUm64m4wAAiQAAAAAAAAAddTP+3+pxJFUbNQ1cqIl+2pyqZ/2v1OvQ2mJWxCmmVsx1U776aCntWKztOonorY0y57Ps7SfiYD9wocSK5EhsVyhkNGZ6zMWYfGRG1HModF+kiLvXXHPm8Fi/kU+SkBsvB0iLeq+1y8Kn2bwWL+RT4K606ssIUNYcKyp0SndyOCQ/wAp0h3clgkL8p9o3ZNKR7f6GY4tIwEiwFeifXb7b/wOUfHpexyLvoa7VVFrQsojEe1UUj34od7KxPpZdj+FPadGvsU7ailvk0/BVQ+8ZMxWyS1PqPxTP8hn5vRTroKo2Ixy7SKl52NM/wAhn5vRTrN4zDuITa1Rqzuf4+W99e6p8/jpa/7a9inT3LwL2BEW9PYu2YWC1D6ddi6iQp7UATaBrlogAAAAAAAAAJNVPAouM9CMkmqngUXGehlpNl5+a14HBxi5FI2SSteBwcYuRSNh15h14306UL2WM7l1XepMKJ76dKF7LGdy6rvUmFtQ/bduOHw40WF5l5EvABfnmoAAAAAAAAAUqHos91FOpQvUt4pUPRZ7qKdShepXUpo670OqwN7zTyryNQGWRw6BjG5TEZZHDoGMblOZPVicKQmkMOj4xcpNlITSGHR8YuUm64m4wAAiQAAAAAAAAAOtpn/a/U4sk1r5mG1yIqKvtRTlUztwk6TjSGFw+k2mrVDKmMlcx6HbJKyyLekBl/QZUuRLmoiJ+ABqotZata1tyAxzeCxfyKZDHN4LF/IplLw/sqdEd5JYHC/KdGdtKTEFsrDa6I1qo25UVTYjJWhVySoj8+o5ZjmHpDgPc5fZcY3zss3/AHL+hLzrp2adMLpURWw03uE+TIaqpuRpljGrUtanHU7mjmqyThou/wC06mBCdHioxu/trwId61Ea1GptIlx9IypVUa0iytVccKmf5DPzeinXwP50P8yHYUz/ACGfm9FOvgfzof5kMw7j5TXx/Q725OBD7cnAgBrVlxmC7YABgAAAAAAAAAEmqngUXGehGSTVTwKLjPQy0my8/Na8Dg4xcikbJJWvA4OMXIpGw68w68b6dKF7LGdy6rvUmFE99OlC9ljO5dV3qTC2oftu3HD4caLC8y8iXgAvzzUAAAAAAAAAKVD0We6inUoXqW8UqHos91FOpQvUrqU0dd6HVYG95p5V5GoDLI4dAxjcpiMsjh0DGNynMnqxOFITSGHR8YuUmykJpDDo+MXKTdcTcYAARIAAAAAAAAAHW019qF0KcaQVP4yH0ncvY1/2mo67hQ+JDhot6Mai8KIfVIiI2o03yqui26z9gA+SG6DHNYLF/KpkC+1Ll2gmYiqVpUR28+Eg+ihf229g+ihf229h9+mK3qDtoj5ngS0eLdpYa3cKndIxibTG9h+jCxtR9GyKJ2lMEpLNl2Lct7l21M4B8VVVWtTdaxGpUhwaZ/kM/N6KddLr/rw/b/Uh3zmtclzmovSh+UhQkW9IbL+g+rYllKjUjSqxIltFP2AD5G6AAAAAAAAAAAACTVTwKLjPQjJJqp4FFxnoZaTZefmteBwcYuRSNkkrXgcHGLkUjYdeYdeN9OlC9ljO5dV3qTCie+nSheyxncuq71JhbUP23bjh8ONFheZeRLwAX55qAAAAAAAAAFKh6LPdRTqUL1LeKVD0We6inUoXqV1KaOu9DqsDe808q8jUBlkcOgYxuUxGWRw6BjG5TmT1YnCkJpDDo+MXKTZSE0hh0fGLlJuuJuMAAIkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASaqeBRcZ6EZJNVPAouM9DLSbLz81rwODjFyKRskla8Dg4xcikbDrzDrxvp0oXssZ3Lqu9SYUT306UL2WM7l1XepMLah+27ccPhxosLzLyJeAC/PNQAAAAAAAAApUPRZ7qKdShepbxSoeiz3UU6lC9SupTR13odVgb3mnlXkagMsjh0DGNymIyyOHQMY3KcyerE4UhNIYdHxi5SbKQmkMOj4xcpN1xNxgABEgAAAAAAAAAAAAAAAAAAAAAAAAAXaAAODTKf6cJfiXIdWu2d9MwkjQXQ9/e6TontVj1a5FRUNmEtbaipnWKkS1rPgAPqaYAAAAAAAAAAAAAAMoSyy+vlN2f1jZS1ERdNCfcyalXr/pzDOBeBU3nbadCqi3qs4rtQ1equwqYoePei/VjQXL9eC/fa5P8A+vPOkldmFe6aqBWOHS1ExVWGtzJmWcv+nMQ7/suThTbR22i/gqou7KzKwlqW4o6Yohs63pIeZ6cfop6IofSMWbV2oavVXYVL0RGRb0RseCq/Xgv32uT13yTl01yOStDz6Ix0NysclSoAAZIgAAAAAAAABSoeiz3UU6lC9S3ilQ9Fnuop1KF6ldSmjrvQ6rA3vNPKvI1AZZHDoGMblMRlkcOgYxuU5k9WJwpCaQw6PjFyk2UhNIYdHxi5SbribjAACJAAAAAAAAAAAAAAAAAAAAAAAAAAAAGCZlocdPrIqO95DOAiqlxFzUclSnUuo6O1yo1WOThvuPmp8zwM7x24Pp0zjW6lCOo1Pmfg7w1Pmfg7x24M9M4x1GEdRqfM/B3hqdM/B3jtwOmcOowjqNT5n4O8NTpn4O8duB0zh1GEdRqfM/B3hqdM/B3jtwOmcOowjqNT5n4O8cyRq9SM5DdEgpCVGrct77jlkmqngUXGehlIrlJNkISqQ2eq9SMnDa+MkK5y3Jc+84mp8zwM7xO614HBxi5FI2YdFchhZGEinaWY1srJUGscOlqJisVi/UmJZ7v9OOz3XJkXbRf1Rb5VRpmHWGrVH01BgvgsnIDYqMet6tv3jz5306UL2WM7l1XupMLeioznqrVuOGwxkIMGHDjNT8SqqLuqJeAC6ODAAAAAAAAAClQ9Fnuop1KF6lvFKh6LPdRTqUL1K6lNHXeh1WBveaeVeRqAyyOHQMY3KYjLI4dAxjcpzJ6sThSE0hh0fGLlJspCaQw6PjFyk3XE3GAAESAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABJqp4FFxnoRkk1U8Ci4z0MtJsvPzWvA4OMXIpGySVrwODjFyKRsOvMOvG+nSheyxncuq71JhRPfTpQvZYzuXVd6kwtqH7btxw+HGiwvMvIl4AL881AAAAAAAAAClQ9Fnuop1KF6lvFKh6LPdRTqUL1K6lNHXeh1WBveaeVeRqAyyOHQMY3KYjLI4dAxjcpzJ6sThSE0hh0fGLlJspCaQw6PjFyk3XE3GAAESAAAAAAAAAAAAAAAAAAAAAAAAAALtAABwaZT/ThL8S5Dq12zvpmEkaC6Hv73SdE9qserXIqKhswlrbUVM6xUiWtZ8AB9TTAAAAAAAAAAAAAABlCWWX18puz+sbKWoiLpoT7mTUq9f9OYZwLwKm87bToVUW9VnFdqGr1V2FTFDx70X6saC5frwX77XJ/gXnnSSuzCvdNVArHDpaiYqrDW5kzLOX/TmId/2XJwpto7bRfwVUXdlZlYS1LcUdMUQ2db0kPM9OP0U9EUPpGLNq7UNXqrsKl6IjIt6I2PBVfrwX77XJ675J66a5HJWh59EY6G5WOSpUVUX2KZAAyZAAAAAAAAAUqHos91FOpQvUt4pUPRZ7qKdShepXUpo670OqwN7zTyryNQGWRw6BjG5TEZZHDoGMblOZPVicKQmkMOj4xcpNlITSGHR8YuUm64m4wAAiQAAAAAAAAAddTP+3+pxJFUbNQ1cqIl+2pyqZ/2v1OvQ2mJWxCmmVsx1U776aCntWKztOonorY0y57Ps7SfiYD9wocSK5EhsVyhkNGZ6zMWYfGRG1HModF+kiLvXXHPm8Fi/kU+SkBsvB0iLeq+1y8Kn2bwWL+RT4K606ssIUNYcKyp0SndyOCQ/wAp0h3clgkL8p9o3ZNKR7f6GY4tIwEiwFeifXb7b/wOUfHpexyLvoa7VVFrQsojEe1UUj34od7KxPpZdj+FPadGvsU7ailvk0/BVQ+8ZMxWyS1PqPxTP8hn5vRTroKo2Ixy7SKl52NM/wAhn5vRTrN4zDuITa1Rqzuf4+W99e6p8/jpa/7a9inT3LwL2BEW9PYu2YWC1D6ddi6iQp7UATaBrlogAAAAAAAAAJNVPAouM9CMkmqngUXGehlpNl5+a14HBxi5FI2SSteBwcYuRSNh15h14306UL2WM7l1XepMKJ76dKF7LGdy6rvUmFtQ/bduOHw40WF5l5EvABfnmoAAAAAAAAAUqHos91FOpQvUt4pUPRZ7qKdShepXUpo670OqwN7zTyryNQGWRw6BjG5TEZZHDoGMblOZPVicKQmkMOj4xcpNlITSGHR8YuUm64m4wAAiQAAAAAAAAAOtpn/a/U4sk1r5mG1yIqKvtRTlUztwk6TjSGFw+k2mrVDKmMlcx6HbJKyyLekBl/QZUuRLmoiJ+ABqotZata1tyAxzeCxfyKZDHN4LF/IplLw/sqdEd5JYHC/KdGdtKTEFsrDa6I1qo25UVTYjJWhVySoj8+o5ZjmHpDgPc5fZcY3zss3/AHL+hLzrp2adMLpURWw03uE+TIaqpuRpljGrUtanHU7mjmqyThou/wC06mBCdHioxu/trwId61Ea1GptIlx9IypVUa0iytVccKmf5DPzeinXwP50P8yHYUz/ACGfm9FOvgfzof5kMw7j5TXx/Q725OBD7cnAgBrVlxmC7YABgAAAAAAAAAEmqngUXGehGSTVTwKLjPQy0my8/Na8Dg4xcikbJJWvA4OMXIpGw68w68b6dKF7LGdy6rvUmFE99OlC9ljO5dV3qTC2oftu3HD4caLC8y8iXgAvzzUAAAAAAAAAKVD0We6inUoXqW8UqHos91FOpQvUrqU0dd6HVYG95p5V5GoDLI4dAxjcpiMsjh0DGNynMnqxOFITSGHR8YuUmykJpDDo+MXKTdcTcYAARIAAAAAAAAAHW019qF0KcaQVP4yH0ncvY1/2mo67hQ+JDhot6Mai8KIfVIiI2o03yqui26z9gA+SG6DHNYLF/KpkC+1Ll2gmYiqVpUR28+Eg+ihf229g+ihf229h9+mK3qDtoj5ngS0eLdpYa3cKndIxibTG9h+jCxtR9GyKJ2lMEpLNl2Lct7l21M4B8VVVWtTdaxGpUhwaZ/kM/N6KddLr/rw/b/Uh3zmtclzmovSh+UhQkW9IbL+g+rYllKjUjSqxIltFP2AD5G6AAAAAAAAAAAACTVTwKLjPQjJJqp4FFxnoZaTZefmteBwcYuRSNkkrXgcHGLkUjYdeYdeN9OlC9ljO5dV3qTCie+nSheyxncuq71JhbUP23bjh8ONFheZeRLwAX55qAAAAAAAAAFKh6LPdRTqUL1LeKVD0We6inUoXqV1KaOu9DqsDe808q8jUBlkcOgYxuUxGWRw6BjG5TmT1YnCkJpDDo+MXKTZSE0hh0fGLlJuuJuMAAIkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASaqeBRcZ6EZJNVPAouM9DLSbLz81rwODjFyKRskla8Dg4xcikbDrzDrxvp0oXssZ3Lqu9SYUT306UL2WM7l1XepMLah+27ccPhxosLzLyJeAC/PNQAAAAAAAAApUPRZ7qKdShepbxSoeiz3UU6lC9SupTR13odVgb3mnlXkagMsjh0DGNymIyyOHQMY3KcyerE4UhNIYdHxi5SbKQmkMOj4xcpN1xNxgABEgAAAAAAAAAAAAAAAAAAAAAAAAAXaAAODTKf6cJfiXIdWu2d9MwkjQXQ9/e6TontVj1a5FRUNmEtbaipnWKkS1rPgAPqaYAAAAAAAAAAAAAAMoSyy+vlN2f1jZS1ERdNCfcyalXr/pzDOBeBU3nbadCqi3qs4rtQ1equwqYoePei/VjQXL9eC/fa5P8A+vPOkldmFe6aqBWOHS1ExVWGtzJmWcv+nMQ7/suThTbR22i/gqou7KzKwlqW4o6Yohs63pIeZ6cfop6IofSMWbV2oavVXYVL0RGRb0RseCq/Xgv32uT13yTl01yOStDz6Ix0NysclSoAAZIgAAAAAAAABSoeiz3UU6lC9S3ilQ9Fnuop1KF6ldSmjrvQ6rA3vNPKvI1AZZHDoGMblMRlkcOgYxuU5k9WJwpCaQw6PjFyk2UhNIYdHxi5SbribjAACJAAAAAAAAAAAAAAAAAAAAAAAAAAAAGCZlocdPrIqO95DOAiqlxFzUclSnUuo6O1yo1WOThvuPmp8zwM7x24Pp0zjW6lCOo1Pmfg7w1Pmfg7x24M9M4x1GEdRqfM/B3hqdM/B3jtwOmcOowjqNT5n4O8NTpn4O8duB0zh1GEdRqfM/B3hqdM/B3jtwOmcOowjqNT5n4O8cyRq9SM5DdEgpCVGrct77jlkmqngUXGehlIrlJNkISqQ2eq9SMnDa+MkK5y3Jc+84mp8zwM7xO614HBxi5FI2YdFchhZGEinaWY1srJUGscOlqJisVi/UmJZ7v9OOz3XJkXbRf1Rb5VRpmHWGrVH01BgvgsnIDYqMet6tv3jz5306UL2WM7l1XupMLeioznqrVuOGwxkIMGHDjNT8SqqLuqJeAC6ODAAAAAAAAAClQ9Fnuop1KF6lvFKh6LPdRTqUL1K6lNHXeh1WBveaeVeRqAyyOHQMY3KYjLI4dAxjcpzJ6sThSE0hh0fGLlJspCaQw6PjFyk3XE3GAAESAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABJqp4FFxnoRkk1U8Ci4z0MtJsvPzWvA4OMXIpGySVrwODjFyKRsOvMOvG+nSheyxncuq71JhRPfTpQvZYzuXVd6kwtqH7btxw+HGiwvMvIl4AL881AAAAAAAAAClQ9Fnuop1KF6lvFKh6LPdRTqUL1K6lNHXeh1WBveaeVeRqAyyOHQMY3KYjLI4dAxjcpzJ6sThSE0hh0fGLlJspCaQw6PjFyk3XE3GAAESAAAAAAAAAAAAAAAAAAAAAAAAAALtAABwaZT/AE4S/EuQ6tds76ZhJGguh7+90nRParHq1yKioehLW2oqZ1ipEtaz4AD6mmAAAAAAAAAAAAAAAZQlll9fKbs/rGylqIi6aE+5k1KvX/TmGcC8CpvO206FVFvVZxXahq9VdhUxQ8e9F+rGguX68F++1yf4F550krswr3TVQKxw6WomKqw1uZMyzl/05iHf9lycKbaO20X8FVF3ZWZWEtS3FHTFENnW9JDzPTj9FPRFD6RizYu1DV6q7CpeiIyLeiNjwVX68F++1yeu+SeumuRyVoefRGOhuVjkqVFVF9imQAMmQAAAAAAAAFKh6LPdRTqUL1LeKVD0We6inUoXqV1KaOu9DqsDe808q8jUBlkcOgYxuUxGWRw6BjG5TmT1YnCkJpDDo+MXKTZSE0hh0fGLlJuuJuMAAIkAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"/>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path d="M6 2.6h7L19 8v12.4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3.6a1 1 0 0 1 1-1Z" fill={hayDocNuevo ? "#b45309" : "#0a5ac8"} fillOpacity="0.14" stroke={hayDocNuevo ? "#b45309" : "#0a5ac8"} strokeWidth="1.4" />
+              <path d="M13 2.6V8h6" stroke={hayDocNuevo ? "#b45309" : "#0a5ac8"} strokeWidth="1.4" strokeLinejoin="round" />
+              <path d="M8.4 13h7.2M8.4 16.4h5" stroke={hayDocNuevo ? "#b45309" : "#0a5ac8"} strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
             {hayDocNuevo && (
-              <span style={{ position: "absolute", top: -3, right: -3, width: 11, height: 11, borderRadius: "50%", background: C.gold, border: "2px solid white", boxShadow: `0 0 0 0 ${C.gold}aa`, animation: "pulseGold 1.6s infinite" }} />
+              <span style={{ position: "absolute", top: -3, right: -3, width: 10, height: 10, borderRadius: "50%", background: C.gold, border: "2px solid white", animation: "pulseGold 1.8s infinite" }} />
             )}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 11, color: hayDocNuevo ? "#92400e" : C.gray, marginBottom: 2, fontWeight: hayDocNuevo ? 700 : 400 }}>
-              Descargas Misas
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}>
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: hayDocNuevo ? "#b45309" : C.gray, letterSpacing: "0.04em", textTransform: "uppercase" }}>Descargas Misas</span>
+              {hayDocNuevo && (
+                <span style={{ fontSize: 9, fontWeight: 800, color: "#b45309", background: C.gold + "26", borderRadius: 20, padding: "1.5px 7px", letterSpacing: "0.05em", textTransform: "uppercase", flexShrink: 0 }}>Nuevo</span>
+              )}
             </div>
             {hayDocNuevo ? (
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#1c1c1e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#1c1c1e", lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                 {docNuevo.nombre}
               </div>
             ) : (
               <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>
-                {docs.length} archivos
+                {docs.length} {docs.length === 1 ? "archivo" : "archivos"}
               </div>
             )}
           </div>
-          <style>{`@keyframes pulseGold { 0% { box-shadow: 0 0 0 0 ${C.gold}88; } 70% { box-shadow: 0 0 0 7px ${C.gold}00; } 100% { box-shadow: 0 0 0 0 ${C.gold}00; } }`}</style>
+          <span style={{ fontSize: 17, color: hayDocNuevo ? C.gold : "#c7c7cc", flexShrink: 0, fontWeight: 300 }}>›</span>
+          <style>{`@keyframes pulseGold { 0% { box-shadow: 0 0 0 0 ${C.gold}77; } 70% { box-shadow: 0 0 0 6px ${C.gold}00; } 100% { box-shadow: 0 0 0 0 ${C.gold}00; } }`}</style>
         </Card>
       </div>
 
@@ -6466,14 +6624,25 @@ function Dashboard({
       {/* ── Reconocimientos destacado ── */}
       <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} user={user} />
 
-      {/* ── Widget cumpleaños del DÍA (solo aparece ese día) ── */}
-      {cumple.length > 0 && <CumpleanosHoyWidget cumple={cumple} />}
+      {/* ── Hoy: santoral + cumpleaños (sobre el video destacado) ── */}
+      {santoral && (
+        <div style={{ display: "flex", alignItems: "center", gap: 13, background: "linear-gradient(180deg,#fffdf6,#fdf4df)", border: `1px solid ${C.gold}40`, borderRadius: 16, padding: "13px 16px", marginBottom: 14 }}>
+          <div style={{ width: 42, height: 42, borderRadius: 13, flexShrink: 0, background: `linear-gradient(135deg,${C.gold},#caa017)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, boxShadow: `0 5px 14px ${C.gold}44` }}>✨</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#a9780a", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 1 }}>Santoral de hoy</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#5b4708", letterSpacing: "-0.01em", lineHeight: 1.3 }}>{santoral}</div>
+          </div>
+        </div>
+      )}
 
-      {/* ── Video destacado (se reordena solo si no hay cumpleañeros hoy) ── */}
-      <VideoDestacadoWidget isAdmin={isAdmin} />
+      {/* ── Cumpleaños del día (solo aparece ese día) ── */}
+      {cumple.length > 0 && <CumpleanosHoyWidget cumple={cumple} />}
 
       {/* ── Próximos cumpleaños del mes ── */}
       <ProximosCumpleanosWidget members={members} setSection={setSection} />
+
+      {/* ── Video destacado ── */}
+      <VideoDestacadoWidget isAdmin={isAdmin} />
 
       <div
         className="grid-dash-main"
@@ -6610,105 +6779,24 @@ function Dashboard({
         <GaleriaWidget fotos={fotos} setSection={setSection} isAdmin={isAdmin} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <Card style={{ flex: 1 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 10,
-              }}
-            >
-              <span style={{ fontSize: 18 }}>✨</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>
-                Santoral del Día
-              </span>
+          <Card style={{ flex: 1, overflow: "hidden", padding: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "13px 15px 10px" }}>
+              <div style={{ width: 30, height: 30, borderRadius: 9, background: "#1DB954", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm4.59 14.42a.62.62 0 0 1-.86.21c-2.35-1.44-5.3-1.76-8.79-.96a.62.62 0 1 1-.28-1.21c3.81-.87 7.08-.5 9.71 1.11.3.18.39.57.22.85Zm1.23-2.73a.78.78 0 0 1-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.17a.78.78 0 1 1-.45-1.49c3.63-1.1 8.15-.56 11.23 1.33.37.22.49.71.26 1.07Zm.11-2.85C14.81 8.94 9.4 8.76 6.3 9.7a.93.93 0 1 1-.54-1.78c3.56-1.08 9.53-.87 13.29 1.36a.93.93 0 0 1-.96 1.6Z"/></svg>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.dark }}>Playlist Coro MJ</div>
+                <div style={{ fontSize: 11, color: C.gray }}>Reproduce aquí mismo</div>
+              </div>
             </div>
-            {loading ? (
-              <Spinner />
-            ) : santoral ? (
-              <div
-                style={{
-                  background: `linear-gradient(135deg,${C.goldLight},#fef9e7)`,
-                  borderRadius: 12,
-                  padding: "12px 14px",
-                  border: `1px solid ${C.gold}30`,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: C.gold,
-                    fontWeight: 700,
-                    letterSpacing: "0.05em",
-                    marginBottom: 4,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Hoy celebramos
-                </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    color: "var(--text-secondary)",
-                    lineHeight: 1.6,
-                    fontWeight: 500,
-                  }}
-                >
-                  ⭐ {santoral}
-                </div>
-              </div>
-            ) : (
-              <div style={{ fontSize: 13, color: C.gray, fontStyle: "italic" }}>
-                Cargando santoral...
-              </div>
-            )}
-          </Card>
-          <Card style={{ flex: 1 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 10,
-              }}
-            >
-              <span>🎵</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>
-                Playlist
-              </span>
-            </div>
-            <a
-              href="https://open.spotify.com/playlist/3ssNSNlljyYlw2La83mXZE"
-              target="_blank"
-              rel="noopener"
-              style={{ display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <div
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  background: "#1DB954",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "white",
-                  fontSize: 16,
-                  flexShrink: 0,
-                }}
-              >
-                ▶
-              </div>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: C.dark }}>
-                  Playlist Coro MJ
-                </div>
-                <div style={{ fontSize: 11, color: C.gray }}>
-                  Abrir en Spotify
-                </div>
-              </div>
-            </a>
+            <iframe
+              title="Spotify Coro MJ"
+              src="https://open.spotify.com/embed/playlist/3ssNSNlljyYlw2La83mXZE?utm_source=generator&theme=0"
+              width="100%" height="352" frameBorder="0"
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              loading="lazy"
+              style={{ display: "block", border: 0 }}
+            />
           </Card>
           <Card style={{ flex: 1 }}>
             <YoutubeWidget compact />
