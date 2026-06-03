@@ -5091,11 +5091,11 @@ function ProyectorLetraEnsayo({ docs, cantoNombre, accent }) {
   }
 
   async function extraer() {
-    const fid = fileIdDe(sel && sel.url);
-    if (!fid) { setErrExtrae(true); return; }
+    const url = sel && sel.url;
+    if (!url) { setErrExtrae(true); return; }
     setExtrayendo(true); setErrExtrae(false);
     const PROMPT = `Eres un experto en música litúrgica católica latinoamericana.
-Esta es una imagen de una partitura/canción. Extrae la letra completa y los acordes, y formatea en el estilo de lacuerda.net.
+Esto es una partitura/cancionero. Extrae la letra completa y los acordes, y formatea en el estilo de lacuerda.net.
 
 REGLAS ESTRICTAS:
 - Los acordes van en la línea ENCIMA de la sílaba correspondiente, usando espacios para alinear.
@@ -5104,18 +5104,28 @@ REGLAS ESTRICTAS:
 - Si los acordes aparecen en español (DO, RE, MI, FA, SOL, LA, SI), conviértelos: SOL=G, RE=D, MIm=Em, LAm=Am, SIm=Bm, DO=C, FA=F, SOL7=G7, RE7=D7.
 - Devuelve ÚNICAMENTE el texto formateado, sin explicaciones, sin markdown, sin comillas.`;
     try {
-      const imageUrl = `https://drive.google.com/thumbnail?id=${fid}&sz=w1600`;
+      const fid = fileIdDe(url);
+      const esDrive = /(?:drive|docs)\.google\.com/i.test(url);
+      let content;
+      if (esDrive && fid) {
+        content = [
+          { type: "image", source: { type: "url", url: `https://drive.google.com/thumbnail?id=${fid}&sz=w1600` } },
+          { type: "text", text: PROMPT },
+        ];
+      } else {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error("fetch");
+        const blob = await resp.blob();
+        const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(blob); });
+        const esPdf = (blob.type || "").includes("pdf") || /\.pdf(\?|$)/i.test(url);
+        content = esPdf
+          ? [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } }, { type: "text", text: PROMPT }]
+          : [{ type: "image", source: { type: "base64", media_type: blob.type || "image/png", data: b64 } }, { type: "text", text: PROMPT }];
+      }
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 4000,
-          messages: [{ role: "user", content: [
-            { type: "image", source: { type: "url", url: imageUrl } },
-            { type: "text", text: PROMPT },
-          ] }],
-        }),
+        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 4000, messages: [{ role: "user", content }] }),
       });
       if (!response.ok) throw new Error("api");
       const data = await response.json();
@@ -5160,14 +5170,23 @@ REGLAS ESTRICTAS:
         </div>
         <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
           <button onClick={() => setTab("pdf")} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 9, cursor: "pointer", border: `1.5px solid ${tab === "pdf" ? ac : "rgba(60,60,67,0.18)"}`, background: tab === "pdf" ? `${ac}12` : "white", color: tab === "pdf" ? ac : "#8a8a90", fontWeight: tab === "pdf" ? 700 : 500 }}>📄 PDF original</button>
-          <button onClick={() => setTab("acordes")} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 9, cursor: "pointer", border: `1.5px solid ${tab === "acordes" ? ac : "rgba(60,60,67,0.18)"}`, background: tab === "acordes" ? `${ac}12` : "white", color: tab === "acordes" ? ac : "#8a8a90", fontWeight: tab === "acordes" ? 700 : 500 }}>🎵 Letra y acordes</button>
+          <button onClick={() => setTab("acordes")} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 9, cursor: "pointer", border: `1.5px solid ${tab === "acordes" ? ac : "rgba(60,60,67,0.18)"}`, background: tab === "acordes" ? `${ac}12` : "white", color: tab === "acordes" ? ac : "#8a8a90", fontWeight: tab === "acordes" ? 700 : 500 }}>🎵 Acordes · cambiar tono</button>
           <a href={sel.url} target="_blank" rel="noopener noreferrer" style={{ marginLeft: "auto", fontSize: 11, color: ac, textDecoration: "none", fontWeight: 600, alignSelf: "center" }}>Pantalla completa ↗</a>
         </div>
       </div>
 
       {tab === "pdf" ? (
-        <div style={{ background: "#1c1c22" }}>
-          <iframe key={sel.id} title="Letra / partitura" src={previewSrc} style={{ width: "100%", height: 460, border: 0, display: "block" }} allow="autoplay" />
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 14px", background: `${ac}0a`, borderBottom: `1px solid ${ac}1f`, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11.5, color: "#5a5a60" }}>¿Quieres subir o bajar el tono? Pásate a los acordes editables.</span>
+            <button onClick={() => { setTab("acordes"); if (!texto && !extrayendo) extraer(); }}
+              style={{ fontSize: 12, fontWeight: 700, color: "white", background: ac, border: "none", borderRadius: 9, padding: "7px 13px", cursor: "pointer" }}>
+              🎵 Cambiar tono
+            </button>
+          </div>
+          <div style={{ background: "#1c1c22" }}>
+            <iframe key={sel.id} title="Letra / partitura" src={previewSrc} style={{ width: "100%", height: 460, border: 0, display: "block" }} allow="autoplay" />
+          </div>
         </div>
       ) : (
         <div style={{ padding: "14px 16px" }}>
@@ -5232,6 +5251,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
   const [cantoSel, setCantoSel] = useState(null);
   const [trackId, setTrackId] = useState(null);
   const [proyAbierto, setProyAbierto] = useState(true);
+  const [verOtras, setVerOtras] = useState(false);
   const [progreso, setProgreso] = useState(() => { try { return JSON.parse(localStorage.getItem("me_progreso") || "{}"); } catch { return {}; } });
 
   useEffect(() => { try { if (miCuerda) localStorage.setItem("me_mi_cuerda", miCuerda); } catch {} }, [miCuerda]);
@@ -5280,6 +5300,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
   function abrirCanto(c) {
     setCantoSel(c.key);
     setProyAbierto(true);
+    setVerOtras(false);
     const aud = audiosDe(c);
     let pick = aud.find((a) => a.voz && a.voz.id === miCuerda) || aud.find((a) => !a.voz) || aud[0];
     setTrackId(pick ? pick.doc.id : null);
@@ -5461,30 +5482,42 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                 </div>
               );
             }
-            const track = aud.find((a) => a.doc.id === trackId) || aud[0];
+            const track = aud.find((a) => a.doc.id === trackId) || aud.find((a) => a.voz && a.voz.id === miCuerda) || aud.find((a) => !a.voz) || aud[0];
             const trackAccent = track.voz ? track.voz.color : C.primary;
+            const vozLabel = track.voz ? track.voz.id : "Mezcla (todas)";
+            const vozEmoji = track.voz ? track.voz.emoji : "🎚";
+            const esMiVoz = track.voz && track.voz.id === miCuerda;
+            const otras = aud.filter((a) => a.doc.id !== track.doc.id);
             return (
               <div style={{ background: "white", borderRadius: 16, border: "1px solid rgba(60,60,67,0.1)", padding: "14px 16px", marginBottom: 12 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 800, color: "#1c1c1e", marginBottom: 4 }}>🎧 Pistas por voz</div>
-                <div style={{ fontSize: 10.5, color: "#b0b0b5", marginBottom: 9 }}>
-                  Tu cuerda viene seleccionada; toca otra voz para acompañarte con ella.
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "#b0b0b5", letterSpacing: "0.06em", textTransform: "uppercase" }}>Escuchando</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: trackAccent, letterSpacing: "-0.01em", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span>{vozEmoji}</span> {vozLabel}{esMiVoz ? <span style={{ fontSize: 11, fontWeight: 700, color: "#8a8a90" }}>· tu voz</span> : null}
+                    </div>
+                  </div>
+                  {otras.length > 0 && (
+                    <button onClick={() => setVerOtras((o) => !o)}
+                      style={{ fontSize: 12, fontWeight: 700, color: C.primary, background: verOtras ? `${C.primary}12` : "white", border: `1px solid ${verOtras ? C.primary + "44" : "rgba(60,60,67,0.18)"}`, borderRadius: 10, padding: "7px 12px", cursor: "pointer" }}>
+                      {verOtras ? "Ocultar voces ▴" : "🎧 Escuchar otra voz ▾"}
+                    </button>
+                  )}
                 </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {aud.map((a) => {
-                    const on = track.doc.id === a.doc.id;
-                    const v = a.voz;
-                    const label = v ? (v.id + (v.id === miCuerda ? " (tú)" : "")) : "Mezcla (todas)";
-                    const col = v ? v.color : C.primary;
-                    const lt = v ? v.light : C.primaryLight;
-                    const dk = v ? v.dark : C.primaryDark;
-                    return (
-                      <button key={a.doc.id} onClick={() => setTrackId(a.doc.id)}
-                        style={{ fontSize: 11.5, padding: "6px 11px", borderRadius: 9, cursor: "pointer", border: `1.5px solid ${on ? col : "rgba(60,60,67,0.18)"}`, background: on ? lt : "white", color: on ? dk : "#8a8a90", fontWeight: on ? 700 : 500 }}>
-                        {(v ? v.emoji + " " : "🎚 ") + label}
-                      </button>
-                    );
-                  })}
-                </div>
+                {verOtras && otras.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(60,60,67,0.08)" }}>
+                    {otras.map((a) => {
+                      const v = a.voz;
+                      const label = v ? (v.id + (v.id === miCuerda ? " (tú)" : "")) : "Mezcla (todas)";
+                      return (
+                        <button key={a.doc.id} onClick={() => { setTrackId(a.doc.id); setVerOtras(false); }}
+                          style={{ fontSize: 11.5, padding: "6px 11px", borderRadius: 9, cursor: "pointer", border: "1.5px solid rgba(60,60,67,0.18)", background: "white", color: "#5a5a60", fontWeight: 600 }}>
+                          {(v ? v.emoji + " " : "🎚 ") + label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
                 <ReproductorPista doc={track.doc} accent={trackAccent} onFirstPlay={() => setProyAbierto(true)} />
                 <div style={{ marginTop: 8, textAlign: "right" }}>
                   <a href={urlDoc(track.doc)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: C.primary, textDecoration: "none", fontWeight: 600 }}>↓ Descargar esta pista</a>
