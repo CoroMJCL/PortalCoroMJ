@@ -3760,7 +3760,7 @@ function VideoDestacadoWidget({ isAdmin }) {
 
       {/* Player */}
       {videoId ? (
-        <div style={{ position:"relative", paddingTop:"56.25%", background:"#000" }}>
+        <div style={{ position:"relative", paddingTop:"56.25%", maxWidth:500, margin:"0 auto", background:"#000", borderRadius:12, overflow:"hidden" }}>
           <iframe
             key={videoId}
             src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`}
@@ -5322,14 +5322,15 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
     setTrackId(pick ? pick.doc.id : null);
   }
 
-  // Al cambiar de cuerda con un canto abierto, seleccionar la pista de esa cuerda
+  // Al cambiar de cuerda con un canto abierto, re-seleccionar SIEMPRE la pista
   useEffect(() => {
     if (!cantoSel) return;
     const c = cantos.find((x) => x.key === cantoSel);
     if (!c) return;
     const aud = audiosDe(c);
-    const mine = aud.find((a) => a.voz && a.voz.id === miCuerda);
-    if (mine) setTrackId(mine.doc.id);
+    const pick = aud.find((a) => a.voz && a.voz.id === miCuerda) || aud.find((a) => !a.voz) || aud[0];
+    setTrackId(pick ? pick.doc.id : null);
+    setVerOtras(false);
   }, [miCuerda]);
 
   const ESTADOS = [
@@ -6943,25 +6944,28 @@ function Dashboard({
       {/* ── Valores del coro ── */}
       <ValoresWidget />
 
-      {/* ── Reconocimientos destacado ── */}
-      <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} user={user} />
-
-      {/* ── Hoy: santoral + cumpleaños (sobre el video destacado) ── */}
-      {santoral && (
-        <div style={{ display: "flex", alignItems: "center", gap: 13, background: "linear-gradient(180deg,#fffdf6,#fdf4df)", border: `1px solid ${C.gold}40`, borderRadius: 16, padding: "13px 16px", marginBottom: 14 }}>
-          <div style={{ width: 42, height: 42, borderRadius: 13, flexShrink: 0, background: `linear-gradient(135deg,${C.gold},#caa017)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, boxShadow: `0 5px 14px ${C.gold}44` }}>✨</div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#a9780a", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 1 }}>Santoral de hoy</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#5b4708", letterSpacing: "-0.01em", lineHeight: 1.3 }}>{santoral}</div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Cumpleaños del día (solo aparece ese día) ── */}
+      {/* ── Cumpleañeros de hoy (solo ese día) ── */}
       {cumple.length > 0 && <CumpleanosHoyWidget cumple={cumple} />}
 
-      {/* ── Próximos cumpleaños del mes ── */}
-      <ProximosCumpleanosWidget members={members} setSection={setSection} />
+      {/* ── Fila: Santoral | Próximos cumpleaños ── */}
+      <div className="grid-dash-main" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14, alignItems: "start" }}>
+        {santoral ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, background: "linear-gradient(180deg,#fffdf6,#fdf4df)", border: `1px solid ${C.gold}40`, borderRadius: 16, padding: "13px 15px" }}>
+            <div style={{ width: 38, height: 38, borderRadius: 12, flexShrink: 0, background: `linear-gradient(135deg,${C.gold},#caa017)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>✨</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 9.5, fontWeight: 800, color: "#a9780a", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 1 }}>Santoral de hoy</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#5b4708", lineHeight: 1.25 }}>{santoral}</div>
+            </div>
+          </div>
+        ) : <div />}
+        <ProximosCumpleanosWidget members={members} setSection={setSection} />
+      </div>
+
+      {/* ── Fila: Galería | Reconocimientos ── */}
+      <div className="grid-dash-main" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14, alignItems: "start" }}>
+        <GaleriaWidget fotos={fotos} setSection={setSection} isAdmin={isAdmin} />
+        <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} user={user} />
+      </div>
 
       {/* ── Video destacado ── */}
       <VideoDestacadoWidget isAdmin={isAdmin} />
@@ -7098,7 +7102,6 @@ function Dashboard({
           </Card>
         )}
         <VocalizacionWidget isAdmin={isAdmin} />
-        <GaleriaWidget fotos={fotos} setSection={setSection} isAdmin={isAdmin} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <Card style={{ flex: 1, overflow: "hidden", padding: 0 }}>
@@ -7137,18 +7140,14 @@ function Dashboard({
         }}
       >
         <Card>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 12,
-            }}
-          >
-            <span>📅</span>
-            <span style={{ fontSize: 14, fontWeight: 600, color: C.dark }}>
-              Agenda Coro
-            </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(10,90,200,0.10)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0a5ac8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></svg>
+            </div>
+            <div>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.01em" }}>Agenda del Coro</div>
+              <div style={{ fontSize: 11, color: C.gray }}>Próximos ensayos y misas</div>
+            </div>
           </div>
           <div
             style={{
@@ -7192,8 +7191,10 @@ function Dashboard({
               marginBottom: 12,
             }}
           >
-            <span>📰</span>
-            <span style={{ fontSize: 14, fontWeight: 600, color: C.dark }}>
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(185,28,28,0.10)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h13v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5Z" /><path d="M17 8.5h2.5A1.5 1.5 0 0 1 21 10v8a1 1 0 0 1-1 1" /><path d="M7 9h7M7 12.5h7M7 16h4" /></svg>
+            </div>
+            <span style={{ fontSize: 14.5, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.01em" }}>
               Noticias Católicas
             </span>
             {noticiasLoading && noticias.length > 0 && (
@@ -16845,7 +16846,8 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
 
   const eventosOrdenados = [...gcalEventos].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
-  // Al cambiar evento, recargar asistencia fresca desde Supabase antes de inicializar registros
+  // Al cambiar de EVENTO, inicializar registros (no en cada refresco de integrantes,
+  // para no borrar lo que se está ingresando sin guardar)
   useEffect(() => {
     if (!eventoId) return;
     setSaved(false);
@@ -16861,7 +16863,7 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
       });
       setRegistros(init);
     });
-  }, [eventoId, members]);
+  }, [eventoId]);
 
   const marcarTodos = (estado) => {
     const nuevo = {};
