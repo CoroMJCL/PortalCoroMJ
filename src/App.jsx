@@ -3815,7 +3815,7 @@ function VocalizacionWidget({ isAdmin }) {
     // Notificación push al cambiar video de vocalización
     if (esNuevo) {
       sendPushToAll(
-        "🎤 Nueva Vocalización",
+        "🙏 Nueva Oración",
         "El encargado publicó un nuevo video de vocalización para el ensayo",
         "/"
       );
@@ -3825,11 +3825,11 @@ function VocalizacionWidget({ isAdmin }) {
   return (
     <div style={{ background:"white", borderRadius:14, overflow:"hidden", border:"1px solid rgba(60,60,67,0.1)", boxShadow:"0 1px 6px rgba(0,0,0,0.05)", marginBottom:14 }}>
       <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", borderBottom: videoId ? "1px solid rgba(60,60,67,0.08)" : "none" }}>
-        <div style={{ width:30, height:30, background:"linear-gradient(145deg,#152d4a,#1e6ab0)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-          <svg width="11" height="13" viewBox="0 0 11 13" fill="none"><rect x="3" y="0" width="5" height="8" rx="2.5" fill="white"/><path d="M1 7c0 2.5 9 2.5 9 0" stroke="white" strokeWidth="1.2" strokeLinecap="round" fill="none"/><line x1="5.5" y1="10" x2="5.5" y2="13" stroke="white" strokeWidth="1.2" strokeLinecap="round"/></svg>
+        <div style={{ width:30, height:30, background:"linear-gradient(145deg,#152d4a,#1e6ab0)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, fontSize:15 }}>
+          🙏
         </div>
         <div style={{ flex:1 }}>
-          <div style={{ fontSize:13, fontWeight:600, color:"#1c1c1e", letterSpacing:"-0.016em" }}>Vocalización</div>
+          <div style={{ fontSize:13, fontWeight:600, color:"#1c1c1e", letterSpacing:"-0.016em" }}>Oraciones</div>
           <div style={{ fontSize:11, color:"#8e8e93" }}>{videoId ? "YouTube" : "Sin video asignado"}</div>
         </div>
         {isAdmin && (
@@ -3852,7 +3852,7 @@ function VocalizacionWidget({ isAdmin }) {
       )}
       {videoId ? (
         <div style={{ position:"relative", paddingTop:"56.25%", background:"#000" }}>
-          <iframe key={videoId} src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`} style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none" }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="Vocalización" />
+          <iframe key={videoId} src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`} style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none" }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="Oraciones" />
         </div>
       ) : isAdmin ? (
         <div style={{ padding:"32px 20px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:6, background:"rgba(242,242,247,0.5)" }}>
@@ -5625,51 +5625,160 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
   );
 }
 
-function PartiturasEnsayo({ docs }) {
-  const parts = (docs || []).filter((d) => tipoDocEnsayo(d) === "partitura");
-  const [selId, setSelId] = useState(parts[0] ? parts[0].id : null);
-  const AZUL = "#0a5ac8";
 
-  if (parts.length === 0) {
+function VocesPlayer({ voces, partituraUrl }) {
+  const refs = useRef({});
+  const [playing, setPlaying] = useState(false);
+  const [solo, setSolo] = useState(null);
+  const [muted, setMuted] = useState({});
+  const [cur, setCur] = useState(0);
+  const [dur, setDur] = useState(0);
+  const AZUL = "#0a5ac8";
+  const masterId = voces[0] && voces[0].id;
+
+  const eff = (id) => (solo ? id !== solo : !!muted[id]);
+  useEffect(() => { voces.forEach((v) => { const a = refs.current[v.id]; if (a) a.muted = eff(v.id); }); });
+
+  function toggle() {
+    const t = refs.current[masterId] ? refs.current[masterId].currentTime : 0;
+    if (playing) { voces.forEach((v) => { const a = refs.current[v.id]; if (a) a.pause(); }); setPlaying(false); }
+    else { voces.forEach((v) => { const a = refs.current[v.id]; if (a) { try { a.currentTime = t; } catch (e) {} a.play().catch(() => {}); } }); setPlaying(true); }
+  }
+  function restart() { voces.forEach((v) => { const a = refs.current[v.id]; if (a) { try { a.currentTime = 0; } catch (e) {} } }); setCur(0); }
+  function seek(t) { voces.forEach((v) => { const a = refs.current[v.id]; if (a) { try { a.currentTime = t; } catch (e) {} } }); setCur(t); }
+  const fmt = (s) => { s = Math.floor(s || 0); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+
+  return (
+    <div>
+      {voces.map((v) => (
+        <audio key={v.id} ref={(el) => (refs.current[v.id] = el)} src={v.src} preload="metadata"
+          onTimeUpdate={v.id === masterId ? (e) => setCur(e.target.currentTime) : undefined}
+          onLoadedMetadata={v.id === masterId ? (e) => setDur(e.target.duration) : undefined}
+          onEnded={v.id === masterId ? () => setPlaying(false) : undefined} />
+      ))}
+
+      {partituraUrl && (
+        <div style={{ background: "#1c1c22", borderRadius: 12, overflow: "hidden", marginBottom: 14 }}>
+          <iframe title="Partitura" src={drivePreviewUrl(partituraUrl) || partituraUrl} style={{ width: "100%", height: 460, border: 0, display: "block" }} />
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18, marginBottom: 10 }}>
+        <button onClick={restart} title="Reiniciar" style={{ width: 44, height: 44, borderRadius: "50%", border: "none", background: "#eef1f6", color: "#444", fontSize: 18, cursor: "pointer" }}>↺</button>
+        <button onClick={toggle} title="Reproducir" style={{ width: 56, height: 56, borderRadius: "50%", border: "none", background: "#1c1c1e", color: "white", fontSize: 22, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>{playing ? "❚❚" : "▶"}</button>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <span style={{ fontSize: 11, color: "#8a8a90", fontVariantNumeric: "tabular-nums", minWidth: 34 }}>{fmt(cur)}</span>
+        <input type="range" min={0} max={dur || 0} step="0.1" value={cur} onChange={(e) => seek(parseFloat(e.target.value))} style={{ flex: 1, accentColor: AZUL }} />
+        <span style={{ fontSize: 11, color: "#8a8a90", fontVariantNumeric: "tabular-nums", minWidth: 34 }}>{fmt(dur)}</span>
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+        {voces.map((v) => {
+          const isSolo = solo === v.id;
+          const isMute = muted[v.id];
+          return (
+            <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid rgba(60,60,67,0.15)", borderRadius: 12, padding: "7px 10px", background: "white" }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1c1c1e", minWidth: 56 }}>{v.label}</span>
+              <button onClick={() => setMuted((m) => ({ ...m, [v.id]: !m[v.id] }))} title="Silenciar"
+                style={{ width: 30, height: 30, borderRadius: "50%", border: "none", cursor: "pointer", background: isMute && !solo ? "#e5e7eb" : "#dff0e6", color: isMute && !solo ? "#9aa" : "#15803d", fontSize: 13 }}>{isMute && !solo ? "🔇" : "🔊"}</button>
+              <button onClick={() => setSolo((s) => (s === v.id ? null : v.id))} title="Solo"
+                style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.04em", borderRadius: 8, padding: "6px 9px", cursor: "pointer", border: `1.5px solid ${isSolo ? AZUL : "rgba(60,60,67,0.2)"}`, background: isSolo ? AZUL : "white", color: isSolo ? "white" : "#8a8a90" }}>SOLO</button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CantoHub({ nombre, rows }) {
+  const [open, setOpen] = useState(false);
+  const DARK = "#33333a";
+  const AZUL = "#0a5ac8";
+  const ficha = {};
+  rows.forEach((r) => { ["autor", "youtube", "spotify", "material_url"].forEach((k) => { if (!ficha[k] && r[k]) ficha[k] = r[k]; }); });
+  const partitura = rows.find((r) => tipoDocEnsayo(r) === "partitura");
+  const letra = rows.find((r) => tipoDocEnsayo(r) === "letra") || rows.find((r) => r.letra_texto);
+  const esGoogle = (u) => /drive\.google|docs\.google/.test(u || "");
+  const voces = rows
+    .filter((r) => tipoDocEnsayo(r) === "audio" && r.url && !esGoogle(r.url))
+    .map((r) => ({ id: r.id, label: vozDocEnsayo(r) || "Voz", src: audioSrcEnsayo(r.url) }));
+
+  const btnFill = { display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 700, letterSpacing: "0.02em", borderRadius: 10, padding: "10px 15px", border: "none", textDecoration: "none", textTransform: "uppercase", cursor: "pointer" };
+  const btnOut = { ...btnFill, background: "white", color: "#1c1c1e", border: "1.5px solid rgba(60,60,67,0.22)" };
+  const dis = { opacity: 0.4, pointerEvents: "none" };
+
+  return (
+    <div style={{ border: "1px solid rgba(60,60,67,0.16)", borderRadius: 16, padding: "18px 20px", marginBottom: 14, background: "white" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 23, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.01em", lineHeight: 1.15 }}>{nombre}</div>
+          {ficha.autor && <div style={{ fontSize: 13, color: "#6a6a70", marginTop: 4 }}><strong style={{ color: "#3a3a40" }}>Autor:</strong> {ficha.autor}</div>}
+        </div>
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          {ficha.youtube && (
+            <a href={ficha.youtube} target="_blank" rel="noopener" title="YouTube" style={{ width: 34, height: 34, borderRadius: "50%", background: "#FF0000", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="white"><path d="M23 7.5a3 3 0 0 0-2.1-2.1C19 4.9 12 4.9 12 4.9s-7 0-8.9.5A3 3 0 0 0 1 7.5 31 31 0 0 0 .5 12 31 31 0 0 0 1 16.5a3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.5 31 31 0 0 0-.5-4.5ZM9.8 15.3V8.7l5.7 3.3-5.7 3.3Z" /></svg>
+            </a>
+          )}
+          {ficha.spotify && (
+            <a href={ficha.spotify} target="_blank" rel="noopener" title="Spotify" style={{ width: 34, height: 34, borderRadius: "50%", background: "#1DB954", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm4.59 14.42a.62.62 0 0 1-.86.21c-2.35-1.44-5.3-1.76-8.79-.96a.62.62 0 1 1-.28-1.21c3.81-.87 7.08-.5 9.71 1.11.3.18.39.57.22.85Zm1.23-2.73a.78.78 0 0 1-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.17a.78.78 0 1 1-.45-1.49c3.63-1.1 8.15-.56 11.23 1.33.37.22.49.71.26 1.07Zm.11-2.85C14.81 8.94 9.4 8.76 6.3 9.7a.93.93 0 1 1-.54-1.78c3.56-1.08 9.53-.87 13.29 1.36a.93.93 0 0 1-.96 1.6Z" /></svg>
+            </a>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 9, marginTop: 16 }}>
+        <button onClick={() => setOpen((o) => !o)} style={{ ...btnOut, ...((voces.length || partitura) ? {} : dis) }}>
+          Aprende las voces {open ? "▾" : "›"}
+        </button>
+        <a href={partitura ? partitura.url : "#"} target="_blank" rel="noopener" style={{ ...btnFill, background: DARK, color: "white", ...(partitura ? {} : dis) }}>Partitura coral ↓</a>
+        <a href={letra && letra.url ? letra.url : "#"} target="_blank" rel="noopener" style={{ ...btnFill, background: DARK, color: "white", ...(letra && letra.url ? {} : dis) }}>Texto y acordes ↓</a>
+        <a href={ficha.material_url || "#"} target="_blank" rel="noopener" style={{ ...btnOut, ...(ficha.material_url ? {} : dis) }}>Material adicional ↗</a>
+      </div>
+
+      {open && (
+        <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(60,60,67,0.1)" }}>
+          {voces.length === 0 ? (
+            <div style={{ fontSize: 12.5, color: "#8a8a90", lineHeight: 1.6 }}>
+              {partitura ? "Mostrando la partitura. " : ""}Aún no hay pistas de audio por voz para este canto (deben estar subidas a la app, no en Drive, para poder reproducirlas y aislar cada voz).
+              {partitura && (
+                <div style={{ background: "#1c1c22", borderRadius: 12, overflow: "hidden", marginTop: 12 }}>
+                  <iframe title="Partitura" src={drivePreviewUrl(partitura.url) || partitura.url} style={{ width: "100%", height: 460, border: 0, display: "block" }} />
+                </div>
+              )}
+            </div>
+          ) : (
+            <VocesPlayer voces={voces} partituraUrl={partitura ? partitura.url : null} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PartiturasEnsayo({ docs }) {
+  const grupos = {};
+  (docs || []).forEach((d) => { const k = cantoBaseEnsayo(d); if (!k) return; (grupos[k] = grupos[k] || []).push(d); });
+  const cantos = Object.keys(grupos).sort((a, b) => a.localeCompare(b));
+
+  if (cantos.length === 0) {
     return (
       <div style={{ background: "rgba(242,242,247,0.7)", borderRadius: 16, padding: "32px 22px", textAlign: "center", color: "#8a8a90", fontSize: 13.5, lineHeight: 1.6 }}>
-        🎼 Aún no hay partituras cargadas.<br />
-        El encargado puede subirlas en PDF desde <strong>Administración → Material Ensayo</strong> eligiendo la categoría <strong>“Partitura”</strong>.
+        🎼 Aún no hay cantos cargados.<br />
+        El encargado los sube desde <strong>Administración → Material Ensayo</strong> (partitura, pistas por voz y la ficha del canto).
       </div>
     );
   }
 
-  const sel = parts.find((p) => p.id === selId) || parts[0];
-  const src = drivePreviewUrl(sel.url || "") || sel.url;
-
   return (
     <div>
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ fontSize: 11, fontWeight: 700, color: "#8a8a90", letterSpacing: "0.04em", textTransform: "uppercase", display: "block", marginBottom: 5 }}>Elige la partitura</label>
-        <select value={sel.id} onChange={(e) => setSelId(e.target.value)}
-          style={{ width: "100%", maxWidth: 420, padding: "11px 13px", borderRadius: 12, border: "1px solid rgba(60,60,67,0.2)", fontSize: 14, fontWeight: 600, color: "#1c1c1e", background: "white", outline: "none", cursor: "pointer" }}>
-          {parts.map((p) => (
-            <option key={p.id} value={p.id}>{cantoBaseEnsayo(p)}</option>
-          ))}
-        </select>
-      </div>
-
-      <div style={{ background: "white", borderRadius: 16, border: "1px solid rgba(60,60,67,0.1)", overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 15px", borderBottom: "1px solid rgba(60,60,67,0.08)", flexWrap: "wrap" }}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.01em" }}>🎼 {cantoBaseEnsayo(sel)}</div>
-          <a href={sel.url} target="_blank" rel="noopener"
-            style={{ fontSize: 12.5, fontWeight: 700, color: "white", background: AZUL, borderRadius: 10, padding: "8px 14px", textDecoration: "none" }}>
-            ↓ Descargar / abrir
-          </a>
-        </div>
-        <div style={{ background: "#1c1c22" }}>
-          <iframe key={sel.id} title="Partitura" src={src} style={{ width: "100%", height: 620, border: 0, display: "block" }} />
-        </div>
-      </div>
-
-      <div style={{ fontSize: 11, color: "#b0b0b5", marginTop: 10, lineHeight: 1.5 }}>
-        ¿Quieres escuchar tu voz mientras lees la partitura? Las pistas por voz están en la pestaña <strong>Repertorio</strong>.
-      </div>
+      {cantos.map((nombre) => (
+        <CantoHub key={nombre} nombre={nombre} rows={grupos[nombre]} />
+      ))}
     </div>
   );
 }
@@ -5813,8 +5922,12 @@ function CuotaRecordatorioWidget({ members, user, setSection }) {
       border: "1px solid #cfe0fb", borderRadius: 18, padding: "16px 18px", marginBottom: 16,
       display: "flex", alignItems: "center", gap: 15, flexWrap: "wrap",
     }}>
-      <div style={{ width: 46, height: 46, borderRadius: 14, flexShrink: 0, background: "linear-gradient(135deg,#0a5ac8,#0847a0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 6px 16px rgba(10,90,200,0.32)" }}>
-        {yoPague ? "✓" : "🪙"}
+      <div style={{ width: 46, height: 46, borderRadius: 14, flexShrink: 0, background: "rgba(10,90,200,0.10)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {yoPague ? (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0a5ac8" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+        ) : (
+          <span style={{ fontSize: 21, fontWeight: 800, color: "#0a5ac8" }}>$</span>
+        )}
       </div>
       <div style={{ flex: 1, minWidth: 220 }}>
         <div style={{ fontSize: 10, fontWeight: 800, color: "#0a5ac8", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 2 }}>
@@ -5836,7 +5949,7 @@ function CuotaRecordatorioWidget({ members, user, setSection }) {
       </div>
       {esGestor && (
         <button onClick={() => setSection("finanzas")}
-          style={{ flexShrink: 0, background: "#0a5ac8", border: "none", borderRadius: 12, padding: "9px 15px", fontSize: 12.5, fontWeight: 700, color: "white", cursor: "pointer", boxShadow: "0 4px 12px rgba(10,90,200,0.28)" }}>
+          style={{ flexShrink: 0, background: "#0a5ac8", border: "none", borderRadius: 11, padding: "9px 16px", fontSize: 12.5, fontWeight: 700, color: "white", cursor: "pointer" }}>
           Gestionar cuotas →
         </button>
       )}
@@ -11947,7 +12060,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
   const CATS = ["Repertorio", "Partituras", "Letras", "Audio", "Video", "Comunicados", "Otro"];
   const CUERDAS_MAT = ["Todas", "Soprano", "Contralto", "Tenor", "Bajo", "Instrumentos"];
   const MOMENTOS = ["", "Entrada", "Acto Penitencial", "Gloria", "Salmo", "Aleluya", "Ofertorio", "Santo", "Cordero", "Comunión", "Salida", "Otro"];
-  const [form, setForm] = useState({ nombre: "", canto: "", momento: "", orden: "", url: "", categoria: "Audio", cuerda_mat: "Todas", descripcion: "", size: "", letra_texto: "" });
+  const [form, setForm] = useState({ nombre: "", canto: "", momento: "", orden: "", url: "", categoria: "Audio", cuerda_mat: "Todas", descripcion: "", size: "", letra_texto: "", autor: "", youtube: "", spotify: "", material_url: "" });
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -11988,7 +12101,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
     setSaving(true);
     try {
       await supabase("material_ensayo", { method: "POST", body: limpiarBody(form) });
-      setForm({ nombre: "", canto: "", momento: "", orden: "", url: "", categoria: "Audio", cuerda_mat: "Todas", descripcion: "", size: "", letra_texto: "" });
+      setForm({ nombre: "", canto: "", momento: "", orden: "", url: "", categoria: "Audio", cuerda_mat: "Todas", descripcion: "", size: "", letra_texto: "", autor: "", youtube: "", spotify: "", material_url: "" });
       setShowForm(false);
       onReload();
     } catch (e) { alert("Error: " + e.message); }
@@ -12231,6 +12344,32 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
               </div>
             </div>
           )}
+          <div style={{ borderTop: "1px dashed rgba(60,60,67,0.2)", paddingTop: 12, marginBottom: 12 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: C.primaryDark, marginBottom: 8 }}>
+              🎴 Ficha del canto <span style={{ fontWeight: 400, color: C.gray }}>(opcional · llénala una vez por canto)</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Autor</label>
+                <input value={form.autor} onChange={e => setForm(p => ({ ...p, autor: e.target.value }))} placeholder="Ej: Juan Pablo Rojas" style={inp} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>YouTube (enlace)</label>
+                <input value={form.youtube} onChange={e => setForm(p => ({ ...p, youtube: e.target.value }))} placeholder="https://youtube.com/…" style={inp} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Spotify (enlace)</label>
+                <input value={form.spotify} onChange={e => setForm(p => ({ ...p, spotify: e.target.value }))} placeholder="https://open.spotify.com/…" style={inp} />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Material adicional (enlace)</label>
+                <input value={form.material_url} onChange={e => setForm(p => ({ ...p, material_url: e.target.value }))} placeholder="https://… (carpeta, drive, web)" style={inp} />
+              </div>
+            </div>
+            <div style={{ fontSize: 10, color: C.gray, marginTop: 6 }}>
+              Estos datos aparecen en la tarjeta del canto (Autor, íconos de YouTube/Spotify y botón “Material adicional”). Basta llenarlos en un archivo del canto.
+            </div>
+          </div>
           <Btn onClick={submit} disabled={saving || !form.canto || !form.url}>
             {saving ? "Guardando…" : "💾 Guardar material"}
           </Btn>
@@ -21994,6 +22133,11 @@ ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS canto   TEXT;
 ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS momento TEXT;
 ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS orden   INTEGER;
 ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS letra_texto TEXT;
+-- Ficha del canto (para la tarjeta tipo Canto Católico): Autor, YouTube, Spotify, Material adicional
+ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS autor        TEXT;
+ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS youtube      TEXT;
+ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS spotify      TEXT;
+ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS material_url TEXT;
 -- Cómo cargar: por cada canto sube un archivo por voz, repitiendo el mismo
 -- "canto" y eligiendo Cuerda/Voz (Soprano/Contralto/Tenor/Bajo/Instrumentos o Todas)
 -- y Categoría (Audio = pista de práctica, Letras, Partituras, Video).
