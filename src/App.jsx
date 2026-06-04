@@ -2694,7 +2694,7 @@ export default function App() {
               {section === "musica" && <Musica />}
               {section === "fotos" && <Fotos />}
               {section === "podcast" && (
-                <Podcast podcasts={podcasts} onReload={loadData} user={user} />
+                <Podcast podcasts={(podcasts || []).filter((p) => p.tipo !== "vocalizacion")} onReload={loadData} user={user} />
               )}
               {section === "videos" && <Videos />}
               {section === "cancionero" && <Cancionero user={user} />}
@@ -2759,10 +2759,20 @@ export default function App() {
                 <InfoGastos user={user} members={members} />
               )}
               {section === "material_ensayo" && esVisita(user) && (
-                <MaterialEnsayo docs={materialEnsayo} user={user} />
+                <div style={{ maxWidth: 1100 }}>
+                  <div style={{ background: "linear-gradient(135deg,#0a5ac8,#0847a0)", borderRadius: 22, padding: "22px 24px", marginBottom: 18, display: "flex", alignItems: "center", gap: 15, boxShadow: "0 12px 32px rgba(10,90,200,0.28)" }}>
+                    <div style={{ width: 52, height: 52, borderRadius: 15, background: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, flexShrink: 0 }}>🎼</div>
+                    <div>
+                      <div style={{ fontSize: 10.5, fontWeight: 800, color: "rgba(255,255,255,0.75)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>Sala de Ensayo</div>
+                      <div style={{ fontSize: 21, fontWeight: 800, color: "white", letterSpacing: "-0.02em", lineHeight: 1.15 }}>Repertorio de la misión</div>
+                      <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.82)", marginTop: 2 }}>Escucha las voces, sigue la letra y la partitura.</div>
+                    </div>
+                  </div>
+                  <PartiturasEnsayo docs={(materialEnsayo || []).filter((d) => !d.audiencia || d.audiencia === "invitado" || d.audiencia === "ambos")} />
+                </div>
               )}
               {section === "material_ensayo" && !esVisita(user) && (
-                <SalaEnsayoMiembro docs={materialEnsayo} user={user} isAdmin={esCuerdaAdmin(user)} podcasts={podcasts} onReload={loadData} />
+                <SalaEnsayoMiembro docs={(materialEnsayo || []).filter((d) => d.audiencia === "coro" || d.audiencia === "ambos")} user={user} isAdmin={esCuerdaAdmin(user)} podcasts={podcasts} onReload={loadData} />
               )}
               {section === "vista_invitado" && esCuerdaAdmin(user) && (
                 <div>
@@ -5852,7 +5862,7 @@ function SalaEnsayoMiembro({ docs, user, isAdmin, podcasts, onReload }) {
 
       {/* Pestañas */}
       <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
-        {[{ id: "repertorio", label: "🎧 Repertorio" }, { id: "cancionero", label: "♫ Canto Digital" }, { id: "partituras", label: "🎼 Partituras" }, { id: "vocalizacion", label: "🎙 Vocalización" }, { id: "musica", label: "♪ Música" }].map((t) => {
+        {[{ id: "repertorio", label: "🎧 Repertorio" }, { id: "cancionero", label: "♫ Canto Digital" }, { id: "vocalizacion", label: "🎙 Vocalización" }, { id: "musica", label: "♪ Música" }].map((t) => {
           const on = tab === t.id;
           return (
             <button key={t.id} onClick={() => setTab(t.id)}
@@ -5863,15 +5873,20 @@ function SalaEnsayoMiembro({ docs, user, isAdmin, podcasts, onReload }) {
         })}
       </div>
 
-      {tab === "repertorio" && <MaterialEnsayo docs={docs} user={user} />}
+      {tab === "repertorio" && <PartiturasEnsayo docs={docs} />}
       {tab === "cancionero" && <Cancionero user={user} />}
-      {tab === "partituras" && <PartiturasEnsayo docs={docs} />}
       {tab === "vocalizacion" && (
         <div>
           <div style={{ fontSize: 12.5, color: "#6a6a70", marginBottom: 12, lineHeight: 1.5 }}>
             🎙 Ejercicios de canto y calentamiento de voz. Escúchalos como un podcast antes de ensayar.
           </div>
-          <Podcast podcasts={podcasts} onReload={onReload} user={user} />
+          <Podcast
+            podcasts={(podcasts || []).filter((p) => p.tipo === "vocalizacion")}
+            onReload={onReload} user={user}
+            title="Vocalización"
+            subtitle="Ejercicios de canto y calentamiento"
+            emptyText="Aún no hay ejercicios de vocalización publicados."
+          />
         </div>
       )}
       {tab === "musica" && <Musica />}
@@ -6885,7 +6900,7 @@ function Dashboard({
         </Card>
         {podcasts && podcasts.length > 0 && (
           <Card style={{ overflow: "hidden", padding: "14px 16px" }}>
-            <PodcastWidget podcasts={podcasts} setSection={setSection} />
+            <PodcastWidget podcasts={(podcasts || []).filter((p) => p.tipo !== "vocalizacion")} setSection={setSection} />
           </Card>
         )}
         <VocalizacionWidget isAdmin={isAdmin} />
@@ -9147,12 +9162,12 @@ function Fotos() {
   );
 }
 
-function Podcast({ podcasts, onReload, user }) {
+function Podcast({ podcasts, onReload, user, title = "Podcast del Coro", subtitle = "Reflexiones y formación", emptyText = "Los episodios del podcast aparecerán aquí." }) {
   return (
     <div style={{ maxWidth: 800 }}>
       <SectionTitle
-        title="Podcast del Coro"
-        subtitle="Reflexiones y formación"
+        title={title}
+        subtitle={subtitle}
       />
       {!podcasts || podcasts.length === 0 ? (
         <Card style={{ textAlign: "center", padding: 40 }}>
@@ -9169,7 +9184,7 @@ function Podcast({ podcasts, onReload, user }) {
             Próximamente
           </div>
           <p style={{ color: C.gray, fontSize: 13 }}>
-            Los episodios del podcast aparecerán aquí.
+            {emptyText}
           </p>
         </Card>
       ) : (
@@ -12060,7 +12075,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
   const CATS = ["Repertorio", "Partituras", "Letras", "Audio", "Video", "Comunicados", "Otro"];
   const CUERDAS_MAT = ["Todas", "Soprano", "Contralto", "Tenor", "Bajo", "Instrumentos"];
   const MOMENTOS = ["", "Entrada", "Acto Penitencial", "Gloria", "Salmo", "Aleluya", "Ofertorio", "Santo", "Cordero", "Comunión", "Salida", "Otro"];
-  const [form, setForm] = useState({ nombre: "", canto: "", momento: "", orden: "", url: "", categoria: "Audio", cuerda_mat: "Todas", descripcion: "", size: "", letra_texto: "", autor: "", youtube: "", spotify: "", material_url: "" });
+  const [form, setForm] = useState({ nombre: "", canto: "", momento: "", orden: "", url: "", categoria: "Audio", cuerda_mat: "Todas", descripcion: "", size: "", letra_texto: "", autor: "", youtube: "", spotify: "", material_url: "", audiencia: "invitado" });
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -12101,7 +12116,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
     setSaving(true);
     try {
       await supabase("material_ensayo", { method: "POST", body: limpiarBody(form) });
-      setForm({ nombre: "", canto: "", momento: "", orden: "", url: "", categoria: "Audio", cuerda_mat: "Todas", descripcion: "", size: "", letra_texto: "", autor: "", youtube: "", spotify: "", material_url: "" });
+      setForm({ nombre: "", canto: "", momento: "", orden: "", url: "", categoria: "Audio", cuerda_mat: "Todas", descripcion: "", size: "", letra_texto: "", autor: "", youtube: "", spotify: "", material_url: "", audiencia: "invitado" });
       setShowForm(false);
       onReload();
     } catch (e) { alert("Error: " + e.message); }
@@ -12272,6 +12287,23 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
           </div>
           <div style={{ background: "rgba(14,165,233,0.08)", border: "1px solid rgba(14,165,233,0.2)", borderRadius: 10, padding: "9px 12px", marginBottom: 12, fontSize: 11, color: C.dark, lineHeight: 1.6 }}>
             💡 Organiza por <strong>canto</strong>: sube un archivo por voz con el <strong>mismo Canto</strong>, eligiendo la <strong>Cuerda/Voz</strong> y la <strong>Categoría</strong> (Audio, Letras, Partituras, Video). El nombre se arma solo (ej: "Reina de Chile — Tenor").
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: C.primaryDark, display: "block", marginBottom: 5 }}>¿Para qué sala es este material?</label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {[{ id: "coro", label: "🎵 Coro (integrantes)" }, { id: "invitado", label: "👤 Invitado" }, { id: "ambos", label: "Ambos" }].map((a) => {
+                const on = form.audiencia === a.id;
+                return (
+                  <button key={a.id} type="button" onClick={() => setForm((p) => ({ ...p, audiencia: a.id }))}
+                    style={{ fontSize: 12.5, fontWeight: 700, padding: "8px 14px", borderRadius: 10, cursor: "pointer", border: `1.5px solid ${on ? C.primary : "rgba(60,60,67,0.2)"}`, background: on ? C.primary : "white", color: on ? "white" : "#6a6a70" }}>
+                    {a.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: 10, color: C.gray, marginTop: 5 }}>
+              Los integrantes y los invitados ven repertorios distintos. “Ambos” aparece en las dos salas.
+            </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 0.7fr", gap: 10, marginBottom: 10 }}>
             <div>
@@ -14001,7 +14033,7 @@ function AdminBiblioteca({ biblioteca, onReload }) {
 }
 
 function AdminPodcasts({ podcasts, onReload }) {
-  const emptyForm = { titulo: "", descripcion: "", url: "", autor: "", orden: 0 };
+  const emptyForm = { titulo: "", descripcion: "", url: "", autor: "", orden: 0, tipo: "podcast" };
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -14090,12 +14122,30 @@ function AdminPodcasts({ podcasts, onReload }) {
       {/* SQL hint for orden column */}
       <div style={{ background: C.goldLight, border: `1px solid ${C.gold}40`, borderRadius: 14, padding: "9px 14px", fontSize: 11, color: C.gray, marginBottom: 14 }}>
         ⚠️ Si el campo <strong>orden</strong> no existe aún, ejecuta en Supabase:<br />
-        <code style={{ fontFamily: "monospace" }}>alter table podcasts add column if not exists orden int default 0;</code>
+        <code style={{ fontFamily: "monospace" }}>alter table podcasts add column if not exists orden int default 0;</code><br />
+        <code style={{ fontFamily: "monospace" }}>alter table podcasts add column if not exists tipo text default 'podcast';</code>
       </div>
 
       {showForm && (
         <Card style={{ marginBottom: 16, border: `1px solid ${C.primary}40`, background: C.primaryLight }}>
           <div style={{ fontWeight: 600, fontSize: 13, color: C.dark, marginBottom: 10 }}>Nuevo episodio</div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: C.primaryDark, display: "block", marginBottom: 5 }}>Tipo de episodio</label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {[{ id: "podcast", label: "🎙 Podcast (temas varios)" }, { id: "vocalizacion", label: "🎵 Vocalización (ejercicios)" }].map((tp) => {
+                const on = form.tipo === tp.id;
+                return (
+                  <button key={tp.id} type="button" onClick={() => setForm((p) => ({ ...p, tipo: tp.id }))}
+                    style={{ fontSize: 12.5, fontWeight: 700, padding: "8px 13px", borderRadius: 10, cursor: "pointer", border: `1.5px solid ${on ? C.primary : "rgba(60,60,67,0.2)"}`, background: on ? C.primary : "white", color: on ? "white" : "#6a6a70" }}>
+                    {tp.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: 10, color: C.gray, marginTop: 5 }}>
+              “Vocalización” aparece en la Sala de Ensayo; “Podcast” en la sección Podcast. No se mezclan.
+            </div>
+          </div>
           <input
             placeholder="Título del episodio *"
             value={form.titulo}
@@ -14144,6 +14194,17 @@ function AdminPodcasts({ podcasts, onReload }) {
             // ── Modo edición ──────────────────────────
             <div>
               <div style={{ fontWeight: 600, fontSize: 12, color: C.primary, marginBottom: 10 }}>✏️ Editando episodio</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                {[{ id: "podcast", label: "🎙 Podcast" }, { id: "vocalizacion", label: "🎵 Vocalización" }].map((tp) => {
+                  const on = (editData.tipo || "podcast") === tp.id;
+                  return (
+                    <button key={tp.id} type="button" onClick={() => setEditData((d) => ({ ...d, tipo: tp.id }))}
+                      style={{ fontSize: 12, fontWeight: 700, padding: "7px 12px", borderRadius: 9, cursor: "pointer", border: `1.5px solid ${on ? C.primary : "rgba(60,60,67,0.2)"}`, background: on ? C.primary : "white", color: on ? "white" : "#6a6a70" }}>
+                      {tp.label}
+                    </button>
+                  );
+                })}
+              </div>
               <input
                 placeholder="Título *"
                 value={editData.titulo}
@@ -14216,7 +14277,7 @@ function AdminPodcasts({ podcasts, onReload }) {
                 style={{ fontSize: 11, padding: "5px 10px", color: C.primary }}
                 onClick={() => {
                   setEditId(p.id);
-                  setEditData({ titulo: p.titulo || "", descripcion: p.descripcion || "", url: p.url || "", autor: p.autor || "", orden: p.orden ?? 0 });
+                  setEditData({ titulo: p.titulo || "", descripcion: p.descripcion || "", url: p.url || "", autor: p.autor || "", orden: p.orden ?? 0, tipo: p.tipo || "podcast" });
                 }}
               >✏️ Editar</Btn>
               <ConfirmBtn onConfirm={() => del(p.id)} />
@@ -22138,6 +22199,11 @@ ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS autor        TEXT;
 ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS youtube      TEXT;
 ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS spotify      TEXT;
 ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS material_url TEXT;
+-- Audiencia: separa el repertorio del Coro vs del Invitado ('coro' | 'invitado' | 'ambos')
+-- El material que ya tienes cargado (con voces) es del Invitado, por eso el default es 'invitado':
+ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS audiencia TEXT DEFAULT 'invitado';
+-- Tipo de episodio de podcast: 'podcast' (temas varios) vs 'vocalizacion' (ejercicios de canto)
+ALTER TABLE podcasts ADD COLUMN IF NOT EXISTS tipo TEXT DEFAULT 'podcast';
 -- Cómo cargar: por cada canto sube un archivo por voz, repitiendo el mismo
 -- "canto" y eligiendo Cuerda/Voz (Soprano/Contralto/Tenor/Bajo/Instrumentos o Todas)
 -- y Categoría (Audio = pista de práctica, Letras, Partituras, Video).
