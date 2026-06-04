@@ -625,7 +625,7 @@ const NAV = [
   { id: "pauta_misa",       icon: "🎼", label: "Pauta de Misa" },
   { id: "podcast",          icon: "◉",  label: "Podcast" },
   { id: "qanda",            icon: "?",  label: "Preguntas" },
-  { id: "material_ensayo",  icon: "📥", label: "Sala de Ensayo" },
+  { id: "material_ensayo",  icon: "📥", label: "Ensayos Coro" },
   { id: "vista_invitado",   icon: "👁", label: "Vista Invitado" },
   { id: "cantos_pdf",       icon: "📄", label: "Cantos PDF" },
   { id: "audios",           icon: "🎧", label: "Audios" },
@@ -1238,6 +1238,7 @@ export default function App() {
   const [pautas, setPautas] = useState([]);
   const [reconocimientos, setReconocimientos] = useState([]);
   const [materialEnsayo, setMaterialEnsayo] = useState([]);
+  const [materialCoro, setMaterialCoro] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
   const [firstLoadDone, setFirstLoadDone] = useState(false);
 
@@ -1297,6 +1298,7 @@ export default function App() {
       setComunidades(com || []);
       setReconocimientos(reco || []);
       setMaterialEnsayo(mat || []);
+      supabase("material_coro", { order: "&order=created_at.desc" }).then(mc => setMaterialCoro(mc || [])).catch(() => setMaterialCoro([]));
       // Cargar eventos desde Google Calendar para el Dashboard
       fetchGoogleCalendarEvents().then((gcal) => setGcalEventos(gcal));
     } catch (e) {
@@ -2733,6 +2735,7 @@ export default function App() {
                   fotos={fotos}
                   comunidades={comunidades}
                   materialEnsayo={materialEnsayo}
+                  materialCoro={materialCoro}
                   onReload={loadData}
                   user={user}
                 />
@@ -2762,7 +2765,7 @@ export default function App() {
                 <MaterialEnsayo docs={materialEnsayo} user={user} />
               )}
               {section === "material_ensayo" && !esVisita(user) && (
-                <SalaEnsayoMiembro docs={(materialEnsayo || []).filter((d) => d.audiencia === "coro" || d.audiencia === "ambos")} user={user} isAdmin={esCuerdaAdmin(user)} podcasts={podcasts} onReload={loadData} />
+                <SalaEnsayoMiembro docs={materialCoro} user={user} isAdmin={esCuerdaAdmin(user)} podcasts={podcasts} onReload={loadData} />
               )}
               {section === "vista_invitado" && esCuerdaAdmin(user) && (
                 <div>
@@ -6080,7 +6083,7 @@ function SalaEnsayoMiembro({ docs, user, isAdmin, podcasts, onReload }) {
         })}
       </div>
 
-      {tab === "repertorio" && <RepertorioCoroDrive user={user} isAdmin={isAdmin} />}
+      {tab === "repertorio" && <MaterialEnsayo docs={docs} user={user} />}
       {tab === "cancionero" && <Cancionero user={user} />}
       {tab === "vocalizacion" && (
         <div>
@@ -6174,6 +6177,61 @@ function CuotaRecordatorioWidget({ members, user, setSection }) {
           style={{ flexShrink: 0, background: "#0a5ac8", border: "none", borderRadius: 11, padding: "9px 16px", fontSize: 12.5, fontWeight: 700, color: "white", cursor: "pointer" }}>
           Gestionar cuotas →
         </button>
+      )}
+    </div>
+  );
+}
+
+function ComunicadosWidget({ isAdmin }) {
+  const [html, setHtml] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => { getConfig("comunicados_html").then((v) => setHtml(v || "")).catch(() => {}); }, []);
+  useEffect(() => { if (editing && ref.current) ref.current.innerHTML = html || ""; }, [editing]);
+  function cmd(c) { document.execCommand(c, false, null); if (ref.current) ref.current.focus(); }
+  async function guardar() {
+    setSaving(true);
+    const h = ref.current ? ref.current.innerHTML : html;
+    try { await setConfig("comunicados_html", h); setHtml(h); setEditing(false); } catch (e) {}
+    setSaving(false);
+  }
+  const AZUL = "#0a5ac8";
+  const tbBtn = { border: "1px solid rgba(60,60,67,0.2)", background: "white", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, cursor: "pointer", fontWeight: 700, color: "#3a3a40" };
+  return (
+    <div style={{ background: "white", borderRadius: 18, border: `1px solid ${C.border}`, padding: "16px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(10,90,200,0.10)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={AZUL} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l16-5v13L3 14v-3Z" /><path d="M10.5 16.5 10 21a1 1 0 0 1-2 .1L7 15" /></svg>
+          </div>
+          <div style={{ fontSize: 14.5, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.01em" }}>Comunicados</div>
+        </div>
+        {isAdmin && !editing && (
+          <button onClick={() => setEditing(true)} style={{ fontSize: 12, fontWeight: 700, color: AZUL, background: "none", border: "none", cursor: "pointer" }}>✏️ Editar</button>
+        )}
+      </div>
+      {editing ? (
+        <div>
+          <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+            <button onClick={() => cmd("bold")} style={{ ...tbBtn, fontWeight: 800 }}>N</button>
+            <button onClick={() => cmd("insertUnorderedList")} style={tbBtn}>• Viñetas</button>
+            <button onClick={() => cmd("justifyCenter")} style={tbBtn}>Centrar</button>
+            <button onClick={() => cmd("justifyLeft")} style={tbBtn}>Izquierda</button>
+          </div>
+          <div ref={ref} contentEditable suppressContentEditableWarning
+            style={{ minHeight: 130, border: `1px solid ${AZUL}55`, borderRadius: 10, padding: "12px 14px", fontSize: 13.5, lineHeight: 1.6, color: "#2a2a30", outline: "none", background: "#fbfcff" }} />
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button onClick={guardar} disabled={saving} style={{ background: AZUL, color: "white", border: "none", borderRadius: 9, padding: "8px 16px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>{saving ? "Guardando…" : "Guardar"}</button>
+            <button onClick={() => setEditing(false)} style={{ background: "white", color: "#6a6a70", border: "1px solid rgba(60,60,67,0.2)", borderRadius: 9, padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
+          </div>
+        </div>
+      ) : html ? (
+        <div style={{ fontSize: 13.5, lineHeight: 1.6, color: "#2a2a30" }} dangerouslySetInnerHTML={{ __html: html }} />
+      ) : (
+        <div style={{ fontSize: 12.5, color: C.gray, fontStyle: "italic", padding: "8px 0" }}>
+          {isAdmin ? "Aún no hay comunicados. Toca “Editar” para escribir uno." : "Sin comunicados por ahora."}
+        </div>
       )}
     </div>
   );
@@ -7116,6 +7174,7 @@ function Dashboard({
         <VocalizacionWidget isAdmin={isAdmin} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <ComunicadosWidget isAdmin={isAdmin} />
           <Card style={{ flex: 1, overflow: "hidden", padding: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "13px 15px 10px" }}>
               <div style={{ width: 30, height: 30, borderRadius: 9, background: "#1DB954", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -11131,6 +11190,7 @@ const ADMIN_TABS = [
   { id: "asistencia", label: "✅ Asistencia" },
   { id: "documentos", label: "📄 Descargas Misas" },
   { id: "material_ensayo_admin", label: "📥 Material Ensayo (Invitado)" },
+  { id: "material_coro_admin", label: "🎵 Material Coro" },
   { id: "oraciones", label: "✦ Oraciones" },
   { id: "noticias", label: "📢 Avisos" },
   { id: "preguntas", label: "❓ Preguntas" },
@@ -12208,7 +12268,7 @@ function AdminDocumentos({ docs, onReload }) {
 // ═══════════════════════════════════════════════════════════════
 //  ADMIN — MATERIAL DE ENSAYO (exclusivo Invitado/Coro Provisorio)
 // ═══════════════════════════════════════════════════════════════
-function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
+function AdminMaterialEnsayo({ materialEnsayo, onReload, tabla = "material_ensayo" }) {
   const CATS = ["Repertorio", "Partituras", "Letras", "Audio", "Video", "Comunicados", "Otro"];
   const CUERDAS_MAT = ["Todas", "Soprano", "Contralto", "Tenor", "Bajo", "Instrumentos"];
   const MOMENTOS = ["", "Entrada", "Acto Penitencial", "Gloria", "Salmo", "Aleluya", "Ofertorio", "Santo", "Cordero", "Comunión", "Salida", "Otro"];
@@ -12252,7 +12312,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
     if (!form.canto || !form.url) return;
     setSaving(true);
     try {
-      await supabase("material_ensayo", { method: "POST", body: limpiarBody(form) });
+      await supabase(tabla, { method: "POST", body: limpiarBody(form) });
       setForm({ nombre: "", canto: "", momento: "", orden: "", url: "", categoria: "Audio", cuerda_mat: "Todas", descripcion: "", size: "", letra_texto: "", autor: "", youtube: "", spotify: "", material_url: "", audiencia: "invitado" });
       setShowForm(false);
       onReload();
@@ -12309,7 +12369,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
     try {
       for (const d of lista) {
         await borrarStorage(d.url);
-        await deleteRecord("material_ensayo", d.id);
+        await deleteRecord(tabla, d.id);
       }
       alert("Listo. Espacio liberado y repertorio vaciado para la próxima misa.");
       onReload();
@@ -12320,7 +12380,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload }) {
   async function saveEdit(id) {
     setEditSaving(true);
     try {
-      await updateRecord("material_ensayo", id, limpiarBody(editForm));
+      await updateRecord(tabla, id, limpiarBody(editForm));
       setEditId(null);
       onReload();
     } catch (e) { alert("Error: " + e.message); }
@@ -17233,7 +17293,7 @@ function ValoresWidget() {
         <div style={{ position:"absolute", top:-70, right:-50, width:200, height:200, borderRadius:"50%", background:`radial-gradient(circle, ${ac}26 0%, transparent 70%)`, pointerEvents:"none", transition:"background 0.5s ease" }} />
 
         {/* Encabezado */}
-        <div style={{ display:"flex", alignItems:"center", gap:9, padding:"16px 20px 0", position:"relative" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, padding:"11px 18px 0", position:"relative" }}>
           <svg width="15" height="15" viewBox="0 0 22 22" fill="none">
             <polygon points="11,2 13.5,8.5 20.5,9.2 15.5,13.8 17.2,20.5 11,16.8 4.8,20.5 6.5,13.8 1.5,9.2 8.5,8.5" fill="#c9a227" stroke="#a07c1a" strokeWidth="0.6" strokeLinejoin="round"/>
           </svg>
@@ -17243,22 +17303,22 @@ function ValoresWidget() {
         </div>
 
         {/* Valor activo */}
-        <div style={{ padding:"18px 20px 16px", position:"relative" }}>
-          <div className={`vw-content ${fade ? "show" : "hide"}`} style={{ display:"flex", alignItems:"center", gap:18 }}>
+        <div style={{ padding:"12px 18px 12px", position:"relative" }}>
+          <div className={`vw-content ${fade ? "show" : "hide"}`} style={{ display:"flex", alignItems:"center", gap:13 }}>
             <div style={{
-              width:68, height:68, borderRadius:20, flexShrink:0,
+              width:46, height:46, borderRadius:14, flexShrink:0,
               background:`linear-gradient(145deg, ${ac} 0%, ${ac}cc 100%)`,
               display:"flex", alignItems:"center", justifyContent:"center",
-              fontSize:32,
-              boxShadow:`0 8px 22px ${ac}55, inset 0 1px 0 rgba(255,255,255,0.4)`,
+              fontSize:22,
+              boxShadow:`0 6px 16px ${ac}4d, inset 0 1px 0 rgba(255,255,255,0.4)`,
             }}>
               <span style={{ filter:"drop-shadow(0 1px 2px rgba(0,0,0,0.15))" }}>{v.icon}</span>
             </div>
             <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:25, fontWeight:800, color:"#1c1c1e", letterSpacing:"-0.035em", lineHeight:1.05, marginBottom:7 }}>
+              <div style={{ fontSize:17, fontWeight:800, color:"#1c1c1e", letterSpacing:"-0.025em", lineHeight:1.1, marginBottom:3 }}>
                 {v.label}
               </div>
-              <div style={{ fontSize:13.5, color:"#5c5c63", lineHeight:1.55, letterSpacing:"-0.012em", fontWeight:450 }}>
+              <div style={{ fontSize:12, color:"#5c5c63", lineHeight:1.45, letterSpacing:"-0.012em", fontWeight:450 }}>
                 {v.desc}
               </div>
             </div>
@@ -18993,6 +19053,7 @@ function Admin({
   fotos,
   comunidades,
   materialEnsayo,
+  materialCoro,
   onReload,
   user,
 }) {
@@ -19141,6 +19202,18 @@ function Admin({
                 <div style={{ fontSize: 12.5, fontWeight: 700 }}>Vista previa — así lo ve el Invitado <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.8)" }}>(se actualiza al guardar)</span></div>
               </div>
               <MaterialEnsayo docs={materialEnsayo} user={user} />
+            </div>
+          </div>
+        )}
+        {tab === "material_coro_admin" && (
+          <div>
+            <AdminMaterialEnsayo materialEnsayo={materialCoro} onReload={onReload} tabla="material_coro" />
+            <div style={{ marginTop: 22, paddingTop: 18, borderTop: "2px dashed rgba(60,60,67,0.18)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9, background: "linear-gradient(135deg,#0a5ac8,#0847a0)", borderRadius: 12, padding: "11px 15px", marginBottom: 14, color: "white" }}>
+                <span style={{ fontSize: 18 }}>👁</span>
+                <div style={{ fontSize: 12.5, fontWeight: 700 }}>Vista previa — así lo ven los Integrantes <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.8)" }}>(se actualiza al guardar)</span></div>
+              </div>
+              <MaterialEnsayo docs={materialCoro} user={user} />
             </div>
           </div>
         )}
@@ -21836,15 +21909,19 @@ function ProximosCumpleanosWidget({ members, setSection }) {
     return { day, month };
   }
 
-  // Filter members with birthday this month, upcoming (day >= today), excluding today (those have their own widget)
+  function diasHasta(p) {
+    const now = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    let next = new Date(hoy.getFullYear(), p.month - 1, p.day);
+    if (next < now) next = new Date(hoy.getFullYear() + 1, p.month - 1, p.day);
+    return Math.round((next - now) / 86400000);
+  }
+
+  // Próximos 3 meses (excluye hoy, que tiene su propio widget)
   const proximos = members
-    .filter((m) => {
-      const p = parseCumple(m.cumpleanos);
-      if (!p) return false;
-      return p.month === mesActual && p.day > diaActual;
-    })
-    .map((m) => ({ ...m, _day: parseCumple(m.cumpleanos).day }))
-    .sort((a, b) => a._day - b._day);
+    .filter((m) => parseCumple(m.cumpleanos))
+    .map((m) => { const p = parseCumple(m.cumpleanos); return { ...m, _p: p, _dias: diasHasta(p) }; })
+    .filter((m) => m._dias > 0 && m._dias <= 92)
+    .sort((a, b) => a._dias - b._dias);
 
   if (proximos.length === 0) return null;
 
@@ -21862,7 +21939,7 @@ function ProximosCumpleanosWidget({ members, setSection }) {
         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
           <span style={{ fontSize:20 }}>🎂</span>
           <span style={{ fontFamily:"var(--font-display)", fontSize:14, fontWeight:600, color:C.dark }}>
-            Cumpleaños en {MESES[mesActual - 1]}
+            Próximos cumpleaños
           </span>
         </div>
         <button
@@ -21877,7 +21954,7 @@ function ProximosCumpleanosWidget({ members, setSection }) {
       <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
         {proximos.map((m) => {
           const cuerdaColor = CUERDAS[m.cuerda] || C.gray;
-          const diasFaltan = m._day - diaActual;
+          const diasFaltan = m._dias;
           return (
             <div key={m.id} style={{
               display:"flex",
@@ -21916,7 +21993,7 @@ function ProximosCumpleanosWidget({ members, setSection }) {
                 textAlign:"right",
               }}>
                 <div style={{ fontSize:13, fontWeight:700, color: diasFaltan <= 3 ? C.primary : C.dark }}>
-                  {String(m._day).padStart(2,"0")}/{String(mesActual).padStart(2,"0")}
+                  {String(m._p.day).padStart(2,"0")}/{String(m._p.month).padStart(2,"0")}
                 </div>
                 <div style={{ fontSize:10, color: diasFaltan <= 3 ? C.primary : C.gray, fontWeight: diasFaltan <= 3 ? 600 : 400 }}>
                   {diasFaltan === 1 ? "¡Mañana! 🎉" : `en ${diasFaltan} días`}
@@ -22351,7 +22428,17 @@ ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS material_url TEXT;
 ALTER TABLE material_ensayo ADD COLUMN IF NOT EXISTS audiencia TEXT DEFAULT 'invitado';
 -- Tipo de episodio de podcast: 'podcast' (temas varios) vs 'vocalizacion' (ejercicios de canto)
 ALTER TABLE podcasts ADD COLUMN IF NOT EXISTS tipo TEXT DEFAULT 'podcast';
--- Repertorio del CORO leído desde Google Drive (no ocupa espacio: guarda solo los enlaces)
+-- Material del CORO (independiente del invitado; NO se borra tras la misa). Misma estructura.
+CREATE TABLE IF NOT EXISTS material_coro (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  nombre TEXT, canto TEXT, momento TEXT, orden INTEGER, url TEXT,
+  categoria TEXT, cuerda_mat TEXT, descripcion TEXT, size TEXT,
+  letra_texto TEXT, autor TEXT, youtube TEXT, spotify TEXT, material_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE material_coro ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "material_coro_all" ON material_coro FOR ALL USING (true) WITH CHECK (true);
+-- Repertorio del CORO leído desde Google Drive (en desuso)
 CREATE TABLE IF NOT EXISTS repertorio_drive (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
   canto TEXT, cuerda_mat TEXT, categoria TEXT, nombre TEXT,
