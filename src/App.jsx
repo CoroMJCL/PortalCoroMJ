@@ -3760,7 +3760,7 @@ function VideoDestacadoWidget({ isAdmin }) {
 
       {/* Player */}
       {videoId ? (
-        <div style={{ position:"relative", paddingTop:"56.25%", maxWidth:500, margin:"0 auto", background:"#000", borderRadius:12, overflow:"hidden" }}>
+        <div style={{ position:"relative", paddingTop:"56.25%", background:"#000", borderRadius:12, overflow:"hidden" }}>
           <iframe
             key={videoId}
             src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`}
@@ -5822,7 +5822,7 @@ function ImportadorDrive({ onDone }) {
     let files = [], pageToken = "";
     do {
       const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
-      const url = `https://www.googleapis.com/drive/v3/files?q=${q}&key=${apiKey}&fields=nextPageToken,files(id,name,mimeType)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${pageToken ? `&pageToken=${pageToken}` : ""}`;
+      const url = `https://www.googleapis.com/drive/v3/files?q=${q}&key=${apiKey}&fields=nextPageToken,files(id,name,mimeType,shortcutDetails(targetId,targetMimeType))&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${pageToken ? `&pageToken=${pageToken}` : ""}`;
       const r = await fetch(url);
       if (!r.ok) throw new Error(`No se pudo leer la carpeta (código ${r.status}). Revisa la clave y que la carpeta sea accesible por enlace.`);
       const d = await r.json();
@@ -5832,14 +5832,22 @@ function ImportadorDrive({ onDone }) {
     return files;
   }
 
-  async function walk(folderId, parentName, grandName, acc, depth) {
-    if (depth > 6) return;
+  async function walk(folderId, parentName, grandName, acc, depth, stats) {
+    if (depth > 7) return;
     const children = await listChildren(folderId);
     for (const c of children) {
-      if (c.mimeType === "application/vnd.google-apps.folder") {
-        await walk(c.id, c.name, parentName, acc, depth + 1);
+      let mime = c.mimeType, id = c.id;
+      const name = c.name;
+      if (mime === "application/vnd.google-apps.shortcut" && c.shortcutDetails) {
+        mime = c.shortcutDetails.targetMimeType || mime;
+        id = c.shortcutDetails.targetId || id;
+      }
+      if (mime === "application/vnd.google-apps.folder") {
+        stats.folders++;
+        await walk(id, name, parentName, acc, depth + 1, stats);
       } else {
-        acc.push({ file: c, parentName, grandName });
+        stats.files++;
+        acc.push({ file: { id, name, mimeType: mime }, parentName, grandName });
       }
     }
   }
@@ -5867,10 +5875,14 @@ function ImportadorDrive({ onDone }) {
     try {
       try { await setConfig("drive_api_key", apiKey); } catch (e) {}
       const acc = [];
-      await walk(id, "", "", acc, 0);
+      const stats = { folders: 0, files: 0 };
+      await walk(id, "", "", acc, 0, stats);
       const clasif = acc.map(clasificar).filter(Boolean);
       setItems(clasif);
-      setMsg(clasif.length ? `Encontré ${clasif.length} archivo(s) en ${new Set(clasif.map((i) => i.canto)).size} canto(s). Revisa y luego Importar.` : "No encontré archivos de audio/partitura en esa carpeta.");
+      if (clasif.length) setMsg(`Encontré ${clasif.length} archivo(s) en ${new Set(clasif.map((i) => i.canto)).size} canto(s). Revisa y luego Importar.`);
+      else if (stats.files > 0) setMsg(`Recorrí ${stats.folders} carpeta(s) y vi ${stats.files} archivo(s), pero ninguno parece audio/partitura (deben ser .mp3/.m4a/.wav o .pdf).`);
+      else if (stats.folders > 0) setMsg(`Recorrí ${stats.folders} carpeta(s) pero sin archivos dentro (o son accesos directos que no pude abrir).`);
+      else setMsg("La carpeta no devolvió contenido. Verifica el enlace, la clave y que esté en “Cualquiera con el enlace”.");
     } catch (e) { setMsg("⚠️ " + e.message); }
     setLoading(false);
   }
@@ -6947,28 +6959,28 @@ function Dashboard({
       {/* ── Cumpleañeros de hoy (solo ese día) ── */}
       {cumple.length > 0 && <CumpleanosHoyWidget cumple={cumple} />}
 
-      {/* ── Fila: Santoral | Próximos cumpleaños ── */}
-      <div className="grid-dash-main" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14, alignItems: "start" }}>
-        {santoral ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 12, background: "linear-gradient(180deg,#fffdf6,#fdf4df)", border: `1px solid ${C.gold}40`, borderRadius: 16, padding: "13px 15px" }}>
-            <div style={{ width: 38, height: 38, borderRadius: 12, flexShrink: 0, background: `linear-gradient(135deg,${C.gold},#caa017)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>✨</div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 9.5, fontWeight: 800, color: "#a9780a", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 1 }}>Santoral de hoy</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#5b4708", lineHeight: 1.25 }}>{santoral}</div>
-            </div>
+      {/* ── Santoral (franja completa) ── */}
+      {santoral && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "linear-gradient(180deg,#fffdf6,#fdf4df)", border: `1px solid ${C.gold}40`, borderRadius: 16, padding: "12px 16px", marginBottom: 14 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 11, flexShrink: 0, background: `linear-gradient(135deg,${C.gold},#caa017)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17 }}>✨</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 9.5, fontWeight: 800, color: "#a9780a", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 1 }}>Santoral de hoy</div>
+            <div style={{ fontSize: 14.5, fontWeight: 700, color: "#5b4708", lineHeight: 1.25 }}>{santoral}</div>
           </div>
-        ) : <div />}
-        <ProximosCumpleanosWidget members={members} setSection={setSection} />
-      </div>
+        </div>
+      )}
 
-      {/* ── Fila: Galería | Reconocimientos ── */}
+      {/* ── Fila: Próximos cumpleaños | Reconocimientos ── */}
       <div className="grid-dash-main" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14, alignItems: "start" }}>
-        <GaleriaWidget fotos={fotos} setSection={setSection} isAdmin={isAdmin} />
+        <ProximosCumpleanosWidget members={members} setSection={setSection} />
         <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} user={user} />
       </div>
 
-      {/* ── Video destacado ── */}
-      <VideoDestacadoWidget isAdmin={isAdmin} />
+      {/* ── Fila: Video destacado | Galería ── */}
+      <div className="grid-dash-main" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14, alignItems: "start" }}>
+        <VideoDestacadoWidget isAdmin={isAdmin} />
+        <GaleriaWidget fotos={fotos} setSection={setSection} isAdmin={isAdmin} />
+      </div>
 
       <div
         className="grid-dash-main"
@@ -7130,58 +7142,7 @@ function Dashboard({
         </div>
       </div>
 
-      <div
-        className="grid-dash-sub"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 14,
-          marginBottom: 14,
-        }}
-      >
-        <Card>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(10,90,200,0.10)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0a5ac8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></svg>
-            </div>
-            <div>
-              <div style={{ fontSize: 14.5, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.01em" }}>Agenda del Coro</div>
-              <div style={{ fontSize: 11, color: C.gray }}>Próximos ensayos y misas</div>
-            </div>
-          </div>
-          <div
-            style={{
-              borderRadius: 12,
-              overflow: "hidden",
-              border: `1px solid ${C.border}`,
-            }}
-          >
-            <iframe
-              src="https://calendar.google.com/calendar/embed?src=coromisionerosdjesuscl%40gmail.com&ctz=America%2FSantiago&hl=es&showTitle=0&showNav=0&showDate=0&showPrint=0&showTabs=0&showCalendars=0&showTz=0&mode=AGENDA"
-              style={{
-                width: "100%",
-                height: 200,
-                border: 0,
-                display: "block",
-              }}
-              title="Próximos eventos"
-            />
-          </div>
-          <button
-            onClick={() => setSection("agenda")}
-            style={{
-              fontSize: 12,
-              color: C.primary,
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: "8px 0 0",
-              fontWeight: 500,
-            }}
-          >
-            Ver agenda completa →
-          </button>
-        </Card>
+      <div style={{ marginBottom: 14 }}>
         <Card>
           <div
             style={{
@@ -7220,43 +7181,24 @@ function Dashboard({
             </a>
           </div>
           {noticias.length > 0 ? (
-            noticias.slice(0, 4).map((n, i) => (
-              <div
-                key={n.id || i}
-                style={{
-                  marginBottom: 10,
-                  paddingBottom: 10,
-                  borderBottom:
-                    i < Math.min(noticias.length, 4) - 1
-                      ? `1px solid ${C.border}`
-                      : "none",
-                }}
-              >
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 10 }}>
+              {noticias.slice(0, 6).map((n, i) => (
                 <a
+                  key={n.id || i}
                   href={n.url}
                   target="_blank"
                   rel="noopener"
-                  style={{ textDecoration: "none" }}
+                  style={{ textDecoration: "none", display: "block", border: "1px solid rgba(60,60,67,0.12)", borderRadius: 12, padding: "12px 14px", background: "white" }}
                 >
-                  <div
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: C.dark,
-                      lineHeight: 1.4,
-                      marginBottom: 3,
-                    }}
-                  >
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: "#1c1c1e", lineHeight: 1.4, marginBottom: 6 }}>
                     {n.titulo}
                   </div>
-                  <div
-                    style={{ fontSize: 10, color: C.primary, fontWeight: 500 }}
-                  >
+                  <div style={{ fontSize: 10.5, color: C.primary, fontWeight: 600 }}>
                     {n.fuente || "Vatican News"} →
                   </div>
                 </a>
-              </div>
-            ))
+              ))}
+            </div>
           ) : (
             <div
               style={{
