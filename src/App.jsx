@@ -966,7 +966,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
         {NAV.filter((item) => {
           const isVisita = esVisita(user);
           if (isVisita) {
-            return ["dashboard", "material_ensayo", "cancioneros"].includes(item.id);
+            return ["dashboard", "material_ensayo", "cancioneros", "pauta_misa"].includes(item.id);
           }
           if (item.id === "cancioneros") return false; if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
           if (item.id === "cancionero") return false;
@@ -979,7 +979,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
           const isVisita = esVisita(user);
           const VISITA_STYLES = {
             dashboard: { bg:"#0f3d6e", color:"white", icon:"⛪" },
-            material_ensayo: { bg:"#1c4a8a", color:"white", icon:"🎼" }, cancioneros: { bg:"#1c4a8a", color:"white", icon:"📄" },
+            material_ensayo: { bg:"#1c4a8a", color:"white", icon:"🎼" }, cancioneros: { bg:"#1c4a8a", color:"white", icon:"📄" }, pauta_misa: { bg:"#1c4a8a", color:"white", icon:"🎼" },
           };
           const vs = isVisita ? VISITA_STYLES[item.id] : null;
           const isActive = section === item.id;
@@ -2248,7 +2248,7 @@ export default function App() {
           {NAV.filter((item) => {
             const isVisita = esVisita(user);
             if (isVisita) {
-              return ["dashboard", "material_ensayo", "cancioneros"].includes(item.id);
+              return ["dashboard", "material_ensayo", "cancioneros", "pauta_misa"].includes(item.id);
             }
             // Sala de Ensayo: visible a TODOS los integrantes (el admin la habilita/deshabilita dentro)
             // Vista Invitado: solo Admin
@@ -5311,7 +5311,7 @@ function CancionerosInvitado({ user, isAdmin }) {
       const path = `cancioneros/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
       const res = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
         method: "POST",
-        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": file.type || "application/pdf", "x-upsert": "true" },
+        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" },
         body: file,
       });
       if (!res.ok) throw new Error("subida falló");
@@ -5338,8 +5338,8 @@ function CancionerosInvitado({ user, isAdmin }) {
       </div>
       {isAdmin && (
         <div style={{ background: "#f5f9ff", border: "1px solid #cfe0fb", borderRadius: 14, padding: 16, marginBottom: 18 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: AZUL, marginBottom: 8 }}>Subir archivo (PDF)</div>
-          <input ref={fileRef} type="file" accept="application/pdf" onChange={subir} disabled={subiendo} style={{ fontSize: 13 }} />
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: AZUL, marginBottom: 8 }}>Subir archivo (cualquier tipo)</div>
+          <input ref={fileRef} type="file" onChange={subir} disabled={subiendo} style={{ fontSize: 13 }} />
           {subiendo && <div style={{ fontSize: 12, color: "#8a8a90", marginTop: 8 }}>Subiendo…</div>}
           <div style={{ fontSize: 10.5, color: "#8a8a90", marginTop: 8 }}>Estos archivos los ve el perfil Invitado. Puedes borrarlos cuando ya no se necesiten.</div>
         </div>
@@ -5360,7 +5360,7 @@ function CancionerosInvitado({ user, isAdmin }) {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                <a href={r.url} target="_blank" rel="noopener" style={{ flex: 1, textAlign: "center", background: AZUL, color: "white", borderRadius: 9, padding: "8px 0", fontSize: 12.5, fontWeight: 700, textDecoration: "none" }}>Abrir PDF</a>
+                <a href={r.url} target="_blank" rel="noopener" style={{ flex: 1, textAlign: "center", background: AZUL, color: "white", borderRadius: 9, padding: "8px 0", fontSize: 12.5, fontWeight: 700, textDecoration: "none" }}>Abrir / descargar</a>
                 {isAdmin && <button onClick={() => borrar(r.id)} style={{ background: "#fff0f0", color: "#c0392b", border: "1px solid #f3c4c4", borderRadius: 9, padding: "8px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Borrar</button>}
               </div>
             </div>
@@ -11308,6 +11308,7 @@ const ADMIN_TABS = [
   { id: "documentos", label: "📄 Descargas Misas" },
   { id: "material_ensayo_admin", label: "📥 Material Ensayo (Invitado)" },
   { id: "material_coro_admin", label: "🎵 Material Coro" },
+  { id: "descargas_admin", label: "📄 Descargas (Invitado)" },
   { id: "oraciones", label: "✦ Oraciones" },
   { id: "noticias", label: "📢 Avisos" },
   { id: "preguntas", label: "❓ Preguntas" },
@@ -15040,19 +15041,22 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   }
 
   const thStyle = {
-    padding: "10px 12px",
+    padding: "11px 12px",
     textAlign: "left",
-    fontSize: 11,
-    fontWeight: 700,
-    color: "white",
-    background: "#1a3a2a",
+    fontSize: 10.5,
+    fontWeight: 600,
+    color: "#6b7280",
+    background: "#f7f8fa",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
     whiteSpace: "nowrap",
+    borderBottom: "1px solid rgba(60,60,67,0.12)",
   };
   const tdStyle = {
-    padding: "9px 12px",
-    fontSize: 12,
+    padding: "11px 12px",
+    fontSize: 12.5,
     color: C.dark,
-    borderBottom: `1px solid ${C.border}`,
+    borderBottom: "1px solid rgba(60,60,67,0.07)",
     verticalAlign: "top",
   };
   const tdEditStyle = {
@@ -15396,7 +15400,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
               + Agregar fila
             </Btn>
           </div>
-          <div style={{ overflowX: "auto" }}>
+          <div style={{ overflowX: "auto", border: "1px solid rgba(60,60,67,0.1)", borderRadius: 16, boxShadow: "0 1px 6px rgba(0,0,0,0.04)" }}>
             <table
               style={{
                 width: "100%",
@@ -15425,12 +15429,12 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     <button
                       onClick={toggleColLetra}
                       title={showColLetra ? "Ocultar URL Letra" : "Mostrar URL Letra (PDF)"}
-                      style={{ background: showColLetra ? "#1d6fc7" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer", marginRight: 3 }}
+                      style={{ background: showColLetra ? "#0a5ac8" : "#eef0f3", border: "none", borderRadius: 6, padding: "3px 8px", color: showColLetra ? "white" : "#6b7280", fontSize: 11, fontWeight: 700, cursor: "pointer", marginRight: 3 }}
                     >📄</button>
                     <button
                       onClick={toggleColAudio}
                       title={showColAudio ? "Ocultar URL Audio" : "Mostrar URL Audio Ref."}
-                      style={{ background: showColAudio ? "#1d6fc7" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer" }}
+                      style={{ background: showColAudio ? "#0a5ac8" : "#eef0f3", border: "none", borderRadius: 6, padding: "3px 8px", color: showColAudio ? "white" : "#6b7280", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
                     >▶</button>
                   </th>
                 </tr>
@@ -15928,7 +15932,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             </div>
           </div>
 
-          <div style={{ overflowX: "auto" }}>
+          <div style={{ overflowX: "auto", border: "1px solid rgba(60,60,67,0.1)", borderRadius: 16, boxShadow: "0 1px 6px rgba(0,0,0,0.04)" }}>
             <table
               style={{
                 width: "100%",
@@ -15963,12 +15967,12 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     <button
                       onClick={toggleColLetra}
                       title={showColLetra ? "Ocultar Letra (PDF)" : "Mostrar Letra (PDF)"}
-                      style={{ background: showColLetra ? "#1d6fc7" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer", marginRight: 3 }}
+                      style={{ background: showColLetra ? "#0a5ac8" : "#eef0f3", border: "none", borderRadius: 6, padding: "3px 8px", color: showColLetra ? "white" : "#6b7280", fontSize: 11, fontWeight: 700, cursor: "pointer", marginRight: 3 }}
                     >📄</button>
                     <button
                       onClick={toggleColAudio}
                       title={showColAudio ? "Ocultar Audio Ref." : "Mostrar Audio Ref."}
-                      style={{ background: showColAudio ? "#1d6fc7" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 5, padding: "2px 7px", color: "white", fontSize: 10, fontWeight: 700, cursor: "pointer" }}
+                      style={{ background: showColAudio ? "#0a5ac8" : "#eef0f3", border: "none", borderRadius: 6, padding: "3px 8px", color: showColAudio ? "white" : "#6b7280", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
                     >▶</button>
                   </th>
                 </tr>
@@ -15982,11 +15986,11 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       key={i}
                       style={{
                         background: c.pendiente
-                          ? "#fef9c3"
+                          ? "#fdf6da"
                           : i % 2 === 0
                           ? "#ffffff"
-                          : "#f8fffe",
-                        boxShadow: c.pendiente ? "inset 3px 0 0 #eab308" : "none",
+                          : "#fbfcfd",
+                        boxShadow: c.pendiente ? "inset 3px 0 0 #e0a92e" : "none",
                       }}
                     >
                       <td
@@ -19340,6 +19344,11 @@ function Admin({
               </div>
               <MaterialEnsayo docs={materialCoro} user={user} />
             </div>
+          </div>
+        )}
+        {tab === "descargas_admin" && (
+          <div>
+            <CancionerosInvitado user={user} isAdmin={true} />
           </div>
         )}
         {tab === "oraciones" && (
