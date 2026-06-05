@@ -15944,7 +15944,6 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                 <tr>
                   {[
                     "N°",
-                    "Tr",
                     "Orden Litúrgico",
                     "Canción",
                     "Autor",
@@ -15956,8 +15955,8 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       key={i}
                       style={{
                         ...thStyle,
-                        textAlign: i <= 1 ? "center" : "left",
-                        width: i === 0 ? "40px" : i === 1 ? "35px" : "auto",
+                        textAlign: i === 0 ? "center" : "left",
+                        width: i === 0 ? "46px" : "auto",
                       }}
                     >
                       {h}
@@ -15995,13 +15994,6 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     >
                       <td style={{ ...tdStyle, textAlign: "center", width: 44, verticalAlign: "middle" }}>
                         <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: c.pendiente ? "#fdf3da" : "#eef2f7", color: c.pendiente ? "#b45309" : "#475569", fontSize: 11.5, fontWeight: 700 }}>{c.n}</span>
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: "center", width: 40, verticalAlign: "middle" }}>
-                        {c.url_audio && c.url_audio.includes("http") ? (
-                          <a href={c.url_audio} target="_blank" rel="noopener" title="Reproducir audio referencial" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 27, height: 27, borderRadius: "50%", background: c.pendiente ? "#e0a92e" : "#0a5ac8", color: "white", textDecoration: "none", fontSize: 10, boxShadow: "0 1px 3px rgba(0,0,0,0.18)" }}>▶</a>
-                        ) : (
-                          <span style={{ color: "#cbd5e1", fontSize: 13 }}>—</span>
-                        )}
                       </td>
                       <td
                         style={{
