@@ -3863,7 +3863,7 @@ function VocalizacionWidget({ isAdmin }) {
           🙏
         </div>
         <div style={{ flex:1 }}>
-          <div style={{ fontSize:13, fontWeight:600, color:"#1c1c1e", letterSpacing:"-0.016em" }}>Oraciones</div>
+          <div style={{ fontSize:13, fontWeight:600, color:"#1c1c1e", letterSpacing:"-0.016em" }}>Reflexiones</div>
           <div style={{ fontSize:11, color:"#8e8e93" }}>{videoId ? "YouTube" : "Sin video asignado"}</div>
         </div>
         {isAdmin && (
@@ -3886,7 +3886,7 @@ function VocalizacionWidget({ isAdmin }) {
       )}
       {videoId ? (
         <div style={{ position:"relative", paddingTop:"56.25%", background:"#000" }}>
-          <iframe key={videoId} src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`} style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none" }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="Oraciones" />
+          <iframe key={videoId} src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`} style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none" }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="Reflexiones" />
         </div>
       ) : isAdmin ? (
         <div style={{ padding:"32px 20px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:6, background:"rgba(242,242,247,0.5)" }}>
@@ -7148,6 +7148,18 @@ function Dashboard({
       )}
       <ProximosCumpleanosWidget members={members} setSection={setSection} />
       <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} user={user} />
+      <div style={{ background: "white", borderRadius: 16, overflow: "hidden", border: "1px solid rgba(60,60,67,0.1)", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 13px 8px" }}>
+          <div style={{ width: 28, height: 28, borderRadius: 9, background: "#1DB954", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm4.59 14.42a.62.62 0 0 1-.86.21c-2.35-1.44-5.3-1.76-8.79-.96a.62.62 0 1 1-.28-1.21c3.81-.87 7.08-.5 9.71 1.11.3.18.39.57.22.85Zm1.23-2.73a.78.78 0 0 1-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.17a.78.78 0 1 1-.45-1.49c3.63-1.1 8.15-.56 11.23 1.33.37.22.49.71.26 1.07Zm.11-2.85C14.81 8.94 9.4 8.76 6.3 9.7a.93.93 0 1 1-.54-1.78c3.56-1.08 9.53-.87 13.29 1.36a.93.93 0 0 1-.96 1.6Z"/></svg>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.dark }}>Playlist Coro MJ</div>
+            <div style={{ fontSize: 10.5, color: C.gray }}>Reproduce aquí mismo</div>
+          </div>
+        </div>
+        <iframe title="Spotify Coro MJ" src="https://open.spotify.com/embed/playlist/3ssNSNlljyYlw2La83mXZE?utm_source=generator&theme=0" width="100%" height="232" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" style={{ display: "block", border: 0 }} />
+      </div>
         </div>
       </div>
 
@@ -7285,25 +7297,6 @@ function Dashboard({
         <VocalizacionWidget isAdmin={isAdmin} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <Card style={{ flex: 1, overflow: "hidden", padding: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "13px 15px 10px" }}>
-              <div style={{ width: 30, height: 30, borderRadius: 9, background: "#1DB954", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm4.59 14.42a.62.62 0 0 1-.86.21c-2.35-1.44-5.3-1.76-8.79-.96a.62.62 0 1 1-.28-1.21c3.81-.87 7.08-.5 9.71 1.11.3.18.39.57.22.85Zm1.23-2.73a.78.78 0 0 1-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.17a.78.78 0 1 1-.45-1.49c3.63-1.1 8.15-.56 11.23 1.33.37.22.49.71.26 1.07Zm.11-2.85C14.81 8.94 9.4 8.76 6.3 9.7a.93.93 0 1 1-.54-1.78c3.56-1.08 9.53-.87 13.29 1.36a.93.93 0 0 1-.96 1.6Z"/></svg>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: C.dark }}>Playlist Coro MJ</div>
-                <div style={{ fontSize: 11, color: C.gray }}>Reproduce aquí mismo</div>
-              </div>
-            </div>
-            <iframe
-              title="Spotify Coro MJ"
-              src="https://open.spotify.com/embed/playlist/3ssNSNlljyYlw2La83mXZE?utm_source=generator&theme=0"
-              width="100%" height="352" frameBorder="0"
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              loading="lazy"
-              style={{ display: "block", border: 0 }}
-            />
-          </Card>
           <Card style={{ flex: 1 }}>
             <YoutubeWidget compact />
           </Card>
