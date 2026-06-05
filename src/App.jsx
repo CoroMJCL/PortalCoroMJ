@@ -5394,11 +5394,25 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
     if (d.momento && !map[key].momento) map[key].momento = d.momento;
     if (d.orden != null && d.orden !== "" && !isNaN(+d.orden)) map[key].orden = Math.min(map[key].orden, +d.orden);
   });
-  const MOM_ORDER = { "entrada": 1, "acto penitencial": 2, "señor ten piedad": 2, "gloria": 3, "salmo": 4, "aleluya": 5, "ofertorio": 6, "santo": 7, "cordero": 8, "cordero de dios": 8, "comunión": 9, "comunion": 9, "salida": 10, "final": 10 };
+  const MOM_ORDER = {
+    "entrada": 1,
+    "acto penitencial": 2, "perdón": 2, "perdon": 2, "kyrie": 2, "perdón (kyrie)": 2, "perdon (kyrie)": 2, "señor ten piedad": 2, "senor ten piedad": 2,
+    "gloria": 3,
+    "salmo": 4, "salmo responsorial": 4,
+    "aclamación": 5, "aclamacion": 5, "aclamación evangelio": 5, "aclamacion evangelio": 5, "aleluya": 5,
+    "proclamación": 6, "proclamacion": 6, "proclamación evangelio": 6, "proclamacion evangelio": 6,
+    "ofertorio": 7,
+    "santo": 8,
+    "cordero": 9, "cordero de dios": 9, "paz": 9,
+    "comunión": 10, "comunion": 10,
+    "comunión espiritual": 11, "comunion espiritual": 11,
+    "otro": 12,
+    "salida": 13, "final": 13, "canto final": 13, "despedida": 13,
+  };
   let cantos = Object.values(map).sort((a, b) => {
-    if (a.orden !== b.orden) return a.orden - b.orden;
     const ma = MOM_ORDER[norm(a.momento)] || 50, mb = MOM_ORDER[norm(b.momento)] || 50;
     if (ma !== mb) return ma - mb;
+    if (a.orden !== b.orden) return a.orden - b.orden;
     return a.nombre.localeCompare(b.nombre);
   });
   if (search) cantos = cantos.filter((c) => norm(c.nombre).includes(norm(search)));
@@ -12507,6 +12521,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload, tabla = "material_ensay
 
   return (
     <div>
+      {tabla === "material_ensayo" && (<>
       {/* ── AFICHE DE MISA (widget del perfil Invitado) ── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{
@@ -12544,6 +12559,7 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload, tabla = "material_ensay
         </div>
         <AgendaInvitado isAdmin={true} />
       </div>
+      </>)}
 
       {/* Header explicativo */}
       <div style={{
@@ -12554,11 +12570,12 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload, tabla = "material_ensay
         <div style={{ fontSize: 32 }}>📥</div>
         <div>
           <div style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 700, color: "white", marginBottom: 3 }}>
-            Material de Ensayo — Acceso Invitado
+            {tabla === "material_coro" ? "Material del Coro — Integrantes" : "Material de Ensayo — Acceso Invitado"}
           </div>
           <div style={{ fontSize: 11, color: "rgba(255,255,255,0.72)", lineHeight: 1.6 }}>
-            Archivos publicados <strong style={{ color: "white" }}>exclusivamente</strong> para el perfil Invitado / Coro Provisorio.
-            Son independientes de "Descargas Misas" del coro propio.
+            {tabla === "material_coro"
+              ? <>Material de estudio para los <strong style={{ color: "white" }}>integrantes del coro</strong>. Independiente del perfil Invitado.</>
+              : <>Archivos publicados <strong style={{ color: "white" }}>exclusivamente</strong> para el perfil Invitado / Coro Provisorio. Son independientes de "Descargas Misas" del coro propio.</>}
           </div>
         </div>
       </div>
