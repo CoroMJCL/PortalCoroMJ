@@ -626,6 +626,7 @@ const NAV = [
   { id: "podcast",          icon: "◉",  label: "Podcast" },
   { id: "qanda",            icon: "?",  label: "Preguntas" },
   { id: "material_ensayo",  icon: "📥", label: "Ensayos Coro" },
+  { id: "cancioneros",  icon: "📕", label: "Cancioneros" },
   { id: "vista_invitado",   icon: "👁", label: "Vista Invitado" },
   { id: "cantos_pdf",       icon: "📄", label: "Cantos PDF" },
   { id: "audios",           icon: "🎧", label: "Audios" },
@@ -965,9 +966,9 @@ function MobileMenu({ section, setSection, onClose, user }) {
         {NAV.filter((item) => {
           const isVisita = esVisita(user);
           if (isVisita) {
-            return ["dashboard", "material_ensayo"].includes(item.id);
+            return ["dashboard", "material_ensayo", "cancioneros"].includes(item.id);
           }
-          if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
+          if (item.id === "cancioneros" && !esCuerdaAdmin(user)) return false; if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
           if (item.id === "cancionero") return false;
             if (item.id === "musica") return false;
           if (item.id === "cantos_pdf" || item.id === "audios") return false;
@@ -978,7 +979,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
           const isVisita = esVisita(user);
           const VISITA_STYLES = {
             dashboard: { bg:"#0f3d6e", color:"white", icon:"⛪" },
-            material_ensayo: { bg:"#1c4a8a", color:"white", icon:"🎼" },
+            material_ensayo: { bg:"#1c4a8a", color:"white", icon:"🎼" }, cancioneros: { bg:"#1c4a8a", color:"white", icon:"📕" },
           };
           const vs = isVisita ? VISITA_STYLES[item.id] : null;
           const isActive = section === item.id;
@@ -1038,6 +1039,30 @@ function MobileMenu({ section, setSection, onClose, user }) {
 // ══════════════════════════════════════════
 //  APP PRINCIPAL
 // ══════════════════════════════════════════
+function SpotifyBarWidget() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: "relative", flexShrink: 0 }}>
+      <button onClick={() => setOpen((p) => !p)} title="Música del Coro"
+        style={{ display: "flex", alignItems: "center", gap: 7, background: open ? "#e8f8ee" : C.light, border: `1px solid ${open ? "#1DB954" : C.border}`, borderRadius: 9, padding: "5px 11px", cursor: "pointer", transition: "all 0.18s" }}>
+        <span style={{ width: 18, height: 18, borderRadius: "50%", background: "#1DB954", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm4.59 14.42a.62.62 0 0 1-.86.21c-2.35-1.44-5.3-1.76-8.79-.96a.62.62 0 1 1-.28-1.21c3.81-.87 7.08-.5 9.71 1.11.3.18.39.57.22.85Zm1.23-2.73a.78.78 0 0 1-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.17a.78.78 0 1 1-.45-1.49c3.63-1.1 8.15-.56 11.23 1.33.37.22.49.71.26 1.07Zm.11-2.85C14.81 8.94 9.4 8.76 6.3 9.7a.93.93 0 1 1-.54-1.78c3.56-1.08 9.53-.87 13.29 1.36a.93.93 0 0 1-.96 1.6Z" /></svg>
+        </span>
+        <div style={{ textAlign: "left" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.dark, lineHeight: 1.1 }}>Música</div>
+          <div style={{ fontSize: 9, color: C.gray, lineHeight: 1.2 }}>Coro MJ</div>
+        </div>
+        <span style={{ fontSize: 9, color: C.gray, marginLeft: 2 }}>{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, width: 320, maxWidth: "90vw", background: "white", borderRadius: 14, boxShadow: "0 12px 40px rgba(0,0,0,0.18)", border: `1px solid ${C.border}`, overflow: "hidden", zIndex: 200 }}>
+          <iframe title="Spotify Coro MJ" src="https://open.spotify.com/embed/playlist/3ssNSNlljyYlw2La83mXZE?utm_source=generator&theme=0" width="100%" height="352" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" style={{ display: "block", border: 0 }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RadioMariaWidget() {
   const [open, setOpen] = useState(false);
   const audioRef = useRef(null);
@@ -2223,11 +2248,11 @@ export default function App() {
           {NAV.filter((item) => {
             const isVisita = esVisita(user);
             if (isVisita) {
-              return ["dashboard", "material_ensayo"].includes(item.id);
+              return ["dashboard", "material_ensayo", "cancioneros"].includes(item.id);
             }
             // Sala de Ensayo: visible a TODOS los integrantes (el admin la habilita/deshabilita dentro)
             // Vista Invitado: solo Admin
-            if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
+            if (item.id === "cancioneros" && !esCuerdaAdmin(user)) return false; if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
             // Canto Digital ahora vive dentro de la Sala de Ensayo
             if (item.id === "cancionero") return false;
             if (item.id === "musica") return false;
@@ -2521,7 +2546,7 @@ export default function App() {
             )}
           </div>
 
-          <RadioMariaWidget />
+          <SpotifyBarWidget />
 
           {/* Clima + Fecha + Saludo — solo desktop */}
           <style>{`.topbar-extras { display: flex; } @media(max-width:640px){ .topbar-extras { display: none !important; } }`}</style>
@@ -2760,6 +2785,9 @@ export default function App() {
               )}
               {section === "info_gastos" && (
                 <InfoGastos user={user} members={members} />
+              )}
+              {section === "cancioneros" && (
+                <CancionerosInvitado user={user} isAdmin={esCuerdaAdmin(user)} />
               )}
               {section === "material_ensayo" && esVisita(user) && (
                 <MaterialEnsayo docs={materialEnsayo} user={user} />
@@ -5263,6 +5291,83 @@ REGLAS ESTRICTAS:
   );
 }
 
+function CancionerosInvitado({ user, isAdmin }) {
+  const [rows, setRows] = useState(null);
+  const [subiendo, setSubiendo] = useState(false);
+  const fileRef = useRef(null);
+  async function load() {
+    try { const r = await supabase("cancioneros_pdf", { order: "&order=created_at.desc" }); setRows(r || []); }
+    catch (e) { setRows([]); }
+  }
+  useEffect(() => { load(); }, []);
+  async function subir(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setSubiendo(true);
+    try {
+      const path = `cancioneros/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
+        method: "POST",
+        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": file.type || "application/pdf", "x-upsert": "true" },
+        body: file,
+      });
+      if (!res.ok) throw new Error("subida falló");
+      const url = `${SUPABASE_URL}/storage/v1/object/public/publico/${path}`;
+      await supabase("cancioneros_pdf", { method: "POST", body: { nombre: file.name, url, size: `${(file.size / 1048576).toFixed(1)} MB` } });
+      await load();
+    } catch (er) { alert("No se pudo subir el PDF."); }
+    setSubiendo(false);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+  async function borrar(id) {
+    if (!window.confirm("¿Eliminar este cancionero?")) return;
+    try { await deleteRecord("cancioneros_pdf", id); await load(); } catch (e) {}
+  }
+  const AZUL = "#0a5ac8";
+  return (
+    <div style={{ maxWidth: 900 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+        <div style={{ width: 46, height: 46, borderRadius: 14, background: "rgba(10,90,200,0.10)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>📕</div>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.02em" }}>Cancioneros</div>
+          <div style={{ fontSize: 12.5, color: "#8a8a90" }}>Cuadernillos en PDF para la misa</div>
+        </div>
+      </div>
+      {isAdmin && (
+        <div style={{ background: "#f5f9ff", border: "1px solid #cfe0fb", borderRadius: 14, padding: 16, marginBottom: 18 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: AZUL, marginBottom: 8 }}>Subir cancionero (PDF)</div>
+          <input ref={fileRef} type="file" accept="application/pdf" onChange={subir} disabled={subiendo} style={{ fontSize: 13 }} />
+          {subiendo && <div style={{ fontSize: 12, color: "#8a8a90", marginTop: 8 }}>Subiendo…</div>}
+          <div style={{ fontSize: 10.5, color: "#8a8a90", marginTop: 8 }}>Estos PDF los ve el perfil Invitado. Puedes borrarlos cuando termine la misa.</div>
+        </div>
+      )}
+      {rows === null ? (
+        <div style={{ textAlign: "center", color: "#8a8a90", padding: "30px 0", fontSize: 13 }}>Cargando…</div>
+      ) : rows.length === 0 ? (
+        <div style={{ background: "rgba(242,242,247,0.7)", borderRadius: 16, padding: "34px 22px", textAlign: "center", color: "#8a8a90", fontSize: 13.5 }}>📕 Aún no hay cancioneros publicados.</div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 12 }}>
+          {rows.map((r) => (
+            <div key={r.id} style={{ background: "white", border: "1px solid rgba(60,60,67,0.12)", borderRadius: 14, padding: "14px 15px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <div style={{ fontSize: 22 }}>📕</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: "#1c1c1e", lineHeight: 1.3, wordBreak: "break-word" }}>{r.nombre}</div>
+                  {r.size && <div style={{ fontSize: 11, color: "#a0a0a6", marginTop: 2 }}>{r.size}</div>}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <a href={r.url} target="_blank" rel="noopener" style={{ flex: 1, textAlign: "center", background: AZUL, color: "white", borderRadius: 9, padding: "8px 0", fontSize: 12.5, fontWeight: 700, textDecoration: "none" }}>Abrir PDF</a>
+                {isAdmin && <button onClick={() => borrar(r.id)} style={{ background: "#fff0f0", color: "#c0392b", border: "1px solid #f3c4c4", borderRadius: 9, padding: "8px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Borrar</button>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MaterialEnsayo({ docs, user, catFiltroInicial }) {
   const norm = _normME;
   const [miCuerda, setMiCuerda] = useState(() => { try { return localStorage.getItem("me_mi_cuerda") || ""; } catch { return ""; } });
@@ -5394,6 +5499,17 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
 
       {!cantoActivo ? (
         <div className="me-fade">
+          <details style={{ marginBottom: 14, background: "#f5f9ff", border: "1px solid #cfe0fb", borderRadius: 14 }}>
+            <summary style={{ cursor: "pointer", padding: "11px 16px", fontSize: 13, fontWeight: 700, color: "#0a5ac8", listStyle: "none" }}>❓ ¿Cómo se usa esta sala?</summary>
+            <div style={{ padding: "2px 16px 14px", fontSize: 12.5, color: "#3a3a40", lineHeight: 1.65 }}>
+              <div style={{ marginBottom: 6 }}><strong>1. Elige tu cuerda</strong> arriba (Soprano, Contralto, Tenor, Bajo o Instrumentos). El reproductor cargará tu voz sola.</div>
+              <div style={{ marginBottom: 6 }}><strong>2. Toca un canto</strong> de la lista para abrirlo.</div>
+              <div style={{ marginBottom: 6 }}><strong>3. Escucha tu pista:</strong> ▶ para reproducir. Baja la <strong>velocidad</strong> (0.75x / 0.9x) para aprender un pasaje difícil, y fija un tramo con <strong>A</strong> y <strong>B</strong> para repetirlo en bucle.</div>
+              <div style={{ marginBottom: 6 }}><strong>4. Cambia de voz</strong> cuando quieras: toca otra cuerda y sonará esa pista.</div>
+              <div style={{ marginBottom: 6 }}><strong>5. Lee la partitura y la letra</strong> en pantalla, y descarga tu pista con <strong>↓ Descargar</strong>.</div>
+              <div><strong>6. Marca tu avance</strong> en cada canto: Pendiente → En práctica → Aprendido.</div>
+            </div>
+          </details>
           {/* Buscador */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "white", borderRadius: 11, padding: "8px 13px", border: "1px solid rgba(60,60,67,0.12)", marginBottom: 14 }}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#8e8e93" strokeWidth="1.3" /><path d="M9.5 9.5l3 3" stroke="#8e8e93" strokeWidth="1.3" strokeLinecap="round" /></svg>
@@ -5424,25 +5540,23 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                       {estO && <span style={{ fontSize: 9.5, fontWeight: 700, color: estO.color, background: estO.bg, borderRadius: 6, padding: "2px 8px" }}>{estO.label}</span>}
                     </div>
                     <div style={{ fontSize: 15, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 10 }}>{c.nombre}</div>
-                    {/* Disponibilidad por voz */}
-                    <div style={{ display: "flex", gap: 5, marginBottom: 10 }}>
-                      {VOCES_ENSAYO.map((v) => {
-                        const aud = tieneVozAudio(c, v.id);
-                        const algo = tieneVozAlgo(c, v.id);
-                        const mine = v.id === miCuerda;
-                        return (
-                          <div key={v.key} title={`${v.id}${aud ? " · con pista de audio" : algo ? " · con material" : " · sin material"}`}
-                            style={{ width: 18, height: 18, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9.5, fontWeight: 700, background: aud ? v.light : "transparent", color: aud ? v.dark : (algo ? "#8a8a90" : "#c7c7cc"), border: mine ? `1.5px solid ${v.color}` : `1px solid ${aud ? v.color + "44" : "rgba(60,60,67,0.12)"}` }}>
-                            {v.id[0]}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ fontSize: 11, color: tieneLetra ? "#3c3c43" : "#c7c7cc" }}>📝 Letra</span>
-                      <span style={{ fontSize: 11, color: tienePart ? "#3c3c43" : "#c7c7cc" }}>🎼 Partitura</span>
-                      <span style={{ fontSize: 11, color: tieneVideo ? "#3c3c43" : "#c7c7cc" }}>🎬 Video</span>
-                      <span style={{ marginLeft: "auto", fontSize: 15, color: C.primary, fontWeight: 700 }}>›</span>
+                    {/* Voces con pista (claro, en palabras) */}
+                    {(() => {
+                      const conAudio = VOCES_ENSAYO.filter((v) => tieneVozAudio(c, v.id));
+                      return conAudio.length > 0 ? (
+                        <div style={{ fontSize: 11.5, color: "#5a5a60", marginBottom: 10, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", lineHeight: 1.4 }}>
+                          <span style={{ fontSize: 13 }}>🎧</span>
+                          <span><strong style={{ color: "#1c1c1e" }}>Voces:</strong> {conAudio.map((v) => v.id).join(" · ")}</span>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 11.5, color: "#a0a0a6", marginBottom: 10 }}>🎧 Sin pistas de audio aún</div>
+                      );
+                    })()}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      {tieneLetra && <span style={{ fontSize: 11, fontWeight: 600, color: "#3c3c43", background: "rgba(60,60,67,0.06)", borderRadius: 7, padding: "3px 8px" }}>📝 Letra</span>}
+                      {tienePart && <span style={{ fontSize: 11, fontWeight: 600, color: "#3c3c43", background: "rgba(60,60,67,0.06)", borderRadius: 7, padding: "3px 8px" }}>🎼 Partitura</span>}
+                      {tieneVideo && <span style={{ fontSize: 11, fontWeight: 600, color: "#3c3c43", background: "rgba(60,60,67,0.06)", borderRadius: 7, padding: "3px 8px" }}>🎬 Video</span>}
+                      <span style={{ marginLeft: "auto", fontSize: 12, color: C.primary, fontWeight: 800 }}>Estudiar ›</span>
                     </div>
                   </button>
                 );
@@ -6308,7 +6422,7 @@ function Dashboard({
     });
   };
   return (
-    <div style={{ maxWidth: 1100 }}>
+    <div style={{ maxWidth: 1280 }}>
       {/* ═══ MODO VISITA — Dashboard especial ═══ */}
       {isVisita && (
         <DashboardVisita user={user} pautas={pautas} setSection={setSection} isAdmin={isAdmin} evangelio={evangelio} comunidades={comunidades} />
@@ -6512,6 +6626,8 @@ function Dashboard({
       ))}
 
       {/* ── Recordatorio de cuota del mes (desaparece cuando todos pagan) ── */}
+      <style>{`.dash-board{columns:340px;column-gap:16px}.dash-board>*{-webkit-column-break-inside:avoid;break-inside:avoid}@media(max-width:760px){.dash-board{columns:1}}`}</style>
+      <div className="dash-board">
       <CuotaRecordatorioWidget members={members} user={user} setSection={setSection} />
 
       {/* ── Stats con foto de usuario ── */}
@@ -7028,17 +7144,11 @@ function Dashboard({
         </div>
       )}
 
-      {/* ── Fila: Próximos cumpleaños | Reconocimientos ── */}
-      <div className="grid-dash-main" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14, alignItems: "start" }}>
-        <ProximosCumpleanosWidget members={members} setSection={setSection} />
-        <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} user={user} />
-      </div>
-
-      {/* ── Fila: Video destacado | Galería ── */}
-      <div className="grid-dash-main" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14, alignItems: "start" }}>
-        <VideoDestacadoWidget isAdmin={isAdmin} />
-        <GaleriaWidget fotos={fotos} setSection={setSection} isAdmin={isAdmin} />
-      </div>
+      <ProximosCumpleanosWidget members={members} setSection={setSection} />
+      <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} user={user} />
+      <VideoDestacadoWidget isAdmin={isAdmin} />
+      <GaleriaWidget fotos={fotos} setSection={setSection} isAdmin={isAdmin} />
+      </div>{/* fin tablero */}
 
       <div
         className="grid-dash-main"
@@ -22438,6 +22548,13 @@ CREATE TABLE IF NOT EXISTS material_coro (
 );
 ALTER TABLE material_coro ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "material_coro_all" ON material_coro FOR ALL USING (true) WITH CHECK (true);
+-- Cancioneros (PDF) del perfil Invitado: se suben y se borran tras la misa. Independiente del material por canto.
+CREATE TABLE IF NOT EXISTS cancioneros_pdf (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  nombre TEXT, url TEXT, size TEXT, created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE cancioneros_pdf ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "cancioneros_pdf_all" ON cancioneros_pdf FOR ALL USING (true) WITH CHECK (true);
 -- Repertorio del CORO leído desde Google Drive (en desuso)
 CREATE TABLE IF NOT EXISTS repertorio_drive (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
