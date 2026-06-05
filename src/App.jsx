@@ -6628,14 +6628,8 @@ function Dashboard({
         </div>
       ))}
 
-      {/* ── Recordatorio de cuota del mes (desaparece cuando todos pagan) ── */}
-      <style>{`.dash-board{columns:340px;column-gap:16px}.dash-board>*{-webkit-column-break-inside:avoid;break-inside:avoid}@media(max-width:760px){.dash-board{columns:1}}`}</style>
-      <div style={{ marginBottom: 16 }}>
-        <ComunicadosWidget isAdmin={isAdmin} />
-      </div>
-      <div className="dash-board">
-      <CuotaRecordatorioWidget members={members} user={user} setSection={setSection} />
-
+      {/* ── Inicio: hero + cuota a lo ancho, luego 2 columnas ── */}
+      <style>{`.dash-2col{display:grid;grid-template-columns:1.65fr 1fr;gap:14px;align-items:start}.dash-col{display:flex;flex-direction:column;gap:14px;min-width:0}@media(max-width:860px){.dash-2col{grid-template-columns:1fr}}`}</style>
       {/* ── Stats con foto de usuario ── */}
       <div
         className="grid-stats"
@@ -6883,7 +6877,9 @@ function Dashboard({
           <style>{`@keyframes pulseGold { 0% { box-shadow: 0 0 0 0 ${C.gold}77; } 70% { box-shadow: 0 0 0 6px ${C.gold}00; } 100% { box-shadow: 0 0 0 0 ${C.gold}00; } }`}</style>
         </Card>
       </div>
-
+      <CuotaRecordatorioWidget members={members} user={user} setSection={setSection} />
+      <div className="dash-2col">
+        <div className="dash-col">
       {/* ── Avisos del Coro ── */}
       {avisos && avisos.length > 0 && (
         <div style={{ marginBottom: 14 }}>
@@ -7129,13 +7125,17 @@ function Dashboard({
             ))}
         </div>
       )}
-
+      <div style={{ marginBottom: 16 }}>
+        <ComunicadosWidget isAdmin={isAdmin} />
+      </div>
+      <VideoDestacadoWidget isAdmin={isAdmin} />
+      <GaleriaWidget fotos={fotos} setSection={setSection} isAdmin={isAdmin} />
+        </div>
+        <div className="dash-col">
       {/* ── Valores del coro ── */}
       <ValoresWidget />
-
       {/* ── Cumpleañeros de hoy (solo ese día) ── */}
       {cumple.length > 0 && <CumpleanosHoyWidget cumple={cumple} />}
-
       {/* ── Santoral (franja completa) ── */}
       {santoral && (
         <div style={{ display: "flex", alignItems: "center", gap: 12, background: "linear-gradient(180deg,#fffdf6,#fdf4df)", border: `1px solid ${C.gold}40`, borderRadius: 16, padding: "12px 16px", marginBottom: 14 }}>
@@ -7146,12 +7146,10 @@ function Dashboard({
           </div>
         </div>
       )}
-
       <ProximosCumpleanosWidget members={members} setSection={setSection} />
       <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} user={user} />
-      <VideoDestacadoWidget isAdmin={isAdmin} />
-      <GaleriaWidget fotos={fotos} setSection={setSection} isAdmin={isAdmin} />
-      </div>{/* fin tablero */}
+        </div>
+      </div>
 
       <div
         className="grid-dash-main"
@@ -17778,6 +17776,11 @@ function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
                     <span style={{ opacity:0.7 }}> · {fecha}</span>
                   </div>
                 </div>
+                {r.id && (
+                  <div style={{ marginTop:10, paddingTop:10, borderTop:"1px solid rgba(60,60,67,0.08)" }}>
+                    <ReaccionesBar recoId={r.id} userId={user?.id} />
+                  </div>
+                )}
               </div>
             </div>
 
