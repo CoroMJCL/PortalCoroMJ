@@ -626,7 +626,7 @@ const NAV = [
   { id: "podcast",          icon: "◉",  label: "Podcast" },
   { id: "qanda",            icon: "?",  label: "Preguntas" },
   { id: "material_ensayo",  icon: "📥", label: "Ensayos Coro" },
-  { id: "cancioneros",  icon: "📕", label: "Cancioneros" },
+  { id: "cancioneros",  icon: "📄", label: "Descargas" },
   { id: "vista_invitado",   icon: "👁", label: "Vista Invitado" },
   { id: "cantos_pdf",       icon: "📄", label: "Cantos PDF" },
   { id: "audios",           icon: "🎧", label: "Audios" },
@@ -968,7 +968,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
           if (isVisita) {
             return ["dashboard", "material_ensayo", "cancioneros"].includes(item.id);
           }
-          if (item.id === "cancioneros" && !esCuerdaAdmin(user)) return false; if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
+          if (item.id === "cancioneros") return false; if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
           if (item.id === "cancionero") return false;
             if (item.id === "musica") return false;
           if (item.id === "cantos_pdf" || item.id === "audios") return false;
@@ -979,7 +979,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
           const isVisita = esVisita(user);
           const VISITA_STYLES = {
             dashboard: { bg:"#0f3d6e", color:"white", icon:"⛪" },
-            material_ensayo: { bg:"#1c4a8a", color:"white", icon:"🎼" }, cancioneros: { bg:"#1c4a8a", color:"white", icon:"📕" },
+            material_ensayo: { bg:"#1c4a8a", color:"white", icon:"🎼" }, cancioneros: { bg:"#1c4a8a", color:"white", icon:"📄" },
           };
           const vs = isVisita ? VISITA_STYLES[item.id] : null;
           const isActive = section === item.id;
@@ -2252,7 +2252,7 @@ export default function App() {
             }
             // Sala de Ensayo: visible a TODOS los integrantes (el admin la habilita/deshabilita dentro)
             // Vista Invitado: solo Admin
-            if (item.id === "cancioneros" && !esCuerdaAdmin(user)) return false; if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
+            if (item.id === "cancioneros") return false; if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
             // Canto Digital ahora vive dentro de la Sala de Ensayo
             if (item.id === "cancionero") return false;
             if (item.id === "musica") return false;
@@ -2818,6 +2818,9 @@ export default function App() {
                     evangelio={evangelio}
                     comunidades={comunidades}
                   />
+                  <div style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid rgba(60,60,67,0.12)" }}>
+                    <CancionerosInvitado user={user} isAdmin={true} />
+                  </div>
                 </div>
               )}
               {section === "cantos_pdf" && esVisita(user) && (
@@ -5320,7 +5323,7 @@ function CancionerosInvitado({ user, isAdmin }) {
     if (fileRef.current) fileRef.current.value = "";
   }
   async function borrar(id) {
-    if (!window.confirm("¿Eliminar este cancionero?")) return;
+    if (!window.confirm("¿Eliminar este archivo?")) return;
     try { await deleteRecord("cancioneros_pdf", id); await load(); } catch (e) {}
   }
   const AZUL = "#0a5ac8";
@@ -5329,22 +5332,22 @@ function CancionerosInvitado({ user, isAdmin }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
         <div style={{ width: 46, height: 46, borderRadius: 14, background: "rgba(10,90,200,0.10)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>📕</div>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.02em" }}>Cancioneros</div>
-          <div style={{ fontSize: 12.5, color: "#8a8a90" }}>Cuadernillos en PDF para la misa</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.02em" }}>Descargas</div>
+          <div style={{ fontSize: 12.5, color: "#8a8a90" }}>Archivos en PDF para descargar</div>
         </div>
       </div>
       {isAdmin && (
         <div style={{ background: "#f5f9ff", border: "1px solid #cfe0fb", borderRadius: 14, padding: 16, marginBottom: 18 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: AZUL, marginBottom: 8 }}>Subir cancionero (PDF)</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: AZUL, marginBottom: 8 }}>Subir archivo (PDF)</div>
           <input ref={fileRef} type="file" accept="application/pdf" onChange={subir} disabled={subiendo} style={{ fontSize: 13 }} />
           {subiendo && <div style={{ fontSize: 12, color: "#8a8a90", marginTop: 8 }}>Subiendo…</div>}
-          <div style={{ fontSize: 10.5, color: "#8a8a90", marginTop: 8 }}>Estos PDF los ve el perfil Invitado. Puedes borrarlos cuando termine la misa.</div>
+          <div style={{ fontSize: 10.5, color: "#8a8a90", marginTop: 8 }}>Estos archivos los ve el perfil Invitado. Puedes borrarlos cuando ya no se necesiten.</div>
         </div>
       )}
       {rows === null ? (
         <div style={{ textAlign: "center", color: "#8a8a90", padding: "30px 0", fontSize: 13 }}>Cargando…</div>
       ) : rows.length === 0 ? (
-        <div style={{ background: "rgba(242,242,247,0.7)", borderRadius: 16, padding: "34px 22px", textAlign: "center", color: "#8a8a90", fontSize: 13.5 }}>📕 Aún no hay cancioneros publicados.</div>
+        <div style={{ background: "rgba(242,242,247,0.7)", borderRadius: 16, padding: "34px 22px", textAlign: "center", color: "#8a8a90", fontSize: 13.5 }}>📄 Aún no hay archivos publicados.</div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 12 }}>
           {rows.map((r) => (
@@ -6313,7 +6316,7 @@ function ComunicadosWidget({ isAdmin }) {
   const AZUL = "#0a5ac8";
   const tbBtn = { border: "1px solid rgba(60,60,67,0.2)", background: "white", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, cursor: "pointer", fontWeight: 700, color: "#3a3a40" };
   return (
-    <div style={{ background: "white", borderRadius: 18, border: `1px solid ${C.border}`, padding: "16px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+    <div style={{ background: "linear-gradient(180deg,#f5f9ff,#ffffff)", borderRadius: 18, border: "1px solid #cfe0fb", borderLeft: "4px solid #0a5ac8", padding: "16px 18px", boxShadow: "0 6px 18px rgba(10,90,200,0.10)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(10,90,200,0.10)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -6627,6 +6630,9 @@ function Dashboard({
 
       {/* ── Recordatorio de cuota del mes (desaparece cuando todos pagan) ── */}
       <style>{`.dash-board{columns:340px;column-gap:16px}.dash-board>*{-webkit-column-break-inside:avoid;break-inside:avoid}@media(max-width:760px){.dash-board{columns:1}}`}</style>
+      <div style={{ marginBottom: 16 }}>
+        <ComunicadosWidget isAdmin={isAdmin} />
+      </div>
       <div className="dash-board">
       <CuotaRecordatorioWidget members={members} user={user} setSection={setSection} />
 
@@ -6933,11 +6939,9 @@ function Dashboard({
           {avisos.filter((a) => a.imagen_url).length > 0 && (
             <div
               style={{
-                display: "flex",
-                gap: 10,
-                overflowX: "auto",
-                paddingBottom: 6,
-                WebkitOverflowScrolling: "touch",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
+                gap: 12,
                 marginBottom: 10,
               }}
             >
@@ -6950,7 +6954,6 @@ function Dashboard({
                     onClick={() => setSection("noticias")}
                     style={{
                       flexShrink: 0,
-                      width: 180,
                       borderRadius: 14,
                       overflow: "hidden",
                       border: `1px solid ${C.border}`,
@@ -7284,7 +7287,6 @@ function Dashboard({
         <VocalizacionWidget isAdmin={isAdmin} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <ComunicadosWidget isAdmin={isAdmin} />
           <Card style={{ flex: 1, overflow: "hidden", padding: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "13px 15px 10px" }}>
               <div style={{ width: 30, height: 30, borderRadius: 9, background: "#1DB954", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
