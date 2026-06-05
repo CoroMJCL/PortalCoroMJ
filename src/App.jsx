@@ -15781,7 +15781,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             style={{
               textAlign: "center",
               padding: "20px 24px 16px",
-              borderBottom: `3px solid #1a3a2a`,
+              borderBottom: `1px solid rgba(60,60,67,0.1)`,
             }}
           >
             <div
@@ -15902,7 +15902,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                           borderRadius: 12,
                           padding: 6,
                           border: `2px solid ${
-                            selected.publicada ? "#1a3a2a" : "#fbbf24"
+                            selected.publicada ? "#0a5ac8" : "#fbbf24"
                           }`,
                           boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
                         }}
@@ -15993,40 +15993,26 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                         boxShadow: c.pendiente ? "inset 3px 0 0 #e0a92e" : "none",
                       }}
                     >
-                      <td
-                        style={{
-                          ...tdStyle,
-                          textAlign: "center",
-                          fontWeight: 700,
-                          color: C.primaryDark,
-                          width: 40,
-                        }}
-                      >
-                        {c.n}
+                      <td style={{ ...tdStyle, textAlign: "center", width: 44, verticalAlign: "middle" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: c.pendiente ? "#fdf3da" : "#eef2f7", color: c.pendiente ? "#b45309" : "#475569", fontSize: 11.5, fontWeight: 700 }}>{c.n}</span>
                       </td>
-                      <td
-                        style={{ ...tdStyle, textAlign: "center", width: 35 }}
-                      >
-                        {c.url_audio && c.url_audio.includes("youtube") && (
-                          <span style={{ fontSize: 14 }}>▶</span>
+                      <td style={{ ...tdStyle, textAlign: "center", width: 40, verticalAlign: "middle" }}>
+                        {c.url_audio && c.url_audio.includes("http") ? (
+                          <a href={c.url_audio} target="_blank" rel="noopener" title="Reproducir audio referencial" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 27, height: 27, borderRadius: "50%", background: c.pendiente ? "#e0a92e" : "#0a5ac8", color: "white", textDecoration: "none", fontSize: 10, boxShadow: "0 1px 3px rgba(0,0,0,0.18)" }}>▶</a>
+                        ) : (
+                          <span style={{ color: "#cbd5e1", fontSize: 13 }}>—</span>
                         )}
-                        {c.url_audio &&
-                          !c.url_audio.includes("youtube") &&
-                          c.url_audio.includes("http") && (
-                            <span style={{ fontSize: 14 }}>🔗</span>
-                          )}
-                        {(!c.url_audio || !c.url_audio.includes("http")) &&
-                          c.url_letra &&
-                          c.url_letra.includes("http") && (
-                            <span style={{ fontSize: 14 }}>📄</span>
-                          )}
                       </td>
                       <td
                         style={{
                           ...tdStyle,
-                          fontWeight: isSubSalmo ? 400 : 600,
-                          color: isSubSalmo ? "#374151" : "#1a3a2a",
+                          verticalAlign: "middle",
+                          fontWeight: isSubSalmo ? 400 : 700,
+                          color: isSubSalmo ? "#64748b" : "#0a5ac8",
                           paddingLeft: isSubSalmo ? 24 : 12,
+                          textTransform: isSubSalmo ? "none" : "uppercase",
+                          letterSpacing: isSubSalmo ? "0" : "0.02em",
+                          fontSize: isSubSalmo ? 12 : 10.5,
                         }}
                       >
                         {c.orden}
@@ -16034,8 +16020,10 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       <td
                         style={{
                           ...tdStyle,
+                          verticalAlign: "middle",
                           fontWeight: 600,
-                          color: C.primaryDark,
+                          fontSize: 13,
+                          color: "#1c1c1e",
                         }}
                       >
                         {c.cancion || (
@@ -16044,43 +16032,42 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                           </span>
                         )}
                       </td>
-                      <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>
-                        {c.autor || <span style={{ color: C.gray }}>—</span>}
+                      <td style={{ ...tdStyle, verticalAlign: "middle", color: "#64748b", fontSize: 12 }}>
+                        {c.autor || <span style={{ color: "#cbd5e1" }}>—</span>}
                       </td>
-                      <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>
-                        {c.salmista || <span style={{ color: C.gray }}>—</span>}
+                      <td style={{ ...tdStyle, verticalAlign: "middle", color: "#64748b", fontSize: 12 }}>
+                        {c.salmista || <span style={{ color: "#cbd5e1" }}>—</span>}
                       </td>
                       {showColLetra && (
-                      <td style={{ ...tdStyle }}>
+                      <td style={{ ...tdStyle, verticalAlign: "middle" }}>
                         {c.pendiente ? (
-                          <span style={{ background: "#fef08a", color: "#713f12", fontWeight: 600, fontSize: 11, padding: "3px 10px", borderRadius: 6 }}>
-                            Letra y Acordes (Pendiente)
+                          <span style={{ background: "#fdf3da", color: "#8a6d1f", fontWeight: 600, fontSize: 10.5, padding: "4px 10px", borderRadius: 999 }}>
+                            Pendiente
                           </span>
                         ) : c.url_letra && c.url_letra.includes("http") ? (
-                          <a href={c.url_letra} target="_blank" rel="noopener" style={{ color: C.primary, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
-                            <span>📄</span>
-                            {c.url_letra.split("/").pop()?.slice(0, 30) || "Ver PDF"}
+                          <a href={c.url_letra} target="_blank" rel="noopener" style={{ color: "#0a5ac8", fontSize: 11.5, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none", background: "rgba(10,90,200,0.08)", padding: "4px 11px", borderRadius: 999 }}>
+                            <span>📄</span> Ver PDF
                           </a>
                         ) : c.url_letra ? (
-                          <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{c.url_letra}</span>
+                          <span style={{ fontSize: 11.5, color: "#8a8a90" }}>{c.url_letra}</span>
                         ) : (
-                          <span style={{ color: C.gray, fontSize: 12 }}>—</span>
+                          <span style={{ color: "#cbd5e1", fontSize: 12 }}>—</span>
                         )}
                       </td>
                       )}
                       {showColAudio && (
-                      <td style={{ ...tdStyle }}>
+                      <td style={{ ...tdStyle, verticalAlign: "middle" }}>
                         {c.url_audio && c.url_audio.includes("http") ? (
-                          <a href={c.url_audio} target="_blank" rel="noopener" style={{ color: C.danger, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
-                            <span style={{ fontSize: 14 }}>▶</span>
-                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 }}>
-                              {c.url_audio.includes("youtube") ? (c.cancion || "Ver video") : (c.url_audio.split("/").pop()?.slice(0, 30) || "Escuchar")}
+                          <a href={c.url_audio} target="_blank" rel="noopener" style={{ color: "#c0392b", fontSize: 11.5, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", background: "rgba(192,57,43,0.08)", padding: "4px 11px", borderRadius: 999, maxWidth: 210 }}>
+                            <span style={{ fontSize: 11 }}>▶</span>
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {c.url_audio.includes("youtube") ? (c.cancion || "Ver video") : "Escuchar"}
                             </span>
                           </a>
                         ) : c.url_audio ? (
-                          <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{c.url_audio}</span>
+                          <span style={{ fontSize: 11.5, color: "#8a8a90" }}>{c.url_audio}</span>
                         ) : (
-                          <span style={{ color: C.gray, fontSize: 12 }}>—</span>
+                          <span style={{ color: "#cbd5e1", fontSize: 12 }}>—</span>
                         )}
                       </td>
                       )}
