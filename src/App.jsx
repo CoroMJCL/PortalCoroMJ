@@ -3364,7 +3364,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter }) {
                   value={guestCode}
                   onChange={(e) => setGuestCode(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") doGuestEnter(); }}
-                  placeholder="Ej: Coromj1234"
+                  placeholder="Escribe el código aquí..."
                   style={{ ...inp, letterSpacing: "0.05em", fontWeight: 600 }}
                   className="auth-input"
                 />
