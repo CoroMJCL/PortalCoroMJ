@@ -263,7 +263,7 @@ async function supabase(table, options = {}) {
 setInterval(() => {
   if (_refreshToken) refreshSession();
 }, 50 * 60 * 1000);
-async function authSignUp(email, password, nombre, cuerda, cumpleanos, genero) {
+async function authSignUp(email, password, nombre, cuerda, cumpleanos, genero, aprobadoDirecto) {
   nombre = formatoNombre(nombre);
   const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
     method: "POST",
@@ -282,7 +282,7 @@ async function authSignUp(email, password, nombre, cuerda, cumpleanos, genero) {
   localStorage.setItem("sb_access_token", data.access_token);
   localStorage.setItem("sb_refresh_token", data.refresh_token);
   const uid = data.user?.id;
-  // cuerda ya viene calculada (Soprano/Contralto/Tenor/Bajo/Admin)
+  const esAprobado = aprobadoDirecto === true; // solo con código de admin
   await fetch(`${SUPABASE_URL}/rest/v1/integrantes`, {
     method: "POST",
     headers: {
@@ -294,7 +294,9 @@ async function authSignUp(email, password, nombre, cuerda, cumpleanos, genero) {
     body: JSON.stringify({
       nombre,
       email,
-      cuerda: cuerda || "Soprano",
+      cuerda: esAprobado ? (cuerda || "Admin") : "",
+      cuerda_solicitada: esAprobado ? "" : (cuerda || ""),
+      acceso: esAprobado ? "aprobado" : "pendiente",
       cumpleanos: cumpleanos || "",
       genero: genero || "",
       auth_id: uid,
@@ -623,6 +625,7 @@ const NAV = [
   { id: "dashboard",        icon: "⊞",  label: "Inicio" },
   { id: "perfil",           icon: "◎",  label: "Mi Perfil" },
   { id: "admin",            icon: "⚙",  label: "Administración" },
+  { id: "solicitudes",      icon: "🔔", label: "Solicitudes" },
   { id: "finanzas",         icon: "💼", label: "Finanzas" },
   { id: "info_gastos",      icon: "📊", label: "Info. Gastos" },
   { id: "agenda",           icon: "◫",  label: "Agenda" },
@@ -982,7 +985,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
           if (isVisita) {
             return ["dashboard", "material_ensayo", "cancioneros", "pauta_misa"].includes(item.id);
           }
-          if (item.id === "cancioneros") return false; if (item.id === "info_gastos" && !esCuerdaAdmin(user) && !cuotaInscritos.has(user?.id)) return false; if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
+          if (item.id === "cancioneros") return false; if (item.id === "info_gastos" && !esCuerdaAdmin(user) && !cuotaInscritos.has(user?.id)) return false; if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false; if (item.id === "solicitudes" && !esCuerdaAdmin(user)) return false;
           if (item.id === "cancionero") return false;
             if (item.id === "musica") return false;
           if (item.id === "cantos_pdf" || item.id === "audios") return false;
@@ -1253,6 +1256,8 @@ export default function App() {
   const [showPushModal, setShowPushModal] = useState(false);
   const [pushBloqueado, setPushBloqueado] = useState(false);
   const [user, setUser] = useState(null);
+  const [pendingUser, setPendingUser] = useState(null);
+  const [pendientes, setPendientes] = useState([]);
   const [authToken, setAuthToken] = useState(null);
   const [section, setSection] = useState("dashboard");
   const [preParaId, setPreParaId] = useState("");
@@ -1366,6 +1371,7 @@ export default function App() {
       setMaterialEnsayo(mat || []);
       supabase("material_coro", { order: "&order=created_at.desc" }).then(mc => setMaterialCoro(mc || [])).catch(() => setMaterialCoro([]));
       finDbGet("fin_miembros_cuotas").then(mc => setCuotaInscritos(new Set((mc || []).map(x => x.integrante_id)))).catch(() => setCuotaInscritos(new Set()));
+      supabase("integrantes", { filters: "&acceso=eq.pendiente", order: "&order=created_at.desc" }).then(ps => setPendientes(ps || [])).catch(() => setPendientes([]));
       // Cargar eventos desde Google Calendar para el Dashboard
       fetchGoogleCalendarEvents().then((gcal) => setGcalEventos(gcal));
     } catch (e) {
@@ -1930,11 +1936,11 @@ export default function App() {
       filters: `&email=eq.${encodeURIComponent(email)}`,
     });
     let p = perfil && perfil[0] ? perfil[0] : null;
-    // Si no existe en integrantes (confirmó email pero el INSERT del signup falló), crearlo ahora
+    // Si no existe en integrantes (confirmó email pero el INSERT del signup falló), crearlo ahora como PENDIENTE
     if (!p) {
       const uid = data.user?.id;
       const nombre = formatoNombre(data.user?.user_metadata?.nombre || email.split("@")[0]);
-      const cuerda = data.user?.user_metadata?.cuerda || "Soprano";
+      const cuerdaSol = data.user?.user_metadata?.cuerda || "";
       try {
         await fetch(`${SUPABASE_URL}/rest/v1/integrantes`, {
           method: "POST",
@@ -1944,15 +1950,29 @@ export default function App() {
             "Content-Type": "application/json",
             Prefer: "return=representation",
           },
-          body: JSON.stringify({ nombre, email, cuerda, auth_id: uid }),
+          body: JSON.stringify({ nombre, email, cuerda: "", cuerda_solicitada: cuerdaSol, acceso: "pendiente", auth_id: uid }),
         });
         const perfil2 = await supabase("integrantes", {
           filters: `&email=eq.${encodeURIComponent(email)}`,
         });
-        p = perfil2 && perfil2[0] ? perfil2[0] : { nombre, email, cuerda };
+        p = perfil2 && perfil2[0] ? perfil2[0] : { nombre, email, cuerda: "", acceso: "pendiente" };
       } catch (e) {
-        p = { nombre, email, cuerda };
+        p = { nombre, email, cuerda: "", acceso: "pendiente" };
       }
+    }
+    // Control de acceso: solo entran los aprobados
+    const acc = (p.acceso || "aprobado");
+    if (acc === "rechazado") {
+      setAuthToken(data.access_token);
+      setPendingUser(p);
+      setView("denegado");
+      return;
+    }
+    if (acc === "pendiente") {
+      setAuthToken(data.access_token);
+      setPendingUser(p);
+      setView("pendiente");
+      return;
     }
     setAuthToken(data.access_token);
     setUser(p);
@@ -1974,17 +1994,22 @@ export default function App() {
     adminCode,
     genero
   ) {
-    // Si el código secreto es correcto, registrar como Admin
-    const finalCuerda =
-      adminCode.trim() === SECRET_ADMIN_CODE ? "Admin" : cuerda;
+    // Si el código secreto es correcto, registrar como Admin (aprobado directo)
+    const esAdminDirecto = adminCode.trim() === SECRET_ADMIN_CODE;
+    const finalCuerda = esAdminDirecto ? "Admin" : cuerda;
     const data = await authSignUp(
       email,
       password,
       nombre,
       finalCuerda,
       cumpleanos,
-      genero
+      genero,
+      esAdminDirecto
     );
+    // Salvo el admin directo, el registro queda PENDIENTE de aprobación: no entra
+    if (!esAdminDirecto) {
+      return { pendiente: true };
+    }
     const perfil = await supabase("integrantes", {
       filters: `&email=eq.${encodeURIComponent(email)}`,
     });
@@ -1994,10 +2019,10 @@ export default function App() {
     setUser(p);
     setView("app");
     registrarVisita(p, data.access_token);
-    // Mostrar modal solo si no tiene permiso aún y no es usuario Visita
     setTimeout(() => {
       if (Notification.permission !== "granted" && !esVisita(p)) setShowPushModal(true);
     }, 2500);
+    return { pendiente: false };
   }
 
   async function handleSignOut() {
@@ -2067,6 +2092,29 @@ export default function App() {
       return;
     }
     setSection(id);
+  }
+
+  if (view === "pendiente" || view === "denegado") {
+    const deneg = view === "denegado";
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f2f4f8", padding: 20 }}>
+        <div style={{ background: "white", borderRadius: 22, boxShadow: "0 10px 40px rgba(0,0,0,0.08)", padding: "34px 28px", maxWidth: 420, width: "100%", textAlign: "center" }}>
+          <div style={{ fontSize: 46, marginBottom: 10 }}>{deneg ? "🚫" : "⏳"}</div>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: "#1c1c1e", margin: "0 0 10px" }}>
+            {deneg ? "Solicitud no aprobada" : "Solicitud en revisión"}
+          </h2>
+          <p style={{ fontSize: 14.5, color: "#5a5a60", lineHeight: 1.55, margin: "0 0 22px" }}>
+            {deneg
+              ? "Tu solicitud de ingreso no fue aprobada. Si crees que es un error, comunícate con el administrador del coro."
+              : "Tu registro fue recibido. Un administrador del Coro Misioneros de Jesús debe aprobar tu ingreso. Vuelve a iniciar sesión más tarde para revisar tu estado."}
+          </p>
+          <button onClick={() => { handleSignOut(); setView("login"); }}
+            style={{ width: "100%", padding: "12px", background: "#1d6fc7", border: "none", borderRadius: 12, color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+            Volver al inicio de sesión
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (view !== "app")
@@ -2294,7 +2342,7 @@ export default function App() {
             }
             // Sala de Ensayo: visible a TODOS los integrantes (el admin la habilita/deshabilita dentro)
             // Vista Invitado: solo Admin
-            if (item.id === "cancioneros") return false; if (item.id === "info_gastos" && !esCuerdaAdmin(user) && !cuotaInscritos.has(user?.id)) return false; if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
+            if (item.id === "cancioneros") return false; if (item.id === "info_gastos" && !esCuerdaAdmin(user) && !cuotaInscritos.has(user?.id)) return false; if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false; if (item.id === "solicitudes" && !esCuerdaAdmin(user)) return false;
             // Canto Digital ahora vive dentro de la Sala de Ensayo
             if (item.id === "cancionero") return false;
             if (item.id === "musica") return false;
@@ -2712,6 +2760,7 @@ export default function App() {
                   comunidades={comunidades}
                   reconocimientos={reconocimientos}
                   onReload={loadData}
+                  pendientes={pendientes}
                 />
               )}
               {section === "perfil" && (
@@ -2822,6 +2871,9 @@ export default function App() {
                     Solo los administradores pueden acceder a esta sección.
                   </div>
                 </div>
+              )}
+              {section === "solicitudes" && esCuerdaAdmin(user) && (
+                <SolicitudesIngreso pendientes={pendientes} onReload={loadData} />
               )}
               {section === "finanzas" && (esCuerdaAdmin(user) || esCuerdaContador(user)) && (
                 <ModuloFinanzas user={user} members={members} onReload={loadData} />
@@ -3023,7 +3075,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
     }
     setLoading(true);
     try {
-      await onSignUp(
+      const r = await onSignUp(
         regEmail.trim().toLowerCase(),
         regPassword,
         regNombre.trim(),
@@ -3032,6 +3084,10 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
         regAdminCode,
         regGenero
       );
+      if (r && r.pendiente) {
+        setSuccess("¡Solicitud enviada! Un administrador del coro debe aprobar tu ingreso. Te avisaremos cuando puedas entrar.");
+        setView("login");
+      }
     } catch (err) {
       if (err.message.includes("confirma")) {
         setSuccess(err.message);
@@ -6289,6 +6345,71 @@ function SalaEnsayoMiembro({ docs, user, isAdmin, podcasts, onReload }) {
   );
 }
 
+function SolicitudRow({ s, onReload }) {
+  const cuerdas = ["Soprano", "Contralto", "Tenor", "Bajo", "Instrumentos"];
+  const [cuerdaSel, setCuerdaSel] = useState(s.cuerda_solicitada && cuerdas.includes(s.cuerda_solicitada) ? s.cuerda_solicitada : "Soprano");
+  const [proc, setProc] = useState(false);
+  async function accion(cambios) {
+    if (proc) return;
+    setProc(true);
+    try { await updateRecord("integrantes", s.id, cambios); if (onReload) onReload(); }
+    catch (e) { alert("No se pudo procesar: " + (e?.message || "")); setProc(false); }
+  }
+  return (
+    <div style={{ background: "white", border: "1px solid rgba(60,60,67,0.12)", borderRadius: 16, padding: "16px 18px", marginBottom: 12, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#1c1c1e" }}>{s.nombre || "(sin nombre)"}</div>
+          <div style={{ fontSize: 13, color: "#6a6a70" }}>{s.email}</div>
+          {s.cuerda_solicitada ? (
+            <div style={{ fontSize: 12, color: "#8a8a90", marginTop: 3 }}>Pidió entrar como: <b style={{ color: "#0a5ac8" }}>{s.cuerda_solicitada}</b></div>
+          ) : null}
+        </div>
+        <span style={{ fontSize: 10.5, fontWeight: 800, color: "#b06a00", background: "#fff3da", borderRadius: 999, padding: "4px 10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Pendiente</span>
+      </div>
+      <div style={{ borderTop: "1px solid rgba(60,60,67,0.10)", marginTop: 12, paddingTop: 12, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+        <button onClick={() => accion({ acceso: "aprobado", cuerda: "" })} disabled={proc}
+          style={{ background: "#eaf2ff", border: "1px solid #cfe0fb", color: "#0a5ac8", borderRadius: 10, padding: "9px 14px", fontSize: 13, fontWeight: 700, cursor: proc ? "default" : "pointer" }}>
+          Aprobar como invitado
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <select value={cuerdaSel} onChange={(e) => setCuerdaSel(e.target.value)}
+            style={{ fontSize: 13, padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(60,60,67,0.2)", background: "white", color: "#1c1c1e" }}>
+            {cuerdas.map((c) => (<option key={c} value={c}>{c}</option>))}
+          </select>
+          <button onClick={() => accion({ acceso: "aprobado", cuerda: cuerdaSel })} disabled={proc}
+            style={{ background: "#1f9d55", border: "none", color: "white", borderRadius: 10, padding: "9px 14px", fontSize: 13, fontWeight: 700, cursor: proc ? "default" : "pointer" }}>
+            Aprobar como integrante
+          </button>
+        </div>
+        <button onClick={() => accion({ acceso: "rechazado" })} disabled={proc}
+          style={{ marginLeft: "auto", background: "white", border: "1px solid #e3b3b0", color: "#c0392b", borderRadius: 10, padding: "9px 14px", fontSize: 13, fontWeight: 700, cursor: proc ? "default" : "pointer" }}>
+          Rechazar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SolicitudesIngreso({ pendientes, onReload }) {
+  const lista = pendientes || [];
+  return (
+    <div style={{ maxWidth: 760, margin: "0 auto" }}>
+      <h2 style={{ fontSize: 22, fontWeight: 800, color: "#1c1c1e", margin: "0 0 4px" }}>Solicitudes de ingreso</h2>
+      <p style={{ fontSize: 13.5, color: "#6a6a70", margin: "0 0 18px" }}>
+        Personas que se registraron y esperan tu aprobación. Apruébalas como <b>invitado</b> (solo ve contenido) o como <b>integrante</b> (miembro del coro con su cuerda), o recházalas.
+      </p>
+      {lista.length === 0 ? (
+        <div style={{ background: "white", border: "1px dashed rgba(60,60,67,0.2)", borderRadius: 16, padding: "32px 18px", textAlign: "center", color: "#8a8a90", fontSize: 14 }}>
+          No hay solicitudes pendientes por ahora. 🎉
+        </div>
+      ) : (
+        lista.map((s) => <SolicitudRow key={s.id} s={s} onReload={onReload} />)
+      )}
+    </div>
+  );
+}
+
 function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
   const [data, setData] = useState(null);
   const [inscribiendo, setInscribiendo] = useState(false);
@@ -6546,6 +6667,7 @@ function Dashboard({
   comunidades,
   reconocimientos,
   onReload,
+  pendientes,
 }) {
   const futuros = [...eventos]
     .filter((e) => new Date(e.fecha + "T00:00:00") >= new Date())
@@ -7047,6 +7169,19 @@ function Dashboard({
           <style>{`@keyframes pulseGold { 0% { box-shadow: 0 0 0 0 ${C.gold}77; } 70% { box-shadow: 0 0 0 6px ${C.gold}00; } 100% { box-shadow: 0 0 0 0 ${C.gold}00; } }`}</style>
         </Card>
       </div>
+      {esCuerdaAdmin(user) && pendientes && pendientes.length > 0 && (
+        <div onClick={() => setSection("solicitudes")}
+          style={{ background: "linear-gradient(180deg,#fff7e6,#fff0cf)", border: "1px solid #ffd98a", borderRadius: 16, padding: "14px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 13, cursor: "pointer" }}>
+          <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: "rgba(176,106,0,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 21 }}>🔔</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#7a4d00" }}>
+              {pendientes.length === 1 ? "1 solicitud de ingreso pendiente" : `${pendientes.length} solicitudes de ingreso pendientes`}
+            </div>
+            <div style={{ fontSize: 12.5, color: "#9a6a1a" }}>Hay personas esperando tu aprobación para entrar.</div>
+          </div>
+          <span style={{ fontSize: 13, fontWeight: 800, color: "#b06a00", flexShrink: 0 }}>Revisar →</span>
+        </div>
+      )}
       <CuotaRecordatorioWidget members={members} user={user} setSection={setSection} onReload={onReload} />
       <div className="dash-2col">
         <div className="dash-col">
