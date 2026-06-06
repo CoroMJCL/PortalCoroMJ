@@ -14,6 +14,19 @@ const SECRET_ADMIN_CODE = "CoroCJM2026!";
 // Detecta usuario Invitado: no es integrante del coro, no tiene cuerda asignada
 const esVisita = (u) => !u?.cuerda || u.cuerda.trim() === "";
 
+// Normaliza nombres a formato "Juan Perez Osorio" (sin importar si vienen en mayúscula/minúscula/mezclado)
+function formatoNombre(s) {
+  if (!s) return s;
+  const minus = new Set(["de", "del", "la", "las", "los", "y", "da", "do", "dos", "e", "di", "van", "von"]);
+  return String(s)
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .split(" ")
+    .map((w, i) => (i > 0 && minus.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(" ");
+}
+
 // Normaliza el valor de cuerda para comparaciones robustas (trim + lowercase)
 const esCuerdaContador = (u) => {
   const c = (u?.cuerda || "").trim().toLowerCase();
@@ -251,6 +264,7 @@ setInterval(() => {
   if (_refreshToken) refreshSession();
 }, 50 * 60 * 1000);
 async function authSignUp(email, password, nombre, cuerda, cumpleanos, genero) {
+  nombre = formatoNombre(nombre);
   const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
     method: "POST",
     headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
@@ -968,7 +982,7 @@ function MobileMenu({ section, setSection, onClose, user }) {
           if (isVisita) {
             return ["dashboard", "material_ensayo", "cancioneros", "pauta_misa"].includes(item.id);
           }
-          if (item.id === "cancioneros") return false; if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
+          if (item.id === "cancioneros") return false; if (item.id === "info_gastos" && !esCuerdaAdmin(user) && !cuotaInscritos.has(user?.id)) return false; if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
           if (item.id === "cancionero") return false;
             if (item.id === "musica") return false;
           if (item.id === "cantos_pdf" || item.id === "audios") return false;
@@ -1264,6 +1278,7 @@ export default function App() {
   const [reconocimientos, setReconocimientos] = useState([]);
   const [materialEnsayo, setMaterialEnsayo] = useState([]);
   const [materialCoro, setMaterialCoro] = useState([]);
+  const [cuotaInscritos, setCuotaInscritos] = useState(new Set());
   const [dbLoading, setDbLoading] = useState(true);
   const [firstLoadDone, setFirstLoadDone] = useState(false);
 
@@ -1324,6 +1339,7 @@ export default function App() {
       setReconocimientos(reco || []);
       setMaterialEnsayo(mat || []);
       supabase("material_coro", { order: "&order=created_at.desc" }).then(mc => setMaterialCoro(mc || [])).catch(() => setMaterialCoro([]));
+      finDbGet("fin_miembros_cuotas").then(mc => setCuotaInscritos(new Set((mc || []).map(x => x.integrante_id)))).catch(() => setCuotaInscritos(new Set()));
       // Cargar eventos desde Google Calendar para el Dashboard
       fetchGoogleCalendarEvents().then((gcal) => setGcalEventos(gcal));
     } catch (e) {
@@ -1891,7 +1907,7 @@ export default function App() {
     // Si no existe en integrantes (confirmó email pero el INSERT del signup falló), crearlo ahora
     if (!p) {
       const uid = data.user?.id;
-      const nombre = data.user?.user_metadata?.nombre || email.split("@")[0];
+      const nombre = formatoNombre(data.user?.user_metadata?.nombre || email.split("@")[0]);
       const cuerda = data.user?.user_metadata?.cuerda || "Soprano";
       try {
         await fetch(`${SUPABASE_URL}/rest/v1/integrantes`, {
@@ -2252,7 +2268,7 @@ export default function App() {
             }
             // Sala de Ensayo: visible a TODOS los integrantes (el admin la habilita/deshabilita dentro)
             // Vista Invitado: solo Admin
-            if (item.id === "cancioneros") return false; if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
+            if (item.id === "cancioneros") return false; if (item.id === "info_gastos" && !esCuerdaAdmin(user) && !cuotaInscritos.has(user?.id)) return false; if (item.id === "vista_invitado" && !esCuerdaAdmin(user)) return false;
             // Canto Digital ahora vive dentro de la Sala de Ensayo
             if (item.id === "cancionero") return false;
             if (item.id === "musica") return false;
@@ -2669,6 +2685,7 @@ export default function App() {
                   fotos={fotos}
                   comunidades={comunidades}
                   reconocimientos={reconocimientos}
+                  onReload={loadData}
                 />
               )}
               {section === "perfil" && (
@@ -5601,7 +5618,19 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
               <div style={{ minWidth: 0 }}>
                 {cantoActivo.momento && <div style={{ fontSize: 10, fontWeight: 800, color: C.primary, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>{cantoActivo.momento}</div>}
                 <div style={{ fontSize: 20, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.025em", lineHeight: 1.15 }}>{cantoActivo.nombre}</div>
+                {(() => { const fa = (cantoActivo.files || []).map((r) => r.autor).find(Boolean); return fa ? <div style={{ fontSize: 12.5, color: "#6a6a70", marginTop: 4 }}><strong style={{ color: "#3a3a40" }}>Autor:</strong> {fa}</div> : null; })()}
               </div>
+              {(() => {
+                const fy = (cantoActivo.files || []).map((r) => r.youtube).find(Boolean);
+                const fs = (cantoActivo.files || []).map((r) => r.spotify).find(Boolean);
+                if (!fy && !fs) return null;
+                return (
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    {fy && <a href={fy} target="_blank" rel="noopener" title="YouTube" style={{ width: 32, height: 32, borderRadius: "50%", background: "#FF0000", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M23 7.5a3 3 0 0 0-2.1-2.1C19 4.9 12 4.9 12 4.9s-7 0-8.9.5A3 3 0 0 0 1 7.5 31 31 0 0 0 .5 12 31 31 0 0 0 1 16.5a3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.5 31 31 0 0 0-.5-4.5ZM9.8 15.3V8.7l5.7 3.3-5.7 3.3Z" /></svg></a>}
+                    {fs && <a href={fs} target="_blank" rel="noopener" title="Spotify" style={{ width: 32, height: 32, borderRadius: "50%", background: "#1DB954", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="17" height="17" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm4.59 14.42a.62.62 0 0 1-.86.21c-2.35-1.44-5.3-1.76-8.79-.96a.62.62 0 1 1-.28-1.21c3.81-.87 7.08-.5 9.71 1.11.3.18.39.57.22.85Zm1.23-2.73a.78.78 0 0 1-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.17a.78.78 0 1 1-.45-1.49c3.63-1.1 8.15-.56 11.23 1.33.37.22.49.71.26 1.07Zm.11-2.85C14.81 8.94 9.4 8.76 6.3 9.7a.93.93 0 1 1-.54-1.78c3.56-1.08 9.53-.87 13.29 1.36a.93.93 0 0 1-.96 1.6Z" /></svg></a>}
+                  </div>
+                );
+              })()}
             </div>
             {/* Progreso */}
             <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
@@ -5872,7 +5901,6 @@ function CantoHub({ nombre, rows }) {
         </button>
         <a href={partitura ? partitura.url : "#"} target="_blank" rel="noopener" style={{ ...btnFill, background: DARK, color: "white", ...(partitura ? {} : dis) }}>Partitura coral ↓</a>
         <a href={letra && letra.url ? letra.url : "#"} target="_blank" rel="noopener" style={{ ...btnFill, background: DARK, color: "white", ...(letra && letra.url ? {} : dis) }}>Texto y acordes ↓</a>
-        <a href={ficha.material_url || "#"} target="_blank" rel="noopener" style={{ ...btnOut, ...(ficha.material_url ? {} : dis) }}>Material adicional ↗</a>
       </div>
 
       {open && (
@@ -6235,34 +6263,82 @@ function SalaEnsayoMiembro({ docs, user, isAdmin, podcasts, onReload }) {
   );
 }
 
-function CuotaRecordatorioWidget({ members, user, setSection }) {
+function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
   const [data, setData] = useState(null);
+  const [inscribiendo, setInscribiendo] = useState(false);
 
-  useEffect(() => {
-    let vivo = true;
-    (async () => {
-      try {
-        const [cuotas, pagos, mc] = await Promise.all([
-          finDbGet("fin_cuotas").catch(() => []),
-          finDbGet("fin_pagos").catch(() => []),
-          finDbGet("fin_miembros_cuotas").catch(() => []),
-        ]);
-        if (vivo) setData({ cuotas: cuotas || [], pagos: pagos || [], mc: mc || [] });
-      } catch { if (vivo) setData({ cuotas: [], pagos: [], mc: [] }); }
-    })();
-    return () => { vivo = false; };
-  }, []);
+  async function fetchCuotaData() {
+    try {
+      const [cuotas, pagos, mc] = await Promise.all([
+        finDbGet("fin_cuotas").catch(() => []),
+        finDbGet("fin_pagos").catch(() => []),
+        finDbGet("fin_miembros_cuotas").catch(() => []),
+      ]);
+      setData({ cuotas: cuotas || [], pagos: pagos || [], mc: mc || [] });
+    } catch { setData({ cuotas: [], pagos: [], mc: [] }); }
+  }
+  useEffect(() => { fetchCuotaData(); }, []);
 
-  if (!data || !finMesVigente()) return null;
+  async function inscribirmeCuota() {
+    if (!user?.id || inscribiendo) return;
+    setInscribiendo(true);
+    try {
+      await finDbPost("fin_miembros_cuotas", { integrante_id: user.id });
+      await fetchCuotaData();
+      if (onReload) onReload();
+    } catch (e) { alert("No se pudo inscribir: " + (e?.message || "")); }
+    setInscribiendo(false);
+  }
 
-  const mes = finCurrentMesIso();
+  const [bajaOpen, setBajaOpen] = useState(false);
+  const [motivoBaja, setMotivoBaja] = useState("");
+  const [dandoBaja, setDandoBaja] = useState(false);
+  async function darmeDeBaja() {
+    if (!motivoBaja || dandoBaja) return;
+    const row = (data?.mc || []).find((m) => m.integrante_id === user?.id);
+    if (!row) { setBajaOpen(false); return; }
+    setDandoBaja(true);
+    try {
+      await finDbDelete("fin_miembros_cuotas", row.id);
+      setBajaOpen(false);
+      setMotivoBaja("");
+      await fetchCuotaData();
+      if (onReload) onReload();
+    } catch (e) { alert("No se pudo dar de baja: " + (e?.message || "")); }
+    setDandoBaja(false);
+  }
+
+  if (!data) return null;
+
   const inscritosIds = new Set((data.mc || []).map((m) => m.integrante_id));
+  const yoInscrito = inscritosIds.has(user?.id);
+  const esGestorCuota = esCuerdaAdmin(user) || esCuerdaContador(user);
+
+  // Quien no participa en la cuota ve una invitación para inscribirse
+  if (!yoInscrito && !esGestorCuota) {
+    return (
+      <div style={{ background: "linear-gradient(180deg,#f5f9ff,#eaf2ff)", border: "1px solid #cfe0fb", borderRadius: 18, padding: "16px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 15, flexWrap: "wrap" }}>
+        <div style={{ width: 46, height: 46, borderRadius: 14, flexShrink: 0, background: "rgba(10,90,200,0.10)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>💸</div>
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "#0a5ac8", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 2 }}>Cuota mensual del coro</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#0b2a52", lineHeight: 1.35 }}>¿Quieres participar en el pago de la cuota mensual? Al inscribirte tendrás acceso a la información de gastos del coro.</div>
+        </div>
+        <button onClick={inscribirmeCuota} disabled={inscribiendo} style={{ flexShrink: 0, background: "#0a5ac8", border: "none", borderRadius: 11, padding: "10px 17px", fontSize: 12.5, fontWeight: 700, color: "white", cursor: inscribiendo ? "default" : "pointer", opacity: inscribiendo ? 0.7 : 1 }}>
+          {inscribiendo ? "Inscribiendo…" : "Quiero participar →"}
+        </button>
+      </div>
+    );
+  }
+
+  if (!finMesVigente()) return null;
+  const mes = finCurrentMesIso();
   const inscritos = (members || []).filter((m) => inscritosIds.has(m.id));
   if (inscritos.length === 0) return null;
 
   const pagaron = new Set((data.pagos || []).filter((p) => p.mes === mes && (p.tipo === "cuota" || !p.tipo)).map((p) => p.integrante_id));
   const pendientes = inscritos.filter((m) => !pagaron.has(m.id));
-  if (pendientes.length === 0) return null; // todos pagaron → el aviso desaparece
+  const alDia = pendientes.length === 0;
+  if (alDia && !yoInscrito) return null; // gestor no inscrito y todos al día → nada que mostrar
 
   const total = inscritos.length;
   const pagados = total - pendientes.length;
@@ -6290,7 +6366,9 @@ function CuotaRecordatorioWidget({ members, user, setSection }) {
           Cuota del coro · {finMesLabel(mes)}
         </div>
         <div style={{ fontSize: 15, fontWeight: 800, color: "#0b2a52", letterSpacing: "-0.01em", lineHeight: 1.3 }}>
-          {yoPague
+          {alDia
+            ? `¡Todos al día con la cuota de ${finMesLabel(mes)}! 🎉`
+            : yoPague
             ? `Estás al día. Aún faltan ${pendientes.length} ${pendientes.length === 1 ? "integrante" : "integrantes"} por pagar.`
             : `Tienes tu cuota de ${finMesLabel(mes)} pendiente${valor ? ` — ${finFmtCLP(valor)}` : ""}. ¡Ponte al día!`}
         </div>
@@ -6303,6 +6381,36 @@ function CuotaRecordatorioWidget({ members, user, setSection }) {
           </span>
         </div>
       </div>
+      {yoInscrito && !esGestor && (
+        <div style={{ flexBasis: "100%", borderTop: "1px solid rgba(10,90,200,0.15)", marginTop: 4, paddingTop: 10 }}>
+          {!bajaOpen ? (
+            <button onClick={() => setBajaOpen(true)} style={{ background: "none", border: "none", color: "#8a8a90", fontSize: 11.5, cursor: "pointer", textDecoration: "underline", padding: 0 }}>
+              Darme de baja de la cuota
+            </button>
+          ) : (
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, color: "#0b2a52", fontWeight: 600 }}>Motivo de la baja:</span>
+              <select value={motivoBaja} onChange={(e) => setMotivoBaja(e.target.value)}
+                style={{ fontSize: 12.5, padding: "7px 10px", borderRadius: 9, border: "1px solid #cfe0fb", background: "white", color: "#1c1c1e" }}>
+                <option value="">Selecciona un motivo…</option>
+                <option value="Motivos económicos">Motivos económicos</option>
+                <option value="Pausa temporal">Pausa temporal</option>
+                <option value="Me retiro del coro">Me retiro del coro</option>
+                <option value="Ya no deseo participar">Ya no deseo participar</option>
+                <option value="Otro">Otro</option>
+              </select>
+              <button onClick={darmeDeBaja} disabled={!motivoBaja || dandoBaja}
+                style={{ background: !motivoBaja ? "#cbd5e1" : "#c0392b", border: "none", borderRadius: 9, padding: "7px 13px", fontSize: 12, fontWeight: 700, color: "white", cursor: !motivoBaja || dandoBaja ? "default" : "pointer" }}>
+                {dandoBaja ? "Procesando…" : "Confirmar baja"}
+              </button>
+              <button onClick={() => { setBajaOpen(false); setMotivoBaja(""); }}
+                style={{ background: "none", border: "none", color: "#8a8a90", fontSize: 12, cursor: "pointer" }}>
+                Cancelar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {esGestor && (
         <button onClick={() => setSection("finanzas")}
           style={{ flexShrink: 0, background: "#0a5ac8", border: "none", borderRadius: 11, padding: "9px 16px", fontSize: 12.5, fontWeight: 700, color: "white", cursor: "pointer" }}>
@@ -6390,6 +6498,7 @@ function Dashboard({
   fotos,
   comunidades,
   reconocimientos,
+  onReload,
 }) {
   const futuros = [...eventos]
     .filter((e) => new Date(e.fecha + "T00:00:00") >= new Date())
@@ -6891,7 +7000,7 @@ function Dashboard({
           <style>{`@keyframes pulseGold { 0% { box-shadow: 0 0 0 0 ${C.gold}77; } 70% { box-shadow: 0 0 0 6px ${C.gold}00; } 100% { box-shadow: 0 0 0 0 ${C.gold}00; } }`}</style>
         </Card>
       </div>
-      <CuotaRecordatorioWidget members={members} user={user} setSection={setSection} />
+      <CuotaRecordatorioWidget members={members} user={user} setSection={setSection} onReload={onReload} />
       <div className="dash-2col">
         <div className="dash-col">
       {/* ── Avisos del Coro ── */}
@@ -11486,7 +11595,7 @@ function AdminIntegrantes({ members, onReload }) {
           email: form.email,
           password: form.password,
           email_confirm: true,
-          user_metadata: { nombre: form.nombre, cuerda: form.cuerda },
+          user_metadata: { nombre: formatoNombre(form.nombre), cuerda: form.cuerda },
         }),
       });
       const authData = await authRes.json();
@@ -11497,7 +11606,7 @@ function AdminIntegrantes({ members, onReload }) {
       await supabase("integrantes", {
         method: "POST",
         body: {
-          nombre: form.nombre,
+          nombre: formatoNombre(form.nombre),
           email: form.email,
           cuerda: form.cuerda,
           cargo: form.cargo,
@@ -11519,7 +11628,8 @@ function AdminIntegrantes({ members, onReload }) {
   async function saveEdit(id) {
     setSaving(true);
     try {
-      await updateRecord("integrantes", id, editData);
+      const datos = editData.nombre ? { ...editData, nombre: formatoNombre(editData.nombre) } : editData;
+      await updateRecord("integrantes", id, datos);
       setEditId(null);
       onReload();
     } catch (e) {
@@ -12711,13 +12821,9 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload, tabla = "material_ensay
                 <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Spotify (enlace)</label>
                 <input value={form.spotify} onChange={e => setForm(p => ({ ...p, spotify: e.target.value }))} placeholder="https://open.spotify.com/…" style={inp} />
               </div>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <label style={{ fontSize: 11, color: C.gray, display: "block", marginBottom: 3 }}>Material adicional (enlace)</label>
-                <input value={form.material_url} onChange={e => setForm(p => ({ ...p, material_url: e.target.value }))} placeholder="https://… (carpeta, drive, web)" style={inp} />
-              </div>
             </div>
             <div style={{ fontSize: 10, color: C.gray, marginTop: 6 }}>
-              Estos datos aparecen en la tarjeta del canto (Autor, íconos de YouTube/Spotify y botón “Material adicional”). Basta llenarlos en un archivo del canto.
+              Estos datos aparecen en la tarjeta del canto (Autor e íconos de YouTube/Spotify). Basta llenarlos en un archivo del canto.
             </div>
           </div>
           <Btn onClick={submit} disabled={saving || !form.canto || !form.url}>
@@ -16037,9 +16143,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                             Pendiente
                           </span>
                         ) : c.url_letra && c.url_letra.includes("http") ? (
-                          <a href={c.url_letra} target="_blank" rel="noopener" style={{ color: "#0a5ac8", fontSize: 11.5, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none", background: "rgba(10,90,200,0.08)", padding: "4px 11px", borderRadius: 999 }}>
-                            <span>📄</span> Ver PDF
-                          </a>
+                          <a href={c.url_letra} target="_blank" rel="noopener" title="Ver PDF" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 34, height: 22, borderRadius: 5, background: "#c0392b", color: "white", fontSize: 9, fontWeight: 800, letterSpacing: "0.05em", textDecoration: "none" }}>PDF</a>
                         ) : c.url_letra ? (
                           <span style={{ fontSize: 11.5, color: "#8a8a90" }}>{c.url_letra}</span>
                         ) : (
@@ -16050,12 +16154,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       {showColAudio && (
                       <td style={{ ...tdStyle, verticalAlign: "middle" }}>
                         {c.url_audio && c.url_audio.includes("http") ? (
-                          <a href={c.url_audio} target="_blank" rel="noopener" style={{ color: "#c0392b", fontSize: 11.5, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", background: "rgba(192,57,43,0.08)", padding: "4px 11px", borderRadius: 999, maxWidth: 210 }}>
-                            <span style={{ fontSize: 11 }}>▶</span>
-                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {c.url_audio.includes("youtube") ? (c.cancion || "Ver video") : "Escuchar"}
-                            </span>
-                          </a>
+                          <a href={c.url_audio} target="_blank" rel="noopener" title="Reproducir audio referencial" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: "50%", background: "#c0392b", color: "white", fontSize: 11, textDecoration: "none", boxShadow: "0 1px 3px rgba(0,0,0,0.18)" }}>▶</a>
                         ) : c.url_audio ? (
                           <span style={{ fontSize: 11.5, color: "#8a8a90" }}>{c.url_audio}</span>
                         ) : (
