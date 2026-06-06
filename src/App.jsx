@@ -6386,41 +6386,38 @@ function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
           </span>
         </div>
       </div>
-      {yoInscrito && (
-        <div style={{ flexBasis: "100%", borderTop: "1px solid rgba(10,90,200,0.15)", marginTop: 4, paddingTop: 10 }}>
-          {!bajaOpen ? (
-            <button onClick={() => setBajaOpen(true)} style={{ background: "white", border: "1px solid #e3b3b0", color: "#c0392b", fontSize: 12, fontWeight: 700, cursor: "pointer", borderRadius: 9, padding: "8px 15px" }}>
-              Darme de baja de la cuota
-            </button>
-          ) : (
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 12, color: "#0b2a52", fontWeight: 600 }}>Motivo de la baja:</span>
-              <select value={motivoBaja} onChange={(e) => setMotivoBaja(e.target.value)}
-                style={{ fontSize: 12.5, padding: "7px 10px", borderRadius: 9, border: "1px solid #cfe0fb", background: "white", color: "#1c1c1e" }}>
-                <option value="">Selecciona un motivo…</option>
-                <option value="Motivos económicos">Motivos económicos</option>
-                <option value="Pausa temporal">Pausa temporal</option>
-                <option value="Me retiro del coro">Me retiro del coro</option>
-                <option value="Ya no deseo participar">Ya no deseo participar</option>
-                <option value="Otro">Otro</option>
-              </select>
-              <button onClick={darmeDeBaja} disabled={!motivoBaja || dandoBaja}
-                style={{ background: !motivoBaja ? "#cbd5e1" : "#c0392b", border: "none", borderRadius: 9, padding: "7px 13px", fontSize: 12, fontWeight: 700, color: "white", cursor: !motivoBaja || dandoBaja ? "default" : "pointer" }}>
-                {dandoBaja ? "Procesando…" : "Confirmar baja"}
-              </button>
-              <button onClick={() => { setBajaOpen(false); setMotivoBaja(""); }}
-                style={{ background: "none", border: "none", color: "#8a8a90", fontSize: 12, cursor: "pointer" }}>
-                Cancelar
-              </button>
-            </div>
-          )}
-        </div>
+      {yoInscrito && !bajaOpen && (
+        <button onClick={() => setBajaOpen(true)} style={{ flexShrink: 0, background: "white", border: "1px solid #e3b3b0", color: "#c0392b", fontSize: 12, fontWeight: 700, cursor: "pointer", borderRadius: 10, padding: "8px 14px" }}>
+          Darme de baja
+        </button>
       )}
       {esGestor && (
         <button onClick={() => setSection("finanzas")}
           style={{ flexShrink: 0, background: "#0a5ac8", border: "none", borderRadius: 11, padding: "9px 16px", fontSize: 12.5, fontWeight: 700, color: "white", cursor: "pointer" }}>
           Gestionar cuotas →
         </button>
+      )}
+      {yoInscrito && bajaOpen && (
+        <div style={{ flexBasis: "100%", borderTop: "1px solid rgba(10,90,200,0.15)", marginTop: 4, paddingTop: 10, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12, color: "#0b2a52", fontWeight: 600 }}>Motivo de la baja:</span>
+          <select value={motivoBaja} onChange={(e) => setMotivoBaja(e.target.value)}
+            style={{ fontSize: 12.5, padding: "7px 10px", borderRadius: 9, border: "1px solid #cfe0fb", background: "white", color: "#1c1c1e" }}>
+            <option value="">Selecciona un motivo…</option>
+            <option value="Motivos económicos">Motivos económicos</option>
+            <option value="Pausa temporal">Pausa temporal</option>
+            <option value="Me retiro del coro">Me retiro del coro</option>
+            <option value="Ya no deseo participar">Ya no deseo participar</option>
+            <option value="Otro">Otro</option>
+          </select>
+          <button onClick={darmeDeBaja} disabled={!motivoBaja || dandoBaja}
+            style={{ background: !motivoBaja ? "#cbd5e1" : "#c0392b", border: "none", borderRadius: 9, padding: "7px 13px", fontSize: 12, fontWeight: 700, color: "white", cursor: !motivoBaja || dandoBaja ? "default" : "pointer" }}>
+            {dandoBaja ? "Procesando…" : "Confirmar baja"}
+          </button>
+          <button onClick={() => { setBajaOpen(false); setMotivoBaja(""); }}
+            style={{ background: "none", border: "none", color: "#8a8a90", fontSize: 12, cursor: "pointer" }}>
+            Cancelar
+          </button>
+        </div>
       )}
     </div>
   );
