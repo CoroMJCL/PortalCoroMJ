@@ -6266,6 +6266,7 @@ function SalaEnsayoMiembro({ docs, user, isAdmin, podcasts, onReload }) {
 function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
   const [data, setData] = useState(null);
   const [inscribiendo, setInscribiendo] = useState(false);
+  const [cuotaInfo, setCuotaInfo] = useState("");
 
   async function fetchCuotaData() {
     try {
@@ -6277,7 +6278,7 @@ function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
       setData({ cuotas: cuotas || [], pagos: pagos || [], mc: mc || [] });
     } catch { setData({ cuotas: [], pagos: [], mc: [] }); }
   }
-  useEffect(() => { fetchCuotaData(); }, []);
+  useEffect(() => { fetchCuotaData(); getConfig("cuota_info").then((v) => { if (v) setCuotaInfo(v); }).catch(() => {}); }, []);
 
   async function inscribirmeCuota() {
     if (!user?.id || inscribiendo) return;
@@ -6321,7 +6322,11 @@ function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
         <div style={{ width: 46, height: 46, borderRadius: 14, flexShrink: 0, background: "rgba(10,90,200,0.10)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>💸</div>
         <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: "#0a5ac8", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 2 }}>Cuota mensual del coro</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0b2a52", lineHeight: 1.35 }}>¿Quieres participar en el pago de la cuota mensual? Al inscribirte tendrás acceso a la información de gastos del coro.</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#0b2a52", lineHeight: 1.35 }}>¿Quieres participar en el pago de la cuota mensual?</div>
+          <div style={{ fontSize: 12, color: "#3a5a80", lineHeight: 1.5, marginTop: 5 }}>
+            {cuotaInfo || "La cuota mensual nos ayuda a cubrir los gastos del coro: partituras, materiales, vestuario y actividades de la misión."}
+          </div>
+          <div style={{ fontSize: 11.5, color: "#6a8ab0", marginTop: 5 }}>Al inscribirte tendrás acceso a la información de gastos del coro.</div>
         </div>
         <button onClick={inscribirmeCuota} disabled={inscribiendo} style={{ flexShrink: 0, background: "#0a5ac8", border: "none", borderRadius: 11, padding: "10px 17px", fontSize: 12.5, fontWeight: 700, color: "white", cursor: inscribiendo ? "default" : "pointer", opacity: inscribiendo ? 0.7 : 1 }}>
           {inscribiendo ? "Inscribiendo…" : "Quiero participar →"}
@@ -6381,10 +6386,10 @@ function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
           </span>
         </div>
       </div>
-      {yoInscrito && !esGestor && (
+      {yoInscrito && (
         <div style={{ flexBasis: "100%", borderTop: "1px solid rgba(10,90,200,0.15)", marginTop: 4, paddingTop: 10 }}>
           {!bajaOpen ? (
-            <button onClick={() => setBajaOpen(true)} style={{ background: "none", border: "none", color: "#8a8a90", fontSize: 11.5, cursor: "pointer", textDecoration: "underline", padding: 0 }}>
+            <button onClick={() => setBajaOpen(true)} style={{ background: "white", border: "1px solid #e3b3b0", color: "#c0392b", fontSize: 12, fontWeight: 700, cursor: "pointer", borderRadius: 9, padding: "8px 15px" }}>
               Darme de baja de la cuota
             </button>
           ) : (
