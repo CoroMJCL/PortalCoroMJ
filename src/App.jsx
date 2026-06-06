@@ -11,6 +11,9 @@ const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 // Código secreto para registrarse como Admin
 const SECRET_ADMIN_CODE = "CoroCJM2026!";
 
+// Código de acceso para Invitados esporádicos (cámbialo cuando quieras)
+const GUEST_CODE = "Coromj1234";
+
 // Detecta usuario Invitado: no es integrante del coro, no tiene cuerda asignada
 const esVisita = (u) => !u?.cuerda || u.cuerda.trim() === "";
 
@@ -2025,6 +2028,13 @@ export default function App() {
     return { pendiente: false };
   }
 
+  function handleGuestEnter() {
+    // Sesión de invitado: solo en memoria, sin cuenta Supabase
+    setUser({ nombre: "Invitado", cuerda: "", acceso: "aprobado", id: null });
+    setSection("dashboard");
+    setView("app");
+  }
+
   async function handleSignOut() {
     // Marcar offline antes de cerrar sesión
     if (user?.id) {
@@ -2124,6 +2134,7 @@ export default function App() {
         setView={setView}
         onSignIn={handleSignIn}
         onSignUp={handleSignUp}
+        onGuestEnter={handleGuestEnter}
       />
     );
 
@@ -2994,7 +3005,7 @@ export default function App() {
 // ══════════════════════════════════════════
 //  AUTH SCREEN (Login / Registro / Recuperar)
 // ══════════════════════════════════════════
-function AuthScreen({ view, setView, onSignIn, onSignUp }) {
+function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -3015,6 +3026,16 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
 
   // Recuperar
   const [recEmail, setRecEmail] = useState("");
+
+  // Invitado
+  const [guestCode, setGuestCode] = useState("");
+
+  function doGuestEnter() {
+    setError("");
+    if (!guestCode.trim()) { setError("Ingresa el código de acceso."); return; }
+    if (guestCode.trim() !== GUEST_CODE) { setError("Código incorrecto. Pídele el código al administrador del coro."); return; }
+    onGuestEnter();
+  }
 
   const inp = {
     width: "100%",
@@ -3178,7 +3199,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
         </div>
 
         {/* Tabs */}
-        <div className="seg-control" style={{ marginBottom: 20 }}>
+        {view !== "guest_code" && <div className="seg-control" style={{ marginBottom: 20 }}>
           {[
             ["login", "Ingresar"],
             ["register", "Registrarse"],
@@ -3208,7 +3229,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
               {l}
             </button>
           ))}
-        </div>
+        </div>}
 
         <div style={{ marginTop: 4 }}>
           {error && (
@@ -3306,7 +3327,68 @@ function AuthScreen({ view, setView, onSignIn, onSignUp }) {
               >
                 {loading ? "Verificando..." : "Ingresar al Portal"}
               </button>
+
+              {/* Separador invitado */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0 0" }}>
+                <div style={{ flex: 1, height: 1, background: "rgba(60,60,67,0.13)" }} />
+                <span style={{ fontSize: 11, color: "#8a8a90", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}>o</span>
+                <div style={{ flex: 1, height: 1, background: "rgba(60,60,67,0.13)" }} />
+              </div>
+              <button
+                type="button"
+                onClick={() => { setView("guest_code"); setError(""); setSuccess(""); setGuestCode(""); }}
+                style={{
+                  width: "100%", marginTop: 12, padding: "12px",
+                  background: "rgba(30,58,95,0.06)", border: "1.5px solid rgba(30,58,95,0.20)",
+                  borderRadius: 10, color: "#1e3a5f", fontSize: 14,
+                  fontFamily: "var(--font-display)", fontWeight: 600,
+                  cursor: "pointer", letterSpacing: "-0.016em",
+                }}
+              >
+                👤 Entrar como Invitado
+              </button>
             </form>
+          )}
+
+          {/* ── CÓDIGO INVITADO ── */}
+          {view === "guest_code" && (
+            <div>
+              <p style={{ fontSize: 13.5, color: "#5a5a60", marginBottom: 20, lineHeight: 1.6 }}>
+                Ingresa el código que te compartió el administrador del coro.
+              </p>
+              <div style={{ marginBottom: 18 }}>
+                <label style={lbl}>Código de acceso</label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={guestCode}
+                  onChange={(e) => setGuestCode(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") doGuestEnter(); }}
+                  placeholder="Ej: Coromj1234"
+                  style={{ ...inp, letterSpacing: "0.05em", fontWeight: 600 }}
+                  className="auth-input"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={doGuestEnter}
+                style={{
+                  width: "100%", padding: "13px",
+                  background: "#1e3a5f", border: "none", borderRadius: 10,
+                  color: "white", fontSize: 14, fontFamily: "var(--font-display)",
+                  fontWeight: 600, cursor: "pointer", letterSpacing: "-0.016em",
+                }}
+              >
+                Entrar al portal →
+              </button>
+              <button
+                type="button"
+                onClick={() => { setView("login"); setError(""); setSuccess(""); }}
+                style={{ width: "100%", marginTop: 10, padding: "10px", background: "transparent", border: "1px solid rgba(60,60,67,0.18)", borderRadius: 10, color: "#6b7280", fontSize: 13, cursor: "pointer" }}
+              >
+                ← Volver
+              </button>
+            </div>
           )}
 
           {/* ── REGISTRO ── */}
