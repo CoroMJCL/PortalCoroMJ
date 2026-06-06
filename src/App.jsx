@@ -6430,7 +6430,7 @@ function ComunicadosWidget({ isAdmin }) {
   const ref = useRef(null);
   useEffect(() => { getConfig("comunicados_html").then((v) => setHtml(v || "")).catch(() => {}); }, []);
   useEffect(() => { if (editing && ref.current) ref.current.innerHTML = html || ""; }, [editing]);
-  function cmd(c) { document.execCommand(c, false, null); if (ref.current) ref.current.focus(); }
+  function cmd(c, v) { document.execCommand(c, false, v != null ? v : null); if (ref.current) ref.current.focus(); }
   async function guardar() {
     setSaving(true);
     const h = ref.current ? ref.current.innerHTML : html;
@@ -6439,6 +6439,16 @@ function ComunicadosWidget({ isAdmin }) {
   }
   const AZUL = "#0a5ac8";
   const tbBtn = { border: "1px solid rgba(60,60,67,0.2)", background: "white", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, cursor: "pointer", fontWeight: 700, color: "#3a3a40" };
+  const tbBtnIcon = { ...tbBtn, padding: "6px 8px", minWidth: 32, display: "inline-flex", alignItems: "center", justifyContent: "center" };
+  const tbSep = { width: 1, alignSelf: "stretch", background: "#cfe0fb", margin: "2px 4px" };
+  function alignIcon(kind) {
+    const L = { left: [[3, 15], [3, 21], [3, 13]], center: [[6, 18], [3, 21], [7, 17]], right: [[9, 21], [3, 21], [11, 21]], justify: [[3, 21], [3, 21], [3, 21]] }[kind];
+    return (
+      <svg width="15" height="15" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none">
+        {[6, 12, 18].map((y, i) => (<line key={i} x1={L[i][0]} y1={y} x2={L[i][1]} y2={y} />))}
+      </svg>
+    );
+  }
   return (
     <div style={{ background: "linear-gradient(180deg,#f5f9ff,#ffffff)", borderRadius: 18, border: "1px solid #cfe0fb", borderLeft: "4px solid #0a5ac8", padding: "16px 18px", boxShadow: "0 6px 18px rgba(10,90,200,0.10)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 10 }}>
@@ -6454,11 +6464,20 @@ function ComunicadosWidget({ isAdmin }) {
       </div>
       {editing ? (
         <div>
-          <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
-            <button onClick={() => cmd("bold")} style={{ ...tbBtn, fontWeight: 800 }}>N</button>
-            <button onClick={() => cmd("insertUnorderedList")} style={tbBtn}>• Viñetas</button>
-            <button onClick={() => cmd("justifyCenter")} style={tbBtn}>Centrar</button>
-            <button onClick={() => cmd("justifyLeft")} style={tbBtn}>Izquierda</button>
+          <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap", alignItems: "center", background: "#eef4ff", border: "1px solid #d8e6fb", borderRadius: 12, padding: 6 }}>
+            <button title="Negrita" onClick={() => cmd("bold")} style={{ ...tbBtnIcon, fontWeight: 800 }}>B</button>
+            <button title="Cursiva" onClick={() => cmd("italic")} style={{ ...tbBtnIcon, fontStyle: "italic", fontWeight: 700 }}>I</button>
+            <button title="Subrayado" onClick={() => cmd("underline")} style={{ ...tbBtnIcon, textDecoration: "underline" }}>U</button>
+            <span style={tbSep} />
+            <button title="Alinear a la izquierda" onClick={() => cmd("justifyLeft")} style={tbBtnIcon}>{alignIcon("left")}</button>
+            <button title="Centrar" onClick={() => cmd("justifyCenter")} style={tbBtnIcon}>{alignIcon("center")}</button>
+            <button title="Alinear a la derecha" onClick={() => cmd("justifyRight")} style={tbBtnIcon}>{alignIcon("right")}</button>
+            <button title="Justificar" onClick={() => cmd("justifyFull")} style={tbBtnIcon}>{alignIcon("justify")}</button>
+            <span style={tbSep} />
+            <button title="Lista con viñetas" onClick={() => cmd("insertUnorderedList")} style={tbBtnIcon}>•</button>
+            <button title="Texto azul" onClick={() => cmd("foreColor", "#0a5ac8")} style={{ ...tbBtnIcon, color: "#0a5ac8", fontWeight: 800 }}>A</button>
+            <button title="Texto rojo" onClick={() => cmd("foreColor", "#c0392b")} style={{ ...tbBtnIcon, color: "#c0392b", fontWeight: 800 }}>A</button>
+            <button title="Quitar formato" onClick={() => cmd("removeFormat")} style={{ ...tbBtnIcon, color: "#8a8a90" }}>⨯</button>
           </div>
           <div ref={ref} contentEditable suppressContentEditableWarning
             style={{ minHeight: 130, border: `1px solid ${AZUL}55`, borderRadius: 10, padding: "12px 14px", fontSize: 13.5, lineHeight: 1.6, color: "#2a2a30", outline: "none", background: "#fbfcff" }} />
@@ -20001,13 +20020,20 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
   async function subirComprobante(miembro, file) {
     setUploadingId(miembro.id);
     try {
-      const pago = pagosMes.find((p) => p.integrante_id === miembro.id);
+      let pago = pagosMes.find((p) => p.integrante_id === miembro.id);
       if (!pago) {
-        alert("Primero marca el pago, luego adjunta el comprobante.");
-        setUploadingId(null);
-        return;
+        // Al adjuntar comprobante se marca el pago automáticamente (un solo paso)
+        const creado = await finDbPost("fin_pagos", {
+          integrante_id: miembro.id,
+          mes: mesSeleccionado,
+          monto: cuotaMes?.valor || 0,
+          tipo: "cuota",
+        });
+        pago = Array.isArray(creado) ? creado[0] : creado;
       }
-      const path = `comprobantes/${mesSeleccionado}/${miembro.id}_${Date.now()}.${file.name.split(".").pop()}`;
+      if (!pago || !pago.id) throw new Error("No se pudo registrar el pago.");
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `comprobantes/${mesSeleccionado}/${miembro.id}_${Date.now()}.${ext}`;
       const url = await finUploadFile("finanzas", path, file);
       await finDbPatch("fin_pagos", pago.id, { comprobante_url: url });
       await reload();
@@ -20218,8 +20244,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
                   <div style={{ fontWeight: 600, color: C.dark, fontSize: 14 }}>{m.nombre}</div>
                   <div style={{ fontSize: 11, color: C.gray }}>{finCuerdaLabel(m.cuerda)}</div>
                 </div>
-                {pagado && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     {pago?.comprobante_url ? (
                       <a
                         href={pago.comprobante_url}
@@ -20242,14 +20267,13 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
                           variant="ghost"
                           onClick={() => fileRefs.current[m.id]?.click()}
                           disabled={uploadingId === m.id}
-                          style={{ fontSize: 11, padding: "5px 10px" }}
+                          style={{ fontSize: 12, padding: "8px 12px" }}
                         >
                           {uploadingId === m.id ? "Subiendo..." : "📎 Comprobante"}
                         </FinBtn>
                       </div>
                     )}
                   </div>
-                )}
                 <button
                   onClick={() => togglePago(m)}
                   style={{
