@@ -1282,6 +1282,32 @@ export default function App() {
   const [dbLoading, setDbLoading] = useState(true);
   const [firstLoadDone, setFirstLoadDone] = useState(false);
 
+  // Íconos de acceso directo / app instalada (iOS, Android, PC) — apuntan al logo en Supabase
+  useEffect(() => {
+    try {
+      const base = `${SUPABASE_URL}/storage/v1/object/public/publico/iconos`;
+      const head = document.head;
+      head.querySelectorAll('link[rel="apple-touch-icon"], link[rel="manifest"], link[data-mjicon]').forEach((el) => el.remove());
+      const add = (attrs) => { const l = document.createElement("link"); Object.entries(attrs).forEach(([k, v]) => l.setAttribute(k, v)); l.setAttribute("data-mjicon", "1"); head.appendChild(l); };
+      add({ rel: "apple-touch-icon", sizes: "180x180", href: `${base}/mj-180.png` });
+      add({ rel: "apple-touch-icon", sizes: "192x192", href: `${base}/mj-192.png` });
+      add({ rel: "icon", type: "image/png", sizes: "32x32", href: `${base}/mj-32.png` });
+      add({ rel: "icon", type: "image/png", sizes: "192x192", href: `${base}/mj-192.png` });
+      const manifest = {
+        name: "Coro Misioneros de Jesús", short_name: "Coro MJ",
+        start_url: window.location.origin + "/", scope: window.location.origin + "/",
+        display: "standalone", background_color: "#ffffff", theme_color: "#0a5ac8",
+        icons: [
+          { src: `${base}/mj-192.png`, sizes: "192x192", type: "image/png" },
+          { src: `${base}/mj-512.png`, sizes: "512x512", type: "image/png" },
+          { src: `${base}/mj-maskable-512.png`, sizes: "512x512", type: "image/png", purpose: "maskable" },
+        ],
+      };
+      const blob = new Blob([JSON.stringify(manifest)], { type: "application/manifest+json" });
+      const m = document.createElement("link"); m.rel = "manifest"; m.href = URL.createObjectURL(blob); m.setAttribute("data-mjicon", "1"); head.appendChild(m);
+    } catch (e) {}
+  }, []);
+
   const [evangelio, setEvangelio] = useState(null);
   const [santoral, setSantoral] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
