@@ -6324,7 +6324,7 @@ function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
           <div style={{ fontSize: 10, fontWeight: 800, color: "#0a5ac8", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 2 }}>Cuota mensual del coro</div>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#0b2a52", lineHeight: 1.35 }}>¿Quieres participar en el pago de la cuota mensual?</div>
           <div style={{ fontSize: 12, color: "#3a5a80", lineHeight: 1.5, marginTop: 5 }}>
-            {cuotaInfo || "La cuota mensual nos ayuda a cubrir los gastos del coro: partituras, materiales, vestuario y actividades de la misión."}
+            {cuotaInfo || "La cuota mensual es un aporte voluntario con el que reunimos fondos para nuestras actividades extraprogramáticas: salidas, convivencias y celebraciones que nos permiten compartir y fortalecer los lazos del coro más allá de los ensayos y las misas."}
           </div>
           <div style={{ fontSize: 11.5, color: "#6a8ab0", marginTop: 5 }}>Al inscribirte tendrás acceso a la información de gastos del coro.</div>
         </div>
@@ -7024,6 +7024,9 @@ function Dashboard({
       <CuotaRecordatorioWidget members={members} user={user} setSection={setSection} onReload={onReload} />
       <div className="dash-2col">
         <div className="dash-col">
+      <div style={{ marginBottom: 16 }}>
+        <ComunicadosWidget isAdmin={isAdmin} />
+      </div>
       {/* ── Avisos del Coro ── */}
       {avisos && avisos.length > 0 && (
         <div style={{ marginBottom: 14 }}>
@@ -7269,9 +7272,6 @@ function Dashboard({
             ))}
         </div>
       )}
-      <div style={{ marginBottom: 16 }}>
-        <ComunicadosWidget isAdmin={isAdmin} />
-      </div>
       <VideoDestacadoWidget isAdmin={isAdmin} />
       <GaleriaWidget fotos={fotos} setSection={setSection} isAdmin={isAdmin} />
         </div>
