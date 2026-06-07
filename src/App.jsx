@@ -905,20 +905,20 @@ function SectionTitle({ title, subtitle, action }) {
 
 function MobileMenu({ section, setSection, onClose, user }) {
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex" }}>
       <div
         onClick={onClose}
         style={{
           position: "absolute",
           inset: 0,
-          background: "rgba(0,0,0,0.45)",
+          background: "rgba(0,0,0,0.50)",
         }}
       />
       <div
         style={{
           position: "relative",
           width: 256,
-          background: "rgba(249,249,251,0.96)",
+          background: "rgba(245,246,250,0.98)",
           backdropFilter: "saturate(180%) blur(24px)",
           WebkitBackdropFilter: "saturate(180%) blur(24px)",
           height: "100%",
@@ -926,8 +926,9 @@ function MobileMenu({ section, setSection, onClose, user }) {
           padding: "12px 6px",
           display: "flex",
           flexDirection: "column",
-          zIndex: 301,
+          zIndex: 10000,
           WebkitOverflowScrolling: "touch",
+          boxShadow: "4px 0 24px rgba(0,0,0,0.18)",
         }}
       >
         <div
@@ -2541,6 +2542,9 @@ export default function App() {
               padding: 4,
               borderRadius: 9,
               flexShrink: 0,
+              zIndex: 20,
+              touchAction: "manipulation",
+              WebkitTapHighlightColor: "transparent",
             }}
           >
             ☰
