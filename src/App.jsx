@@ -904,7 +904,7 @@ function SectionTitle({ title, subtitle, action }) {
   );
 }
 
-function MobileMenu({ section, setSection, onClose, user }) {
+function MobileMenu({ section, setSection, onClose, user, cuotaInscritos = new Set() }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex" }}>
       <div
@@ -2286,6 +2286,7 @@ export default function App() {
           setSection={setSection}
           onClose={() => setMobileMenu(false)}
           user={user}
+          cuotaInscritos={cuotaInscritos}
         />
       )}
 
