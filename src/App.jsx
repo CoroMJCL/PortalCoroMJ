@@ -194,6 +194,7 @@ async function fetchGoogleCalendarEvents() {
 // Token de sesión activo (se actualiza al hacer login)
 let _authToken = null;
 let _refreshToken = null;
+let _isGuestSession = false; // true cuando entró con código de invitado (sin auth Supabase)
 
 async function refreshSession() {
   if (!_refreshToken) return false;
@@ -238,7 +239,7 @@ async function supabase(table, options = {}) {
   let url = `${SUPABASE_URL}/rest/v1/${table}?select=${select}${filters}${order}`;
   const makeHeaders = () => ({
     apikey: SUPABASE_KEY,
-    Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
+    Authorization: `Bearer ${_isGuestSession ? SUPABASE_SERVICE_KEY : (_authToken || SUPABASE_KEY)}`,
     "Content-Type": "application/json",
     Prefer: method === "POST" ? "return=representation" : "",
   });
@@ -2031,6 +2032,7 @@ export default function App() {
 
   function handleGuestEnter() {
     // Sesión de invitado: solo en memoria, sin cuenta Supabase
+    _isGuestSession = true;
     setUser({ nombre: "Invitado", cuerda: "", acceso: "aprobado", id: null });
     setSection("dashboard");
     setView("app");
@@ -3849,9 +3851,10 @@ function normalizarUrlFoto(url) {
 // ── Helpers para tabla config en Supabase ────────────────────────────
 async function getConfig(key) {
   try {
+    const token = _authToken || SUPABASE_SERVICE_KEY;
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/config?select=value&key=eq.${encodeURIComponent(key)}&limit=1`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` } }
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } }
     );
     if (!res.ok) return null;
     const data = await res.json();
