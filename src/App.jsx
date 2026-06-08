@@ -2754,7 +2754,17 @@ export default function App() {
             <Spinner />
           ) : (
             <>
-              {section === "dashboard" && (
+              {section === "dashboard" && esVisita(user) && (
+                <DashboardVisita
+                  user={user}
+                  pautas={pautas}
+                  setSection={setSection}
+                  isAdmin={false}
+                  evangelio={evangelio}
+                  comunidades={comunidades}
+                />
+              )}
+              {section === "dashboard" && !esVisita(user) && (
                 <Dashboard
                   cumple={cumple}
                   evangelio={evangelio}
@@ -20301,7 +20311,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
     try {
       const mesLabel = finMesLabel(mesSeleccionado);
       const nota = `texto:Cuota de ${mesLabel} registrada con cargo a la cuenta corriente de la Contadora/Tesorera del coro. No aplica transferencia.`;
-      const creado = await finDbPost("fin_pagos", {
+      await finDbPost("fin_pagos", {
         integrante_id: miembro.id,
         mes: mesSeleccionado,
         monto: cuotaMes?.valor || 0,
