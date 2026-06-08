@@ -11480,7 +11480,7 @@ function CancioneroDetallePauta({ pauta, canciones, isAdmin, onVolver, onReload 
             <div style={{ fontSize: 9, color: C.gray, wordBreak: "break-all", background: C.light, borderRadius: 9, padding: "6px 10px", lineHeight: 1.5 }}>
               {qrLink}
             </div>
-            <button onClick={() => navigator.clipboard?.writeText(qrLink).then(() => alert("✅ Link copiado"))} style={{
+            <button onClick={() => copiarTexto(qrLink)} style={{
               marginTop: 10, width: "100%", padding: 8, borderRadius: 10, border: `1px solid ${C.border}`,
               background: C.white, fontSize: 12, cursor: "pointer", color: C.gray,
             }}>📋 Copiar link</button>
@@ -19932,6 +19932,47 @@ const finFmtCLP = (n) => new Intl.NumberFormat("es-CL", { style: "currency", cur
 const FIN_MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 function finMesLabel(iso) { const [y, m] = iso.split("-"); return `${FIN_MESES[parseInt(m) - 1]} ${y}`; }
 function finCurrentMesIso() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
+
+function mostrarToastCopia(msg) {
+  try {
+    const t = document.createElement("div");
+    t.textContent = msg;
+    t.style.cssText = "position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#1c1c1e;color:#fff;padding:10px 18px;border-radius:12px;font-size:14px;font-weight:600;z-index:99999;box-shadow:0 6px 24px rgba(0,0,0,0.28);opacity:0;transition:opacity .15s";
+    document.body.appendChild(t);
+    requestAnimationFrame(() => { t.style.opacity = "1"; });
+    setTimeout(() => { t.style.opacity = "0"; setTimeout(() => { try { t.remove(); } catch (e) {} }, 220); }, 1200);
+  } catch (e) {}
+}
+function fallbackCopiar(text) {
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.top = "-9999px";
+    ta.contentEditable = "true";
+    ta.readOnly = false;
+    document.body.appendChild(ta);
+    const range = document.createRange();
+    range.selectNodeContents(ta);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    ta.setSelectionRange(0, 999999);
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch (e) { return false; }
+}
+function copiarTexto(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+    navigator.clipboard.writeText(text)
+      .then(() => mostrarToastCopia("✓ Copiado"))
+      .catch(() => mostrarToastCopia(fallbackCopiar(text) ? "✓ Copiado" : "No se pudo copiar"));
+  } else {
+    mostrarToastCopia(fallbackCopiar(text) ? "✓ Copiado" : "No se pudo copiar");
+  }
+}
+
 const CUOTAS_MES_INICIO = "2026-06"; // Las cuotas empiezan en Junio 2026
 function finMesVigente() { return finCurrentMesIso() >= CUOTAS_MES_INICIO; }
 const finIni = (n) => (n || "?").charAt(0).toUpperCase();
@@ -20166,7 +20207,7 @@ function useFinanzasData() {
 //  TAB: CUOTAS MENSUALES
 // ══════════════════════════════════════════════════════════════════════
 
-function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
+function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
   // Mes inicial: el mes actual, o el siguiente si ya es día 20+ (pago anticipado habilitado)
   const _initMes = (() => {
     const hoyI = new Date();
@@ -20229,6 +20270,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
   // ── Modales de confirmación de pago ──
   const [confirmPagar, setConfirmPagar]       = useState(null); // { miembro }
   const [confirmBorrar, setConfirmBorrar]     = useState(null); // { miembro, pago }
+  const [confirmContadora, setConfirmContadora] = useState(null); // { miembro } — pago propio de la contadora
   const [procesando, setProcesando]           = useState(false);
 
   async function togglePago(miembro) {
@@ -20238,9 +20280,38 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
       if (!pago) return;
       setConfirmBorrar({ miembro, pago });
     } else {
-      // Marcar → pedir confirmación antes de guardar
-      setConfirmPagar({ miembro });
+      // Caso especial: la contadora está registrando su PROPIO pago
+      // (ella no se transfiere a sí misma — el dinero ya está en su cuenta)
+      if (esCuerdaContador(user) && miembro.id === user.id) {
+        setConfirmContadora({ miembro });
+        return;
+      }
+      // Marcar pago de otro → es OBLIGATORIO adjuntar el comprobante como respaldo
+      const input = fileRefs.current[miembro.id];
+      if (input) {
+        input.click();
+      } else {
+        alert("Recarga la página e inténtalo de nuevo para adjuntar el comprobante.");
+      }
     }
+  }
+
+  async function ejecutarPagoContadora(miembro) {
+    setProcesando(true);
+    try {
+      const mesLabel = finMesLabel(mesSeleccionado);
+      const nota = `texto:Cuota de ${mesLabel} registrada con cargo a la cuenta corriente de la Contadora/Tesorera del coro. No aplica transferencia.`;
+      const creado = await finDbPost("fin_pagos", {
+        integrante_id: miembro.id,
+        mes: mesSeleccionado,
+        monto: cuotaMes?.valor || 0,
+        tipo: "cuota",
+        comprobante_url: nota,
+      });
+      await reload();
+    } catch (e) { alert("Error: " + e.message); }
+    setConfirmContadora(null);
+    setProcesando(false);
   }
 
   async function ejecutarPago(miembro) {
@@ -20308,6 +20379,39 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
   return (
     <div>
 
+      {/* ══ MODAL: Pago propio de la Contadora (sin transferencia) ══ */}
+      {confirmContadora && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.40)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "rgba(255,255,255,0.97)", backdropFilter: "saturate(180%) blur(20px)", WebkitBackdropFilter: "saturate(180%) blur(20px)", borderRadius: 22, padding: "28px 28px", maxWidth: 380, width: "90%", boxShadow: "0 24px 72px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)", border: "1px solid rgba(255,255,255,0.8)" }}>
+            <div style={{ fontSize: 32, textAlign: "center", marginBottom: 10 }}>🏦</div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, color: "var(--text-primary)", textAlign: "center", marginBottom: 6 }}>
+              Registrar tu cuota
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text-secondary)", textAlign: "center", marginBottom: 14, lineHeight: 1.6 }}>
+              Como Contadora/Tesorera, los fondos del coro se guardan en tu cuenta corriente.
+            </div>
+            <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 12, padding: "12px 14px", marginBottom: 18, fontSize: 12.5, color: "#0c4a6e", lineHeight: 1.6 }}>
+              📝 Se guardará la siguiente nota como respaldo:<br />
+              <span style={{ fontStyle: "italic", marginTop: 6, display: "block", color: "#0369a1" }}>
+                "Cuota de {finMesLabel(mesSeleccionado)} registrada con cargo a la cuenta corriente de la Contadora/Tesorera del coro. No aplica transferencia."
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => ejecutarPagoContadora(confirmContadora.miembro)}
+                disabled={procesando}
+                style={{ flex: 1, background: "linear-gradient(135deg,#1d6fc7,#1a4d8f)", border: "none", borderRadius: 12, padding: "11px 0", fontSize: 13, fontWeight: 700, color: "white", cursor: procesando ? "not-allowed" : "pointer", opacity: procesando ? 0.7 : 1 }}
+              >{procesando ? "Registrando..." : "✅ Confirmar"}</button>
+              <button
+                onClick={() => setConfirmContadora(null)}
+                disabled={procesando}
+                style={{ flex: 1, background: "white", border: "1.5px solid #e2e8f0", borderRadius: 12, padding: "11px 0", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", cursor: "pointer" }}
+              >Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ══ MODAL: Confirmar registro de pago ══ */}
       {confirmPagar && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.40)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -20358,9 +20462,9 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
               </div>
               {confirmBorrar.pago.comprobante_url && (
                 <div style={{ marginTop: 8, padding: "6px 10px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 14 }}>📎</span>
+                  <span style={{ fontSize: 14 }}>{confirmBorrar.pago.comprobante_url.startsWith("texto:") ? "📝" : "📎"}</span>
                   <span style={{ fontSize: 11, color: "#92400e", fontWeight: 600 }}>
-                    Este pago tiene comprobante adjunto. También se perderá.
+                    {confirmBorrar.pago.comprobante_url.startsWith("texto:") ? "Este pago tiene una nota de respaldo. También se perderá." : "Este pago tiene comprobante adjunto. También se perderá."}
                   </span>
                 </div>
               )}
@@ -20467,6 +20571,10 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
       </div>
 
       {/* Lista de integrantes */}
+      <div style={{ background: "#fff7e6", border: "1px solid #ffd98a", borderRadius: 10, padding: "10px 13px", margin: "0 0 12px", fontSize: 12.5, color: "#7a4d00", display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <span style={{ fontSize: 15, flexShrink: 0 }}>📌</span>
+        <span>Para registrar un pago es <b>obligatorio adjuntar el comprobante</b> (una imagen) como respaldo. Al marcar a una persona como pagada se te pedirá la imagen del comprobante.</span>
+      </div>
       {miembrosActivos.length === 0 ? (
         <div style={{ textAlign: "center", padding: "30px 0", color: C.gray, fontSize: 13 }}>
           No hay integrantes en el sistema de cuotas aún. Ve a la pestaña <strong>Participantes</strong> para agregarlos.
@@ -20497,6 +20605,14 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     {pago?.comprobante_url ? (
+                      pago.comprobante_url.startsWith("texto:") ? (
+                        <span
+                          title={pago.comprobante_url.replace("texto:", "")}
+                          style={{ fontSize: 11, color: "#0369a1", cursor: "help", display: "flex", alignItems: "center", gap: 4 }}
+                        >
+                          📝 Nota registrada
+                        </span>
+                      ) : (
                       <a
                         href={pago.comprobante_url}
                         target="_blank"
@@ -20505,11 +20621,12 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload }) {
                       >
                         📎 Ver comprobante
                       </a>
+                      )
                     ) : (
                       <div>
                         <input
                           type="file"
-                          accept="image/*,application/pdf"
+                          accept="image/*"
                           style={{ display: "none" }}
                           ref={(el) => (fileRefs.current[m.id] = el)}
                           onChange={(e) => e.target.files[0] && subirComprobante(m, e.target.files[0])}
@@ -21014,10 +21131,16 @@ function TabActividades({ actividades, gastos, members, pagos, reload }) {
                       <div style={{ flex: 1, fontSize: 13, color: C.dark }}>{m?.nombre || "Desconocido"}</div>
                       <div style={{ fontWeight: 700, color: C.primary, fontSize: 13 }}>{finFmtCLP(p.monto)}</div>
                       {p.comprobante_url && (
+                        p.comprobante_url.startsWith("texto:") ? (
+                          <span title={p.comprobante_url.replace("texto:", "")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#0369a1", background: "#e0f2fe", padding: "3px 9px", borderRadius: 20, fontWeight: 600, cursor: "help" }}>
+                            📝 Nota
+                          </span>
+                        ) : (
                         <a href={p.comprobante_url} target="_blank" rel="noreferrer" title="Ver comprobante de pago"
                           style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: C.primary, textDecoration: "none", background: C.primary + "12", padding: "3px 9px", borderRadius: 20, fontWeight: 600 }}>
                           📎 Comprobante
                         </a>
+                        )
                       )}
                     </div>
                   );
@@ -21216,7 +21339,11 @@ function TabReporte({ members, cuotas, pagos, miembrosEnCuotas }) {
                     <Avatar nombre={m.nombre} foto_url={m.foto_url} size={28} color={C.primary} />
                     <div style={{ flex: 1, fontSize: 13 }}>{m.nombre}</div>
                     {pago?.comprobante_url && (
+                      pago.comprobante_url.startsWith("texto:") ? (
+                        <span title={pago.comprobante_url.replace("texto:", "")} style={{ cursor: "help" }}>📝</span>
+                      ) : (
                       <a href={pago.comprobante_url} target="_blank" rel="noreferrer" title="Ver comprobante">📎</a>
+                      )
                     )}
                   </div>
                 );
@@ -21456,6 +21583,7 @@ export function ModuloFinanzas({ user, members }) {
                 pagos={pagos}
                 miembrosEnCuotas={miembrosEnCuotas}
                 reload={reload}
+                user={user}
               />
             )}
             {tab === "actividades" && (
@@ -21985,6 +22113,7 @@ export function InfoGastos({ user, members }) {
   const [cuentaBancaria, setCuentaBancaria] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tabActiva, setTabActiva] = useState("estado");
+  const [mesVerCuotas, setMesVerCuotas] = useState("");
   const [actExpandida, setActExpandida] = useState(null);
 
   useEffect(() => {
@@ -22023,19 +22152,21 @@ export function InfoGastos({ user, members }) {
     ? new Date(_hoyIG.getFullYear(), _hoyIG.getMonth())
     : new Date(_hoyIG.getFullYear(), _hoyIG.getMonth() + 1);
   const mesActual = `${_mesVigenteDate.getFullYear()}-${String(_mesVigenteDate.getMonth() + 1).padStart(2, "0")}`;
+  const mesVer = mesVerCuotas || mesActual;
   // El plazo de pago vence el día 20 del mes de la cuota
-  const [_igAnio, _igMes] = mesActual.split("-").map(Number);
+  const [_igAnio, _igMes] = mesVer.split("-").map(Number);
   const plazoVencimiento = new Date(_igAnio, _igMes - 1, 20);
   const mesVencidoIG = _hoyIG > plazoVencimiento;
 
   const cuotasActivas = mesActual >= CUOTAS_MES_INICIO || pagos.some((p) => p.tipo === "cuota");
-  const pagosMesActual = pagos.filter((p) => p.mes === mesActual);
+  const pagosMesActual = pagos.filter((p) => p.mes === mesVer);
   const miembrosIds = new Set(miembrosEnCuotas.map((m) => m.integrante_id));
   const miembrosActivos = members.filter((m) => miembrosIds.has(m.id));
   const pagaron = new Set(pagosMesActual.map((p) => p.integrante_id));
   const alDia = cuotasActivas ? miembrosActivos.filter((m) => pagaron.has(m.id)) : [];
   const pendientes = cuotasActivas ? miembrosActivos.filter((m) => !pagaron.has(m.id)) : [];
-  const cuotaMesActual = cuotas.find((c) => c.mes === mesActual);
+  const cuotaMesActual = cuotas.find((c) => c.mes === mesVer);
+  const mesesCuotaDisponibles = Array.from(new Set([...cuotas.map((c) => c.mes), ...pagos.map((p) => p.mes), mesActual].filter((m) => m && m >= CUOTAS_MES_INICIO))).sort().reverse();
 
 
   if (loading) return <FinSpinner />;
@@ -22043,6 +22174,7 @@ export function InfoGastos({ user, members }) {
   const TABS_PUB = [
     { id: "estado", label: "💰 Estado financiero" },
     { id: "cuotas", label: "📋 Estado de cuotas" },
+    { id: "mihistorial", label: "📅 Mis pagos" },
     { id: "gastos", label: "🧾 Gastos por actividad" },
   ];
 
@@ -22118,10 +22250,17 @@ export function InfoGastos({ user, members }) {
             </div>
           </FinCard>
         ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12.5, color: C.gray, fontWeight: 600 }}>Ver mes:</span>
+            <select value={mesVer} onChange={(e) => setMesVerCuotas(e.target.value)} style={{ fontSize: 13, padding: "7px 11px", borderRadius: 9, border: `1px solid ${C.border}`, background: "white", color: C.dark, fontWeight: 600 }}>
+              {mesesCuotaDisponibles.map((m) => (<option key={m} value={m}>{finMesLabel(m)}</option>))}
+            </select>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <FinCard>
             <div style={{ fontWeight: 700, color: C.primary, fontSize: 14, marginBottom: 12 }}>
-              ✅ Al día — {finMesLabel(mesActual)}
+              ✅ Al día — {finMesLabel(mesVer)}
               {cuotaMesActual && <span style={{ fontSize: 11, fontWeight: 400, color: C.gray }}> · {finFmtCLP(cuotaMesActual.valor)}</span>}
             </div>
             {alDia.length === 0 ? (
@@ -22133,6 +22272,11 @@ export function InfoGastos({ user, members }) {
                   <Avatar nombre={m.nombre} foto_url={m.foto_url} size={28} color={C.primary} />
                   <span style={{ fontSize: 13, flex: 1 }}>{m.nombre}</span>
                   {pagoM?.comprobante_url ? (
+                    pagoM.comprobante_url.startsWith("texto:") ? (
+                      <span title={pagoM.comprobante_url.replace("texto:", "")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#0369a1", background: "#e0f2fe", padding: "3px 8px", borderRadius: 16, fontWeight: 600, cursor: "help" }}>
+                        📝 Nota
+                      </span>
+                    ) : (
                     <a
                       href={pagoM.comprobante_url}
                       target="_blank"
@@ -22142,6 +22286,7 @@ export function InfoGastos({ user, members }) {
                     >
                       📎 Comprobante
                     </a>
+                    )
                   ) : (
                     <span style={{ fontSize: 10, color: C.gray, background: "#f1f5f9", padding: "2px 7px", borderRadius: 10 }}>Sin comprobante</span>
                   )}
@@ -22151,12 +22296,12 @@ export function InfoGastos({ user, members }) {
           </FinCard>
           <FinCard>
             <div style={{ fontWeight: 700, color: mesVencidoIG ? "#ef4444" : "#f59e0b", fontSize: 14, marginBottom: 12 }}>
-              {mesVencidoIG ? "⚠️ Morosos" : "🕐 Plazo vigente"} — {finMesLabel(mesActual)}
+              {mesVencidoIG ? "⚠️ Morosos" : "🕐 Plazo vigente"} — {finMesLabel(mesVer)}
             </div>
             {!mesVencidoIG ? (
               <div style={{ fontSize: 12, color: C.gray, lineHeight: 1.6 }}>
                 <div style={{ marginBottom: 6 }}>El plazo de pago aún está abierto.</div>
-                <div>Cada integrante puede pagar hasta el <strong>día 20 de {finMesLabel(mesActual)}</strong>.</div>
+                <div>Cada integrante puede pagar hasta el <strong>día 20 de {finMesLabel(mesVer)}</strong>.</div>
                 <div style={{ marginTop: 8, padding: "6px 10px", background: "#fef9c3", borderRadius: 10, color: "#92400e", fontSize: 11 }}>
                   💡 Quienes ya aparecen como &quot;Al día&quot; pagaron de forma anticipada.
                 </div>
@@ -22171,8 +22316,58 @@ export function InfoGastos({ user, members }) {
             ))}
           </FinCard>
         </div>
+        </div>
         )
       )}
+
+      {/* Mis pagos — historial personal del integrante */}
+      {tabActiva === "mihistorial" && (() => {
+        const misPagos = (pagos || [])
+          .filter((p) => p.integrante_id === user?.id)
+          .sort((a, b) => (b.mes || "").localeCompare(a.mes || ""));
+        const totalMio = misPagos.reduce((s, p) => s + (p.monto || 0), 0);
+        return (
+          <div>
+            <div style={{ background: "linear-gradient(180deg,#f5f9ff,#eaf2ff)", border: "1px solid #cfe0fb", borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#0a5ac8", letterSpacing: "0.06em", textTransform: "uppercase" }}>Mi historial de cuotas</div>
+              <div style={{ fontSize: 13.5, color: "#3a5a80", marginTop: 3 }}>
+                Has realizado <b>{misPagos.length}</b> pago{misPagos.length !== 1 ? "s" : ""} — total aportado: <b>{finFmtCLP(totalMio)}</b>
+              </div>
+            </div>
+            {misPagos.length === 0 ? (
+              <div style={{ background: "white", border: "1px dashed rgba(60,60,67,0.2)", borderRadius: 14, padding: "28px 16px", textAlign: "center", color: C.gray, fontSize: 14 }}>
+                Aún no tienes pagos registrados.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {misPagos.map((p) => (
+                  <div key={p.id} style={{ background: "white", border: "1px solid rgba(60,60,67,0.12)", borderRadius: 12, padding: "12px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: C.dark }}>{finMesLabel(p.mes)}</div>
+                      <div style={{ fontSize: 12.5, color: C.gray }}>{finFmtCLP(p.monto || 0)}{p.tipo && p.tipo !== "cuota" ? ` · ${p.tipo}` : ""}</div>
+                    </div>
+                    {p.comprobante_url ? (
+                      p.comprobante_url.startsWith("texto:") ? (
+                        <span title={p.comprobante_url.replace("texto:", "")}
+                          style={{ fontSize: 12.5, fontWeight: 700, color: "#0369a1", textDecoration: "none", border: "1px solid #bae6fd", background: "#e0f2fe", borderRadius: 9, padding: "7px 12px", cursor: "help" }}>
+                          📝 Nota de pago
+                        </span>
+                      ) : (
+                      <a href={p.comprobante_url} target="_blank" rel="noreferrer"
+                        style={{ fontSize: 12.5, fontWeight: 700, color: "#0a5ac8", textDecoration: "none", border: "1px solid #cfe0fb", background: "#eaf2ff", borderRadius: 9, padding: "7px 12px" }}>
+                        📎 Ver comprobante
+                      </a>
+                      )
+                    ) : (
+                      <span style={{ fontSize: 12, color: "#9a9aa0", fontStyle: "italic" }}>Sin comprobante</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Gastos por actividad */}
       {tabActiva === "gastos" && (
@@ -22288,7 +22483,7 @@ export function InfoGastos({ user, members }) {
                     {val}
                     <button
                       title="Copiar"
-                      onClick={() => navigator.clipboard.writeText(val).catch(() => {})}
+                      onClick={() => copiarTexto(val)}
                       style={{
                         background: "none", border: "none", cursor: "pointer",
                         padding: "1px 4px", borderRadius: 7, fontSize: 12,
