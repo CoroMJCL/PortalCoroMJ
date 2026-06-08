@@ -20278,10 +20278,11 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
   }
 
   // ── Modales de confirmación de pago ──
-  const [confirmPagar, setConfirmPagar]       = useState(null); // { miembro }
-  const [confirmBorrar, setConfirmBorrar]     = useState(null); // { miembro, pago }
-  const [confirmContadora, setConfirmContadora] = useState(null); // { miembro } — pago propio de la contadora
-  const [procesando, setProcesando]           = useState(false);
+  const [confirmPagar, setConfirmPagar]                   = useState(null); // { miembro }
+  const [confirmBorrar, setConfirmBorrar]                 = useState(null); // { miembro, pago }
+  const [confirmContadora, setConfirmContadora]           = useState(null); // { miembro } — pago propio de la contadora
+  const [confirmPagarConComprobante, setConfirmPagarConComprobante] = useState(null); // { miembro } — modal explicativo antes de pedir archivo
+  const [procesando, setProcesando]                       = useState(false);
 
   async function togglePago(miembro) {
     if (pagaron.has(miembro.id)) {
@@ -20291,18 +20292,22 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
       setConfirmBorrar({ miembro, pago });
     } else {
       // Caso especial: la contadora está registrando su PROPIO pago
-      // (ella no se transfiere a sí misma — el dinero ya está en su cuenta)
       if (esCuerdaContador(user) && miembro.id === user.id) {
         setConfirmContadora({ miembro });
         return;
       }
-      // Marcar pago de otro → es OBLIGATORIO adjuntar el comprobante como respaldo
-      const input = fileRefs.current[miembro.id];
-      if (input) {
-        input.click();
-      } else {
-        alert("Recarga la página e inténtalo de nuevo para adjuntar el comprobante.");
-      }
+      // Marcar pago de otro → mostrar modal explicativo primero
+      setConfirmPagarConComprobante({ miembro });
+    }
+  }
+
+  function solicitarComprobante(miembro) {
+    setConfirmPagarConComprobante(null);
+    const input = fileRefs.current[miembro.id];
+    if (input) {
+      input.click();
+    } else {
+      alert("Recarga la página e inténtalo de nuevo para adjuntar el comprobante.");
     }
   }
 
@@ -20388,6 +20393,40 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
 
   return (
     <div>
+
+      {/* ══ MODAL: Explicación antes de pedir comprobante ══ */}
+      {confirmPagarConComprobante && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.40)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "rgba(255,255,255,0.97)", backdropFilter: "saturate(180%) blur(20px)", WebkitBackdropFilter: "saturate(180%) blur(20px)", borderRadius: 22, padding: "28px 24px", maxWidth: 400, width: "90%", boxShadow: "0 24px 72px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)", border: "1px solid rgba(255,255,255,0.8)" }}>
+            <div style={{ fontSize: 32, textAlign: "center", marginBottom: 10 }}>📎</div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, color: "var(--text-primary)", textAlign: "center", marginBottom: 10 }}>
+              Registrar pago de cuota
+            </div>
+            {/* Quién */}
+            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "10px 14px", marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#14532d" }}>{confirmPagarConComprobante.miembro.nombre}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#15803d" }}>{finFmtCLP(cuotaMes?.valor || 0)} · {finMesLabel(mesSeleccionado)}</span>
+            </div>
+            {/* Explicación */}
+            <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.65, marginBottom: 16 }}>
+              Para registrar este pago <strong>debes adjuntar el comprobante de transferencia</strong> que el integrante te envió.
+              <div style={{ marginTop: 10, background: "#fefce8", border: "1px solid #fde68a", borderRadius: 10, padding: "10px 13px", fontSize: 12, color: "#78350f", lineHeight: 1.6 }}>
+                💡 <strong>¿Por qué?</strong> El comprobante queda guardado como respaldo en caso de cualquier duda futura sobre los pagos del coro. Sin comprobante no se puede registrar el pago.
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => solicitarComprobante(confirmPagarConComprobante.miembro)}
+                style={{ flex: 1, background: "linear-gradient(135deg,#1d6fc7,#1a4d8f)", border: "none", borderRadius: 12, padding: "11px 0", fontSize: 13, fontWeight: 700, color: "white", cursor: "pointer" }}
+              >📎 Adjuntar comprobante</button>
+              <button
+                onClick={() => setConfirmPagarConComprobante(null)}
+                style={{ flex: 1, background: "white", border: "1.5px solid #e2e8f0", borderRadius: 12, padding: "11px 0", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", cursor: "pointer" }}
+              >Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══ MODAL: Pago propio de la Contadora (sin transferencia) ══ */}
       {confirmContadora && (
