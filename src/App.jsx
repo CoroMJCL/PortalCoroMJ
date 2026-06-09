@@ -194,6 +194,7 @@ async function fetchGoogleCalendarEvents() {
 // Token de sesión activo (se actualiza al hacer login)
 let _authToken = null;
 let _refreshToken = null;
+let _anthropicKey = ""; // Se carga desde Supabase config al iniciar sesión
 let _isGuestSession = false; // true cuando entró con código de invitado (sin auth Supabase)
 
 async function refreshSession() {
@@ -1782,6 +1783,7 @@ export default function App() {
           "Content-Type": "application/json",
           "anthropic-version": "2023-06-01",
           "anthropic-dangerous-direct-browser-access": "true",
+          ...(_anthropicKey ? { "x-api-key": _anthropicKey } : {}),
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
@@ -1984,6 +1986,8 @@ export default function App() {
     setView("app");
     if (esVisita(p)) setSection("dashboard");
     registrarVisita(p, data.access_token);
+    // Cargar API key de Anthropic para funciones de IA (extracción de acordes, etc.)
+    getConfig("anthropic_api_key").then((k) => { if (k) _anthropicKey = k; }).catch(() => {});
     // Mostrar modal solo si no tiene permiso aún y no es usuario Visita
     setTimeout(() => {
       if (Notification.permission !== "granted" && !esVisita(p)) setShowPushModal(true);
@@ -5349,10 +5353,16 @@ REGLAS ESTRICTAS:
     try {
       const fid = fileIdDe(url);
       const esDrive = /(?:drive|docs)\.google\.com/i.test(url);
+      const esSupabase = url.includes("/storage/v1/object/public/");
       let content;
       if (esDrive && fid) {
         content = [
           { type: "image", source: { type: "url", url: `https://drive.google.com/thumbnail?id=${fid}&sz=w1600` } },
+          { type: "text", text: PROMPT },
+        ];
+      } else if (esSupabase) {
+        content = [
+          { type: "document", source: { type: "url", url } },
           { type: "text", text: PROMPT },
         ];
       } else {
@@ -5367,7 +5377,12 @@ REGLAS ESTRICTAS:
       }
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+          ...(_anthropicKey ? { "x-api-key": _anthropicKey } : {}),
+        },
         body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 4000, messages: [{ role: "user", content }] }),
       });
       if (!response.ok) throw new Error("api");
@@ -6514,6 +6529,8 @@ function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
   const [data, setData] = useState(null);
   const [inscribiendo, setInscribiendo] = useState(false);
   const [cuotaInfo, setCuotaInfo] = useState("");
+  const [modalTipo, setModalTipo] = useState(false);
+  const [modalConfirmado, setModalConfirmado] = useState(null); // { esEstudiante } — post-inscripción
 
   async function fetchCuotaData() {
     try {
@@ -6527,13 +6544,15 @@ function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
   }
   useEffect(() => { fetchCuotaData(); getConfig("cuota_info").then((v) => { if (v) setCuotaInfo(v); }).catch(() => {}); }, []);
 
-  async function inscribirmeCuota() {
+  async function inscribirmeCuota(esEstudiante) {
     if (!user?.id || inscribiendo) return;
+    setModalTipo(false);
     setInscribiendo(true);
     try {
-      await finDbPost("fin_miembros_cuotas", { integrante_id: user.id });
+      await finDbPost("fin_miembros_cuotas", { integrante_id: user.id, es_estudiante: esEstudiante });
       await fetchCuotaData();
       if (onReload) onReload();
+      setModalConfirmado({ esEstudiante });
     } catch (e) { alert("No se pudo inscribir: " + (e?.message || "")); }
     setInscribiendo(false);
   }
@@ -6575,7 +6594,7 @@ function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
           </div>
           <div style={{ fontSize: 11.5, color: "#6a8ab0", marginTop: 5 }}>Al inscribirte tendrás acceso a la información de gastos del coro.</div>
         </div>
-        <button onClick={inscribirmeCuota} disabled={inscribiendo} style={{ flexShrink: 0, background: "#0a5ac8", border: "none", borderRadius: 11, padding: "10px 17px", fontSize: 12.5, fontWeight: 700, color: "white", cursor: inscribiendo ? "default" : "pointer", opacity: inscribiendo ? 0.7 : 1 }}>
+        <button onClick={() => setModalTipo(true)} disabled={inscribiendo} style={{ flexShrink: 0, background: "#0a5ac8", border: "none", borderRadius: 11, padding: "10px 17px", fontSize: 12.5, fontWeight: 700, color: "white", cursor: inscribiendo ? "default" : "pointer", opacity: inscribiendo ? 0.7 : 1 }}>
           {inscribiendo ? "Inscribiendo…" : "Quiero participar →"}
         </button>
       </div>
@@ -6632,6 +6651,11 @@ function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
             {pagados}/{total} al día
           </span>
         </div>
+        {yoInscrito && !yoPague && (
+          <div style={{ marginTop: 10, background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: "10px 13px", fontSize: 12, color: "#7c2d12", lineHeight: 1.65 }}>
+            💸 <strong>Tienes el pago pendiente.</strong> Realiza tu transferencia y envía el <strong>comprobante por el WhatsApp del grupo</strong> para que la contadora lo registre en el sistema.
+          </div>
+        )}
       </div>
       {yoInscrito && !bajaOpen && (
         <button onClick={() => setBajaOpen(true)} style={{ flexShrink: 0, background: "white", border: "1px solid #e3b3b0", color: "#c0392b", fontSize: 12, fontWeight: 700, cursor: "pointer", borderRadius: 10, padding: "8px 14px" }}>
@@ -6664,6 +6688,76 @@ function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
             style={{ background: "none", border: "none", color: "#8a8a90", fontSize: 12, cursor: "pointer" }}>
             Cancelar
           </button>
+        </div>
+      )}
+
+      {/* ── Modal: instrucciones de pago post-inscripción ── */}
+      {modalConfirmado && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "rgba(255,255,255,0.97)", borderRadius: 22, padding: "28px 24px", maxWidth: 380, width: "90%", boxShadow: "0 24px 72px rgba(0,0,0,0.18)" }}>
+            <div style={{ fontSize: 34, textAlign: "center", marginBottom: 10 }}>✅</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#1c1c1e", textAlign: "center", marginBottom: 6 }}>
+              ¡Te inscribiste correctamente!
+            </div>
+            <div style={{ fontSize: 13, color: "#3a3a40", textAlign: "center", marginBottom: 18, lineHeight: 1.6 }}>
+              Quedaste inscrito como <strong>{modalConfirmado.esEstudiante ? "Estudiante · $3.000" : "Adulto"}</strong>.
+            </div>
+
+            {/* Instrucciones de pago */}
+            <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 14, padding: "14px 16px", marginBottom: 18 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#7c2d12", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                💸 Debes pagar la cuota de este mes
+              </div>
+              <div style={{ fontSize: 12.5, color: "#7c2d12", lineHeight: 1.7 }}>
+                Para que tu pago quede registrado en el sistema:<br />
+                <span style={{ display: "block", marginTop: 6, paddingLeft: 4 }}>
+                  1. Realiza la transferencia por <strong>{modalConfirmado.esEstudiante ? "$3.000" : "el valor de la cuota del mes"}</strong>.<br />
+                  2. Envía el <strong>comprobante de pago</strong> por el <strong>WhatsApp del grupo</strong>.<br />
+                  3. La contadora lo registrará en el sistema.
+                </span>
+              </div>
+            </div>
+
+            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "10px 14px", marginBottom: 18, fontSize: 12, color: "#14532d", lineHeight: 1.6 }}>
+              💬 <strong>¿Cuál es el WhatsApp del grupo?</strong> Es el mismo grupo de mensajería donde te coordinan los ensayos y misas.
+            </div>
+
+            <button
+              onClick={() => setModalConfirmado(null)}
+              style={{ width: "100%", background: "linear-gradient(135deg,#1d6fc7,#1a4d8f)", border: "none", borderRadius: 12, padding: "12px 0", fontSize: 14, fontWeight: 700, color: "white", cursor: "pointer" }}
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: ¿eres estudiante? ── */}
+      {modalTipo && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.40)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "rgba(255,255,255,0.97)", borderRadius: 22, padding: "28px 24px", maxWidth: 360, width: "90%", boxShadow: "0 24px 72px rgba(0,0,0,0.18)" }}>
+            <div style={{ fontSize: 30, textAlign: "center", marginBottom: 10 }}>🎓</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#1c1c1e", textAlign: "center", marginBottom: 8 }}>¿Cuál es tu situación?</div>
+            <div style={{ fontSize: 13, color: "#6a6a70", textAlign: "center", marginBottom: 20, lineHeight: 1.6 }}>
+              Esto determina el valor de tu cuota mensual.
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
+              <button onClick={() => inscribirmeCuota(false)}
+                style={{ background: "linear-gradient(135deg,#1d6fc7,#1a4d8f)", border: "none", borderRadius: 14, padding: "14px 16px", cursor: "pointer", textAlign: "left" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "white" }}>👤 Adulto</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 3 }}>Pago el valor normal de la cuota</div>
+              </button>
+              <button onClick={() => inscribirmeCuota(true)}
+                style={{ background: "white", border: "1.5px solid #cfe0fb", borderRadius: 14, padding: "14px 16px", cursor: "pointer", textAlign: "left" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#0a5ac8" }}>🎓 Estudiante</div>
+                <div style={{ fontSize: 12, color: "#6a6a70", marginTop: 3 }}>Pago cuota rebajada de $3.000</div>
+              </button>
+            </div>
+            <button onClick={() => setModalTipo(false)}
+              style={{ width: "100%", background: "transparent", border: "none", fontSize: 13, color: "#8a8a90", cursor: "pointer", padding: "6px 0" }}>
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -10789,7 +10883,12 @@ Kyrie eleison`;
 
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+          ...(_anthropicKey ? { "x-api-key": _anthropicKey } : {}),
+        },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 4000,
@@ -11101,7 +11200,12 @@ Kyrie eleison`;
                     try {
                       const response = await fetch("https://api.anthropic.com/v1/messages", {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: {
+                          "Content-Type": "application/json",
+                          "anthropic-version": "2023-06-01",
+                          "anthropic-dangerous-direct-browser-access": "true",
+                          ...(_anthropicKey ? { "x-api-key": _anthropicKey } : {}),
+                        },
                         body: JSON.stringify({
                           model: "claude-sonnet-4-20250514",
                           max_tokens: 4000,
@@ -11714,6 +11818,7 @@ const ADMIN_TABS = [
   { id: "cuenta_bancaria", label: "🏦 Cuenta Bancaria" },
   { id: "visitas", label: "📊 Visitas" },
   { id: "notificaciones", label: "🔔 Notificaciones" },
+  { id: "api_config", label: "🔑 Claves API" },
 ];
 
 function AdminTab({ label, active, onClick }) {
@@ -19736,6 +19841,7 @@ function Admin({
         {tab === "cuenta_bancaria" && <AdminCuentaBancaria />}
         {tab === "visitas" && <AdminVisitas />}
         {tab === "notificaciones" && <AdminNotificaciones />}
+        {tab === "api_config" && <AdminApiConfig />}
       </Card>
 
       <SqlSetupBlock />
@@ -19983,6 +20089,7 @@ function copiarTexto(text) {
   }
 }
 
+const CUOTA_ESTUDIANTE_MONTO = 3000; // Valor fijo cuota estudiante
 const CUOTAS_MES_INICIO = "2026-06"; // Las cuotas empiezan en Junio 2026
 function finMesVigente() { return finCurrentMesIso() >= CUOTAS_MES_INICIO; }
 const finIni = (n) => (n || "?").charAt(0).toUpperCase();
@@ -20236,12 +20343,18 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
   const miembrosIds = new Set(miembrosEnCuotas.map((m) => m.integrante_id));
   const miembrosActivos = members.filter((m) => miembrosIds.has(m.id));
 
+  // Helper: monto que debe pagar cada integrante según su tipo
+  function montoParaMiembro(miembro) {
+    const reg = miembrosEnCuotas.find((r) => r.integrante_id === miembro.id);
+    return reg?.es_estudiante ? CUOTA_ESTUDIANTE_MONTO : (cuotaMes?.valor || 0);
+  }
+
   // Cuota del mes seleccionado
   const cuotaMes = cuotas.find((c) => c.mes === mesSeleccionado);
   const pagosMes = pagos.filter((p) => p.mes === mesSeleccionado);
 
   const pagaron = new Set(pagosMes.map((p) => p.integrante_id));
-  const totalEsperado = miembrosActivos.length * (cuotaMes?.valor || 0);
+  const totalEsperado = miembrosActivos.reduce((s, m) => s + montoParaMiembro(m), 0);
   const totalRecaudado = pagosMes.reduce((s, p) => s + (p.monto || 0), 0);
 
   // Meses disponibles para REGISTRAR PAGOS:
@@ -20283,6 +20396,18 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
   const [confirmContadora, setConfirmContadora]           = useState(null); // { miembro } — pago propio de la contadora
   const [confirmPagarConComprobante, setConfirmPagarConComprobante] = useState(null); // { miembro } — modal explicativo antes de pedir archivo
   const [procesando, setProcesando]                       = useState(false);
+  const [savingTipo, setSavingTipo]                       = useState(null);
+
+  async function toggleTipoCuotas(miembro) {
+    const reg = miembrosEnCuotas.find((r) => r.integrante_id === miembro.id);
+    if (!reg) return;
+    setSavingTipo(miembro.id);
+    try {
+      await finDbPatch("fin_miembros_cuotas", reg.id, { es_estudiante: !reg.es_estudiante });
+      await reload();
+    } catch (e) { alert("Error al cambiar tipo: " + e.message); }
+    setSavingTipo(null);
+  }
 
   async function togglePago(miembro) {
     if (pagaron.has(miembro.id)) {
@@ -20319,7 +20444,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
       await finDbPost("fin_pagos", {
         integrante_id: miembro.id,
         mes: mesSeleccionado,
-        monto: cuotaMes?.valor || 0,
+        monto: montoParaMiembro(miembro),
         tipo: "cuota",
         comprobante_url: nota,
       });
@@ -20335,7 +20460,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
       await finDbPost("fin_pagos", {
         integrante_id: miembro.id,
         mes: mesSeleccionado,
-        monto: cuotaMes?.valor || 0,
+        monto: montoParaMiembro(miembro),
         tipo: "cuota",
       });
       await reload();
@@ -20363,7 +20488,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
         const creado = await finDbPost("fin_pagos", {
           integrante_id: miembro.id,
           mes: mesSeleccionado,
-          monto: cuotaMes?.valor || 0,
+          monto: montoParaMiembro(miembro),
           tipo: "cuota",
         });
         pago = Array.isArray(creado) ? creado[0] : creado;
@@ -20620,9 +20745,13 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
       </div>
 
       {/* Lista de integrantes */}
-      <div style={{ background: "#fff7e6", border: "1px solid #ffd98a", borderRadius: 10, padding: "10px 13px", margin: "0 0 12px", fontSize: 12.5, color: "#7a4d00", display: "flex", gap: 8, alignItems: "flex-start" }}>
+      <div style={{ background: "#fff7e6", border: "1px solid #ffd98a", borderRadius: 10, padding: "10px 13px", margin: "0 0 8px", fontSize: 12.5, color: "#7a4d00", display: "flex", gap: 8, alignItems: "flex-start" }}>
         <span style={{ fontSize: 15, flexShrink: 0 }}>📌</span>
         <span>Para registrar un pago es <b>obligatorio adjuntar el comprobante</b> (una imagen) como respaldo. Al marcar a una persona como pagada se te pedirá la imagen del comprobante.</span>
+      </div>
+      <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 10, padding: "10px 13px", margin: "0 0 12px", fontSize: 12.5, color: "#0c4a6e", display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <span style={{ fontSize: 15, flexShrink: 0 }}>🎓</span>
+        <span><b>Recordatorio:</b> Los <b>Adultos</b> pagan el valor de cuota fijado. Los <b>Estudiantes</b> pagan <b>$3.000</b> fijo. Haz clic en el badge <strong>👤 Adulto</strong> o <strong>🎓 Estudiante</strong> de cada integrante para cambiar su tipo.</span>
       </div>
       {miembrosActivos.length === 0 ? (
         <div style={{ textAlign: "center", padding: "30px 0", color: C.gray, fontSize: 13 }}>
@@ -20649,8 +20778,20 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
               >
                 <Avatar nombre={m.nombre} foto_url={m.foto_url} size={36} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, color: C.dark, fontSize: 14 }}>{m.nombre}</div>
-                  <div style={{ fontSize: 11, color: C.gray }}>{finCuerdaLabel(m.cuerda)}</div>
+                  <div style={{ fontWeight: 600, color: C.dark, fontSize: 14, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    {m.nombre}
+                    <button
+                      onClick={() => toggleTipoCuotas(m)}
+                      disabled={savingTipo === m.id}
+                      title="Clic para cambiar tipo"
+                      style={{ fontSize: 10, fontWeight: 700, borderRadius: 20, padding: "2px 8px", cursor: "pointer", border: "none",
+                        background: miembrosEnCuotas.find((r) => r.integrante_id === m.id)?.es_estudiante ? "#e0f2fe" : "#f1f5f9",
+                        color: miembrosEnCuotas.find((r) => r.integrante_id === m.id)?.es_estudiante ? "#0369a1" : "#64748b",
+                      }}>
+                      {savingTipo === m.id ? "…" : miembrosEnCuotas.find((r) => r.integrante_id === m.id)?.es_estudiante ? "🎓 Estudiante" : "👤 Adulto"}
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11, color: C.gray }}>{finCuerdaLabel(m.cuerda)} · {finFmtCLP(montoParaMiembro(m))}</div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     {pago?.comprobante_url ? (
@@ -21432,6 +21573,7 @@ function TabReporte({ members, cuotas, pagos, miembrosEnCuotas }) {
 
 function TabParticipantes({ members, miembrosEnCuotas, reload }) {
   const [saving, setSaving] = useState(null);
+  const [savingTipo, setSavingTipo] = useState(null);
 
   const enSistema = new Set(miembrosEnCuotas.map((m) => m.integrante_id));
 
@@ -21442,11 +21584,22 @@ function TabParticipantes({ members, miembrosEnCuotas, reload }) {
         const reg = miembrosEnCuotas.find((m) => m.integrante_id === miembro.id);
         await finDbDelete("fin_miembros_cuotas", reg.id);
       } else {
-        await finDbPost("fin_miembros_cuotas", { integrante_id: miembro.id });
+        await finDbPost("fin_miembros_cuotas", { integrante_id: miembro.id, es_estudiante: false });
       }
       await reload();
     } catch (e) { alert("Error: " + e.message); }
     setSaving(null);
+  }
+
+  async function toggleTipo(miembro) {
+    const reg = miembrosEnCuotas.find((m) => m.integrante_id === miembro.id);
+    if (!reg) return;
+    setSavingTipo(miembro.id);
+    try {
+      await finDbPatch("fin_miembros_cuotas", reg.id, { es_estudiante: !reg.es_estudiante });
+      await reload();
+    } catch (e) { alert("Error: " + e.message); }
+    setSavingTipo(null);
   }
 
   const activos = members.filter((m) => enSistema.has(m.id));
@@ -21466,18 +21619,29 @@ function TabParticipantes({ members, miembrosEnCuotas, reload }) {
         {activos.length === 0 && (
           <div style={{ fontSize: 12, color: C.gray }}>Ningún integrante en el sistema aún.</div>
         )}
-        {activos.map((m) => (
+        {activos.map((m) => {
+          const reg = miembrosEnCuotas.find((r) => r.integrante_id === m.id);
+          const esEst = reg?.es_estudiante;
+          return (
           <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: C.primary + "08", border: `1px solid ${C.primary}30`, borderRadius: 10 }}>
             <Avatar nombre={m.nombre} foto_url={m.foto_url} size={32} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>{m.nombre}</div>
               <div style={{ fontSize: 11, color: C.gray }}>{finCuerdaLabel(m.cuerda)}</div>
             </div>
+            <button
+              onClick={() => toggleTipo(m)}
+              disabled={savingTipo === m.id}
+              title={esEst ? "Cambiar a Adulto" : "Cambiar a Estudiante"}
+              style={{ fontSize: 11, padding: "4px 10px", borderRadius: 20, border: `1px solid ${esEst ? "#0369a1" : "#94a3b8"}`, background: esEst ? "#e0f2fe" : "#f1f5f9", color: esEst ? "#0369a1" : "#64748b", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
+              {savingTipo === m.id ? "…" : esEst ? "🎓 Estudiante" : "👤 Adulto"}
+            </button>
             <FinBtn variant="ghost" onClick={() => toggleMiembro(m)} disabled={saving === m.id} style={{ fontSize: 11, padding: "5px 10px" }}>
               {saving === m.id ? "..." : "Quitar"}
             </FinBtn>
           </div>
-        ))}
+        );
+        })}
       </div>
 
       {/* No en sistema */}
@@ -21939,6 +22103,53 @@ function AdminVisitas() {
 }
 
 // ══════════════════════════════════════════════════════════════════════
+//  CONFIGURACIÓN DE CLAVES API (Admin)
+// ══════════════════════════════════════════════════════════════════════
+function AdminApiConfig() {
+  const [anthropicKey, setAnthropicKey] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  useEffect(() => {
+    getConfig("anthropic_api_key").then((k) => { if (k) setAnthropicKey(k); }).catch(() => {});
+  }, []);
+
+  async function guardar() {
+    if (!anthropicKey.trim()) { setMsg({ ok: false, txt: "Pega primero tu clave de Anthropic." }); return; }
+    setGuardando(true); setMsg(null);
+    try {
+      await setConfig("anthropic_api_key", anthropicKey.trim());
+      _anthropicKey = anthropicKey.trim();
+      setMsg({ ok: true, txt: "✓ Clave guardada. Ya funcionarán la extracción de acordes y el evangelio automático." });
+    } catch { setMsg({ ok: false, txt: "Error al guardar. Intenta de nuevo." }); }
+    setGuardando(false);
+  }
+
+  const inp = { width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(60,60,67,0.2)", fontSize: 13, marginBottom: 8, boxSizing: "border-box", fontFamily: "monospace" };
+  return (
+    <div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1c1e", marginBottom: 6 }}>🔑 Clave API de Anthropic</div>
+      <div style={{ fontSize: 12.5, color: "#6a6a70", marginBottom: 14, lineHeight: 1.6 }}>
+        Necesaria para que funcionen: extracción automática de acordes desde PDF, cambio de tono, y el evangelio del domingo.<br />
+        Obtenla en <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" style={{ color: "#0a5ac8" }}>console.anthropic.com → API Keys</a>. Se guarda encriptada en tu base de datos Supabase.
+      </div>
+      <input
+        value={anthropicKey}
+        onChange={(e) => setAnthropicKey(e.target.value)}
+        placeholder="sk-ant-api03-…"
+        type="password"
+        style={inp}
+      />
+      <button onClick={guardar} disabled={guardando}
+        style={{ background: "#0a5ac8", color: "white", border: "none", borderRadius: 10, padding: "9px 18px", fontSize: 13, fontWeight: 700, cursor: guardando ? "not-allowed" : "pointer", opacity: guardando ? 0.7 : 1 }}>
+        {guardando ? "Guardando…" : "Guardar clave"}
+      </button>
+      {msg && <div style={{ marginTop: 10, fontSize: 12.5, color: msg.ok ? "#15803d" : "#b91c1c", lineHeight: 1.5 }}>{msg.txt}</div>}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
 //  MANTENEDOR CUENTA BANCARIA (Admin)
 // ══════════════════════════════════════════════════════════════════════
 function AdminCuentaBancaria() {
@@ -22308,18 +22519,34 @@ export function InfoGastos({ user, members }) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <FinCard>
-            <div style={{ fontWeight: 700, color: C.primary, fontSize: 14, marginBottom: 12 }}>
+            <div style={{ fontWeight: 700, color: C.primary, fontSize: 14, marginBottom: 4 }}>
               ✅ Al día — {finMesLabel(mesVer)}
               {cuotaMesActual && <span style={{ fontSize: 11, fontWeight: 400, color: C.gray }}> · {finFmtCLP(cuotaMesActual.valor)}</span>}
             </div>
+            {miembrosEnCuotas.some((r) => r.es_estudiante) && (
+              <div style={{ fontSize: 11, color: "#0369a1", background: "#e0f2fe", borderRadius: 8, padding: "5px 9px", marginBottom: 10, lineHeight: 1.5 }}>
+                🎓 Los integrantes marcados como <strong>Estudiante</strong> pagan una cuota rebajada de <strong>$3.000</strong>.
+              </div>
+            )}
             {alDia.length === 0 ? (
               <div style={{ fontSize: 12, color: C.gray }}>Ninguno ha pagado aún.</div>
             ) : alDia.map((m) => {
               const pagoM = pagosMesActual.find(p => p.integrante_id === m.id);
+              const esEst = miembrosEnCuotas.find((r) => r.integrante_id === m.id)?.es_estudiante;
               return (
                 <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "6px 8px", borderRadius: 10, background: C.bg }}>
                   <Avatar nombre={m.nombre} foto_url={m.foto_url} size={28} color={C.primary} />
-                  <span style={{ fontSize: 13, flex: 1 }}>{m.nombre}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+                      {m.nombre}
+                      {esEst && (
+                        <span style={{ fontSize: 10, fontWeight: 700, background: "#e0f2fe", color: "#0369a1", borderRadius: 20, padding: "1px 6px" }}>🎓 Estudiante</span>
+                      )}
+                    </div>
+                    {pagoM?.monto && (
+                      <div style={{ fontSize: 10, color: C.gray }}>{finFmtCLP(pagoM.monto)}</div>
+                    )}
+                  </div>
                   {pagoM?.comprobante_url ? (
                     pagoM.comprobante_url.startsWith("texto:") ? (
                       <span title={pagoM.comprobante_url.replace("texto:", "")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#0369a1", background: "#e0f2fe", padding: "3px 8px", borderRadius: 16, fontWeight: 600, cursor: "help" }}>
@@ -23041,8 +23268,11 @@ CREATE TABLE IF NOT EXISTS fin_gastos (
 CREATE TABLE IF NOT EXISTS fin_miembros_cuotas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   integrante_id UUID REFERENCES integrantes(id) ON DELETE CASCADE UNIQUE,
+  es_estudiante BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+-- Migración para tablas ya existentes:
+ALTER TABLE fin_miembros_cuotas ADD COLUMN IF NOT EXISTS es_estudiante BOOLEAN DEFAULT FALSE;
 
 -- 6. RLS (habilitar políticas abiertas para tu proyecto, igual que las otras tablas)
 ALTER TABLE fin_cuotas ENABLE ROW LEVEL SECURITY;
