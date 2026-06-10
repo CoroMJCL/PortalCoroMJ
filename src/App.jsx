@@ -10762,12 +10762,43 @@ function parsearLetra(texto) {
   return bloques;
 }
 
+// Tooltip con diagrama de acorde — aparece al tocar/hover sobre el acorde
+function AcordeConDiagrama({ acorde, acordeAmerican, colorAcorde }) {
+  const [visible, setVisible] = React.useState(false);
+  const tiene = !!GUITAR_CHORDS[acordeAmerican];
+  return (
+    <span
+      style={{ position: "relative", display: "inline-block" }}
+      onMouseEnter={() => tiene && setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+      onClick={() => tiene && setVisible(v => !v)}
+    >
+      <span style={{
+        fontSize: 12, fontWeight: 700, color: colorAcorde || "#1a6fb5",
+        fontFamily: "monospace", letterSpacing: 0.3, lineHeight: 1.4,
+        whiteSpace: "pre", cursor: tiene ? "pointer" : "default",
+        borderBottom: tiene ? `1.5px dotted ${colorAcorde || "#1a6fb5"}` : "none",
+        paddingBottom: 1,
+      }}>{acorde}</span>
+      {visible && tiene && (
+        <span style={{
+          position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)",
+          zIndex: 999, background: "white", border: "1px solid #e2e8f0",
+          borderRadius: 12, padding: "8px 8px 4px",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+          pointerEvents: "none", marginBottom: 6,
+          display: "block", whiteSpace: "nowrap",
+        }}>
+          <DiagramaGuitarra acorde={acordeAmerican} latino={true} />
+        </span>
+      )}
+    </span>
+  );
+}
+
 // Renderiza un par acorde/letra como inline con acordes flotando arriba
 function ParAcordeletra({ acordes, letra, colorAcorde, formatoLatino = false }) {
-  // Construir array de { pos, acorde } a partir de la línea de acordes
   const partes = [];
-  let j = 0;
-  // Recorremos la línea de acordes char por char detectando tokens
   const re = /[A-G][#b]?(m|maj|min|dim|aug|sus|add|M|7|9|11|13)?\d*(\/[A-G][#b]?)?(\([^)]*\))?/g;
   let match;
   while ((match = re.exec(acordes)) !== null) {
@@ -10775,7 +10806,6 @@ function ParAcordeletra({ acordes, letra, colorAcorde, formatoLatino = false }) 
   }
   if (!partes.length) return <div style={{ fontFamily: "monospace", fontSize: 14, lineHeight: 2 }}>{letra}</div>;
 
-  // Construir segmentos de letra con acorde encima
   const segments = [];
   for (let k = 0; k < partes.length; k++) {
     const ini = partes[k].pos;
@@ -10783,7 +10813,6 @@ function ParAcordeletra({ acordes, letra, colorAcorde, formatoLatino = false }) 
     const fragmento = letra.slice(ini, fin) || " ";
     segments.push({ acorde: partes[k].acorde, fragmento });
   }
-  // Texto antes del primer acorde
   const prefijo = letra.slice(0, partes[0]?.pos || 0);
 
   return (
@@ -10793,11 +10822,11 @@ function ParAcordeletra({ acordes, letra, colorAcorde, formatoLatino = false }) 
       )}
       {segments.map((seg, idx) => (
         <span key={idx} style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-start", marginRight: 0 }}>
-          <span style={{
-            fontSize: 12, fontWeight: 700, color: colorAcorde || "#1a6fb5",
-            fontFamily: "monospace", letterSpacing: 0.3, lineHeight: 1.4,
-            whiteSpace: "pre",
-          }}>{mostrarAcorde(seg.acorde, formatoLatino)}</span>
+          <AcordeConDiagrama
+            acorde={mostrarAcorde(seg.acorde, formatoLatino)}
+            acordeAmerican={seg.acorde}
+            colorAcorde={colorAcorde}
+          />
           <span style={{ fontSize: 14, color: "#222", whiteSpace: "pre", lineHeight: 1.8 }}>{seg.fragmento || " "}</span>
         </span>
       ))}
@@ -10821,10 +10850,153 @@ function mostrarAcorde(acorde, formatoLatino) {
 
 // Transposición en semitonos fraccionados (½ = 1 semitono en display)
 // Internamente todo son semitonos enteros; ½ es solo display
+// ══════════════════════════════════════════════════════════════════
+//  DIAGRAMAS DE ACORDES DE GUITARRA
+// ══════════════════════════════════════════════════════════════════
+
+// Posiciones [cuerda1..6] donde 0=al aire, -1=no suena, N=traste N
+// Cuerdas: E2 A2 D3 G3 B3 E4 (de grave a agudo)
+const GUITAR_CHORDS = {
+  "C":   { nombre:"Do",   dedos:[[2,2],[3,2],[1,1]], cuerdas:[0,3,2,0,1,0], barre:null },
+  "Cm":  { nombre:"Dom",  dedos:[[1,3],[2,4],[3,5]], cuerdas:[-1,3,5,5,4,3], barre:{traste:3,desde:1,hasta:5} },
+  "C#":  { nombre:"Do#",  dedos:[], cuerdas:[-1,4,6,6,6,4], barre:{traste:4,desde:1,hasta:5} },
+  "D":   { nombre:"Re",   dedos:[[1,2],[2,3],[3,2]], cuerdas:[-1,-1,0,2,3,2], barre:null },
+  "Dm":  { nombre:"Rem",  dedos:[[1,1],[2,3],[3,2]], cuerdas:[-1,-1,0,2,3,1], barre:null },
+  "D#":  { nombre:"Re#",  dedos:[], cuerdas:[-1,6,8,8,8,6], barre:{traste:6,desde:1,hasta:5} },
+  "E":   { nombre:"Mi",   dedos:[[1,1],[2,2],[3,2]], cuerdas:[0,2,2,1,0,0], barre:null },
+  "Em":  { nombre:"Mim",  dedos:[[1,2],[2,2]], cuerdas:[0,2,2,0,0,0], barre:null },
+  "F":   { nombre:"Fa",   dedos:[[2,2],[3,3]], cuerdas:[1,1,2,3,3,1], barre:{traste:1,desde:0,hasta:5} },
+  "Fm":  { nombre:"Fam",  dedos:[[2,3],[3,3]], cuerdas:[1,1,3,3,2,1], barre:{traste:1,desde:0,hasta:5} },
+  "F#":  { nombre:"Fa#",  dedos:[[2,2],[3,4]], cuerdas:[2,2,4,4,4,2], barre:{traste:2,desde:0,hasta:5} },
+  "F#m": { nombre:"Fa#m", dedos:[[2,4],[3,4]], cuerdas:[2,2,4,4,3,2], barre:{traste:2,desde:0,hasta:5} },
+  "G":   { nombre:"Sol",  dedos:[[1,2],[2,3],[3,3]], cuerdas:[3,2,0,0,0,3], barre:null },
+  "Gm":  { nombre:"Solm", dedos:[], cuerdas:[3,5,5,3,3,3], barre:{traste:3,desde:0,hasta:5} },
+  "G#":  { nombre:"Sol#", dedos:[], cuerdas:[4,6,6,5,4,4], barre:{traste:4,desde:0,hasta:5} },
+  "A":   { nombre:"La",   dedos:[[1,2],[2,2],[3,2]], cuerdas:[-1,0,2,2,2,0], barre:null },
+  "Am":  { nombre:"Lam",  dedos:[[1,2],[2,2],[3,1]], cuerdas:[-1,0,2,2,1,0], barre:null },
+  "A#":  { nombre:"La#",  dedos:[], cuerdas:[-1,1,3,3,3,1], barre:{traste:1,desde:1,hasta:5} },
+  "B":   { nombre:"Si",   dedos:[], cuerdas:[-1,2,4,4,4,2], barre:{traste:2,desde:1,hasta:5} },
+  "Bm":  { nombre:"Sim",  dedos:[], cuerdas:[-1,2,4,4,3,2], barre:{traste:2,desde:1,hasta:5} },
+  "E7":  { nombre:"Mi7",  dedos:[[1,1],[2,2]], cuerdas:[0,2,2,1,3,0], barre:null },
+  "A7":  { nombre:"La7",  dedos:[[1,2]], cuerdas:[-1,0,2,0,2,0], barre:null },
+  "D7":  { nombre:"Re7",  dedos:[[1,2],[2,1],[3,2]], cuerdas:[-1,-1,0,2,1,2], barre:null },
+  "G7":  { nombre:"Sol7", dedos:[[1,2],[2,3],[3,1]], cuerdas:[3,2,0,0,0,1], barre:null },
+  "C7":  { nombre:"Do7",  dedos:[[1,1],[2,2],[3,3],[4,0]], cuerdas:[0,3,2,3,1,0], barre:null },
+  "B7":  { nombre:"Si7",  dedos:[[1,1],[2,2],[3,2],[4,1]], cuerdas:[-1,2,1,2,0,2], barre:null },
+};
+
+function extraerAcordesDeLetra(texto) {
+  if (!texto) return [];
+  const acordeRe = /\b([A-G][#b]?(m|maj|min|dim|aug|sus|add)?\d*)\b/g;
+  const vistos = new Set();
+  const resultado = [];
+  texto.split("\n").forEach(linea => {
+    const tokens = linea.trim().split(/\s+/);
+    const esLineaAcordes = tokens.filter(t => /^[A-G][#b]?(m|maj|min|dim|aug|sus|add)?\d*(\/[A-G][#b]?)?$/.test(t)).length / (tokens.length || 1) >= 0.5;
+    if (!esLineaAcordes) return;
+    let m;
+    acordeRe.lastIndex = 0;
+    while ((m = acordeRe.exec(linea)) !== null) {
+      const a = m[1];
+      if (!vistos.has(a)) { vistos.add(a); resultado.push(a); }
+    }
+  });
+  return resultado;
+}
+
+function DiagramaGuitarra({ acorde, latino = true }) {
+  const data = GUITAR_CHORDS[acorde];
+  if (!data) return null;
+  const W = 80, H = 90, LEFT = 18, TOP = 22, FRETS = 4, STRINGS = 6;
+  const sw = (W - LEFT - 8) / (STRINGS - 1);
+  const fh = (H - TOP - 10) / FRETS;
+  const trasteBase = data.barre ? Math.max(1, data.barre.traste) : 1;
+  const dots = (data.cuerdas || []).map((traste, cuerda) => {
+    if (traste <= 0) return null;
+    const t = traste - trasteBase + 1;
+    if (t < 1 || t > FRETS) return null;
+    const cx = LEFT + cuerda * sw;
+    const cy = TOP + (t - 0.5) * fh;
+    return { cx, cy, cuerda, traste };
+  }).filter(Boolean);
+  const label = latino ? (data.nombre || acorde) : acorde;
+  return (
+    <svg width={W} height={H + 12} viewBox={`0 0 ${W} ${H + 12}`} style={{ display: "block" }}>
+      <text x={W / 2} y={12} textAnchor="middle" fontSize={11} fontWeight={700} fill="#1c1c1e">{label}</text>
+      {/* Cejilla */}
+      {data.barre && (
+        <rect x={LEFT + data.barre.desde * sw - 4} y={TOP + 0.15 * fh} width={(data.barre.hasta - data.barre.desde) * sw + 8} height={fh * 0.55} rx={5} fill="#1c1c1e" />
+      )}
+      {/* Cejilla nº */}
+      {data.barre && data.barre.traste > 1 && (
+        <text x={LEFT - 6} y={TOP + fh * 0.55} textAnchor="end" fontSize={8} fill="#888">{data.barre.traste}ª</text>
+      )}
+      {/* Cuerda al aire o silenciada */}
+      {(data.cuerdas || []).map((traste, i) => (
+        traste === 0 ? (
+          <text key={i} x={LEFT + i * sw} y={TOP - 4} textAnchor="middle" fontSize={9} fill="#0a5ac8" fontWeight={700}>○</text>
+        ) : traste === -1 ? (
+          <text key={i} x={LEFT + i * sw} y={TOP - 4} textAnchor="middle" fontSize={9} fill="#888">✕</text>
+        ) : null
+      ))}
+      {/* Trastes */}
+      {Array.from({ length: FRETS + 1 }, (_, i) => (
+        <line key={i} x1={LEFT} y1={TOP + i * fh} x2={LEFT + (STRINGS - 1) * sw} y2={TOP + i * fh} stroke={i === 0 ? "#1c1c1e" : "#ccc"} strokeWidth={i === 0 ? 2.5 : 1} />
+      ))}
+      {/* Cuerdas verticales */}
+      {Array.from({ length: STRINGS }, (_, i) => (
+        <line key={i} x1={LEFT + i * sw} y1={TOP} x2={LEFT + i * sw} y2={TOP + FRETS * fh} stroke="#bbb" strokeWidth={1} />
+      ))}
+      {/* Puntos */}
+      {dots.map((d, i) => (
+        <circle key={i} cx={d.cx} cy={d.cy} r={7} fill="#1c1c1e" />
+      ))}
+    </svg>
+  );
+}
+
+function PanelAcordes({ texto, semis, latino }) {
+  const acordes = extraerAcordesDeLetra(transponerTextoCompleto(texto, semis));
+  const conDiagrama = acordes.filter(a => GUITAR_CHORDS[a]);
+  if (!conDiagrama.length) return null;
+  return (
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#6a6a70", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>Acordes del canto</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {conDiagrama.map(a => (
+          <div key={a} style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 10, padding: "8px 6px", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 84 }}>
+            <DiagramaGuitarra acorde={a} latino={latino} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function YoutubeEmbed({ url }) {
+  if (!url) return null;
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{6,})/);
+  if (!m) return null;
+  const vid = m[1];
+  return (
+    <div style={{ borderRadius: 12, overflow: "hidden", background: "#000", aspectRatio: "16/9", width: "100%" }}>
+      <iframe
+        width="100%" height="100%"
+        src={`https://www.youtube.com/embed/${vid}`}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+        style={{ display: "block", border: "none" }}
+        title="Video de referencia"
+      />
+    </div>
+  );
+}
+
 function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
   const [semis, setSemis]               = useState(0);
   const [tabVisor, setTabVisor]         = useState("letra"); // "letra" | "pdf"
   const [textoLetra, setTextoLetra]     = useState(cancion?.letra_texto || "");
+  const [youtubeUrl, setYoutubeUrl]     = useState(cancion?.youtube_url || "");
   const [asignando, setAsignando]       = useState(false);
   const [momsSel, setMomsSel]           = useState(cancion?.momentos || []);
   const [guardando, setGuardando]       = useState(false);
@@ -10968,6 +11140,14 @@ Kyrie eleison`;
     try {
       await updateRecord("cancionero_canciones", cancion.id, { letra_texto: textoLetra });
       setMsg("✅ Letra guardada.");
+      await onReload();
+    } catch (e) { setMsg("Error: " + e.message); }
+  }
+
+  async function guardarYoutube() {
+    try {
+      await updateRecord("cancionero_canciones", cancion.id, { youtube_url: youtubeUrl });
+      setMsg("✅ Video guardado.");
       await onReload();
     } catch (e) { setMsg("Error: " + e.message); }
   }
@@ -11385,6 +11565,33 @@ Kyrie eleison`;
               </div>
             </div>
           )}
+
+          {/* Panel de acordes + YouTube — fuera del grid, ancho completo */}
+          {!extrayendo && !errorExtraccion && tieneLetra && (
+            <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
+              {(youtubeUrl || (isAdmin && !esTemp)) && (
+                <Card style={{ padding: "14px 16px" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#6a6a70", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>🎬 Video de referencia</div>
+                  {youtubeUrl ? (
+                    <>
+                      <YoutubeEmbed url={youtubeUrl} />
+                      {isAdmin && !esTemp && (
+                        <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
+                          <input value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." style={{ flex: 1, fontSize: 12, padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }} />
+                          <button onClick={guardarYoutube} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 8, border: "none", background: "#0a5ac8", color: "white", cursor: "pointer", fontWeight: 600 }}>Guardar</button>
+                        </div>
+                      )}
+                    </>
+                  ) : isAdmin && !esTemp ? (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder="Pega el enlace de YouTube del canto..." style={{ flex: 1, fontSize: 12, padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }} />
+                      <button onClick={guardarYoutube} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 8, border: "none", background: "#0a5ac8", color: "white", cursor: "pointer", fontWeight: 600 }}>Guardar</button>
+                    </div>
+                  ) : null}
+                </Card>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
@@ -11771,8 +11978,11 @@ create table if not exists cancionero_canciones (
   tono_base   text default 'C',
   momentos    text[] default '{}',
   letra_texto text default '',
+  youtube_url text default '',
   created_at  timestamptz default now()
 );
+-- Migración:
+ALTER TABLE cancionero_canciones ADD COLUMN IF NOT EXISTS youtube_url text default '';
 alter table cancionero_canciones enable row level security;
 create policy "cancionero_canciones_all" on cancionero_canciones for all using (true);
 
