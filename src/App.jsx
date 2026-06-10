@@ -11194,50 +11194,45 @@ function lineaEsAcordes(items) {
   return hits / tokens.length >= 0.5;
 }
 
+// ── Transpositor latino simple (gratis, sin OCR ni IA) ──
+const LATIN_CROM = ["Do","Do#","Re","Re#","Mi","Fa","Fa#","Sol","Sol#","La","La#","Si"];
+const LATIN_RE_T = /^(Do#|Re#|Fa#|Sol#|La#|Do|Re|Mi|Fa|Sol|La|Si)(.*)$/i;
+function transpLatino(acorde, semis) {
+  if (!acorde) return acorde;
+  const m = acorde.trim().match(LATIN_RE_T);
+  if (!m) return acorde;
+  const raiz = m[1]; let suffix = m[2] || "";
+  const canon = raiz.charAt(0).toUpperCase() + raiz.slice(1).toLowerCase();
+  const idx = LATIN_CROM.findIndex(n => n.toLowerCase() === canon.toLowerCase());
+  if (idx === -1) return acorde;
+  let nueva = LATIN_CROM[((idx + semis) % 12 + 12) % 12];
+  if (raiz[0] === raiz[0].toLowerCase()) nueva = nueva.charAt(0).toLowerCase() + nueva.slice(1);
+  // bajo con slash
+  const slash = suffix.match(/^(.*)\/(Do#|Re#|Fa#|Sol#|La#|Do|Re|Mi|Fa|Sol|La|Si)([#b]?)$/i);
+  if (slash) {
+    const bi = LATIN_CROM.findIndex(n => n.toLowerCase() === (slash[2].charAt(0).toUpperCase()+slash[2].slice(1).toLowerCase()).toLowerCase());
+    if (bi !== -1) suffix = slash[1] + "/" + LATIN_CROM[((bi+semis)%12+12)%12];
+  }
+  return nueva + suffix;
+}
+
 function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
-  const [semis, setSemis]           = useState(0);
-  const [formatoLatino, setFormatoLatino] = useState(true);
-  const [tabVisor, setTabVisor]     = useState("letra");
-  const [textoLetra, setTextoLetra] = useState(cancion?.letra_texto || "");
-  const [youtubeUrl, setYoutubeUrl] = useState(cancion?.youtube_url || "");
   const [asignando, setAsignando]   = useState(false);
   const [momsSel, setMomsSel]       = useState(cancion?.momentos || []);
   const [guardando, setGuardando]   = useState(false);
   const [guardandoNew, setGuardandoNew] = useState(false);
   const [msg, setMsg]               = useState("");
   const [pdfCargado, setPdfCargado] = useState(false);
-  const [extrayendo, setExtrayendo] = useState(false);
-  const [errExtrae, setErrExtrae]   = useState(false);
+  const [semis, setSemis]           = useState(0);
+  // Acordes que el usuario escribe (texto libre separado por espacios/comas)
+  const [acordesInput, setAcordesInput] = useState(cancion?.letra_texto || "");
+  const [editandoAcordes, setEditandoAcordes] = useState(false);
 
   const esTemp = !!cancion?._temporal;
   const previewUrl = drivePreviewUrl(cancion?.drive_url || "");
 
-  // Al montar: si no hay letra guardada, intentar extraer automáticamente
-  useEffect(() => {
-    if (!textoLetra) extraer();
-  }, []);
-
-  async function extraer() {
-    const url = cancion?.drive_url || "";
-    const matchId = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    const fileId = cancion?._driveId || (matchId ? matchId[1] : null);
-    if (!fileId) { setErrExtrae(true); return; }
-    setExtrayendo(true); setErrExtrae(false);
-    try {
-      const texto = await extraerTextoPDF(fileId);
-      if (texto && texto.length > 20) {
-        setTextoLetra(texto);
-        // Guardar en BD si ya está en el cancionero (para no re-extraer)
-        if (!esTemp && cancion?.id) {
-          updateRecord("cancionero_canciones", cancion.id, { letra_texto: texto }).catch(() => {});
-        }
-      } else throw new Error("vacío");
-    } catch (e) {
-      console.warn("extraer falló:", e.message);
-      setErrExtrae(true);
-    }
-    setExtrayendo(false);
-  }
+  // Parsear los acordes escritos
+  const acordesLista = acordesInput.split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
 
   async function guardarEnCancionero() {
     setGuardandoNew(true); setMsg("");
@@ -11245,10 +11240,10 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
       const res = await fetch(`${SUPA_URL}/rest/v1/cancionero_canciones`, {
         method: "POST",
         headers: { ...supaHeaders(), "Prefer": "return=representation" },
-        body: JSON.stringify({ nombre: cancion.nombre, artista: cancion.artista || "", drive_url: cancion.drive_url, tono_base: cancion.tono_base || "C", momentos: [], letra_texto: textoLetra || "", youtube_url: youtubeUrl || "" }),
+        body: JSON.stringify({ nombre: cancion.nombre, artista: cancion.artista || "", drive_url: cancion.drive_url, tono_base: cancion.tono_base || "C", momentos: [], letra_texto: acordesInput || "" }),
       });
       if (!res.ok) throw new Error(await res.text());
-      setMsg("✅ Canción guardada en el cancionero.");
+      setMsg("\u2705 Canci\u00f3n guardada en el cancionero.");
       await onReload();
     } catch (e) { setMsg("Error: " + e.message); }
     setGuardandoNew(false);
@@ -11258,199 +11253,160 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
     setGuardando(true); setMsg("");
     try {
       await updateRecord("cancionero_canciones", cancion.id, { momentos: momsSel });
-      setMsg("✅ Momentos guardados."); await onReload();
+      setMsg("\u2705 Momentos guardados."); await onReload();
     } catch (e) { setMsg("Error: " + e.message); }
     setGuardando(false);
   }
 
-  async function guardarYoutube() {
+  async function guardarAcordes() {
     try {
-      await updateRecord("cancionero_canciones", cancion.id, { youtube_url: youtubeUrl });
-      setMsg("✅ Video guardado."); await onReload();
+      await updateRecord("cancionero_canciones", cancion.id, { letra_texto: acordesInput });
+      setMsg("\u2705 Acordes guardados."); setEditandoAcordes(false); await onReload();
     } catch (e) { setMsg("Error: " + e.message); }
   }
 
-  const tonoBase   = cancion?.tono_base || "C";
-  const idxBase    = NOTAS_CROMATICAS.indexOf(tonoBase);
-  const tonoActual = idxBase === -1 ? tonoBase : NOTAS_CROMATICAS[((idxBase + semis) % 12 + 12) % 12];
-  const tonoDisplay = formatoLatino ? (NOTA_LATINA[tonoActual] || tonoActual) : tonoActual;
-  const letraTranspuesta = transponerTextoCompleto(textoLetra, semis);
-  const tieneLetra = !!textoLetra;
+  function imprimir() {
+    const transp = acordesLista.map(a => transpLatino(a, semis));
+    const w = window.open("", "_blank");
+    if (!w) { alert("Permite las ventanas emergentes para imprimir."); return; }
+    const tonoTxt = semis === 0 ? "Tono original" : (semis > 0 ? "+" : "") + semis + " semitonos";
+    w.document.write(`
+      <html><head><title>${cancion?.nombre || "Canto"}</title>
+      <style>
+        body{font-family:Georgia,serif;padding:40px;color:#1a1a1a;}
+        h1{font-size:22px;margin-bottom:2px;}
+        .sub{color:#666;font-size:13px;margin-bottom:24px;}
+        .tono{background:#f0f0f0;padding:8px 14px;border-radius:8px;display:inline-block;margin-bottom:20px;font-size:14px;}
+        .acordes{display:flex;flex-wrap:wrap;gap:10px;}
+        .ac{border:1.5px solid #1a6fb5;border-radius:10px;padding:10px 16px;font-size:20px;font-weight:bold;color:#1a6fb5;font-family:monospace;}
+        @media print{button{display:none;}}
+      </style></head><body>
+      <h1>${cancion?.nombre || "Canto"}</h1>
+      <div class="sub">${cancion?.artista || ""} \u00b7 Coro Misioneros de Jes\u00fas</div>
+      <div class="tono">Transposici\u00f3n: <b>${tonoTxt}</b></div>
+      <div class="acordes">${transp.map(a => `<div class="ac">${a}</div>`).join("")}</div>
+      </body></html>`);
+    w.document.close();
+    setTimeout(() => w.print(), 300);
+  }
 
   return (
     <div>
       {/* Barra superior */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, padding: "12px 16px", background: C.white, borderRadius: 14, border: `1px solid ${C.border}`, flexWrap: "wrap" }}>
-        <button onClick={onVolver} style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: 10, padding: "7px 12px", cursor: "pointer", fontSize: 13, color: C.gray }}>← Volver</button>
+        <button onClick={onVolver} style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: 10, padding: "7px 12px", cursor: "pointer", fontSize: 13, color: C.gray }}>\u2190 Volver</button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 700, color: C.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cancion?.nombre}</div>
           {cancion?.artista && <div style={{ fontSize: 12, color: C.gray }}>{cancion.artista}</div>}
         </div>
         {isAdmin && esTemp && (
           <button onClick={guardarEnCancionero} disabled={guardandoNew} style={{ padding: "7px 13px", borderRadius: 10, border: "none", background: "#f59e0b", color: "white", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
-            {guardandoNew ? "Guardando…" : "⭐ Guardar en cancionero"}
+            {guardandoNew ? "Guardando\u2026" : "\u2b50 Guardar en cancionero"}
           </button>
         )}
         {isAdmin && !esTemp && (
           <button onClick={() => setAsignando(!asignando)} style={{ padding: "7px 13px", borderRadius: 10, border: `1px solid ${C.primary}`, background: asignando ? C.primary : C.white, color: asignando ? "white" : C.primary, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
-            ⛪ {asignando ? "Cerrar" : "Asignar momentos"}
+            \u26ea {asignando ? "Cerrar" : "Asignar momentos"}
           </button>
         )}
       </div>
 
       {msg && (
-        <div style={{ background: msg.startsWith("✅") ? "#d1fae5" : "#fee2e2", color: msg.startsWith("✅") ? "#065f46" : "#b91c1c", borderRadius: 10, padding: "10px 14px", fontSize: 13, marginBottom: 12 }}>{msg}</div>
+        <div style={{ background: msg.startsWith("\u2705") ? "#d1fae5" : "#fee2e2", color: msg.startsWith("\u2705") ? "#065f46" : "#b91c1c", borderRadius: 10, padding: "10px 14px", fontSize: 13, marginBottom: 12 }}>{msg}</div>
       )}
 
-      {/* Asignación litúrgica */}
       {asignando && isAdmin && !esTemp && (
         <Card style={{ marginBottom: 14, padding: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: C.dark, marginBottom: 12 }}>⛪ Selecciona en qué momentos litúrgicos se usa esta canción:</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.dark, marginBottom: 12 }}>\u26ea Momentos lit\u00fargicos:</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(210px,1fr))", gap: 8, marginBottom: 14 }}>
             {MOMENTOS_LITURGICOS.map(m => (
               <label key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 10, border: `1px solid ${momsSel.includes(m.id) ? m.color : C.border}`, background: momsSel.includes(m.id) ? m.color + "12" : C.white, cursor: "pointer" }}>
                 <input type="checkbox" checked={momsSel.includes(m.id)} onChange={() => setMomsSel(p => p.includes(m.id) ? p.filter(x => x !== m.id) : [...p, m.id])} style={{ accentColor: m.color }} />
                 <span style={{ fontSize: 14 }}>{m.icon}</span>
-                <span style={{ fontSize: 12, color: C.dark, fontWeight: momsSel.includes(m.id) ? 600 : 400 }}>{m.label}</span>
+                <span style={{ fontSize: 12, color: C.dark }}>{m.label}</span>
               </label>
             ))}
           </div>
-          <Btn onClick={guardarMomentos} disabled={guardando}>{guardando ? "Guardando…" : "✅ Guardar momentos"}</Btn>
+          <Btn onClick={guardarMomentos} disabled={guardando}>{guardando ? "Guardando\u2026" : "\u2705 Guardar momentos"}</Btn>
         </Card>
       )}
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 0, marginBottom: 0, borderRadius: "10px 10px 0 0", overflow: "hidden", border: `1px solid ${C.border}`, borderBottom: "none" }}>
-        <button onClick={() => setTabVisor("letra")} style={{ flex: 1, padding: "10px 18px", border: "none", cursor: "pointer", fontSize: 13, fontWeight: tabVisor === "letra" ? 700 : 400, background: tabVisor === "letra" ? C.white : "rgba(0,0,0,0.05)", color: tabVisor === "letra" ? C.primary : C.gray, borderRight: `1px solid ${C.border}` }}>
-          🎵 Letra y Acordes{extrayendo ? " (extrayendo…)" : ""}
-        </button>
-        <button onClick={() => setTabVisor("pdf")} style={{ flex: 1, padding: "10px 18px", border: "none", cursor: "pointer", fontSize: 13, fontWeight: tabVisor === "pdf" ? 700 : 400, background: tabVisor === "pdf" ? C.white : "rgba(0,0,0,0.05)", color: tabVisor === "pdf" ? C.primary : C.gray }}>
-          📄 Ver PDF original
-        </button>
-      </div>
+      {/* Transpositor de acordes */}
+      <Card style={{ marginBottom: 14, padding: "16px 18px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.dark }}>\ud83c\udfb8 Transpositor de acordes</div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <button onClick={() => setSemis(s => s - 1)} style={{ width: 34, height: 34, borderRadius: 9, border: "none", background: "#f87171", color: "#7f1d1d", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>\u25bc</button>
+            <div style={{ minWidth: 96, textAlign: "center", fontSize: 13, fontWeight: 700, color: semis === 0 ? C.gray : "#b45309", background: semis === 0 ? "#f1f5f9" : "#fef3c7", borderRadius: 8, padding: "6px 8px" }}>
+              {semis === 0 ? "Tono original" : `${semis > 0 ? "+" : ""}${semis} ${Math.abs(semis) === 1 ? "semitono" : "semitonos"}`}
+            </div>
+            <button onClick={() => setSemis(s => s + 1)} style={{ width: 34, height: 34, borderRadius: 9, border: "none", background: "#4ade80", color: "#14532d", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>\u25b2</button>
+            {semis !== 0 && <button onClick={() => setSemis(0)} style={{ height: 34, borderRadius: 9, border: `1px solid ${C.border}`, background: C.white, color: C.gray, fontSize: 11, padding: "0 10px", cursor: "pointer" }}>Reiniciar</button>}
+          </div>
+        </div>
 
-      {/* Tab PDF */}
-      {tabVisor === "pdf" && (
-        <Card style={{ padding: 0, borderRadius: "0 0 12px 12px", overflow: "hidden", minHeight: 600 }}>
-          {previewUrl ? (
-            <div style={{ position: "relative" }}>
-              {!pdfCargado && (
-                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, background: "var(--bg-base)", zIndex: 1, minHeight: 400 }}>
-                  <Spinner /><div style={{ fontSize: 13, color: C.gray }}>Cargando PDF…</div>
-                </div>
+        {acordesLista.length === 0 || editandoAcordes ? (
+          <div>
+            <div style={{ fontSize: 12.5, color: C.gray, marginBottom: 8, lineHeight: 1.6 }}>
+              Escribe los acordes del canto tal como aparecen en el PDF, separados por espacios. Ej: <b>Sol Re Do Mim Lam Si7</b>
+            </div>
+            <textarea
+              value={acordesInput}
+              onChange={e => setAcordesInput(e.target.value)}
+              placeholder="Sol Re Do Mim Lam Si7..."
+              style={{ width: "100%", minHeight: 70, padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 15, fontFamily: "monospace", boxSizing: "border-box", marginBottom: 10, resize: "vertical" }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              {isAdmin && !esTemp ? (
+                <Btn onClick={guardarAcordes}>\ud83d\udcbe Guardar acordes</Btn>
+              ) : (
+                <Btn onClick={() => setEditandoAcordes(false)}>\u2705 Listo</Btn>
               )}
-              <iframe src={previewUrl} onLoad={() => setPdfCargado(true)} style={{ width: "100%", height: "80vh", border: "none", display: "block" }} allow="autoplay" title={cancion?.nombre} />
+              {editandoAcordes && <button onClick={() => setEditandoAcordes(false)} style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 14px", fontSize: 13, color: C.gray, cursor: "pointer" }}>Cancelar</button>}
             </div>
-          ) : (
-            <div style={{ padding: 40, textAlign: "center" }}><div style={{ fontSize: 13, color: C.gray }}>No hay URL de PDF disponible.</div></div>
-          )}
-          {cancion?.drive_url && (
-            <div style={{ padding: "10px 16px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <a href={cancion.drive_url} target="_blank" rel="noreferrer" style={{ padding: "7px 14px", borderRadius: 10, background: C.primary, color: "white", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>🔗 Abrir en Google Drive</a>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* Tab Letra */}
-      {tabVisor === "letra" && (
-        <>
-          {/* Extrayendo */}
-          {extrayendo && (
-            <Card style={{ padding: 40, textAlign: "center", borderRadius: "0 0 12px 12px" }}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>🎵</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, marginBottom: 6 }}>Extrayendo letra y acordes con IA…</div>
-              <div style={{ fontSize: 12, color: C.gray, marginBottom: 16 }}>Esto puede tomar unos segundos</div>
-              <Spinner />
-            </Card>
-          )}
-
-          {/* Error — sin letra y sin poder extraer */}
-          {!extrayendo && errExtrae && !tieneLetra && (
-            <Card style={{ padding: 28, borderRadius: "0 0 12px 12px", textAlign: "center" }}>
-              <div style={{ fontSize: 36, marginBottom: 10 }}>📄</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, marginBottom: 6 }}>No se pudo extraer la letra</div>
-              <p style={{ fontSize: 13, color: C.gray, marginBottom: 16, lineHeight: 1.6 }}>
-                La IA no pudo procesar la imagen del PDF.<br />
-                Puedes ver el PDF original en la otra pestaña.
-              </p>
-              <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-                <button onClick={() => setTabVisor("pdf")} style={{ padding: "8px 16px", borderRadius: 10, background: C.primary, color: "white", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>📄 Ver PDF original</button>
-                <button onClick={extraer} style={{ padding: "8px 16px", borderRadius: 10, background: "#6b7280", color: "white", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>🔄 Reintentar</button>
-              </div>
-            </Card>
-          )}
-
-          {/* Visor con letra y transposición */}
-          {!extrayendo && tieneLetra && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 62px", gap: 0, alignItems: "start" }}>
-              <Card style={{ padding: 20, borderRadius: "0 0 0 12px", borderRight: "none" }}>
-                {/* Barra tono */}
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap", padding: "10px 12px", background: "#f8f9fa", borderRadius: 10, border: `1px solid ${C.border}` }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 12, color: C.gray }}>Transposición:</span>
-                    <span style={{ fontWeight: 800, fontSize: 15, color: semis === 0 ? C.gray : "#f59e0b", fontFamily: "monospace" }}>
-                      {semis === 0 ? "Tono original" : `${semis > 0 ? "+" : ""}${semis} ${Math.abs(semis) === 1 ? "semitono" : "semitonos"}`}
-                    </span>
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+              {acordesLista.map((a, i) => {
+                const t = transpLatino(a, semis);
+                const cambio = semis !== 0 && t !== a;
+                return (
+                  <div key={i} style={{ border: `1.5px solid ${cambio ? "#b45309" : C.primary}`, borderRadius: 10, padding: "8px 14px", background: cambio ? "#fffbeb" : C.primary + "0a", textAlign: "center", minWidth: 56 }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: cambio ? "#b45309" : C.primary, fontFamily: "monospace" }}>{t}</div>
+                    {cambio && <div style={{ fontSize: 9, color: C.gray, marginTop: 1 }}>era {a}</div>}
                   </div>
-                  {isAdmin && !esTemp && (
-                    <Btn onClick={() => updateRecord("cancionero_canciones", cancion.id, { letra_texto: textoLetra }).then(() => setMsg("✅ Letra guardada."))} style={{ fontSize: 11, padding: "4px 10px", marginLeft: "auto" }}>💾 Guardar letra</Btn>
-                  )}
-                </div>
-                <LetraRenderer texto={textoLetra} semis={semis} colorAcorde="#1a6fb5" formatoLatino={formatoLatino} />
-              </Card>
-
-              {/* Panel transposición */}
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, background: "#2d2d2d", borderRadius: "0 0 12px 0", padding: "14px 8px", border: `1px solid ${C.border}`, borderLeft: "none", minHeight: 320 }}>
-                <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>tono</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: "white", textAlign: "center", minWidth: 40 }}>🎸</div>
-                <button onClick={() => setSemis(s => s + 1)} style={{ width: 44, height: 36, borderRadius: 10, border: "none", background: "#4ade80", color: "#14532d", fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} title="+1 semitono">▲</button>
-                <div style={{ fontSize: 11, color: semis === 0 ? "#666" : "#f59e0b", fontWeight: 700, textAlign: "center", background: semis !== 0 ? "#f59e0b20" : "transparent", borderRadius: 7, padding: "2px 4px", width: 40 }}>
-                  {semis > 0 ? `+${semis}` : semis < 0 ? `${semis}` : "orig"}
-                </div>
-                <button onClick={() => setSemis(s => s - 1)} style={{ width: 44, height: 36, borderRadius: 10, border: "none", background: "#f87171", color: "#7f1d1d", fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} title="-1 semitono">▼</button>
-                <div style={{ width: 30, height: 1, background: "#555", margin: "4px 0" }} />
-                <button onClick={() => setSemis(0)} style={{ width: 44, height: 30, borderRadius: 10, border: `1px solid #555`, background: semis !== 0 ? "#f59e0b" : "#444", color: semis !== 0 ? "#fff" : "#888", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>orig</button>
-                <div style={{ width: 30, height: 1, background: "#555", margin: "4px 0" }} />
-                <div style={{ fontSize: 8, color: "#666", textAlign: "center" }}>saltos</div>
-                {[{ label: "+3", delta: 3 }, { label: "+5", delta: 5 }, { label: "-3", delta: -3 }, { label: "-5", delta: -5 }].map(({ label, delta }) => (
-                  <button key={label} onClick={() => setSemis(s => s + delta)} style={{ width: 44, height: 26, borderRadius: 9, border: `1px solid #555`, background: "#3a3a3a", color: "#ccc", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>{label}</button>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          )}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button onClick={imprimir} style={{ background: C.primary, border: "none", borderRadius: 10, padding: "8px 14px", fontSize: 12.5, color: "white", cursor: "pointer", fontWeight: 600 }}>\ud83d\udda8\ufe0f Imprimir / Descargar</button>
+              {(isAdmin || true) && <button onClick={() => setEditandoAcordes(true)} style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 14px", fontSize: 12.5, color: C.gray, cursor: "pointer" }}>\u270f\ufe0f Editar acordes</button>}
+            </div>
+          </div>
+        )}
+      </Card>
 
-          {/* YouTube */}
-          {!extrayendo && (youtubeUrl || (isAdmin && !esTemp)) && (
-            <Card style={{ padding: "14px 16px", marginTop: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#6a6a70", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>🎬 Video de referencia</div>
-              {youtubeUrl ? (
-                <>
-                  <YoutubeEmbed url={youtubeUrl} />
-                  {isAdmin && !esTemp && (
-                    <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
-                      <input value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." style={{ flex: 1, fontSize: 12, padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }} />
-                      <button onClick={guardarYoutube} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 8, border: "none", background: "#0a5ac8", color: "white", cursor: "pointer", fontWeight: 600 }}>Guardar</button>
-                    </div>
-                  )}
-                </>
-              ) : isAdmin && !esTemp ? (
-                <div style={{ display: "flex", gap: 6 }}>
-                  <input value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder="Pega el enlace de YouTube del canto..." style={{ flex: 1, fontSize: 12, padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }} />
-                  <button onClick={guardarYoutube} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 8, border: "none", background: "#0a5ac8", color: "white", cursor: "pointer", fontWeight: 600 }}>Guardar</button>
-                </div>
-              ) : null}
-            </Card>
-          )}
-
-          {/* Diagramas de acordes */}
-          {!extrayendo && tieneLetra && extraerAcordesDeLetra(textoLetra).some(a => GUITAR_CHORDS[a]) && (
-            <Card style={{ padding: "14px 16px", marginTop: 14 }}>
-              <PanelAcordes texto={textoLetra} semis={semis} latino={formatoLatino} />
-            </Card>
-          )}
-        </>
-      )}
+      {/* PDF original */}
+      <Card style={{ padding: 0, borderRadius: 12, overflow: "hidden", minHeight: 500 }}>
+        {previewUrl ? (
+          <div style={{ position: "relative" }}>
+            {!pdfCargado && (
+              <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, background: "var(--bg-base)", zIndex: 1, minHeight: 400 }}>
+                <Spinner /><div style={{ fontSize: 13, color: C.gray }}>Cargando PDF\u2026</div>
+              </div>
+            )}
+            <iframe src={previewUrl} onLoad={() => setPdfCargado(true)} style={{ width: "100%", height: "80vh", border: "none", display: "block" }} allow="autoplay" title={cancion?.nombre} />
+          </div>
+        ) : (
+          <div style={{ padding: 40, textAlign: "center" }}><div style={{ fontSize: 13, color: C.gray }}>No hay PDF disponible.</div></div>
+        )}
+        {cancion?.drive_url && (
+          <div style={{ padding: "10px 16px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <a href={cancion.drive_url} target="_blank" rel="noreferrer" style={{ padding: "7px 14px", borderRadius: 10, background: C.primary, color: "white", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>\ud83d\udd17 Abrir en Google Drive</a>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }
