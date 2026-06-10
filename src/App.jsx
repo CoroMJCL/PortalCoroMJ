@@ -10825,7 +10825,7 @@ function parsearLetra(texto) {
 
 // Tooltip con diagrama de acorde — aparece al tocar/hover sobre el acorde
 function AcordeConDiagrama({ acorde, acordeAmerican, colorAcorde }) {
-  const [visible, setVisible] = React.useState(false);
+  const [visible, setVisible] = useState(false);
   const tiene = !!GUITAR_CHORDS[acordeAmerican];
   return (
     <span
