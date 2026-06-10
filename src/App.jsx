@@ -10175,6 +10175,67 @@ function transponerAcorde(acorde, semis) {
   return NOTAS_CROMATICAS[newIdx] + suffix;
 }
 
+// ── Transposición de acordes LATINOS (Do, Re, Mim, Lam, Si7, Fa#...) ──
+// Cadena cromática en latino, preservando mayúscula/minúscula inicial
+const LATIN_CROMATICA = ["Do","Do#","Re","Re#","Mi","Fa","Fa#","Sol","Sol#","La","La#","Si"];
+// Regex que captura nota latina (raíz) + sufijo (m, 7, sus, etc.)
+const LATIN_NOTA_RE = /^(Do#|Re#|Fa#|Sol#|La#|Do|Re|Mi|Fa|Sol|La|Si)(.*)$/i;
+
+function esAcordeLatino(token) {
+  const t = token.trim();
+  if (!t) return false;
+  // Quitar paréntesis tipo (Final: La) no son acordes sueltos
+  const m = t.match(LATIN_NOTA_RE);
+  if (!m) return false;
+  // El sufijo debe ser solo sufijos de acorde válidos (m, 7, maj, sus, dim, aug, add, #, b, números, /)
+  const suffix = m[2];
+  return /^(m|maj|min|dim|aug|sus|add|M|°|\+)?[#b]?\d*(\/(Do#|Re#|Fa#|Sol#|La#|Do|Re|Mi|Fa|Sol|La|Si)[#b]?)?$/i.test(suffix);
+}
+
+function transponerAcordeLatino(acorde, semis) {
+  if (!acorde || semis === 0) return acorde;
+  const m = acorde.match(LATIN_NOTA_RE);
+  if (!m) return acorde;
+  const raiz = m[1];
+  const suffix = m[2];
+  // Normalizar a forma canónica para buscar índice
+  const raizCanonica = raiz.charAt(0).toUpperCase() + raiz.slice(1).toLowerCase();
+  const idx = LATIN_CROMATICA.findIndex(n => n.toLowerCase() === raizCanonica.toLowerCase());
+  if (idx === -1) return acorde;
+  const newIdx = ((idx + semis) % 12 + 12) % 12;
+  let nueva = LATIN_CROMATICA[newIdx];
+  // Preservar si la raíz original era minúscula (convención: menor)
+  if (raiz[0] === raiz[0].toLowerCase()) nueva = nueva.charAt(0).toLowerCase() + nueva.slice(1);
+  // Manejar el caso de acorde con bajo (slash): transponer también el bajo
+  let suffixFinal = suffix;
+  const slashM = suffix.match(/^(.*)\/(Do#|Re#|Fa#|Sol#|La#|Do|Re|Mi|Fa|Sol|La|Si)([#b]?)$/i);
+  if (slashM) {
+    const bajoIdx = LATIN_CROMATICA.findIndex(n => n.toLowerCase() === (slashM[2].charAt(0).toUpperCase() + slashM[2].slice(1).toLowerCase()).toLowerCase());
+    if (bajoIdx !== -1) {
+      const nuevoBajo = LATIN_CROMATICA[((bajoIdx + semis) % 12 + 12) % 12];
+      suffixFinal = slashM[1] + "/" + nuevoBajo;
+    }
+  }
+  return nueva + suffixFinal;
+}
+
+function transponerLineaLatina(linea, semis) {
+  if (semis === 0) return linea;
+  // Tokenizar preservando espacios para mantener alineación
+  return linea.replace(/(\S+)/g, (tok) => esAcordeLatino(tok) ? transponerAcordeLatino(tok, semis) : tok);
+}
+
+function transponerLineaInteligente(linea, semis) {
+  if (semis === 0) return linea;
+  const tokens = linea.trim().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return linea;
+  const latinos = tokens.filter(esAcordeLatino).length;
+  // Si la mayoría de tokens son acordes latinos → es línea de acordes latinos
+  if (latinos / tokens.length >= 0.5) return transponerLineaLatina(linea, semis);
+  // Si no, intentar como americano
+  return transponerLinea(linea, semis);
+}
+
 function transponerLinea(linea, semis) {
   // Detecta si la línea es de acordes: >= 50% de tokens son acordes
   if (semis === 0) return linea;
@@ -10188,7 +10249,7 @@ function transponerLinea(linea, semis) {
 
 function transponerTextoCompleto(texto, semis) {
   if (!texto || semis === 0) return texto;
-  return texto.split("\n").map(l => transponerLinea(l, semis)).join("\n");
+  return texto.split("\n").map(l => transponerLineaInteligente(l, semis)).join("\n");
 }
 
 function drivePreviewUrl(url) {
@@ -10729,7 +10790,7 @@ const ACORDE_RE = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add|M|7|9|11|13)?\d*(\/[A-G
 function esLineaDeAcordes(linea) {
   const tokens = linea.trim().split(/\s+/).filter(Boolean);
   if (!tokens.length) return false;
-  const hits = tokens.filter(t => ACORDE_RE.test(t)).length;
+  const hits = tokens.filter(t => ACORDE_RE.test(t) || esAcordeLatino(t)).length;
   return hits / tokens.length >= 0.5;
 }
 
@@ -10745,7 +10806,7 @@ function parsearLetra(texto) {
     // Línea vacía
     if (!l.trim()) { bloques.push({ tipo: "vacio" }); i++; continue; }
     // Sección (CORO, ESTROFA, PUENTE, INTRO, etc.)
-    if (/^(CORO|ESTROFA|PUENTE|INTRO|OUTRO|BRIDGE|VERSO|PRE-CORO|FINAL|SALMO|RESPONSORIO)/i.test(l.trim())) {
+    if (/^(CORO|ESTROFA|ESTROFAS|PUENTE|INTRO|OUTRO|BRIDGE|VERSO|PRE-CORO|FINAL|SALMO|RESPONSORIO)/i.test(l.trim())) {
       bloques.push({ tipo: "seccion", texto: l.trim() }); i++; continue;
     }
     // Par acordes + letra
@@ -10762,20 +10823,68 @@ function parsearLetra(texto) {
   return bloques;
 }
 
-// Renderiza un par acorde/letra como inline con acordes flotando arriba
+// Tooltip con diagrama de acorde — aparece al tocar/hover sobre el acorde
+function AcordeConDiagrama({ acorde, acordeAmerican, colorAcorde }) {
+  const [visible, setVisible] = useState(false);
+  const tiene = !!GUITAR_CHORDS[acordeAmerican];
+  return (
+    <span
+      style={{ position: "relative", display: "inline-block" }}
+      onMouseEnter={() => tiene && setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+      onClick={() => tiene && setVisible(v => !v)}
+    >
+      <span style={{
+        fontSize: 12, fontWeight: 700, color: colorAcorde || "#1a6fb5",
+        fontFamily: "monospace", letterSpacing: 0.3, lineHeight: 1.4,
+        whiteSpace: "pre", cursor: tiene ? "pointer" : "default",
+        borderBottom: tiene ? `1.5px dotted ${colorAcorde || "#1a6fb5"}` : "none",
+        paddingBottom: 1,
+      }}>{acorde}</span>
+      {visible && tiene && (
+        <span style={{
+          position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)",
+          zIndex: 999, background: "white", border: "1px solid #e2e8f0",
+          borderRadius: 12, padding: "8px 8px 4px",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+          pointerEvents: "none", marginBottom: 6,
+          display: "block", whiteSpace: "nowrap",
+        }}>
+          <DiagramaGuitarra acorde={acordeAmerican} latino={true} />
+        </span>
+      )}
+    </span>
+  );
+}
+
+// Convierte un acorde latino (Do, Mim, Lam, Si7, Fa#) a americano (C, Em, Am, B7, F#) para buscar el diagrama
+const LATIN_A_AMERICAN = { "Do":"C","Do#":"C#","Re":"D","Re#":"D#","Mi":"E","Fa":"F","Fa#":"F#","Sol":"G","Sol#":"G#","La":"A","La#":"A#","Si":"B" };
+function latinoAAmericano(acorde) {
+  const m = acorde.match(LATIN_NOTA_RE);
+  if (!m) return acorde; // ya es americano u otra cosa
+  const raiz = m[1];
+  let suffix = m[2] || "";
+  const raizCanonica = raiz.charAt(0).toUpperCase() + raiz.slice(1).toLowerCase();
+  let base = LATIN_A_AMERICAN[raizCanonica];
+  if (!base) return acorde;
+  // Si la raíz venía en minúscula (convención menor) y el sufijo no tiene ya 'm', agregar 'm'
+  const esMinuscula = raiz[0] === raiz[0].toLowerCase();
+  if (esMinuscula && !/^m/i.test(suffix)) suffix = "m" + suffix;
+  return base + suffix;
+}
+
+// Renderiza un par acorde/letra como inline con acordes flotando arriba (soporta latino y americano)
 function ParAcordeletra({ acordes, letra, colorAcorde, formatoLatino = false }) {
-  // Construir array de { pos, acorde } a partir de la línea de acordes
   const partes = [];
-  let j = 0;
-  // Recorremos la línea de acordes char por char detectando tokens
-  const re = /[A-G][#b]?(m|maj|min|dim|aug|sus|add|M|7|9|11|13)?\d*(\/[A-G][#b]?)?(\([^)]*\))?/g;
+  // Regex que captura acordes latinos O americanos con su posición
+  const re = /(Do#|Re#|Fa#|Sol#|La#|Do|Re|Mi|Fa|Sol|La|Si|[A-G])([#b]?)(m|maj|min|dim|aug|sus|add|M|°|\+)?(\d+)?(\/(Do#|Re#|Fa#|Sol#|La#|Do|Re|Mi|Fa|Sol|La|Si|[A-G])[#b]?)?/g;
   let match;
   while ((match = re.exec(acordes)) !== null) {
+    if (!match[0].trim()) continue;
     partes.push({ pos: match.index, acorde: match[0] });
   }
-  if (!partes.length) return <div style={{ fontFamily: "monospace", fontSize: 14, lineHeight: 2 }}>{letra}</div>;
+  if (!partes.length) return <div style={{ fontFamily: "monospace", fontSize: 14, lineHeight: 2, whiteSpace: "pre-wrap" }}>{letra}</div>;
 
-  // Construir segmentos de letra con acorde encima
   const segments = [];
   for (let k = 0; k < partes.length; k++) {
     const ini = partes[k].pos;
@@ -10783,7 +10892,6 @@ function ParAcordeletra({ acordes, letra, colorAcorde, formatoLatino = false }) 
     const fragmento = letra.slice(ini, fin) || " ";
     segments.push({ acorde: partes[k].acorde, fragmento });
   }
-  // Texto antes del primer acorde
   const prefijo = letra.slice(0, partes[0]?.pos || 0);
 
   return (
@@ -10793,16 +10901,47 @@ function ParAcordeletra({ acordes, letra, colorAcorde, formatoLatino = false }) 
       )}
       {segments.map((seg, idx) => (
         <span key={idx} style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-start", marginRight: 0 }}>
-          <span style={{
-            fontSize: 12, fontWeight: 700, color: colorAcorde || "#1a6fb5",
-            fontFamily: "monospace", letterSpacing: 0.3, lineHeight: 1.4,
-            whiteSpace: "pre",
-          }}>{mostrarAcorde(seg.acorde, formatoLatino)}</span>
+          <AcordeConDiagrama
+            acorde={aLatino(seg.acorde)}
+            acordeAmerican={latinoAAmericano(seg.acorde)}
+            colorAcorde={colorAcorde}
+          />
           <span style={{ fontSize: 14, color: "#222", whiteSpace: "pre", lineHeight: 1.8 }}>{seg.fragmento || " "}</span>
         </span>
       ))}
     </div>
   );
+}
+
+// Convierte CUALQUIER acorde (americano o latino) a notación latina para mostrar
+// Ej: E→Mi, Am→Lam, D→Re, G7→Sol7, F#m→Fa#m. Si ya es latino lo deja igual.
+function aLatino(acorde) {
+  if (!acorde) return acorde;
+  // ¿Ya es latino? (empieza con Do/Re/Mi/Fa/Sol/La/Si)
+  if (LATIN_NOTA_RE.test(acorde)) {
+    // Normalizar mayúscula inicial de la raíz
+    const m = acorde.match(LATIN_NOTA_RE);
+    const raiz = m[1];
+    const raizCanon = raiz.charAt(0).toUpperCase() + raiz.slice(1).toLowerCase();
+    return raizCanon + (m[2] || "");
+  }
+  // Es americano → convertir
+  const flatMap = { Db:"C#", Eb:"D#", Fb:"E", Gb:"F#", Ab:"G#", Bb:"A#", Cb:"B" };
+  const AMER_A_LATIN = { "C":"Do","C#":"Do#","D":"Re","D#":"Re#","E":"Mi","F":"Fa","F#":"Fa#","G":"Sol","G#":"Sol#","A":"La","A#":"La#","B":"Si" };
+  const m = acorde.match(/^([A-G][#b]?)(.*)/);
+  if (!m) return acorde;
+  const raw = flatMap[m[1]] || m[1];
+  let suffix = m[2] || "";
+  const base = AMER_A_LATIN[raw];
+  if (!base) return acorde;
+  // Manejar bajo con slash (ej: C/E → Do/Mi)
+  const slashM = suffix.match(/^(.*)\/([A-G][#b]?)(.*)$/);
+  if (slashM) {
+    const bajoRaw = flatMap[slashM[2]] || slashM[2];
+    const bajoLat = AMER_A_LATIN[bajoRaw] || slashM[2];
+    suffix = slashM[1] + "/" + bajoLat + slashM[3];
+  }
+  return base + suffix;
 }
 
 
@@ -10821,120 +10960,292 @@ function mostrarAcorde(acorde, formatoLatino) {
 
 // Transposición en semitonos fraccionados (½ = 1 semitono en display)
 // Internamente todo son semitonos enteros; ½ es solo display
+// ══════════════════════════════════════════════════════════════════
+//  DIAGRAMAS DE ACORDES DE GUITARRA
+// ══════════════════════════════════════════════════════════════════
+
+// Posiciones [cuerda1..6] donde 0=al aire, -1=no suena, N=traste N
+// Cuerdas: E2 A2 D3 G3 B3 E4 (de grave a agudo)
+const GUITAR_CHORDS = {
+  "C":   { nombre:"Do",   dedos:[[2,2],[3,2],[1,1]], cuerdas:[0,3,2,0,1,0], barre:null },
+  "Cm":  { nombre:"Dom",  dedos:[[1,3],[2,4],[3,5]], cuerdas:[-1,3,5,5,4,3], barre:{traste:3,desde:1,hasta:5} },
+  "C#":  { nombre:"Do#",  dedos:[], cuerdas:[-1,4,6,6,6,4], barre:{traste:4,desde:1,hasta:5} },
+  "D":   { nombre:"Re",   dedos:[[1,2],[2,3],[3,2]], cuerdas:[-1,-1,0,2,3,2], barre:null },
+  "Dm":  { nombre:"Rem",  dedos:[[1,1],[2,3],[3,2]], cuerdas:[-1,-1,0,2,3,1], barre:null },
+  "D#":  { nombre:"Re#",  dedos:[], cuerdas:[-1,6,8,8,8,6], barre:{traste:6,desde:1,hasta:5} },
+  "E":   { nombre:"Mi",   dedos:[[1,1],[2,2],[3,2]], cuerdas:[0,2,2,1,0,0], barre:null },
+  "Em":  { nombre:"Mim",  dedos:[[1,2],[2,2]], cuerdas:[0,2,2,0,0,0], barre:null },
+  "F":   { nombre:"Fa",   dedos:[[2,2],[3,3]], cuerdas:[1,1,2,3,3,1], barre:{traste:1,desde:0,hasta:5} },
+  "Fm":  { nombre:"Fam",  dedos:[[2,3],[3,3]], cuerdas:[1,1,3,3,2,1], barre:{traste:1,desde:0,hasta:5} },
+  "F#":  { nombre:"Fa#",  dedos:[[2,2],[3,4]], cuerdas:[2,2,4,4,4,2], barre:{traste:2,desde:0,hasta:5} },
+  "F#m": { nombre:"Fa#m", dedos:[[2,4],[3,4]], cuerdas:[2,2,4,4,3,2], barre:{traste:2,desde:0,hasta:5} },
+  "G":   { nombre:"Sol",  dedos:[[1,2],[2,3],[3,3]], cuerdas:[3,2,0,0,0,3], barre:null },
+  "Gm":  { nombre:"Solm", dedos:[], cuerdas:[3,5,5,3,3,3], barre:{traste:3,desde:0,hasta:5} },
+  "G#":  { nombre:"Sol#", dedos:[], cuerdas:[4,6,6,5,4,4], barre:{traste:4,desde:0,hasta:5} },
+  "A":   { nombre:"La",   dedos:[[1,2],[2,2],[3,2]], cuerdas:[-1,0,2,2,2,0], barre:null },
+  "Am":  { nombre:"Lam",  dedos:[[1,2],[2,2],[3,1]], cuerdas:[-1,0,2,2,1,0], barre:null },
+  "A#":  { nombre:"La#",  dedos:[], cuerdas:[-1,1,3,3,3,1], barre:{traste:1,desde:1,hasta:5} },
+  "B":   { nombre:"Si",   dedos:[], cuerdas:[-1,2,4,4,4,2], barre:{traste:2,desde:1,hasta:5} },
+  "Bm":  { nombre:"Sim",  dedos:[], cuerdas:[-1,2,4,4,3,2], barre:{traste:2,desde:1,hasta:5} },
+  "E7":  { nombre:"Mi7",  dedos:[[1,1],[2,2]], cuerdas:[0,2,2,1,3,0], barre:null },
+  "A7":  { nombre:"La7",  dedos:[[1,2]], cuerdas:[-1,0,2,0,2,0], barre:null },
+  "D7":  { nombre:"Re7",  dedos:[[1,2],[2,1],[3,2]], cuerdas:[-1,-1,0,2,1,2], barre:null },
+  "G7":  { nombre:"Sol7", dedos:[[1,2],[2,3],[3,1]], cuerdas:[3,2,0,0,0,1], barre:null },
+  "C7":  { nombre:"Do7",  dedos:[[1,1],[2,2],[3,3],[4,0]], cuerdas:[0,3,2,3,1,0], barre:null },
+  "B7":  { nombre:"Si7",  dedos:[[1,1],[2,2],[3,2],[4,1]], cuerdas:[-1,2,1,2,0,2], barre:null },
+};
+
+function extraerAcordesDeLetra(texto) {
+  if (!texto) return [];
+  const vistos = new Set();
+  const resultado = [];
+  // Caso JSON nuevo
+  if (texto.startsWith("JSON_PDF::")) {
+    let lineas;
+    try { lineas = JSON.parse(texto.slice("JSON_PDF::".length)); } catch { return []; }
+    lineas.forEach(l => {
+      if (!l.items || !l.items.length) return;
+      const tokens = l.items.map(it => it.str.trim()).filter(Boolean);
+      const esLineaAc = tokens.filter(t => ACORDE_RE.test(t) || esAcordeLatino(t)).length / (tokens.length || 1) >= 0.5;
+      if (!esLineaAc) return;
+      tokens.forEach(t => {
+        if (ACORDE_RE.test(t) || esAcordeLatino(t)) {
+          const americano = latinoAAmericano(aLatino(t));
+          if (!vistos.has(americano)) { vistos.add(americano); resultado.push(americano); }
+        }
+      });
+    });
+    return resultado;
+  }
+  // Regex que captura acordes latinos O americanos
+  const acordeRe = /(Do#|Re#|Fa#|Sol#|La#|Do|Re|Mi|Fa|Sol|La|Si|[A-G])([#b]?)(m|maj|min|dim|aug|sus|add|M|°|\+)?(\d+)?/g;
+  texto.split("\n").forEach(linea => {
+    const tokens = linea.trim().split(/\s+/).filter(Boolean);
+    if (!tokens.length) return;
+    const esLineaAcordes = tokens.filter(t => ACORDE_RE.test(t) || esAcordeLatino(t)).length / tokens.length >= 0.5;
+    if (!esLineaAcordes) return;
+    let m;
+    acordeRe.lastIndex = 0;
+    while ((m = acordeRe.exec(linea)) !== null) {
+      if (!m[0].trim()) continue;
+      // Convertir a americano para que coincida con GUITAR_CHORDS
+      const americano = latinoAAmericano(m[0]);
+      if (!vistos.has(americano)) { vistos.add(americano); resultado.push(americano); }
+    }
+  });
+  return resultado;
+}
+
+function DiagramaGuitarra({ acorde, latino = true }) {
+  const data = GUITAR_CHORDS[acorde];
+  if (!data) return null;
+  const W = 80, H = 90, LEFT = 18, TOP = 22, FRETS = 4, STRINGS = 6;
+  const sw = (W - LEFT - 8) / (STRINGS - 1);
+  const fh = (H - TOP - 10) / FRETS;
+  const trasteBase = data.barre ? Math.max(1, data.barre.traste) : 1;
+  const dots = (data.cuerdas || []).map((traste, cuerda) => {
+    if (traste <= 0) return null;
+    const t = traste - trasteBase + 1;
+    if (t < 1 || t > FRETS) return null;
+    const cx = LEFT + cuerda * sw;
+    const cy = TOP + (t - 0.5) * fh;
+    return { cx, cy, cuerda, traste };
+  }).filter(Boolean);
+  const label = latino ? (data.nombre || acorde) : acorde;
+  return (
+    <svg width={W} height={H + 12} viewBox={`0 0 ${W} ${H + 12}`} style={{ display: "block" }}>
+      <text x={W / 2} y={12} textAnchor="middle" fontSize={11} fontWeight={700} fill="#1c1c1e">{label}</text>
+      {/* Cejilla */}
+      {data.barre && (
+        <rect x={LEFT + data.barre.desde * sw - 4} y={TOP + 0.15 * fh} width={(data.barre.hasta - data.barre.desde) * sw + 8} height={fh * 0.55} rx={5} fill="#1c1c1e" />
+      )}
+      {/* Cejilla nº */}
+      {data.barre && data.barre.traste > 1 && (
+        <text x={LEFT - 6} y={TOP + fh * 0.55} textAnchor="end" fontSize={8} fill="#888">{data.barre.traste}ª</text>
+      )}
+      {/* Cuerda al aire o silenciada */}
+      {(data.cuerdas || []).map((traste, i) => (
+        traste === 0 ? (
+          <text key={i} x={LEFT + i * sw} y={TOP - 4} textAnchor="middle" fontSize={9} fill="#0a5ac8" fontWeight={700}>○</text>
+        ) : traste === -1 ? (
+          <text key={i} x={LEFT + i * sw} y={TOP - 4} textAnchor="middle" fontSize={9} fill="#888">✕</text>
+        ) : null
+      ))}
+      {/* Trastes */}
+      {Array.from({ length: FRETS + 1 }, (_, i) => (
+        <line key={i} x1={LEFT} y1={TOP + i * fh} x2={LEFT + (STRINGS - 1) * sw} y2={TOP + i * fh} stroke={i === 0 ? "#1c1c1e" : "#ccc"} strokeWidth={i === 0 ? 2.5 : 1} />
+      ))}
+      {/* Cuerdas verticales */}
+      {Array.from({ length: STRINGS }, (_, i) => (
+        <line key={i} x1={LEFT + i * sw} y1={TOP} x2={LEFT + i * sw} y2={TOP + FRETS * fh} stroke="#bbb" strokeWidth={1} />
+      ))}
+      {/* Puntos */}
+      {dots.map((d, i) => (
+        <circle key={i} cx={d.cx} cy={d.cy} r={7} fill="#1c1c1e" />
+      ))}
+    </svg>
+  );
+}
+
+function PanelAcordes({ texto, semis, latino }) {
+  // Extraer acordes base (en americano) y luego transponer cada uno
+  const base = extraerAcordesDeLetra(texto); // ya devuelve americano
+  const acordes = semis ? base.map(a => transponerAcorde(a, semis)) : base;
+  const vistos = [];
+  acordes.forEach(a => { if (!vistos.includes(a)) vistos.push(a); });
+  const conDiagrama = vistos.filter(a => GUITAR_CHORDS[a]);
+  if (!conDiagrama.length) return null;
+  return (
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#6a6a70", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>Acordes del canto</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {conDiagrama.map(a => (
+          <div key={a} style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 10, padding: "8px 6px", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 84 }}>
+            <DiagramaGuitarra acorde={a} latino={latino} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function YoutubeEmbed({ url }) {
+  if (!url) return null;
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{6,})/);
+  if (!m) return null;
+  const vid = m[1];
+  return (
+    <div style={{ borderRadius: 12, overflow: "hidden", background: "#000", aspectRatio: "16/9", width: "100%" }}>
+      <iframe
+        width="100%" height="100%"
+        src={`https://www.youtube.com/embed/${vid}`}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+        style={{ display: "block", border: "none" }}
+        title="Video de referencia"
+      />
+    </div>
+  );
+}
+
+// ── Extracción de texto de PDF con pdf.js (gratis, sin IA) ──
+// Reconstruye el layout de acordes-sobre-letra usando coordenadas X/Y
+let _pdfjsPromise = null;
+function cargarPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (_pdfjsPromise) return _pdfjsPromise;
+  _pdfjsPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload = () => {
+      try {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        resolve(window.pdfjsLib);
+      } catch (e) { reject(e); }
+    };
+    s.onerror = () => reject(new Error("No se pudo cargar pdf.js"));
+    document.head.appendChild(s);
+  });
+  return _pdfjsPromise;
+}
+
+async function extraerTextoPDF(fileId) {
+  const pdfjsLib = await cargarPdfJs();
+  const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${GDRIVE_API_KEY}`;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error("descarga PDF " + resp.status);
+  const buf = await resp.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  // Estructura: array de líneas, cada una { items: [{x, str}] } ordenadas por Y descendente
+  const todasLineas = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const lineas = {};
+    content.items.forEach(it => {
+      if (it.str === undefined || it.str === null) return;
+      const y = Math.round(it.transform[5]);
+      const x = it.transform[4];
+      if (!lineas[y]) lineas[y] = [];
+      lineas[y].push({ x, str: it.str, w: it.width || 0 });
+    });
+    const ys = Object.keys(lineas).map(Number).sort((a, b) => b - a);
+    ys.forEach(y => {
+      const items = lineas[y].sort((a, b) => a.x - b.x).filter(it => it.str.trim() !== "");
+      if (items.length) todasLineas.push({ items });
+    });
+    todasLineas.push({ items: [], salto: true });
+  }
+  // Normalizar X: encontrar el mínimo X para alinear a la izquierda
+  let minX = Infinity;
+  todasLineas.forEach(l => l.items.forEach(it => { if (it.x < minX) minX = it.x; }));
+  if (minX === Infinity) minX = 0;
+  todasLineas.forEach(l => l.items.forEach(it => { it.x = it.x - minX; }));
+  // Devolver como JSON serializado con marca para distinguir del texto plano antiguo
+  return "JSON_PDF::" + JSON.stringify(todasLineas);
+}
+
+// Detecta si una línea (array de items) es de acordes
+function lineaEsAcordes(items) {
+  if (!items.length) return false;
+  const tokens = items.map(it => it.str.trim()).filter(Boolean);
+  if (!tokens.length) return false;
+  const hits = tokens.filter(t => ACORDE_RE.test(t) || esAcordeLatino(t)).length;
+  return hits / tokens.length >= 0.5;
+}
+
 function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
-  const [semis, setSemis]               = useState(0);
-  const [tabVisor, setTabVisor]         = useState("letra"); // "letra" | "pdf"
-  const [textoLetra, setTextoLetra]     = useState(cancion?.letra_texto || "");
-  const [asignando, setAsignando]       = useState(false);
-  const [momsSel, setMomsSel]           = useState(cancion?.momentos || []);
-  const [guardando, setGuardando]       = useState(false);
-  const [msg, setMsg]                   = useState("");
+  const [semis, setSemis]           = useState(0);
+  const [formatoLatino, setFormatoLatino] = useState(true);
+  const [tabVisor, setTabVisor]     = useState("letra");
+  const [textoLetra, setTextoLetra] = useState(cancion?.letra_texto || "");
+  const [youtubeUrl, setYoutubeUrl] = useState(cancion?.youtube_url || "");
+  const [asignando, setAsignando]   = useState(false);
+  const [momsSel, setMomsSel]       = useState(cancion?.momentos || []);
+  const [guardando, setGuardando]   = useState(false);
   const [guardandoNew, setGuardandoNew] = useState(false);
-  const [formatoLatino, setFormatoLatino] = useState(true); // Latino por defecto
-  const [extrayendo, setExtrayendo]     = useState(false);
-  const [errorExtraccion, setErrorExtraccion] = useState(false);
-  const [pdfCargado, setPdfCargado]     = useState(false);
-  const [modoManual, setModoManual]     = useState(false);
-  const [textoManual, setTextoManual]   = useState("");
-  const [procesandoManual, setProcesandoManual] = useState(false);
+  const [msg, setMsg]               = useState("");
+  const [pdfCargado, setPdfCargado] = useState(false);
+  const [extrayendo, setExtrayendo] = useState(false);
+  const [errExtrae, setErrExtrae]   = useState(false);
 
   const esTemp = !!cancion?._temporal;
+  const previewUrl = drivePreviewUrl(cancion?.drive_url || "");
 
-  // ── Al montar: si no hay letra, extraer automáticamente del PDF ──────
+  // Al montar: si no hay letra guardada, intentar extraer automáticamente
   useEffect(() => {
-    if (!textoLetra) {
-      extraerLetraConIA();
-    }
+    if (!textoLetra) extraer();
   }, []);
 
-  async function extraerLetraConIA() {
-    const urlDrive = cancion?.drive_url || "";
-    const matchId  = urlDrive.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    const fileId   = cancion?._driveId || (matchId ? matchId[1] : null);
-    if (!fileId) return;
-
-    setExtrayendo(true);
-    setErrorExtraccion(false);
-
-    const PROMPT_IA = `Eres un experto en música litúrgica católica latinoamericana.
-Esta es una imagen de una partitura/canción. Extrae la letra completa y los acordes, y formatea en el estilo de lacuerda.net.
-
-REGLAS ESTRICTAS:
-- Los acordes van en la línea ENCIMA de la sílaba correspondiente, usando espacios para alinear.
-- Usa acordes en formato americano (C, Dm, Em, F, G, Am, Bm, G7, etc.).
-- Marca las secciones: INTRO, ESTROFA 1, ESTROFA 2, CORO, PUENTE, FINAL.
-- Si los acordes aparecen en español (DO, RE, MI, FA, SOL, LA, SI), conviértelos: SOL=G, RE=D, MIm=Em, LAm=Am, SIm=Bm, DO=C, FA=F, SOL7=G7, RE7=D7.
-- Devuelve ÚNICAMENTE el texto formateado, sin explicaciones, sin markdown, sin comillas.
-
-Formato exacto de salida:
-ESTROFA 1
-Am          G
-Señor ten piedad
-     F          Em
-Cristo ten piedad
-
-CORO
-C        G    Am
-Kyrie eleison`;
-
+  async function extraer() {
+    const url = cancion?.drive_url || "";
+    const matchId = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    const fileId = cancion?._driveId || (matchId ? matchId[1] : null);
+    if (!fileId) { setErrExtrae(true); return; }
+    setExtrayendo(true); setErrExtrae(false);
     try {
-      // Claude API soporta imágenes por URL directa (sin descargar ni CORS)
-      const imageUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`;
-
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-          ...(_anthropicKey ? { "x-api-key": _anthropicKey } : {}),
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 4000,
-          messages: [{
-            role: "user",
-            content: [
-              { type: "image", source: { type: "url", url: imageUrl } },
-              { type: "text", text: PROMPT_IA },
-            ],
-          }],
-        }),
-      });
-
-      if (!response.ok) throw new Error(`Claude API error: ${response.status}`);
-      const data = await response.json();
-      const texto = data.content?.map(b => b.text || "").join("").trim();
+      const texto = await extraerTextoPDF(fileId);
       if (texto && texto.length > 20) {
         setTextoLetra(texto);
-      } else throw new Error("Respuesta vacía");
-
+        // Guardar en BD si ya está en el cancionero (para no re-extraer)
+        if (!esTemp && cancion?.id) {
+          updateRecord("cancionero_canciones", cancion.id, { letra_texto: texto }).catch(() => {});
+        }
+      } else throw new Error("vacío");
     } catch (e) {
-      console.warn("extraerLetraConIA falló:", e.message);
-      setErrorExtraccion(true);
+      console.warn("extraer falló:", e.message);
+      setErrExtrae(true);
     }
-
     setExtrayendo(false);
   }
 
   async function guardarEnCancionero() {
-    setGuardandoNew(true);
-    setMsg("");
+    setGuardandoNew(true); setMsg("");
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/cancionero_canciones`, {
+      const res = await fetch(`${SUPA_URL}/rest/v1/cancionero_canciones`, {
         method: "POST",
-        headers: {
-          apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}`,
-          "Content-Type": "application/json", Prefer: "return=representation",
-        },
-        body: JSON.stringify({
-          nombre: cancion.nombre,
-          artista: cancion.artista || "",
-          drive_url: cancion.drive_url,
-          tono_base: cancion.tono_base || "C",
-          momentos: [],
-          letra_texto: textoLetra || "",
-        }),
+        headers: { ...supaHeaders(), "Prefer": "return=representation" },
+        body: JSON.stringify({ nombre: cancion.nombre, artista: cancion.artista || "", drive_url: cancion.drive_url, tono_base: cancion.tono_base || "C", momentos: [], letra_texto: textoLetra || "", youtube_url: youtubeUrl || "" }),
       });
       if (!res.ok) throw new Error(await res.text());
       setMsg("✅ Canción guardada en el cancionero.");
@@ -10943,447 +11254,200 @@ Kyrie eleison`;
     setGuardandoNew(false);
   }
 
-  const tonoBase   = cancion?.tono_base || "C";
-  const idxBase    = NOTAS_CROMATICAS.indexOf(tonoBase);
-  const tonoActual = idxBase === -1 ? tonoBase : NOTAS_CROMATICAS[((idxBase + semis) % 12 + 12) % 12];
-  const tonoDisplay = formatoLatino ? (NOTA_LATINA[tonoActual] || tonoActual) : tonoActual;
-
-  const previewUrl = drivePreviewUrl(cancion?.drive_url || "");
-
-  // Texto con acordes transpuestos
-  const letraTranspuesta = transponerTextoCompleto(textoLetra, semis);
-
   async function guardarMomentos() {
-    setGuardando(true);
-    setMsg("");
+    setGuardando(true); setMsg("");
     try {
       await updateRecord("cancionero_canciones", cancion.id, { momentos: momsSel });
-      setMsg("✅ Momentos guardados.");
-      await onReload();
+      setMsg("✅ Momentos guardados."); await onReload();
     } catch (e) { setMsg("Error: " + e.message); }
     setGuardando(false);
   }
 
-  async function guardarLetra() {
+  async function guardarYoutube() {
     try {
-      await updateRecord("cancionero_canciones", cancion.id, { letra_texto: textoLetra });
-      setMsg("✅ Letra guardada.");
-      await onReload();
+      await updateRecord("cancionero_canciones", cancion.id, { youtube_url: youtubeUrl });
+      setMsg("✅ Video guardado."); await onReload();
     } catch (e) { setMsg("Error: " + e.message); }
   }
 
-  // Botones de transposición estilo lacuerda.net
-  const btnTranspStyle = (active) => ({
-    width: 44, height: 44, borderRadius: "50%", border: "none",
-    background: active ? C.primary : "#888",
-    color: "white", fontSize: 13, fontWeight: 700,
-    cursor: "pointer", display: "flex", alignItems: "center",
-    justifyContent: "center", transition: "background 0.15s",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.18)",
-  });
-
+  const tonoBase   = cancion?.tono_base || "C";
+  const idxBase    = NOTAS_CROMATICAS.indexOf(tonoBase);
+  const tonoActual = idxBase === -1 ? tonoBase : NOTAS_CROMATICAS[((idxBase + semis) % 12 + 12) % 12];
+  const tonoDisplay = formatoLatino ? (NOTA_LATINA[tonoActual] || tonoActual) : tonoActual;
+  const letraTranspuesta = transponerTextoCompleto(textoLetra, semis);
   const tieneLetra = !!textoLetra;
 
   return (
     <div>
-      {/* ── Barra superior del visor ── */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
-        padding: "12px 16px", background: C.white, borderRadius: 14,
-        border: `1px solid ${C.border}`, flexWrap: "wrap",
-      }}>
-        <button onClick={onVolver} style={{
-          background: C.light, border: `1px solid ${C.border}`, borderRadius: 10,
-          padding: "7px 12px", cursor: "pointer", fontSize: 13, color: C.gray,
-          display: "flex", alignItems: "center", gap: 5,
-        }}>← Volver</button>
-
+      {/* Barra superior */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, padding: "12px 16px", background: C.white, borderRadius: 14, border: `1px solid ${C.border}`, flexWrap: "wrap" }}>
+        <button onClick={onVolver} style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: 10, padding: "7px 12px", cursor: "pointer", fontSize: 13, color: C.gray }}>← Volver</button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 700, color: C.dark,
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cancion?.nombre}</div>
+          <div style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 700, color: C.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cancion?.nombre}</div>
           {cancion?.artista && <div style={{ fontSize: 12, color: C.gray }}>{cancion.artista}</div>}
         </div>
-
         {isAdmin && esTemp && (
-          <button onClick={guardarEnCancionero} disabled={guardandoNew} style={{
-            padding: "7px 13px", borderRadius: 10, border: "none",
-            background: "#f59e0b", color: "white", fontSize: 12, cursor: "pointer", fontWeight: 600,
-            display: "flex", alignItems: "center", gap: 5,
-          }}>{guardandoNew ? "Guardando…" : "⭐ Guardar en cancionero"}</button>
+          <button onClick={guardarEnCancionero} disabled={guardandoNew} style={{ padding: "7px 13px", borderRadius: 10, border: "none", background: "#f59e0b", color: "white", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+            {guardandoNew ? "Guardando…" : "⭐ Guardar en cancionero"}
+          </button>
         )}
         {isAdmin && !esTemp && (
-          <button onClick={() => setAsignando(!asignando)} style={{
-            padding: "7px 13px", borderRadius: 10, border: `1px solid ${C.primary}`,
-            background: asignando ? C.primary : C.white,
-            color: asignando ? "white" : C.primary, fontSize: 12, cursor: "pointer", fontWeight: 600,
-          }}>⛪ {asignando ? "Cerrar" : "Asignar momentos"}</button>
+          <button onClick={() => setAsignando(!asignando)} style={{ padding: "7px 13px", borderRadius: 10, border: `1px solid ${C.primary}`, background: asignando ? C.primary : C.white, color: asignando ? "white" : C.primary, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+            ⛪ {asignando ? "Cerrar" : "Asignar momentos"}
+          </button>
         )}
       </div>
 
       {msg && (
-        <div style={{
-          background: msg.startsWith("✅") ? "#d1fae5" : "#fee2e2",
-          color: msg.startsWith("✅") ? "#065f46" : "#b91c1c",
-          borderRadius: 10, padding: "10px 14px", fontSize: 13, marginBottom: 12,
-        }}>{msg}</div>
+        <div style={{ background: msg.startsWith("✅") ? "#d1fae5" : "#fee2e2", color: msg.startsWith("✅") ? "#065f46" : "#b91c1c", borderRadius: 10, padding: "10px 14px", fontSize: 13, marginBottom: 12 }}>{msg}</div>
       )}
 
-      {/* ── Panel asignación litúrgica ── */}
+      {/* Asignación litúrgica */}
       {asignando && isAdmin && !esTemp && (
         <Card style={{ marginBottom: 14, padding: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: C.dark, marginBottom: 12 }}>
-            ⛪ Selecciona en qué momentos litúrgicos se usa esta canción:
-          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.dark, marginBottom: 12 }}>⛪ Selecciona en qué momentos litúrgicos se usa esta canción:</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(210px,1fr))", gap: 8, marginBottom: 14 }}>
             {MOMENTOS_LITURGICOS.map(m => (
-              <label key={m.id} style={{
-                display: "flex", alignItems: "center", gap: 8, padding: "8px 12px",
-                borderRadius: 10, border: `1px solid ${momsSel.includes(m.id) ? m.color : C.border}`,
-                background: momsSel.includes(m.id) ? m.color + "12" : C.white,
-                cursor: "pointer", transition: "all 0.15s",
-              }}>
-                <input type="checkbox" checked={momsSel.includes(m.id)}
-                  onChange={() => setMomsSel(p => p.includes(m.id) ? p.filter(x => x !== m.id) : [...p, m.id])}
-                  style={{ accentColor: m.color }} />
+              <label key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 10, border: `1px solid ${momsSel.includes(m.id) ? m.color : C.border}`, background: momsSel.includes(m.id) ? m.color + "12" : C.white, cursor: "pointer" }}>
+                <input type="checkbox" checked={momsSel.includes(m.id)} onChange={() => setMomsSel(p => p.includes(m.id) ? p.filter(x => x !== m.id) : [...p, m.id])} style={{ accentColor: m.color }} />
                 <span style={{ fontSize: 14 }}>{m.icon}</span>
                 <span style={{ fontSize: 12, color: C.dark, fontWeight: momsSel.includes(m.id) ? 600 : 400 }}>{m.label}</span>
               </label>
             ))}
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <Btn onClick={guardarMomentos} disabled={guardando}>{guardando ? "Guardando…" : "💾 Guardar asignación"}</Btn>
-            <Btn variant="ghost" onClick={() => setAsignando(false)}>Cancelar</Btn>
-          </div>
+          <Btn onClick={guardarMomentos} disabled={guardando}>{guardando ? "Guardando…" : "✅ Guardar momentos"}</Btn>
         </Card>
       )}
 
-      {/* ── Tabs Letra / PDF ── */}
+      {/* Tabs */}
       <div style={{ display: "flex", gap: 0, marginBottom: 0, borderRadius: "10px 10px 0 0", overflow: "hidden", border: `1px solid ${C.border}`, borderBottom: "none" }}>
-        <button onClick={() => setTabVisor("letra")} style={{
-          flex: 1, padding: "10px 18px", border: "none", cursor: "pointer",
-          fontSize: 13, fontWeight: tabVisor === "letra" ? 700 : 400,
-          background: tabVisor === "letra" ? C.white : "rgba(0,0,0,0.05)",
-          color: tabVisor === "letra" ? C.primary : C.gray,
-          borderRight: `1px solid ${C.border}`,
-          transition: "all 0.15s",
-        }}>🎵 Letra y Acordes{tieneLetra ? "" : " (extrayendo…)"}</button>
-        <button onClick={() => setTabVisor("pdf")} style={{
-          flex: 1, padding: "10px 18px", border: "none", cursor: "pointer",
-          fontSize: 13, fontWeight: tabVisor === "pdf" ? 700 : 400,
-          background: tabVisor === "pdf" ? C.white : "rgba(0,0,0,0.05)",
-          color: tabVisor === "pdf" ? C.primary : C.gray,
-          transition: "all 0.15s",
-        }}>📄 Ver PDF original</button>
+        <button onClick={() => setTabVisor("letra")} style={{ flex: 1, padding: "10px 18px", border: "none", cursor: "pointer", fontSize: 13, fontWeight: tabVisor === "letra" ? 700 : 400, background: tabVisor === "letra" ? C.white : "rgba(0,0,0,0.05)", color: tabVisor === "letra" ? C.primary : C.gray, borderRight: `1px solid ${C.border}` }}>
+          🎵 Letra y Acordes{extrayendo ? " (extrayendo…)" : ""}
+        </button>
+        <button onClick={() => setTabVisor("pdf")} style={{ flex: 1, padding: "10px 18px", border: "none", cursor: "pointer", fontSize: 13, fontWeight: tabVisor === "pdf" ? 700 : 400, background: tabVisor === "pdf" ? C.white : "rgba(0,0,0,0.05)", color: tabVisor === "pdf" ? C.primary : C.gray }}>
+          📄 Ver PDF original
+        </button>
       </div>
 
-      {/* ── TAB: PDF ── */}
+      {/* Tab PDF */}
       {tabVisor === "pdf" && (
         <Card style={{ padding: 0, borderRadius: "0 0 12px 12px", overflow: "hidden", minHeight: 600 }}>
           {previewUrl ? (
             <div style={{ position: "relative" }}>
               {!pdfCargado && (
-                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column",
-                  alignItems: "center", justifyContent: "center", gap: 12, background: "var(--bg-base)", zIndex: 1, minHeight: 400 }}>
-                  <Spinner />
-                  <div style={{ fontSize: 13, color: C.gray }}>Cargando PDF…</div>
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, background: "var(--bg-base)", zIndex: 1, minHeight: 400 }}>
+                  <Spinner /><div style={{ fontSize: 13, color: C.gray }}>Cargando PDF…</div>
                 </div>
               )}
-              <iframe
-                src={previewUrl}
-                onLoad={() => setPdfCargado(true)}
-                style={{ width: "100%", height: "80vh", border: "none", display: "block" }}
-                allow="autoplay"
-                title={cancion?.nombre}
-              />
+              <iframe src={previewUrl} onLoad={() => setPdfCargado(true)} style={{ width: "100%", height: "80vh", border: "none", display: "block" }} allow="autoplay" title={cancion?.nombre} />
             </div>
           ) : (
-            <div style={{ padding: 40, textAlign: "center" }}>
-              <div style={{ fontSize: 13, color: C.gray }}>No hay URL de PDF disponible.</div>
-            </div>
+            <div style={{ padding: 40, textAlign: "center" }}><div style={{ fontSize: 13, color: C.gray }}>No hay URL de PDF disponible.</div></div>
           )}
           {cancion?.drive_url && (
             <div style={{ padding: "10px 16px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <a href={cancion.drive_url} target="_blank" rel="noreferrer" style={{
-                padding: "7px 14px", borderRadius: 10, background: C.primary, color: "white",
-                fontSize: 12, fontWeight: 600, textDecoration: "none",
-              }}>🔗 Abrir en Google Drive</a>
+              <a href={cancion.drive_url} target="_blank" rel="noreferrer" style={{ padding: "7px 14px", borderRadius: 10, background: C.primary, color: "white", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>🔗 Abrir en Google Drive</a>
             </div>
           )}
         </Card>
       )}
 
-      {/* ── TAB: LETRA + ACORDES ── */}
+      {/* Tab Letra */}
       {tabVisor === "letra" && (
         <>
-          {/* ── Spinner mientras la IA extrae la letra ── */}
+          {/* Extrayendo */}
           {extrayendo && (
             <Card style={{ padding: 40, textAlign: "center", borderRadius: "0 0 12px 12px" }}>
               <div style={{ fontSize: 36, marginBottom: 12 }}>🎵</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, marginBottom: 6 }}>
-                Extrayendo letra y acordes con IA…
-              </div>
-              <div style={{ fontSize: 12, color: C.gray }}>Esto puede tomar unos segundos</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, marginBottom: 6 }}>Extrayendo letra y acordes con IA…</div>
+              <div style={{ fontSize: 12, color: C.gray, marginBottom: 16 }}>Esto puede tomar unos segundos</div>
               <Spinner />
             </Card>
           )}
 
-          {/* ── Error de extracción: modo manual ── */}
-          {!extrayendo && errorExtraccion && !modoManual && (
-            <Card style={{ padding: 28, borderRadius: "0 0 12px 12px" }}>
-              <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-                <div style={{ fontSize: 40 }}>📄</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: C.dark, marginBottom: 6 }}>
-                    No se pudo descargar el PDF automáticamente
-                  </div>
-                  <p style={{ fontSize: 13, color: C.gray, marginBottom: 14, lineHeight: 1.6 }}>
-                    Google Drive bloquea la descarga directa por CORS. Tienes dos opciones:
-                  </p>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-                    <button onClick={() => setTabVisor("pdf")} style={{
-                      padding: "8px 16px", borderRadius: 10, background: C.primary, color: "white",
-                      fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
-                    }}>📄 Ver PDF aquí</button>
-                    <a href={cancion?.drive_url} target="_blank" rel="noreferrer" style={{
-                      display: "inline-block", padding: "8px 16px", borderRadius: 10,
-                      background: C.light, color: C.dark, fontSize: 13, fontWeight: 600,
-                      textDecoration: "none", border: `1px solid ${C.border}`,
-                    }}>🔗 Abrir en Drive</a>
-                    <button onClick={extraerLetraConIA} style={{
-                      padding: "8px 16px", borderRadius: 10, background: "#6b7280", color: "white",
-                      fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
-                    }}>🔄 Reintentar</button>
-                  </div>
-                  <div style={{
-                    background: "#fef3c7", border: "1px solid #fbbf24", borderRadius: 10,
-                    padding: "10px 14px", fontSize: 13, color: "#92400e",
-                  }}>
-                    <strong>💡 Opción rápida:</strong> Abre el PDF en Drive, selecciona el texto con Ctrl+A, cópialo y usa el botón de abajo para que la IA lo formatee con acordes.
-                    <div style={{ marginTop: 8 }}>
-                      <button onClick={() => setModoManual(true)} style={{
-                        padding: "7px 14px", borderRadius: 10, background: "#f59e0b", color: "white",
-                        fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer",
-                      }}>✏️ Pegar texto manualmente</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {/* ── Modo manual: pegar texto del PDF ── */}
-          {!extrayendo && errorExtraccion && modoManual && (
-            <Card style={{ padding: 20, borderRadius: "0 0 12px 12px" }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.dark, marginBottom: 8 }}>
-                ✏️ Pega el texto de la canción (copia desde el PDF en Drive)
-              </div>
-              <p style={{ fontSize: 12, color: C.gray, marginBottom: 10, lineHeight: 1.5 }}>
-                Abre el PDF en Drive, selecciona todo el texto (Ctrl+A), cópialo y pégalo aquí. La IA lo formateará con acordes automáticamente.
+          {/* Error — sin letra y sin poder extraer */}
+          {!extrayendo && errExtrae && !tieneLetra && (
+            <Card style={{ padding: 28, borderRadius: "0 0 12px 12px", textAlign: "center" }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>📄</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, marginBottom: 6 }}>No se pudo extraer la letra</div>
+              <p style={{ fontSize: 13, color: C.gray, marginBottom: 16, lineHeight: 1.6 }}>
+                La IA no pudo procesar la imagen del PDF.<br />
+                Puedes ver el PDF original en la otra pestaña.
               </p>
-              <textarea
-                value={textoManual}
-                onChange={e => setTextoManual(e.target.value)}
-                placeholder="Pega aquí el texto completo de la canción..."
-                style={{
-                  width: "100%", minHeight: 160, padding: "10px 12px",
-                  border: `1px solid ${C.border}`, borderRadius: 10,
-                  fontSize: 13, color: C.dark, fontFamily: "monospace",
-                  resize: "vertical", boxSizing: "border-box", marginBottom: 10,
-                }}
-              />
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button
-                  disabled={!textoManual.trim() || procesandoManual}
-                  onClick={async () => {
-                    if (!textoManual.trim()) return;
-                    setProcesandoManual(true);
-                    try {
-                      const response = await fetch("https://api.anthropic.com/v1/messages", {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                          "anthropic-version": "2023-06-01",
-                          "anthropic-dangerous-direct-browser-access": "true",
-                          ...(_anthropicKey ? { "x-api-key": _anthropicKey } : {}),
-                        },
-                        body: JSON.stringify({
-                          model: "claude-sonnet-4-20250514",
-                          max_tokens: 4000,
-                          messages: [{
-                            role: "user",
-                            content: [{
-                              type: "text",
-                              text: `Aquí está el texto de la canción litúrgica católica "${cancion?.nombre}":\n\n${textoManual}\n\nFormatéala con acordes en el estilo de lacuerda.net.\n\nREGLAS:\n- Los acordes van en la línea ENCIMA de la sílaba correspondiente, usando espacios para alinear.\n- Usa acordes americanos (C, Dm, Em, F, G, Am, etc.) el sistema los muestra en latino.\n- Marca secciones: INTRO, ESTROFA 1, ESTROFA 2, CORO, PUENTE, FINAL.\n- Si el texto no trae acordes AGRÉGALOS tú según el estilo litúrgico de la canción.\n- Devuelve ÚNICAMENTE el texto formateado sin explicaciones sin markdown sin comillas.`
-                            }]
-                          }]
-                        })
-                      });
-                      const data = await response.json();
-                      const texto = data.content?.map(b => b.text || "").join("").trim();
-                      if (texto && texto.length > 20) {
-                        setTextoLetra(texto);
-                        setErrorExtraccion(false);
-                        setModoManual(false);
-                        setTextoManual("");
-                      } else {
-                        alert("La IA no pudo procesar el texto. Intenta de nuevo.");
-                      }
-                    } catch (e) {
-                      alert("Error al procesar: " + e.message);
-                    }
-                    setProcesandoManual(false);
-                  }}
-                  style={{
-                    padding: "8px 18px", borderRadius: 10,
-                    background: textoManual.trim() ? C.primary : "#ccc",
-                    color: "white", fontSize: 13, fontWeight: 700,
-                    border: "none", cursor: textoManual.trim() ? "pointer" : "default",
-                  }}
-                >
-                  {procesandoManual ? "⏳ Procesando con IA…" : "🤖 Formatear con IA"}
-                </button>
-                <button onClick={() => { setModoManual(false); setTextoManual(""); }} style={{
-                  padding: "8px 14px", borderRadius: 10, background: C.light,
-                  color: C.gray, fontSize: 13, border: `1px solid ${C.border}`, cursor: "pointer",
-                }}>Cancelar</button>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                <button onClick={() => setTabVisor("pdf")} style={{ padding: "8px 16px", borderRadius: 10, background: C.primary, color: "white", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>📄 Ver PDF original</button>
+                <button onClick={extraer} style={{ padding: "8px 16px", borderRadius: 10, background: "#6b7280", color: "white", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>🔄 Reintentar</button>
               </div>
             </Card>
           )}
 
-          {/* ── Visor Texto / Acordes ── */}
-          {!extrayendo && !errorExtraccion && (
+          {/* Visor con letra y transposición */}
+          {!extrayendo && tieneLetra && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 62px", gap: 0, alignItems: "start" }}>
-
-              {/* Contenido principal */}
               <Card style={{ padding: 20, borderRadius: "0 0 0 12px", borderRight: "none" }}>
-
-                {/* Barra superior: tono + formato */}
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 10, marginBottom: 16,
-                  flexWrap: "wrap", padding: "10px 12px", background: "#f8f9fa",
-                  borderRadius: 10, border: `1px solid ${C.border}`,
-                }}>
-                  {/* Tono actual */}
+                {/* Barra tono */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap", padding: "10px 12px", background: "#f8f9fa", borderRadius: 10, border: `1px solid ${C.border}` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 12, color: C.gray }}>Tono:</span>
-                    <span style={{ fontWeight: 800, fontSize: 18, color: C.primary, fontFamily: "monospace" }}>
-                      {tonoDisplay}
+                    <span style={{ fontSize: 12, color: C.gray }}>Transposición:</span>
+                    <span style={{ fontWeight: 800, fontSize: 15, color: semis === 0 ? C.gray : "#f59e0b", fontFamily: "monospace" }}>
+                      {semis === 0 ? "Tono original" : `${semis > 0 ? "+" : ""}${semis} ${Math.abs(semis) === 1 ? "semitono" : "semitonos"}`}
                     </span>
-                    {semis !== 0 && (
-                      <span style={{ fontSize: 11, color: C.gray }}>
-                        ({semis > 0 ? "+" : ""}{semis} st)
-                      </span>
-                    )}
                   </div>
-
-                  {/* Separador */}
-                  <div style={{ width: 1, height: 20, background: C.border }} />
-
-                  {/* Toggle Latino / Americano */}
-                  <div style={{ display: "flex", borderRadius: 9, overflow: "hidden", border: `1px solid ${C.border}` }}>
-                    {[["🎵 Latino", true], ["ABC Americano", false]].map(([lbl, val]) => (
-                      <button key={lbl} onClick={() => setFormatoLatino(val)} style={{
-                        padding: "4px 10px", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
-                        background: formatoLatino === val ? C.primary : C.white,
-                        color: formatoLatino === val ? "white" : C.gray,
-                        transition: "all 0.15s", whiteSpace: "nowrap",
-                      }}>{lbl}</button>
-                    ))}
-                  </div>
-
                   {isAdmin && !esTemp && (
-                    <Btn onClick={guardarLetra} style={{ fontSize: 11, padding: "4px 10px", marginLeft: "auto" }}>💾 Guardar letra</Btn>
+                    <Btn onClick={() => updateRecord("cancionero_canciones", cancion.id, { letra_texto: textoLetra }).then(() => setMsg("✅ Letra guardada."))} style={{ fontSize: 11, padding: "4px 10px", marginLeft: "auto" }}>💾 Guardar letra</Btn>
                   )}
                 </div>
-
-                {/* Letra con acordes */}
-                <LetraRenderer texto={letraTranspuesta} colorAcorde="#1a6fb5" formatoLatino={formatoLatino} />
-
+                <LetraRenderer texto={textoLetra} semis={semis} colorAcorde="#1a6fb5" formatoLatino={formatoLatino} />
               </Card>
 
-              {/* ── Panel de transposición lateral (estilo lacuerda.net) ── */}
-              <div style={{
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-                background: "#2d2d2d",
-                borderRadius: "0 0 12px 0",
-                padding: "14px 8px",
-                border: `1px solid ${C.border}`,
-                borderLeft: "none",
-                minHeight: 320,
-              }}>
-                <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
-                  tono
-                </div>
-
-                {/* Tono actual en el panel */}
-                <div style={{
-                  width: 44, height: 44, borderRadius: 10,
-                  background: C.primary, color: "white",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 14, fontWeight: 800, fontFamily: "monospace",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-                }}>
-                  {tonoDisplay}
-                </div>
-
-                <div style={{ width: 30, height: 1, background: "#555", margin: "4px 0" }} />
-
-                {/* Subir tono */}
-                <button onClick={() => setSemis(s => s + 1)} style={{
-                  width: 44, height: 36, borderRadius: 10, border: "none",
-                  background: "#4ade80", color: "#065f46", fontSize: 16, fontWeight: 700,
-                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-                }} title="+1 semitono">▲</button>
-
-                {/* Indicador de semitonos */}
-                <div style={{
-                  fontSize: 11, color: semis === 0 ? "#666" : "#f59e0b",
-                  fontWeight: 700, textAlign: "center",
-                  background: semis !== 0 ? "#f59e0b20" : "transparent",
-                  borderRadius: 7, padding: "2px 4px", width: 40, textAlign: "center",
-                }}>
+              {/* Panel transposición */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, background: "#2d2d2d", borderRadius: "0 0 12px 0", padding: "14px 8px", border: `1px solid ${C.border}`, borderLeft: "none", minHeight: 320 }}>
+                <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>tono</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "white", textAlign: "center", minWidth: 40 }}>🎸</div>
+                <button onClick={() => setSemis(s => s + 1)} style={{ width: 44, height: 36, borderRadius: 10, border: "none", background: "#4ade80", color: "#14532d", fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} title="+1 semitono">▲</button>
+                <div style={{ fontSize: 11, color: semis === 0 ? "#666" : "#f59e0b", fontWeight: 700, textAlign: "center", background: semis !== 0 ? "#f59e0b20" : "transparent", borderRadius: 7, padding: "2px 4px", width: 40 }}>
                   {semis > 0 ? `+${semis}` : semis < 0 ? `${semis}` : "orig"}
                 </div>
-
-                {/* Bajar tono */}
-                <button onClick={() => setSemis(s => s - 1)} style={{
-                  width: 44, height: 36, borderRadius: 10, border: "none",
-                  background: "#f87171", color: "#7f1d1d", fontSize: 16, fontWeight: 700,
-                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-                }} title="-1 semitono">▼</button>
-
+                <button onClick={() => setSemis(s => s - 1)} style={{ width: 44, height: 36, borderRadius: 10, border: "none", background: "#f87171", color: "#7f1d1d", fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} title="-1 semitono">▼</button>
                 <div style={{ width: 30, height: 1, background: "#555", margin: "4px 0" }} />
-
-                {/* Reset */}
-                <button onClick={() => setSemis(0)} style={{
-                  width: 44, height: 30, borderRadius: 10, border: `1px solid #555`,
-                  background: semis !== 0 ? "#f59e0b" : "#444",
-                  color: semis !== 0 ? "#fff" : "#888",
-                  fontSize: 10, fontWeight: 700, cursor: "pointer",
-                  transition: "all 0.15s",
-                }} title="Tono original">orig</button>
-
-                {/* Atajos de tonos comunes */}
+                <button onClick={() => setSemis(0)} style={{ width: 44, height: 30, borderRadius: 10, border: `1px solid #555`, background: semis !== 0 ? "#f59e0b" : "#444", color: semis !== 0 ? "#fff" : "#888", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>orig</button>
                 <div style={{ width: 30, height: 1, background: "#555", margin: "4px 0" }} />
-                <div style={{ fontSize: 8, color: "#666", textAlign: "center", lineHeight: 1.3 }}>
-                  saltos
-                </div>
-                {[
-                  { label: "+3", delta: 3 },
-                  { label: "+5", delta: 5 },
-                  { label: "-3", delta: -3 },
-                  { label: "-5", delta: -5 },
-                ].map(({ label, delta }) => (
-                  <button key={label} onClick={() => setSemis(s => s + delta)} style={{
-                    width: 44, height: 26, borderRadius: 9, border: `1px solid #555`,
-                    background: "#3a3a3a", color: "#ccc",
-                    fontSize: 10, fontWeight: 600, cursor: "pointer",
-                  }}>{label}</button>
+                <div style={{ fontSize: 8, color: "#666", textAlign: "center" }}>saltos</div>
+                {[{ label: "+3", delta: 3 }, { label: "+5", delta: 5 }, { label: "-3", delta: -3 }, { label: "-5", delta: -5 }].map(({ label, delta }) => (
+                  <button key={label} onClick={() => setSemis(s => s + delta)} style={{ width: 44, height: 26, borderRadius: 9, border: `1px solid #555`, background: "#3a3a3a", color: "#ccc", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>{label}</button>
                 ))}
               </div>
             </div>
+          )}
+
+          {/* YouTube */}
+          {!extrayendo && (youtubeUrl || (isAdmin && !esTemp)) && (
+            <Card style={{ padding: "14px 16px", marginTop: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#6a6a70", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>🎬 Video de referencia</div>
+              {youtubeUrl ? (
+                <>
+                  <YoutubeEmbed url={youtubeUrl} />
+                  {isAdmin && !esTemp && (
+                    <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
+                      <input value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." style={{ flex: 1, fontSize: 12, padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }} />
+                      <button onClick={guardarYoutube} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 8, border: "none", background: "#0a5ac8", color: "white", cursor: "pointer", fontWeight: 600 }}>Guardar</button>
+                    </div>
+                  )}
+                </>
+              ) : isAdmin && !esTemp ? (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder="Pega el enlace de YouTube del canto..." style={{ flex: 1, fontSize: 12, padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }} />
+                  <button onClick={guardarYoutube} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 8, border: "none", background: "#0a5ac8", color: "white", cursor: "pointer", fontWeight: 600 }}>Guardar</button>
+                </div>
+              ) : null}
+            </Card>
+          )}
+
+          {/* Diagramas de acordes */}
+          {!extrayendo && tieneLetra && extraerAcordesDeLetra(textoLetra).some(a => GUITAR_CHORDS[a]) && (
+            <Card style={{ padding: "14px 16px", marginTop: 14 }}>
+              <PanelAcordes texto={textoLetra} semis={semis} latino={formatoLatino} />
+            </Card>
           )}
         </>
       )}
@@ -11392,40 +11456,132 @@ Kyrie eleison`;
 }
 
 // ── LetraRenderer acepta formatoLatino para mostrar acordes en Do/Re/Mi ──
-function LetraRenderer({ texto, colorAcorde, formatoLatino = false }) {
-  const bloques = parsearLetra(texto);
+// Renderiza una línea de acordes en monospace, coloreada y convertida a latino,
+// preservando las posiciones exactas (espacios) de la línea original
+function LineaAcordesMono({ linea, color }) {
+  // Recorre la línea respetando espacios; convierte cada token-acorde a latino
+  const re = /(\s+)|(\S+)/g;
+  const partes = [];
+  let m, idx = 0;
+  while ((m = re.exec(linea)) !== null) {
+    if (m[1]) partes.push({ tipo: "espacio", val: m[1], k: idx++ });
+    else partes.push({ tipo: "tok", val: m[2], k: idx++ });
+  }
+  return (
+    <div style={{ fontFamily: "'Courier New', monospace", fontSize: 13, lineHeight: 1.4, whiteSpace: "pre", color: "#222", fontWeight: 700 }}>
+      {partes.map(p => {
+        if (p.tipo === "espacio") return <span key={p.k}>{p.val}</span>;
+        const esAc = ACORDE_RE.test(p.val) || esAcordeLatino(p.val);
+        if (!esAc) return <span key={p.k}>{p.val}</span>;
+        const latino = aLatino(p.val);
+        const american = latinoAAmericano(p.val);
+        // El ancho debe coincidir con el original para no desalinear: si el latino es más largo, igual respetamos
+        return (
+          <AcordeConDiagrama key={p.k} acorde={latino} acordeAmerican={american} colorAcorde={color} />
+        );
+      })}
+    </div>
+  );
+}
+
+function LetraRenderer({ texto, semis = 0, colorAcorde, formatoLatino = false }) {
+  // Si es el formato JSON nuevo (con posiciones X reales), usar el renderer posicional
+  if (typeof texto === "string" && texto.startsWith("JSON_PDF::")) {
+    return <LetraRendererPosicional json={texto.slice("JSON_PDF::".length)} semis={semis} colorAcorde={colorAcorde} />;
+  }
+  // Texto plano (formato antiguo) — aplicar transposición y renderer monospace
+  const textoT = transponerTextoCompleto(texto, semis);
+  const bloques = parsearLetra(textoT);
   if (!bloques.length) return <span style={{ color: "#aaa", fontStyle: "italic" }}>Sin letra cargada aún.</span>;
 
   return (
-    <div style={{ fontFamily: "'Segoe UI', Arial, sans-serif", fontSize: 14, lineHeight: 1.8, color: "#222" }}>
+    <div style={{ fontFamily: "'Courier New', monospace", fontSize: 13, lineHeight: 1.5, color: "#222" }}>
       {bloques.map((b, i) => {
-        if (b.tipo === "vacio") return <div key={i} style={{ height: 12 }} />;
+        if (b.tipo === "vacio") return <div key={i} style={{ height: 10 }} />;
         if (b.tipo === "seccion") return (
           <div key={i} style={{
+            fontFamily: "'Segoe UI', Arial, sans-serif",
             fontSize: 11, fontWeight: 800, color: colorAcorde || "#1a6fb5",
             textTransform: "uppercase", letterSpacing: 1.5,
-            marginTop: 18, marginBottom: 4,
+            marginTop: 16, marginBottom: 4,
             background: (colorAcorde || "#1a6fb5") + "15",
             display: "inline-block", padding: "2px 8px", borderRadius: 7,
           }}>{b.texto}</div>
         );
         if (b.tipo === "par") return (
-          <ParAcordeletra key={i} acordes={b.acordes} letra={b.letra} colorAcorde={colorAcorde} formatoLatino={formatoLatino} />
+          <div key={i} style={{ marginBottom: 2 }}>
+            <LineaAcordesMono linea={b.acordes} color={colorAcorde || "#1a6fb5"} />
+            <div style={{ whiteSpace: "pre", lineHeight: 1.5 }}>{b.letra}</div>
+          </div>
         );
-        if (b.tipo === "soloAcordes") {
-          // Reemplazar acordes en la línea al formato deseado
-          const lineaFormateada = b.acordes.replace(
-            /[A-G][#b]?(m|maj|min|dim|aug|sus|add|M)?\d*(\/[A-G][#b]?)?(\([^)]*\))?/g,
-            (match) => mostrarAcorde(match, formatoLatino)
-          );
-          return (
-            <div key={i} style={{ fontSize: 12, fontWeight: 700, color: colorAcorde || "#1a6fb5", fontFamily: "monospace", whiteSpace: "pre", lineHeight: 2 }}>{lineaFormateada}</div>
-          );
-        }
+        if (b.tipo === "soloAcordes") return (
+          <LineaAcordesMono key={i} linea={b.acordes} color={colorAcorde || "#1a6fb5"} />
+        );
         if (b.tipo === "letra") return (
-          <div key={i} style={{ fontSize: 14, color: "#222", lineHeight: 1.9 }}>{b.texto}</div>
+          <div key={i} style={{ whiteSpace: "pre", lineHeight: 1.5 }}>{b.texto}</div>
         );
         return null;
+      })}
+    </div>
+  );
+}
+
+// Renderer que posiciona acordes ABSOLUTAMENTE sobre la letra usando coordenadas X del PDF
+// Esto respeta exactamente la alineación original sin depender de contar espacios
+function LetraRendererPosicional({ json, semis, colorAcorde }) {
+  let lineas;
+  try { lineas = JSON.parse(json); } catch { return <span style={{ color: "#aaa" }}>No se pudo leer la letra.</span>; }
+  if (!lineas || !lineas.length) return <span style={{ color: "#aaa", fontStyle: "italic" }}>Sin letra.</span>;
+
+  // Factor de escala: convertir unidades X del PDF (puntos) a px en pantalla
+  const ESCALA = 1.0; // 1 punto PDF ≈ 1 px (ajustable)
+  const COLOR = colorAcorde || "#1a6fb5";
+
+  function textoDeLinea(items) {
+    return items.map(it => it.str).join("").trim();
+  }
+  function esSeccion(txt) {
+    return /^(CORO|ESTROFA|ESTROFAS|PUENTE|INTRO|OUTRO|BRIDGE|VERSO|PRE-CORO|FINAL|SALMO|RESPONSORIO)/i.test(txt);
+  }
+
+  return (
+    <div style={{ fontFamily: "'Segoe UI', Arial, sans-serif", fontSize: 14, color: "#222" }}>
+      {lineas.map((linea, i) => {
+        if (linea.salto || !linea.items.length) return <div key={i} style={{ height: 8 }} />;
+        const txt = textoDeLinea(linea.items);
+        // Sección
+        if (esSeccion(txt) && linea.items.length <= 3) {
+          return (
+            <div key={i} style={{ fontSize: 11, fontWeight: 800, color: COLOR, textTransform: "uppercase", letterSpacing: 1.2, marginTop: 14, marginBottom: 2, background: COLOR + "15", display: "inline-block", padding: "2px 8px", borderRadius: 7 }}>{txt}</div>
+          );
+        }
+        // ¿Es línea de acordes?
+        if (lineaEsAcordes(linea.items)) {
+          // Posicionar cada acorde de forma absoluta según su X
+          const maxX = Math.max(...linea.items.map(it => it.x), 0);
+          return (
+            <div key={i} style={{ position: "relative", height: 20, minWidth: (maxX * ESCALA + 60) + "px" }}>
+              {linea.items.map((it, j) => {
+                const tok = it.str.trim();
+                if (!tok) return null;
+                const esAc = ACORDE_RE.test(tok) || esAcordeLatino(tok);
+                const tokTranspuesto = esAc && semis ? (esAcordeLatino(tok) ? transponerAcordeLatino(tok, semis) : transponerAcorde(tok, semis)) : tok;
+                const mostrar = esAc ? aLatino(tokTranspuesto) : tok;
+                const american = esAc ? latinoAAmericano(aLatino(tokTranspuesto)) : null;
+                return (
+                  <span key={j} style={{ position: "absolute", left: (it.x * ESCALA) + "px", top: 0, fontSize: 12.5, fontWeight: 700, color: esAc ? COLOR : "#222", whiteSpace: "nowrap" }}>
+                    {esAc ? <AcordeConDiagrama acorde={mostrar} acordeAmerican={american} colorAcorde={COLOR} /> : mostrar}
+                  </span>
+                );
+              })}
+            </div>
+          );
+        }
+        // Línea de letra normal — posicionar también por X para mantener sangría
+        const primerX = linea.items[0]?.x || 0;
+        return (
+          <div key={i} style={{ marginLeft: (primerX * ESCALA) + "px", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{txt}</div>
+        );
       })}
     </div>
   );
@@ -11771,8 +11927,11 @@ create table if not exists cancionero_canciones (
   tono_base   text default 'C',
   momentos    text[] default '{}',
   letra_texto text default '',
+  youtube_url text default '',
   created_at  timestamptz default now()
 );
+-- Migración:
+ALTER TABLE cancionero_canciones ADD COLUMN IF NOT EXISTS youtube_url text default '';
 alter table cancionero_canciones enable row level security;
 create policy "cancionero_canciones_all" on cancionero_canciones for all using (true);
 
