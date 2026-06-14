@@ -6856,10 +6856,98 @@ function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
   );
 }
 
+function BannerWidget({ isAdmin }) {
+  const [url, setUrl] = useState("");
+  const [link, setLink] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [subiendo, setSubiendo] = useState(false);
+  useEffect(() => {
+    getConfig("banner_inicio_url").then((v) => setUrl(v || "")).catch(() => {});
+    getConfig("banner_inicio_link").then((v) => setLink(v || "")).catch(() => {});
+  }, []);
+
+  async function subirImagen(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setSubiendo(true);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `banners/banner_${Date.now()}.${ext}`;
+      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
+        method: "POST",
+        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": file.type || "image/jpeg", "x-upsert": "true" },
+        body: file,
+      });
+      if (!res.ok) throw new Error("subida falló");
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/publico/${path}`;
+      setUrl(publicUrl);
+    } catch (er) { alert("No se pudo subir la imagen. Intenta de nuevo."); }
+    setSubiendo(false);
+    if (e.target) e.target.value = "";
+  }
+
+  async function guardar() {
+    try {
+      await setConfig("banner_inicio_url", url);
+      await setConfig("banner_inicio_link", link);
+      setEditing(false);
+    } catch (e) { alert("Error al guardar."); }
+  }
+
+  async function quitar() {
+    setUrl(""); setLink("");
+    try { await setConfig("banner_inicio_url", ""); await setConfig("banner_inicio_link", ""); } catch (e) {}
+    setEditing(false);
+  }
+
+  // Si no hay banner y no es admin, no mostrar nada
+  if (!url && !isAdmin) return null;
+  if (!url && isAdmin && !editing) {
+    return (
+      <div onClick={() => setEditing(true)} style={{ marginBottom: 16, border: "2px dashed #cbd5e1", borderRadius: 16, padding: "18px", textAlign: "center", cursor: "pointer", color: "#94a3b8", fontSize: 13, fontWeight: 600, background: "#f8fafc" }}>
+        🖼️ Toca para agregar un banner al inicio
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      {url && (
+        link && !editing ? (
+          <a href={link} target="_blank" rel="noreferrer" style={{ display: "block" }}>
+            <img src={url} alt="Banner" style={{ width: "100%", borderRadius: 16, display: "block", boxShadow: "0 6px 18px rgba(0,0,0,0.10)" }} />
+          </a>
+        ) : (
+          <img src={url} alt="Banner" style={{ width: "100%", borderRadius: 16, display: "block", boxShadow: "0 6px 18px rgba(0,0,0,0.10)" }} />
+        )
+      )}
+      {isAdmin && (
+        editing ? (
+          <div style={{ marginTop: 10, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 8 }}>Banner del inicio</div>
+            <input type="file" accept="image/*" disabled={subiendo} onChange={subirImagen} style={{ fontSize: 13, marginBottom: 10, display: "block" }} />
+            {subiendo && <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>Subiendo imagen…</div>}
+            {url && <img src={url} alt="preview" style={{ width: "100%", borderRadius: 10, marginBottom: 10 }} />}
+            <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="Enlace al tocar el banner (opcional)" style={{ width: "100%", fontSize: 13, padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0", boxSizing: "border-box", marginBottom: 10 }} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={guardar} style={{ background: "#0a5ac8", color: "white", border: "none", borderRadius: 9, padding: "8px 16px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Guardar</button>
+              <button onClick={quitar} style={{ background: "white", color: "#ef4444", border: "1px solid #fecaca", borderRadius: 9, padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Quitar banner</button>
+              <button onClick={() => setEditing(false)} style={{ background: "white", color: "#6a6a70", border: "1px solid #e2e8f0", borderRadius: 9, padding: "8px 16px", fontSize: 12.5, cursor: "pointer", marginLeft: "auto" }}>Cerrar</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setEditing(true)} style={{ marginTop: 6, fontSize: 11.5, fontWeight: 700, color: "#0a5ac8", background: "none", border: "none", cursor: "pointer" }}>✏️ Editar banner</button>
+        )
+      )}
+    </div>
+  );
+}
+
 function ComunicadosWidget({ isAdmin }) {
   const [html, setHtml] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => { getConfig("comunicados_html").then((v) => setHtml(v || "")).catch(() => {}); }, []);
   useEffect(() => { if (editing && ref.current) ref.current.innerHTML = html || ""; }, [editing]);
@@ -6911,6 +6999,17 @@ function ComunicadosWidget({ isAdmin }) {
             <button title="Texto azul" onClick={() => cmd("foreColor", "#0a5ac8")} style={{ ...tbBtnIcon, color: "#0a5ac8", fontWeight: 800 }}>A</button>
             <button title="Texto rojo" onClick={() => cmd("foreColor", "#c0392b")} style={{ ...tbBtnIcon, color: "#c0392b", fontWeight: 800 }}>A</button>
             <button title="Quitar formato" onClick={() => cmd("removeFormat")} style={{ ...tbBtnIcon, color: "#8a8a90" }}>⨯</button>
+            <span style={tbSep} />
+            <div style={{ position: "relative", display: "inline-block" }}>
+              <button title="Insertar emoji" onClick={() => setEmojiOpen(o => !o)} style={tbBtnIcon}>😊</button>
+              {emojiOpen && (
+                <div style={{ position: "absolute", top: "110%", left: 0, zIndex: 50, background: "white", border: "1px solid #d8e6fb", borderRadius: 12, padding: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.15)", display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 2, width: 280 }}>
+                  {["😀","😊","😍","🥳","🙏","❤️","🎉","✨","🔥","👏","👍","🙌","🎶","🎵","⛪","✝️","📢","📣","📅","⏰","✅","⚠️","💪","🌟","😇","🕊️","🎸","🎤","💒","🌹","☀️","💙"].map(em => (
+                    <button key={em} onClick={() => { cmd("insertText", em); setEmojiOpen(false); }} style={{ border: "none", background: "none", fontSize: 18, cursor: "pointer", padding: 4, borderRadius: 6 }} onMouseEnter={e => e.currentTarget.style.background = "#eef4ff"} onMouseLeave={e => e.currentTarget.style.background = "none"}>{em}</button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div ref={ref} contentEditable suppressContentEditableWarning
             style={{ minHeight: 130, border: `1px solid ${AZUL}55`, borderRadius: 10, padding: "12px 14px", fontSize: 13.5, lineHeight: 1.6, color: "#2a2a30", outline: "none", background: "#fbfcff" }} />
@@ -6976,6 +7075,7 @@ function Dashboard({
   const docsOrdenados = [...(docs || [])].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
   const docNuevo = docsOrdenados[0];
   const [descVisto, setDescVisto] = useState(() => { try { return localStorage.getItem("descargas_visto_id") || ""; } catch { return ""; } });
+  const [avisoModal, setAvisoModal] = useState(null);
   const hayDocNuevo = !!docNuevo && String(docNuevo.id) !== String(descVisto);
   function abrirDescargas() {
     if (docNuevo) { try { localStorage.setItem("descargas_visto_id", String(docNuevo.id)); } catch {} setDescVisto(String(docNuevo.id)); }
@@ -7455,6 +7555,7 @@ function Dashboard({
           <style>{`@keyframes pulseGold { 0% { box-shadow: 0 0 0 0 ${C.gold}77; } 70% { box-shadow: 0 0 0 6px ${C.gold}00; } 100% { box-shadow: 0 0 0 0 ${C.gold}00; } }`}</style>
         </Card>
       </div>
+      <BannerWidget isAdmin={isAdmin} />
       {esCuerdaAdmin(user) && pendientes && pendientes.length > 0 && (
         <div onClick={() => setSection("solicitudes")}
           style={{ background: "linear-gradient(180deg,#fff7e6,#fff0cf)", border: "1px solid #ffd98a", borderRadius: 16, padding: "14px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 13, cursor: "pointer" }}>
@@ -7541,7 +7642,7 @@ function Dashboard({
                 .map((n) => (
                   <div
                     key={n.id}
-                    onClick={() => setSection("noticias")}
+                    onClick={() => setAvisoModal(n)}
                     style={{
                       flexShrink: 0,
                       borderRadius: 14,
@@ -7640,7 +7741,7 @@ function Dashboard({
             .map((n) => (
               <div
                 key={n.id}
-                onClick={() => setSection("noticias")}
+                onClick={() => setAvisoModal(n)}
                 style={{
                   display: "flex",
                   gap: 12,
@@ -7717,6 +7818,74 @@ function Dashboard({
                 </div>
               </div>
             ))}
+        </div>
+      )}
+
+      {/* ── Modal de aviso (se abre en el mismo lugar) ── */}
+      {avisoModal && (
+        <div
+          onClick={() => setAvisoModal(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16, backdropFilter: "blur(3px)",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: C.white, borderRadius: 18, maxWidth: 540, width: "100%",
+              maxHeight: "88vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              position: "relative",
+            }}
+          >
+            <button
+              onClick={() => setAvisoModal(null)}
+              style={{
+                position: "absolute", top: 12, right: 12, zIndex: 2,
+                width: 34, height: 34, borderRadius: "50%", border: "none",
+                background: "rgba(0,0,0,0.5)", color: "white", fontSize: 18,
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >×</button>
+
+            {avisoModal.imagen_url && (
+              <img
+                src={avisoModal.imagen_url}
+                alt={avisoModal.titulo}
+                style={{ width: "100%", maxHeight: 360, objectFit: "contain", background: "#0d0d0d", display: "block", borderRadius: "18px 18px 0 0" }}
+              />
+            )}
+            <div style={{ padding: "20px 22px" }}>
+              {avisoModal.fuente && (
+                <div style={{ display: "inline-block", fontSize: 10, fontWeight: 700, color: C.primary, textTransform: "uppercase", letterSpacing: "0.06em", background: C.primaryLight, borderRadius: 20, padding: "3px 10px", marginBottom: 10 }}>
+                  {avisoModal.fuente}
+                </div>
+              )}
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: C.dark, margin: "0 0 8px", lineHeight: 1.3 }}>
+                {avisoModal.titulo}
+              </h2>
+              <div style={{ fontSize: 11, color: C.gray, marginBottom: 14 }}>
+                {new Date(avisoModal.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" })}
+              </div>
+              {avisoModal.descripcion && (
+                <div style={{ fontSize: 14, color: C.dark, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                  {avisoModal.descripcion}
+                </div>
+              )}
+              {avisoModal.url && (
+                <a
+                  href={avisoModal.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 16, fontSize: 13, fontWeight: 600, color: "white", background: C.primary, borderRadius: 10, padding: "9px 16px", textDecoration: "none" }}
+                >
+                  🔗 Abrir enlace
+                </a>
+              )}
+            </div>
+          </div>
         </div>
       )}
       <VideoDestacadoWidget isAdmin={isAdmin} />
@@ -17822,6 +17991,8 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
         const reg = asisActual.find(a => a.evento_id === eventoId && a.member_id === m.id);
         if (reg) {
           init[m.id] = reg.estado;
+        } else if (m.asistencia_especial) {
+          init[m.id] = "presente"; // Caso especial: siempre presente
         } else {
           init[m.id] = m.es_nuevo ? "nuevo" : "ausente";
         }
@@ -20734,15 +20905,12 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
   // - A partir del día 20 de cada mes, también se habilita el mes siguiente
   //   (ya que la fecha de pago del mes siguiente vence el día 5).
   const mesesDisponibles = (() => {
-    const hoyTemp = new Date();
-    const diaHoy = hoyTemp.getDate();
-    // Mes máximo permitido: si hoy >= día 20, se habilita el mes siguiente
-    const mesMaxDate = new Date(hoyTemp.getFullYear(), hoyTemp.getMonth() + (diaHoy >= 20 ? 1 : 0));
-    const mesMaxIso = `${mesMaxDate.getFullYear()}-${String(mesMaxDate.getMonth() + 1).padStart(2, "0")}`;
+    // Sin límite de meses futuros: permite registrar pagos por adelantado
+    // (rango: Junio 2026 → Diciembre 2030)
     return Array.from({ length: 55 }, (_, i) => {
       const d = new Date(2026, 5 + i); // Junio 2026 → Diciembre 2030
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    }).filter((m) => m <= mesMaxIso);
+    });
   })();
 
   async function guardarValorCuota() {
@@ -21045,7 +21213,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
             <div>
               <div style={{ fontWeight: 700, fontSize: 13, color: "#92400e" }}>Pago anticipado — {finMesLabel(mesSeleccionado)}</div>
               <div style={{ fontSize: 12, color: "#b45309", marginTop: 2 }}>
-                Estás registrando el pago del próximo mes (vence el día 5). Disponible a partir del día 20 del mes anterior.
+                Estás registrando el pago de un mes futuro. Útil cuando alguien paga varios meses por adelantado.
               </div>
             </div>
           </div>
