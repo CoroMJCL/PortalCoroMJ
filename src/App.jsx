@@ -14,6 +14,53 @@ const SECRET_ADMIN_CODE = "CoroCJM2026!";
 // Código de acceso para Invitados esporádicos (cámbialo cuando quieras)
 const GUEST_CODE = "Coromj1234";
 
+// ══════════════════════════════════════════
+//  VALIDACIÓN Y NORMALIZACIÓN DE RUT CHILENO
+// ══════════════════════════════════════════
+// Limpia un RUT dejando solo dígitos y el dígito verificador (K incluida)
+function limpiarRut(rut) {
+  if (!rut) return "";
+  return rut.toString().replace(/[^0-9kK]/g, "").toUpperCase();
+}
+// Calcula el dígito verificador correcto para un cuerpo numérico
+function calcularDV(cuerpo) {
+  let suma = 0, mul = 2;
+  for (let i = cuerpo.length - 1; i >= 0; i--) {
+    suma += parseInt(cuerpo[i], 10) * mul;
+    mul = mul === 7 ? 2 : mul + 1;
+  }
+  const resto = 11 - (suma % 11);
+  if (resto === 11) return "0";
+  if (resto === 10) return "K";
+  return String(resto);
+}
+// Valida un RUT completo (cuerpo + dígito verificador)
+function rutValido(rut) {
+  const limpio = limpiarRut(rut);
+  if (limpio.length < 2) return false;
+  const cuerpo = limpio.slice(0, -1);
+  const dv = limpio.slice(-1);
+  if (!/^\d+$/.test(cuerpo)) return false;
+  if (cuerpo.length < 7) return false; // RUTs chilenos válidos tienen 7-8 dígitos
+  return calcularDV(cuerpo) === dv;
+}
+// Normaliza a formato canónico para guardar y comparar: "12345678-9"
+function normalizarRut(rut) {
+  const limpio = limpiarRut(rut);
+  if (limpio.length < 2) return "";
+  const cuerpo = limpio.slice(0, -1);
+  const dv = limpio.slice(-1);
+  return `${cuerpo}-${dv}`;
+}
+// Formato bonito para mostrar: "12.345.678-9"
+function formatearRut(rut) {
+  const norm = normalizarRut(rut);
+  if (!norm) return "";
+  const [cuerpo, dv] = norm.split("-");
+  const conPuntos = cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${conPuntos}-${dv}`;
+}
+
 // Detecta usuario Invitado: no es integrante del coro, no tiene cuerda asignada
 const esVisita = (u) => !u?.cuerda || u.cuerda.trim() === "";
 
@@ -268,7 +315,7 @@ async function supabase(table, options = {}) {
 setInterval(() => {
   if (_refreshToken) refreshSession();
 }, 50 * 60 * 1000);
-async function authSignUp(email, password, nombre, cuerda, cumpleanos, genero, aprobadoDirecto) {
+async function authSignUp(email, password, nombre, cuerda, cumpleanos, genero, aprobadoDirecto, rut) {
   nombre = formatoNombre(nombre);
   const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
     method: "POST",
@@ -304,6 +351,7 @@ async function authSignUp(email, password, nombre, cuerda, cumpleanos, genero, a
       acceso: esAprobado ? "aprobado" : "pendiente",
       cumpleanos: cumpleanos || "",
       genero: genero || "",
+      rut: rut || "",
       auth_id: uid,
     }),
   });
@@ -1939,9 +1987,17 @@ export default function App() {
 
   async function handleSignIn(email, password) {
     const data = await authSignIn(email, password);
-    const perfil = await supabase("integrantes", {
-      filters: `&email=eq.${encodeURIComponent(email)}`,
+    const emailNorm = (email || "").trim().toLowerCase();
+    // Buscar sin distinguir mayúsculas/minúsculas ni espacios (ilike) para no crear duplicados
+    let perfil = await supabase("integrantes", {
+      filters: `&email=ilike.${encodeURIComponent(emailNorm)}`,
     });
+    // Respaldo: si ilike no encontró, intentar igualdad exacta con el email original
+    if (!(perfil && perfil[0])) {
+      perfil = await supabase("integrantes", {
+        filters: `&email=eq.${encodeURIComponent(email)}`,
+      });
+    }
     let p = perfil && perfil[0] ? perfil[0] : null;
     // Si no existe en integrantes (confirmó email pero el INSERT del signup falló), crearlo ahora como PENDIENTE
     if (!p) {
@@ -2001,8 +2057,18 @@ export default function App() {
     cuerda,
     cumpleanos,
     adminCode,
-    genero
+    genero,
+    rut
   ) {
+    // Verificar que el RUT no exista ya (evita duplicados con correo distinto)
+    if (rut) {
+      const existentes = await supabase("integrantes", {
+        filters: `&rut=eq.${encodeURIComponent(rut)}`,
+      });
+      if (existentes && existentes.length > 0) {
+        throw new Error("Ya existe una cuenta registrada con este RUT. Si olvidaste tu contraseña, usa la opción 'Recuperar contraseña' en lugar de registrarte de nuevo.");
+      }
+    }
     // Si el código secreto es correcto, registrar como Admin (aprobado directo)
     const esAdminDirecto = adminCode.trim() === SECRET_ADMIN_CODE;
     const finalCuerda = esAdminDirecto ? "Admin" : cuerda;
@@ -2013,7 +2079,8 @@ export default function App() {
       finalCuerda,
       cumpleanos,
       genero,
-      esAdminDirecto
+      esAdminDirecto,
+      rut
     );
     // Salvo el admin directo, el registro queda PENDIENTE de aprobación: no entra
     if (!esAdminDirecto) {
@@ -3040,6 +3107,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter }) {
   const [regPassword, setRegPassword] = useState("");
   const [regPassword2, setRegPassword2] = useState("");
   const [regNombre, setRegNombre] = useState("");
+  const [regRut, setRegRut] = useState("");
   const [regCuerda, setRegCuerda] = useState("Soprano");
   const [regCumple, setRegCumple] = useState("");
   const [regGenero, setRegGenero] = useState("");
@@ -3111,6 +3179,14 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter }) {
       setError("Ingresa tu nombre completo.");
       return;
     }
+    if (!regRut.trim()) {
+      setError("Ingresa tu RUT.");
+      return;
+    }
+    if (!rutValido(regRut)) {
+      setError("El RUT no es válido. Revísalo (incluye el dígito verificador).");
+      return;
+    }
     if (!regGenero) {
       setError("Selecciona tu género.");
       return;
@@ -3124,7 +3200,8 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter }) {
         regCuerda,
         regCumple,
         regAdminCode,
-        regGenero
+        regGenero,
+        normalizarRut(regRut)
       );
       if (r && r.pendiente) {
         setSuccess("¡Solicitud enviada! Un administrador del coro debe aprobar tu ingreso. Te avisaremos cuando puedas entrar.");
@@ -3425,6 +3502,21 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter }) {
                   placeholder="María González"
                   style={inp}
                 />
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={lbl}>RUT *</label>
+                <input
+                  type="text"
+                  required
+                  value={regRut}
+                  onChange={(e) => setRegRut(e.target.value)}
+                  onBlur={(e) => { if (rutValido(e.target.value)) setRegRut(formatearRut(e.target.value)); }}
+                  placeholder="12.345.678-9"
+                  style={{ ...inp, borderColor: regRut && !rutValido(regRut) ? "#dc2626" : inp.border }}
+                />
+                {regRut && !rutValido(regRut) && (
+                  <div style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>RUT inválido — revisa el número y el dígito verificador.</div>
+                )}
               </div>
               <div style={{ marginBottom: 12 }}>
                 <label style={lbl}>Correo electrónico *</label>
@@ -8321,6 +8413,9 @@ function Perfil({ user, members, setUser }) {
   const [editCumple, setEditCumple] = useState(false);
   const [newCumple, setNewCumple] = useState(user?.cumpleanos || "");
   const [savingCumple, setSavingCumple] = useState(false);
+  const [editRut, setEditRut] = useState(false);
+  const [newRut, setNewRut] = useState(user?.rut || "");
+  const [savingRut, setSavingRut] = useState(false);
   const [msg, setMsg] = useState("");
   const [editTel, setEditTel] = useState(false);
   const telSinPrefijo = (user?.telefono || "").replace(/^\+56\s?/, "");
@@ -8408,6 +8503,24 @@ function Perfil({ user, members, setUser }) {
       setMsg("✅ Cumpleaños actualizado.");
     } catch (e) { setMsg("Error: " + e.message); }
     setSavingCumple(false);
+  }
+
+  async function saveRut() {
+    const norm = normalizarRut(newRut);
+    if (norm === (user.rut || "")) { setEditRut(false); return; }
+    if (!rutValido(newRut)) { setMsg("RUT inválido. Revisa el número y el dígito verificador."); return; }
+    setSavingRut(true); setMsg("");
+    try {
+      // Verificar que no exista en otro integrante
+      const existentes = await supabase("integrantes", { filters: `&rut=eq.${encodeURIComponent(norm)}` });
+      const otro = (existentes || []).find(x => x.id !== user.id);
+      if (otro) { setMsg("Ese RUT ya está registrado en otra cuenta."); setSavingRut(false); return; }
+      await updateRecord("integrantes", user.id, { rut: norm });
+      setUser((p) => ({ ...p, rut: norm }));
+      setEditRut(false);
+      setMsg("✅ RUT actualizado.");
+    } catch (e) { setMsg("Error: " + e.message); }
+    setSavingRut(false);
   }
 
   async function saveTelefono() {
@@ -8627,6 +8740,31 @@ function Perfil({ user, members, setUser }) {
 
           {fieldRow("✨", "Nombre completo",
             <div style={{ fontSize:14, fontWeight:600, color:C.dark }}>{user?.nombre || "—"}</div>
+          )}
+
+          {fieldRow("🪪", "RUT",
+            editRut ? (
+              <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
+                <input
+                  value={newRut}
+                  onChange={(e) => setNewRut(e.target.value)}
+                  onBlur={(e) => { if (rutValido(e.target.value)) setNewRut(formatearRut(e.target.value)); }}
+                  placeholder="12.345.678-9"
+                  style={editInputStyle}
+                />
+                <div style={{ display:"flex", gap:6 }}>
+                  {saveBtnEl(saveRut, savingRut)}
+                  {cancelBtnEl(() => { setEditRut(false); setNewRut(user?.rut || ""); })}
+                </div>
+              </div>
+            ) : (
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
+                <span style={{ fontSize:14, fontWeight:500, color:user?.rut ? C.dark : "#9ca3af" }}>
+                  {user?.rut ? formatearRut(user.rut) : "Sin registrar"}
+                </span>
+                {editLinkEl(() => { setEditRut(true); setNewRut(user?.rut || ""); })}
+              </div>
+            )
           )}
 
           {!esVisita(user) && fieldRow("🎵", "Rol en el Coro",
@@ -12128,6 +12266,11 @@ function AdminIntegrantes({ members, onReload }) {
   }
 
   async function saveEdit(id) {
+    // Validar RUT si se editó
+    if (editData.rut !== undefined && editData.rut.trim() !== "") {
+      if (!rutValido(editData.rut)) { alert("El RUT ingresado no es válido. Revisa el dígito verificador."); return; }
+      editData.rut = normalizarRut(editData.rut);
+    }
     setSaving(true);
     try {
       const datos = editData.nombre ? { ...editData, nombre: formatoNombre(editData.nombre) } : editData;
@@ -12154,6 +12297,17 @@ function AdminIntegrantes({ members, onReload }) {
     const newCuerda = m.cuerda === "Admin" ? "Soprano" : "Admin";
     try {
       await updateRecord("integrantes", m.id, { cuerda: newCuerda });
+      onReload();
+    } catch (e) {
+      alert("Error: " + e.message);
+    }
+    setRoleLoading(null);
+  }
+
+  async function toggleEspecial(m) {
+    setRoleLoading(m.id);
+    try {
+      await updateRecord("integrantes", m.id, { asistencia_especial: !m.asistencia_especial });
       onReload();
     } catch (e) {
       alert("Error: " + e.message);
@@ -12456,6 +12610,15 @@ function AdminIntegrantes({ members, onReload }) {
                           }
                           style={{ ...inputS, fontSize: 12 }}
                         />
+                        <input
+                          placeholder="RUT (12.345.678-9)"
+                          value={editData.rut !== undefined ? editData.rut : (m.rut || "")}
+                          onChange={(e) =>
+                            setEditData((p) => ({ ...p, rut: e.target.value }))
+                          }
+                          onBlur={(e) => { if (rutValido(e.target.value)) setEditData((p) => ({ ...p, rut: normalizarRut(e.target.value) })); }}
+                          style={{ ...inputS, fontSize: 12, borderColor: (editData.rut ?? m.rut) && !rutValido(editData.rut ?? m.rut) ? "#dc2626" : undefined }}
+                        />
                       </div>
                     </td>
                     <td style={{ padding: "8px 12px" }}>
@@ -12629,6 +12792,14 @@ function AdminIntegrantes({ members, onReload }) {
                           onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
                           onMouseLeave={e => e.currentTarget.style.transform = "none"}
                         >{roleLoading === m.id ? "…" : "⚙️"}</button>
+                        <button
+                          onClick={() => toggleEspecial(m)}
+                          disabled={roleLoading === m.id}
+                          title={m.asistencia_especial ? "Quitar caso especial de asistencia" : "Marcar como caso especial (siempre presente: vive fuera de la ciudad / presta otros servicios pastorales)"}
+                          style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, background: m.asistencia_especial ? "#ede9fe" : "#f8f8f8", color: m.asistencia_especial ? "#6d28d9" : "#9ca3af", border: `1px solid ${m.asistencia_especial ? "#6d28d9" : "#d1d5db"}45`, borderRadius: 10, cursor: "pointer", transition: "all 0.15s" }}
+                          onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+                          onMouseLeave={e => e.currentTarget.style.transform = "none"}
+                        >★</button>
                         <ConfirmBtn onConfirm={() => del(m.id)} compact />
                       </span>
                     </td>
@@ -15389,6 +15560,26 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [notifStatus, setNotifStatus] = useState("");
+  const [subiendoGuion, setSubiendoGuion] = useState(false);
+
+  async function subirGuion(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setSubiendoGuion(true);
+    try {
+      const path = `guiones/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
+        method: "POST",
+        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" },
+        body: file,
+      });
+      if (!res.ok) throw new Error("subida falló");
+      const url = `${SUPABASE_URL}/storage/v1/object/public/publico/${path}`;
+      setForm((p) => ({ ...p, guion_url: url }));
+    } catch (er) { alert("No se pudo subir el guion. Intenta de nuevo."); }
+    setSubiendoGuion(false);
+    if (e.target) e.target.value = "";
+  }
 
   // Auto-abrir pauta desde QR deeplink
   useEffect(() => {
@@ -15413,6 +15604,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     coro: "Coro Misioneros de Jesús",
     tipo_celebracion: "Misa Dominical",
     notas: "",
+    guion_url: "",
     tipo: "grupo", // "grupo" | "parroquial"
     mostrar_col_letra: false,
     mostrar_col_audio: false,
@@ -15486,6 +15678,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
         coro: form.coro || "Coro Misioneros de Jesús",
         tipo_celebracion: form.tipo_celebracion,
         notas: form.notas.trim(),
+        guion_url: (form.guion_url || "").trim(),
         canciones: JSON.stringify(canciones),
         publicada: publish,
         tipo: form.tipo || "grupo",
@@ -15536,6 +15729,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
         coro: form.coro || pauta.coro || "Coro Misioneros de Jesús",
         tipo_celebracion: form.tipo_celebracion || pauta.tipo_celebracion,
         notas: form.notas ?? pauta.notas,
+        guion_url: (form.guion_url ?? pauta.guion_url ?? "").trim(),
         canciones: JSON.stringify(canciones),
         publicada,
         tipo: form.tipo || pauta.tipo || "grupo",
@@ -15632,6 +15826,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       coro: pauta.coro || "Coro Misioneros de Jesús",
       tipo_celebracion: pauta.tipo_celebracion || "Misa Dominical",
       notas: pauta.notas || "",
+      guion_url: pauta.guion_url || "",
       tipo: pauta.tipo || "grupo",
       mostrar_col_letra: pauta.mostrar_col_letra || false,
       mostrar_col_audio: pauta.mostrar_col_audio || false,
@@ -15976,6 +16171,30 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                 onChange={(v) => setForm((p) => ({ ...p, notas: v }))}
                 placeholder="Indicaciones para el coro. Ej:&#10;**Ofertorio:** solo cantan varones.&#10;**Comunión:** cantan mujeres."
               />
+              {/* Guion de la misa */}
+              <div style={{ marginTop: 14 }}>
+                <label style={{ fontSize: 11, fontWeight: 500, color: C.gray, marginBottom: 4, display: "block" }}>
+                  Guion de la misa (PDF o Word)
+                </label>
+                {form.guion_url ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 12px", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 13, color: C.primary, fontWeight: 600 }}>📄 Guion cargado</span>
+                    <a href={form.guion_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: C.primary }}>Ver</a>
+                    <button type="button" onClick={() => setForm((p) => ({ ...p, guion_url: "" }))} style={{ fontSize: 12, color: "#ef4444", background: "none", border: "none", cursor: "pointer", marginLeft: "auto" }}>Quitar</button>
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      disabled={subiendoGuion}
+                      onChange={subirGuion}
+                      style={{ fontSize: 13 }}
+                    />
+                    {subiendoGuion && <div style={{ fontSize: 12, color: C.gray, marginTop: 6 }}>Subiendo guion…</div>}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </Card>
@@ -16486,6 +16705,28 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   >
                     {renderNotas(selected.notas)}
                   </div>
+                )}
+                {selected.guion_url && (
+                  <a
+                    href={selected.guion_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      marginTop: 10,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "white",
+                      background: C.primary,
+                      borderRadius: 10,
+                      padding: "9px 16px",
+                      textDecoration: "none",
+                    }}
+                  >
+                    📖 Ver guion de la misa
+                  </a>
                 )}
               </div>
               {selected.id &&
@@ -17230,7 +17471,13 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
     asistencia.some(a => a.evento_id === e.id)
   ).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
+  const esEspecial = (memberId) => {
+    const m = (members || []).find(x => x.id === memberId);
+    return !!(m && m.asistencia_especial);
+  };
+
   const calcPct = (memberId) => {
+    if (esEspecial(memberId)) return 100; // Caso especial: siempre presente
     const misReg = asistencia.filter(a => a.member_id === memberId);
     const evaluados = misReg.filter(a => !["justificado","excluido","nuevo"].includes(a.estado));
     const presentes = evaluados.filter(a => a.estado === "presente").length;
@@ -17245,10 +17492,11 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
   const cc = CUERDAS[user?.cuerda] || C.primary;
 
   // Datos personales del usuario logueado
+  const soyEspecial = !!(members || []).find(m => m.id === user?.id)?.asistencia_especial;
   const misReg = asistencia.filter(a => a.member_id === user?.id);
-  const misPresentes = misReg.filter(a => a.estado === "presente").length;
-  const misAusentes = misReg.filter(a => a.estado === "ausente").length;
-  const misJustificados = misReg.filter(a => a.estado === "justificado").length;
+  const misPresentes = soyEspecial ? eventosConAsistencia.length : misReg.filter(a => a.estado === "presente").length;
+  const misAusentes = soyEspecial ? 0 : misReg.filter(a => a.estado === "ausente").length;
+  const misJustificados = soyEspecial ? 0 : misReg.filter(a => a.estado === "justificado").length;
   const misExcluidos = misReg.filter(a => a.estado === "excluido").length;
   const misNuevos = misReg.filter(a => a.estado === "nuevo").length;
   const evaluados = misReg.filter(a => !["justificado","excluido","nuevo"].includes(a.estado)).length;
@@ -17371,9 +17619,12 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                 <tbody>
                   {members.map((m, i) => {
                     const mReg = asistencia.filter(a => a.member_id === m.id);
-                    const presentes = mReg.filter(a => a.estado === "presente").length;
-                    const ausentes = mReg.filter(a => a.estado === "ausente").length;
-                    const justificados = mReg.filter(a => a.estado === "justificado").length;
+                    const especial = !!m.asistencia_especial;
+                    // Para caso especial: cuenta como presente en todos los eventos con asistencia registrada
+                    const totalEventos = eventosConAsistencia.length;
+                    const presentes = especial ? totalEventos : mReg.filter(a => a.estado === "presente").length;
+                    const ausentes = especial ? 0 : mReg.filter(a => a.estado === "ausente").length;
+                    const justificados = especial ? 0 : mReg.filter(a => a.estado === "justificado").length;
                     const excluidos = mReg.filter(a => a.estado === "excluido").length;
                     const nuevos = mReg.filter(a => a.estado === "nuevo").length;
                     const p = calcPct(m.id);
@@ -17386,7 +17637,15 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
                               {m.foto_url ? <img src={m.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(m.nombre || "?")}
                             </div>
                             <div>
-                              <div style={{ fontWeight: 600, color: C.dark }}>{m.nombre} {m.id === user?.id && <span style={{ fontSize: 10, color: C.primary }}>(tú)</span>}</div>
+                              <div style={{ fontWeight: 600, color: C.dark, display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+                                {m.nombre} {m.id === user?.id && <span style={{ fontSize: 10, color: C.primary }}>(tú)</span>}
+                                {m.asistencia_especial && (
+                                  <span
+                                    title="Caso especial: Vive fuera de la ciudad / Prestando otros servicios pastorales"
+                                    style={{ fontSize: 10, fontWeight: 700, background: "#ede9fe", color: "#6d28d9", borderRadius: 20, padding: "1px 7px", cursor: "help", whiteSpace: "nowrap" }}
+                                  >★ Caso especial</span>
+                                )}
+                              </div>
                               <div style={{ fontSize: 11, color: mcc }}>{rolFullLabel(m)}</div>
                             </div>
                           </div>
@@ -19979,11 +20238,9 @@ function AdminNotificaciones() {
   async function cargar() {
     setLoading(true);
     try {
-      const res = await fetch(`https://api.onesignal.com/apps/${ONESIGNAL_APP_ID}`, {
-        headers: { Authorization: `Key ${ONESIGNAL_API_KEY}` },
-      });
+      const res = await fetch("/api/contar-dispositivos");
       const data = await res.json();
-      setTotalSubs(data.players ?? 0);
+      setTotalSubs(data.ok ? (data.total ?? 0) : 0);
     } catch (e) { setTotalSubs(0); }
     setLoading(false);
   }
