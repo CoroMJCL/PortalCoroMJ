@@ -1178,18 +1178,27 @@ function SpotifyBarWidget() {
   return (
     <div style={{ position: "relative", flexShrink: 0 }}>
       <button onClick={() => setOpen((p) => !p)} title="Música del Coro"
-        style={{ display: "flex", alignItems: "center", gap: 7, background: open ? "#e8f8ee" : C.light, border: `1px solid ${open ? "#1DB954" : C.border}`, borderRadius: 9, padding: "5px 11px", cursor: "pointer", transition: "all 0.18s" }}>
-        <span style={{ width: 18, height: 18, borderRadius: "50%", background: "#1DB954", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm4.59 14.42a.62.62 0 0 1-.86.21c-2.35-1.44-5.3-1.76-8.79-.96a.62.62 0 1 1-.28-1.21c3.81-.87 7.08-.5 9.71 1.11.3.18.39.57.22.85Zm1.23-2.73a.78.78 0 0 1-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.17a.78.78 0 1 1-.45-1.49c3.63-1.1 8.15-.56 11.23 1.33.37.22.49.71.26 1.07Zm.11-2.85C14.81 8.94 9.4 8.76 6.3 9.7a.93.93 0 1 1-.54-1.78c3.56-1.08 9.53-.87 13.29 1.36a.93.93 0 0 1-.96 1.6Z" /></svg>
+        style={{ display: "flex", alignItems: "center", gap: 8, background: open ? "#1DB954" : "linear-gradient(135deg,#1DB954,#159c44)", border: "none", borderRadius: 11, padding: "7px 13px", cursor: "pointer", transition: "all 0.18s", boxShadow: "0 2px 10px rgba(29,185,84,0.35)" }}>
+        <span style={{ width: 22, height: 22, borderRadius: "50%", background: "white", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#1DB954"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm4.59 14.42a.62.62 0 0 1-.86.21c-2.35-1.44-5.3-1.76-8.79-.96a.62.62 0 1 1-.28-1.21c3.81-.87 7.08-.5 9.71 1.11.3.18.39.57.22.85Zm1.23-2.73a.78.78 0 0 1-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.17a.78.78 0 1 1-.45-1.49c3.63-1.1 8.15-.56 11.23 1.33.37.22.49.71.26 1.07Zm.11-2.85C14.81 8.94 9.4 8.76 6.3 9.7a.93.93 0 1 1-.54-1.78c3.56-1.08 9.53-.87 13.29 1.36a.93.93 0 0 1-.96 1.6Z" /></svg>
         </span>
         <div style={{ textAlign: "left" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.dark, lineHeight: 1.1 }}>Música</div>
-          <div style={{ fontSize: 9, color: C.gray, lineHeight: 1.2 }}>Coro MJ</div>
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: "white", lineHeight: 1.1 }}>Playlist del Coro</div>
+          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.85)", lineHeight: 1.2 }}>Escúchanos en Spotify</div>
         </div>
-        <span style={{ fontSize: 9, color: C.gray, marginLeft: 2 }}>{open ? "▲" : "▼"}</span>
+        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.9)", marginLeft: 2 }}>{open ? "▲" : "▼"}</span>
       </button>
       {open && (
-        <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, width: 320, maxWidth: "90vw", background: "white", borderRadius: 14, boxShadow: "0 12px 40px rgba(0,0,0,0.18)", border: `1px solid ${C.border}`, overflow: "hidden", zIndex: 200 }}>
+        <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, width: 340, maxWidth: "92vw", background: "white", borderRadius: 16, boxShadow: "0 16px 48px rgba(0,0,0,0.22)", border: `1px solid ${C.border}`, overflow: "hidden", zIndex: 200 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "12px 14px", background: "linear-gradient(135deg,#1DB954,#159c44)" }}>
+            <span style={{ width: 26, height: 26, borderRadius: "50%", background: "white", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#1DB954"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm4.59 14.42a.62.62 0 0 1-.86.21c-2.35-1.44-5.3-1.76-8.79-.96a.62.62 0 1 1-.28-1.21c3.81-.87 7.08-.5 9.71 1.11.3.18.39.57.22.85Zm1.23-2.73a.78.78 0 0 1-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.17a.78.78 0 1 1-.45-1.49c3.63-1.1 8.15-.56 11.23 1.33.37.22.49.71.26 1.07Zm.11-2.85C14.81 8.94 9.4 8.76 6.3 9.7a.93.93 0 1 1-.54-1.78c3.56-1.08 9.53-.87 13.29 1.36a.93.93 0 0 1-.96 1.6Z" /></svg>
+            </span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "white", lineHeight: 1.15 }}>Playlist Coro MJ</div>
+              <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.85)" }}>Reproduce aquí mismo</div>
+            </div>
+          </div>
           <iframe title="Spotify Coro MJ" src="https://open.spotify.com/embed/playlist/3ssNSNlljyYlw2La83mXZE?utm_source=generator&theme=0" width="100%" height="352" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" style={{ display: "block", border: 0 }} />
         </div>
       )}
@@ -8104,9 +8113,25 @@ function Dashboard({
       )}
       <VideoDestacadoWidget isAdmin={isAdmin} />
       <GaleriaWidget fotos={fotos} setSection={setSection} isAdmin={isAdmin} />
+      <VocalizacionWidget isAdmin={isAdmin} />
+      <ComunidadesWidget comunidades={comunidades} isAdmin={isAdmin} setSection={setSection} />
         </div>
         <div className="dash-col">
+      {/* ── Santoral (franja completa) ── */}
+      {santoral && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "linear-gradient(180deg,#fffdf6,#fdf4df)", border: `1px solid ${C.gold}40`, borderRadius: 16, padding: "12px 16px", marginBottom: 14 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 11, flexShrink: 0, background: `linear-gradient(135deg,${C.gold},#caa017)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17 }}>✨</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 9.5, fontWeight: 800, color: "#a9780a", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 1 }}>Santoral de hoy</div>
+            <div style={{ fontSize: 14.5, fontWeight: 700, color: "#5b4708", lineHeight: 1.25 }}>{santoral}</div>
+          </div>
+        </div>
+      )}
+      <ValoresWidget />
+      <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} user={user} />
       <ShortsWidget isAdmin={isAdmin} />
+      {/* ── Cumpleañeros de hoy (solo ese día) ── */}
+      {cumple.length > 0 && <CumpleanosHoyWidget cumple={cumple} />}
         <Card>
           <div
             style={{
@@ -8228,39 +8253,9 @@ function Dashboard({
           </Card>
         )}
       {/* ── Valores del coro ── */}
-      <ValoresWidget />
-      {/* ── Cumpleañeros de hoy (solo ese día) ── */}
-      {cumple.length > 0 && <CumpleanosHoyWidget cumple={cumple} />}
-      {/* ── Santoral (franja completa) ── */}
-      {santoral && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "linear-gradient(180deg,#fffdf6,#fdf4df)", border: `1px solid ${C.gold}40`, borderRadius: 16, padding: "12px 16px", marginBottom: 14 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 11, flexShrink: 0, background: `linear-gradient(135deg,${C.gold},#caa017)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17 }}>✨</div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 9.5, fontWeight: 800, color: "#a9780a", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 1 }}>Santoral de hoy</div>
-            <div style={{ fontSize: 14.5, fontWeight: 700, color: "#5b4708", lineHeight: 1.25 }}>{santoral}</div>
-          </div>
-        </div>
-      )}
       <ProximosCumpleanosWidget members={members} setSection={setSection} />
-      <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} user={user} />
-      <div style={{ background: "white", borderRadius: 16, overflow: "hidden", border: "1px solid rgba(60,60,67,0.1)", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 13px 8px" }}>
-          <div style={{ width: 28, height: 28, borderRadius: 9, background: "#1DB954", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm4.59 14.42a.62.62 0 0 1-.86.21c-2.35-1.44-5.3-1.76-8.79-.96a.62.62 0 1 1-.28-1.21c3.81-.87 7.08-.5 9.71 1.11.3.18.39.57.22.85Zm1.23-2.73a.78.78 0 0 1-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.17a.78.78 0 1 1-.45-1.49c3.63-1.1 8.15-.56 11.23 1.33.37.22.49.71.26 1.07Zm.11-2.85C14.81 8.94 9.4 8.76 6.3 9.7a.93.93 0 1 1-.54-1.78c3.56-1.08 9.53-.87 13.29 1.36a.93.93 0 0 1-.96 1.6Z"/></svg>
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.dark }}>Playlist Coro MJ</div>
-            <div style={{ fontSize: 10.5, color: C.gray }}>Reproduce aquí mismo</div>
-          </div>
-        </div>
-        <iframe title="Spotify Coro MJ" src="https://open.spotify.com/embed/playlist/3ssNSNlljyYlw2La83mXZE?utm_source=generator&theme=0" width="100%" height="232" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" style={{ display: "block", border: 0 }} />
-      </div>
-        </div>
-      </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 14 }}>
-        <VocalizacionWidget isAdmin={isAdmin} />
-        <ComunidadesWidget comunidades={comunidades} isAdmin={isAdmin} setSection={setSection} />
+        </div>
       </div>
 
       <div style={{ marginBottom: 14 }}>
