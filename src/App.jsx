@@ -20991,6 +20991,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
   const pagaron = new Set(pagosMes.map((p) => p.integrante_id));
   const totalEsperado = miembrosActivos.reduce((s, m) => s + montoParaMiembro(m), 0);
   const totalRecaudado = pagosMes.reduce((s, p) => s + (p.monto || 0), 0);
+  const totalRecaudadoGlobal = pagos.reduce((s, p) => s + (p.monto || 0), 0);
 
   // Meses disponibles para REGISTRAR PAGOS:
   // - Desde Junio 2026 hasta el mes actual (inclusive).
@@ -21473,9 +21474,10 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
       {/* Stats del mes */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 12, marginBottom: 20 }}>
         <StatCard icon="👥" label="En sistema" value={miembrosActivos.length} color="#3b82f6" />
-        <StatCard icon="✅" label="Pagaron" value={pagaron.size} color={C.primary} sub={`${pctPago}%`} />
+        <StatCard icon="✅" label="Pagaron este mes" value={pagaron.size} color={C.primary} sub={`${pctPago}%`} />
         <StatCard icon="⚠️" label="Morosos" value={mesVencido ? miembrosActivos.length - pagaron.size : "—"} color="#ef4444" />
-        <StatCard icon="💰" label="Recaudado" value={finFmtCLP(totalRecaudado)} color="#2d7dd2" sub={`de ${finFmtCLP(totalEsperado)}`} />
+        <StatCard icon="💰" label="Recaudado del mes" value={finFmtCLP(totalRecaudado)} color="#2d7dd2" sub={`de ${finFmtCLP(totalEsperado)}`} />
+        <StatCard icon="🏦" label="Total recaudado (todos los meses)" value={finFmtCLP(totalRecaudadoGlobal)} color="#16a34a" sub="cuotas de todos los meses" />
       </div>
 
       {/* Barra de progreso */}
