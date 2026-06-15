@@ -3998,6 +3998,8 @@ function extractYTId(input) {
   if (!input) return null;
   const short = input.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
   if (short) return short[1];
+  const shorts = input.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+  if (shorts) return shorts[1];
   const watch = input.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
   if (watch) return watch[1];
   const embed = input.match(/embed\/([a-zA-Z0-9_-]{11})/);
@@ -4047,6 +4049,120 @@ async function setConfig(key, value) {
       body: JSON.stringify({ key, value }),
     });
   } catch {}
+}
+
+// Widget de Shorts de YouTube en fila vertical deslizable — admin pega los enlaces
+const SHORTS_STORAGE_KEY = "shorts_youtube_lista";
+function ShortsWidget({ isAdmin }) {
+  const [lista, setLista] = useState([]); // array de URLs
+  const [cargado, setCargado] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [nuevoUrl, setNuevoUrl] = useState("");
+  const [activo, setActivo] = useState(null); // short reproduciéndose (id)
+
+  useEffect(() => {
+    getConfig(SHORTS_STORAGE_KEY).then((val) => {
+      if (val) { try { setLista(JSON.parse(val)); } catch { setLista([]); } }
+      setCargado(true);
+    }).catch(() => setCargado(true));
+  }, []);
+
+  async function guardarLista(nueva) {
+    setLista(nueva);
+    try { await setConfig(SHORTS_STORAGE_KEY, JSON.stringify(nueva)); } catch (e) { alert("Error al guardar."); }
+  }
+  function agregar() {
+    const id = extractYTId(nuevoUrl);
+    if (!id) { alert("Ese enlace no es un Short/video de YouTube válido."); return; }
+    if (lista.some((u) => extractYTId(u) === id)) { alert("Ese Short ya está en la lista."); setNuevoUrl(""); return; }
+    guardarLista([...lista, nuevoUrl.trim()]);
+    setNuevoUrl("");
+  }
+  function quitar(idx) { guardarLista(lista.filter((_, i) => i !== idx)); }
+
+  if (!cargado) return null;
+  // Sin shorts y sin ser admin → no mostrar
+  if (lista.length === 0 && !isAdmin) return null;
+
+  const ids = lista.map(extractYTId).filter(Boolean);
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 18 }}>🎬</span>
+          <span style={{ fontSize: 14.5, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.01em" }}>Shorts del Coro</span>
+        </div>
+        {isAdmin && (
+          <button onClick={() => setEditing((v) => !v)} style={{ fontSize: 12, fontWeight: 700, color: C.primary, background: "none", border: "none", cursor: "pointer" }}>
+            {editing ? "Listo" : "✏️ Gestionar"}
+          </button>
+        )}
+      </div>
+
+      {/* Editor admin */}
+      {isAdmin && editing && (
+        <div style={{ background: "#f8fafc", border: `1px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <input
+              value={nuevoUrl}
+              onChange={(e) => setNuevoUrl(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") agregar(); }}
+              placeholder="Pega el enlace del Short (youtube.com/shorts/...)"
+              style={{ flex: 1, fontSize: 13, padding: "9px 12px", borderRadius: 9, border: `1px solid ${C.border}`, boxSizing: "border-box" }}
+            />
+            <button onClick={agregar} style={{ background: C.primary, color: "#fff", border: "none", borderRadius: 9, padding: "0 16px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Agregar</button>
+          </div>
+          {lista.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {lista.map((u, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: C.gray, background: "#fff", borderRadius: 8, padding: "6px 10px", border: `1px solid ${C.border}` }}>
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u}</span>
+                  <button onClick={() => quitar(i)} style={{ color: "#ef4444", background: "none", border: "none", cursor: "pointer", fontSize: 16 }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Fila deslizable de shorts verticales */}
+      {ids.length > 0 ? (
+        <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
+          {ids.map((id) => (
+            <div key={id} style={{ flexShrink: 0, width: 200, scrollSnapAlign: "start" }}>
+              <div style={{ position: "relative", width: "100%", aspectRatio: "9 / 16", borderRadius: 16, overflow: "hidden", background: "#000", boxShadow: "0 6px 18px rgba(0,0,0,0.18)" }}>
+                {activo === id ? (
+                  <iframe
+                    src={`https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1`}
+                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    title={`Short ${id}`}
+                  />
+                ) : (
+                  <button onClick={() => setActivo(id)} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none", padding: 0, cursor: "pointer", background: "#000" }}>
+                    <img src={`https://i.ytimg.com/vi/${id}/oardefault.jpg`} onError={(e) => { e.currentTarget.src = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`; }} alt="Short" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.92 }} />
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ width: 52, height: 52, borderRadius: "50%", background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(2px)" }}>
+                        <div style={{ width: 0, height: 0, borderTop: "10px solid transparent", borderBottom: "10px solid transparent", borderLeft: "16px solid white", marginLeft: 4 }} />
+                      </div>
+                    </div>
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        isAdmin && !editing && (
+          <div onClick={() => setEditing(true)} style={{ border: "2px dashed #cbd5e1", borderRadius: 16, padding: "20px", textAlign: "center", cursor: "pointer", color: "#94a3b8", fontSize: 13, fontWeight: 600, background: "#f8fafc" }}>
+            🎬 Toca para agregar Shorts del coro
+          </div>
+        )
+      )}
+    </div>
+  );
 }
 
 function VideoDestacadoWidget({ isAdmin }) {
@@ -7654,6 +7770,7 @@ function Dashboard({
         </Card>
       </div>
       <BannerWidget isAdmin={isAdmin} />
+      <ShortsWidget isAdmin={isAdmin} />
       {esCuerdaAdmin(user) && pendientes && pendientes.length > 0 && (
         <div onClick={() => setSection("solicitudes")}
           style={{ background: "linear-gradient(180deg,#fff7e6,#fff0cf)", border: "1px solid #ffd98a", borderRadius: 16, padding: "14px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 13, cursor: "pointer" }}>
