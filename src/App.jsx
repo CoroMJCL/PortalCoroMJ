@@ -12435,27 +12435,27 @@ create policy "cancionero_pautas_all" on cancionero_pautas for all using (true);
 //  ADMINISTRACIÓN
 // ══════════════════════════════════════════
 const ADMIN_TABS = [
-  { id: "integrantes", label: "👥 Integrantes" },
-  { id: "asistencia", label: "✅ Asistencia" },
-  { id: "documentos", label: "📄 Descargas Misas" },
-  { id: "material_ensayo_admin", label: "📥 Material Ensayo (Invitado)" },
-  { id: "material_coro_admin", label: "🎵 Material Coro" },
-  { id: "descargas_admin", label: "📄 Descargas (Invitado)" },
-  { id: "oraciones", label: "✦ Oraciones" },
-  { id: "noticias", label: "📢 Avisos" },
-  { id: "preguntas", label: "❓ Preguntas" },
-  { id: "links", label: "🔗 Links" },
-  { id: "biblioteca", label: "📚 Biblioteca" },
-  { id: "podcasts", label: "🎙️ Podcast" },
-  { id: "pautas", label: "🎼 Pautas Misa" },
-  { id: "galeria", label: "🖼️ Galería" },
-  { id: "comunidades", label: "⛪ Comunidades" },
-  { id: "cuentas", label: "🔐 Cuentas" },
-  { id: "historial", label: "📅 Historial Asistencia" },
-  { id: "cuenta_bancaria", label: "🏦 Cuenta Bancaria" },
-  { id: "visitas", label: "📊 Visitas" },
-  { id: "notificaciones", label: "🔔 Notificaciones" },
-  { id: "api_config", label: "🔑 Claves API" },
+  { id: "integrantes", label: "Integrantes", icon: "👥" },
+  { id: "asistencia", label: "Asistencia", icon: "✅" },
+  { id: "documentos", label: "Descargas Misas", icon: "📄" },
+  { id: "material_ensayo_admin", label: "Material Ensayo (Invitado)", icon: "📥" },
+  { id: "material_coro_admin", label: "Material Coro", icon: "🎵" },
+  { id: "descargas_admin", label: "Descargas (Invitado)", icon: "📄" },
+  { id: "oraciones", label: "Oraciones", icon: "✦" },
+  { id: "noticias", label: "Avisos", icon: "📢" },
+  { id: "preguntas", label: "Preguntas", icon: "❓" },
+  { id: "links", label: "Links", icon: "🔗" },
+  { id: "biblioteca", label: "Biblioteca", icon: "📚" },
+  { id: "podcasts", label: "Podcast", icon: "🎙️" },
+  { id: "pautas", label: "Pautas Misa", icon: "🎼" },
+  { id: "galeria", label: "Galería", icon: "🖼️" },
+  { id: "comunidades", label: "Comunidades", icon: "⛪" },
+  { id: "cuentas", label: "Cuentas", icon: "🔐" },
+  { id: "historial", label: "Historial Asistencia", icon: "📅" },
+  { id: "cuenta_bancaria", label: "Cuenta Bancaria", icon: "🏦" },
+  { id: "visitas", label: "Visitas", icon: "📊" },
+  { id: "notificaciones", label: "Notificaciones", icon: "🔔" },
+  { id: "api_config", label: "Claves API", icon: "🔑" },
 ];
 
 function AdminTab({ label, active, onClick }) {
@@ -12487,7 +12487,7 @@ function AdminTab({ label, active, onClick }) {
 
 // Pestañas del panel admin agrupadas por categoría — sin scroll horizontal
 const ADMIN_GRUPOS = [
-  { grupo: "Coro", icon: "👥", ids: ["integrantes", "asistencia", "historial", "pautas", "material_coro_admin", "comunidades"] },
+  { grupo: "Coro", icon: "👥", ids: ["integrantes", "asistencia", "historial", "material_coro_admin", "comunidades"] },
   { grupo: "Contenido", icon: "📚", ids: ["noticias", "oraciones", "preguntas", "biblioteca", "podcasts", "galeria", "links"] },
   { grupo: "Invitados", icon: "👋", ids: ["documentos", "material_ensayo_admin", "descargas_admin", "visitas"] },
   { grupo: "Sistema", icon: "⚙️", ids: ["cuentas", "cuenta_bancaria", "notificaciones", "api_config"] },
@@ -12499,27 +12499,26 @@ function AdminSideMenu({ tabs, tab, setTab, pendientes, onPick }) {
     const o = {}; ADMIN_GRUPOS.forEach((g) => (o[g.grupo] = true)); return o;
   });
   return (
-    <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      {ADMIN_GRUPOS.map((g) => {
+    <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {ADMIN_GRUPOS.map((g, gi) => {
         const exp = abierto[g.grupo];
         return (
-          <div key={g.grupo} style={{ marginBottom: 4 }}>
+          <div key={g.grupo} style={{ marginBottom: gi === ADMIN_GRUPOS.length - 1 ? 0 : 6 }}>
             <button
               onClick={() => setAbierto((p) => ({ ...p, [g.grupo]: !p[g.grupo] }))}
               style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 8,
+                width: "100%", display: "flex", alignItems: "center", gap: 7,
                 background: "transparent", border: "none", cursor: "pointer",
-                padding: "8px 10px", borderRadius: 8,
-                fontSize: 11, fontWeight: 700, color: C.gray,
-                textTransform: "uppercase", letterSpacing: "0.07em",
+                padding: "7px 10px", borderRadius: 7,
+                fontSize: 10.5, fontWeight: 700, color: "#9aa3b2",
+                textTransform: "uppercase", letterSpacing: "0.08em",
               }}
             >
-              <span style={{ fontSize: 13 }}>{g.icon}</span>
               <span style={{ flex: 1, textAlign: "left" }}>{g.grupo}</span>
-              <span style={{ fontSize: 9, transform: exp ? "rotate(90deg)" : "none", transition: "transform 0.15s", opacity: 0.6 }}>▶</span>
+              <span style={{ fontSize: 8, transform: exp ? "rotate(90deg)" : "none", transition: "transform 0.15s", opacity: 0.5 }}>▶</span>
             </button>
             {exp && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                 {g.ids.map((id) => {
                   const t = byId[id];
                   if (!t) return null;
@@ -12530,21 +12529,23 @@ function AdminSideMenu({ tabs, tab, setTab, pendientes, onPick }) {
                       key={id}
                       onClick={() => { setTab(id); onPick && onPick(); }}
                       style={{
-                        display: "flex", alignItems: "center", gap: 9,
-                        padding: "9px 12px 9px 18px", borderRadius: 9,
+                        display: "flex", alignItems: "center", gap: 10,
+                        padding: "8px 12px", borderRadius: 8,
                         border: "none", cursor: "pointer", width: "100%", textAlign: "left",
-                        fontSize: 13.5, fontWeight: active ? 600 : 500,
-                        background: active ? C.primary : "transparent",
-                        color: active ? "#fff" : C.dark,
-                        transition: "background 0.12s",
+                        fontSize: 13, fontWeight: active ? 600 : 500,
+                        background: active ? `${C.primary}0f` : "transparent",
+                        color: active ? C.primary : "#3a3f4a",
                         position: "relative",
+                        transition: "background 0.12s, color 0.12s",
                       }}
-                      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = C.bg; }}
+                      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#f4f5f7"; }}
                       onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
                     >
+                      {active && <span style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: 3, height: 18, borderRadius: 3, background: C.primary }} />}
+                      <span style={{ fontSize: 14, width: 18, textAlign: "center", opacity: active ? 1 : 0.55, filter: active ? "none" : "grayscale(0.3)" }}>{t.icon}</span>
                       <span style={{ flex: 1 }}>{t.label}</span>
                       {badge != null && (
-                        <span style={{ background: active ? "rgba(255,255,255,0.25)" : "#ef4444", color: "#fff", fontSize: 11, fontWeight: 700, borderRadius: 999, minWidth: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>
+                        <span style={{ background: "#ef4444", color: "#fff", fontSize: 10.5, fontWeight: 700, borderRadius: 999, minWidth: 17, height: 17, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>
                           {badge}
                         </span>
                       )}
@@ -20517,8 +20518,18 @@ function Admin({
   onReload,
   user,
 }) {
-  const [tab, setTab] = useState("integrantes");
+  const [tab, setTabRaw] = useState("integrantes");
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
+  const adminContentRef = useRef(null);
+  const setTab = (id) => {
+    setTabRaw(id);
+    // Mantener la vista estable: subir suavemente al inicio del contenido
+    requestAnimationFrame(() => {
+      if (adminContentRef.current) {
+        adminContentRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  };
   const pendientes = preguntas.filter((p) => !p.respuesta).length;
 
   return (
@@ -20664,7 +20675,7 @@ function Admin({
         )}
 
         {/* Columna de contenido */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div ref={adminContentRef} style={{ flex: 1, minWidth: 0, scrollMarginTop: 12 }}>
       <Card>
         {tab === "integrantes" && (
           <AdminIntegrantes members={members} onReload={onReload} />
