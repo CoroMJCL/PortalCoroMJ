@@ -12654,6 +12654,7 @@ function AdminIntegrantes({ members, onReload }) {
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({});
   const [roleLoading, setRoleLoading] = useState(null);
+  const [verIntegrante, setVerIntegrante] = useState(null);
 
   async function submit() {
     if (!form.nombre || !form.email) return;
@@ -12993,262 +12994,115 @@ function AdminIntegrantes({ members, onReload }) {
         ◎ Integrantes ({integrantes.length})
       </div>
       <div style={{ overflowX: "auto" }}>
-        <table
-          style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}
-        >
-          <thead>
-            <tr style={{ background: "rgba(0,0,0,0.025)" }}>
-              {[
-                "Integrante",
-                "Cuerda",
-                "V. Vocal",
-                "Cargo extra",
-                "Género",
-                "Cumpleaños",
-                "Estado",
-                "Acciones",
-              ].map((h) => (
-                <th
-                  key={h}
-                  style={{
-                    padding: "11px 12px",
-                    textAlign: "left",
-                    fontWeight: 700,
-                    color: C.gray,
-                    fontSize: 10.5,
-                    letterSpacing: "0.04em",
-                    textTransform: "uppercase",
-                    borderBottom: `1px solid ${C.border}`,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {integrantes.map((m) => (
-              <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                {editId === m.id ? (
-                  <>
-                    <td style={{ padding: "8px 12px", minWidth: 200 }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                        <input
-                          placeholder="Nombre"
-                          value={editData.nombre || ""}
-                          onChange={(e) =>
-                            setEditData((p) => ({ ...p, nombre: e.target.value }))
-                          }
-                          style={inputS}
-                        />
-                        <input
-                          placeholder="Email"
-                          value={editData.email || ""}
-                          onChange={(e) =>
-                            setEditData((p) => ({ ...p, email: e.target.value }))
-                          }
-                          style={{ ...inputS, fontSize: 12 }}
-                        />
-                        <input
-                          placeholder="RUT (12.345.678-9)"
-                          value={editData.rut !== undefined ? editData.rut : (m.rut || "")}
-                          onChange={(e) =>
-                            setEditData((p) => ({ ...p, rut: e.target.value }))
-                          }
-                          onBlur={(e) => { if (rutValido(e.target.value)) setEditData((p) => ({ ...p, rut: normalizarRut(e.target.value) })); }}
-                          style={{ ...inputS, fontSize: 12, borderColor: (editData.rut ?? m.rut) && !rutValido(editData.rut ?? m.rut) ? "#dc2626" : undefined }}
-                        />
-                      </div>
-                    </td>
-                    <td style={{ padding: "8px 12px" }}>
-                      <select
-                        value={editData.cuerda || "Soprano"}
-                        onChange={(e) =>
-                          setEditData((p) => ({ ...p, cuerda: e.target.value }))
-                        }
-                        style={inputS}
-                      >
-                        {["Soprano", "Contralto", "Tenor", "Bajo", "Contador/a Coro"].map((c) => (
-                          <option key={c}>{c}</option>
-                        ))}
+        {/* Lista limpia: solo nombre + cuerda. Al tocar abre popup con todos los datos */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+          {integrantes.map((m) => {
+            const mcc = CUERDAS[m.cuerda] || C.primary;
+            const fotoUrl = m.foto_url;
+            return (
+              <button
+                key={m.id}
+                onClick={() => setVerIntegrante(m)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
+                  padding: "11px 12px", border: "none", borderBottom: `1px solid ${C.border}`,
+                  background: "transparent", cursor: "pointer", transition: "background 0.12s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = C.bg)}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                <div style={{ width: 38, height: 38, borderRadius: "50%", flexShrink: 0, background: fotoUrl ? `url(${fotoUrl}) center/cover` : `linear-gradient(135deg, ${mcc}, ${mcc}bb)`, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 15 }}>
+                  {!fotoUrl && (m.nombre || "?").charAt(0).toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {m.nombre}
+                    {m.asistencia_especial && <span title="Caso especial" style={{ marginLeft: 6, fontSize: 10, color: "#6d28d9" }}>★</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: mcc, fontWeight: 500 }}>{m.cuerda}{m.cargo ? ` · ${m.cargo}` : ""}</div>
+                </div>
+                <span style={{ fontSize: 16, color: "#c7c7cc", flexShrink: 0 }}>›</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Popup con todos los datos del integrante */}
+        {verIntegrante && (() => {
+          const m = verIntegrante;
+          const mcc = CUERDAS[m.cuerda] || C.primary;
+          const editando = editId === m.id;
+          const campo = (label, valor) => (
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: `1px solid ${C.border}` }}>
+              <span style={{ fontSize: 12.5, color: C.gray, fontWeight: 500 }}>{label}</span>
+              <span style={{ fontSize: 13, color: C.dark, fontWeight: 600, textAlign: "right" }}>{valor || "—"}</span>
+            </div>
+          );
+          return (
+            <div onClick={() => { setVerIntegrante(null); setEditId(null); }} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, backdropFilter: "blur(2px)" }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, maxWidth: 460, width: "100%", maxHeight: "88vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+                {/* Encabezado */}
+                <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "22px 22px 18px", background: `linear-gradient(135deg, ${mcc}, ${mcc}cc)` }}>
+                  <div style={{ width: 56, height: 56, borderRadius: "50%", flexShrink: 0, background: m.foto_url ? `url(${m.foto_url}) center/cover` : "rgba(255,255,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 22, border: "2px solid rgba(255,255,255,0.5)" }}>
+                    {!m.foto_url && (m.nombre || "?").charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", fontFamily: "var(--font-display)", lineHeight: 1.2 }}>{m.nombre}</div>
+                    <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.9)" }}>{m.cuerda}{m.cargo ? ` · ${m.cargo}` : ""}</div>
+                  </div>
+                  <button onClick={() => { setVerIntegrante(null); setEditId(null); }} style={{ background: "rgba(255,255,255,0.25)", border: "none", color: "#fff", width: 32, height: 32, borderRadius: "50%", fontSize: 18, cursor: "pointer", flexShrink: 0 }}>×</button>
+                </div>
+
+                {/* Cuerpo */}
+                <div style={{ padding: "8px 22px 20px" }}>
+                  {editando ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 12 }}>
+                      <input placeholder="Nombre" value={editData.nombre ?? m.nombre ?? ""} onChange={(e) => setEditData((p) => ({ ...p, nombre: e.target.value }))} style={inputS} />
+                      <input placeholder="Email" value={editData.email ?? m.email ?? ""} onChange={(e) => setEditData((p) => ({ ...p, email: e.target.value }))} style={inputS} />
+                      <input placeholder="RUT (12.345.678-9)" value={editData.rut ?? m.rut ?? ""} onChange={(e) => setEditData((p) => ({ ...p, rut: e.target.value }))} onBlur={(e) => { if (rutValido(e.target.value)) setEditData((p) => ({ ...p, rut: normalizarRut(e.target.value) })); }} style={inputS} />
+                      <select value={editData.cuerda ?? m.cuerda ?? "Soprano"} onChange={(e) => setEditData((p) => ({ ...p, cuerda: e.target.value }))} style={inputS}>
+                        {["Soprano","Contralto","Tenor","Bajo","Admin","Contador/a Coro"].map((c) => <option key={c} value={c}>{c}</option>)}
                       </select>
-                    </td>
-                    <td style={{ padding: "8px 12px" }}>
-                      {["Admin", "Contador/a Coro"].includes(editData.cuerda || m.cuerda) ? (
-                        <select
-                          value={editData.cuerda_vocal !== undefined ? editData.cuerda_vocal : (m.cuerda_vocal || "")}
-                          onChange={(e) =>
-                            setEditData((p) => ({ ...p, cuerda_vocal: e.target.value }))
-                          }
-                          style={inputS}
-                        >
-                          <option value="">—</option>
-                          {["Soprano", "Contralto", "Tenor", "Bajo"].map((c) => (
-                            <option key={c}>{c}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span style={{ color: C.border, fontSize: 12 }}>—</span>
-                      )}
-                    </td>
-                    <td style={{ padding: "8px 12px" }}>
-                      <input
-                        placeholder="Ej: Redes Sociales"
-                        value={editData.cargo !== undefined ? editData.cargo : (m.cargo || "")}
-                        onChange={(e) =>
-                          setEditData((p) => ({ ...p, cargo: e.target.value }))
-                        }
-                        style={inputS}
-                      />
-                    </td>
-                    <td style={{ padding: "8px 12px" }}>
-                      <select
-                        value={editData.genero !== undefined ? editData.genero : (m.genero || "")}
-                        onChange={(e) =>
-                          setEditData((p) => ({ ...p, genero: e.target.value }))
-                        }
-                        style={inputS}
-                      >
-                        <option value="">—</option>
-                        <option value="M">M</option>
-                        <option value="F">F</option>
+                      <input placeholder="Cargo extra (ej: Redes Sociales)" value={editData.cargo ?? m.cargo ?? ""} onChange={(e) => setEditData((p) => ({ ...p, cargo: e.target.value }))} style={inputS} />
+                      <input placeholder="Cumpleaños (DD/MM)" value={editData.cumpleanos ?? m.cumpleanos ?? ""} onChange={(e) => setEditData((p) => ({ ...p, cumpleanos: e.target.value }))} style={inputS} />
+                      <select value={editData.genero ?? m.genero ?? ""} onChange={(e) => setEditData((p) => ({ ...p, genero: e.target.value }))} style={inputS}>
+                        <option value="">Género (sin especificar)</option>
+                        <option value="F">Femenino</option>
+                        <option value="M">Masculino</option>
                       </select>
-                    </td>
-                    <td style={{ padding: "8px 12px" }}>
-                      <input
-                        value={editData.cumpleanos || ""}
-                        onChange={(e) =>
-                          setEditData((p) => ({
-                            ...p,
-                            cumpleanos: e.target.value,
-                          }))
-                        }
-                        style={inputS}
-                      />
-                    </td>
-                    <td style={{ padding: "8px 12px" }}>
-                      <input
-                        type="checkbox"
-                        checked={
-                          editData.activo !== undefined
-                            ? editData.activo
-                            : m.activo
-                        }
-                        onChange={(e) =>
-                          setEditData((p) => ({
-                            ...p,
-                            activo: e.target.checked,
-                          }))
-                        }
-                      />
-                    </td>
-                    <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
-                      <span style={{ display: "inline-flex", gap: 6 }}>
-                        <button
-                          onClick={() => saveEdit(m.id)}
-                          disabled={saving}
-                          style={{
-                            padding: "4px 10px",
-                            fontSize: 11,
-                            background: C.primary,
-                            color: "white",
-                            border: "none",
-                            borderRadius: 9,
-                            cursor: "pointer",
-                            fontWeight: 600,
-                          }}
-                        >
-                          ✓ Guardar
-                        </button>
-                        <button
-                          onClick={() => setEditId(null)}
-                          style={{
-                            padding: "4px 10px",
-                            fontSize: 11,
-                            background: C.light,
-                            color: C.gray,
-                            border: `1px solid ${C.border}`,
-                            borderRadius: 9,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Cancelar
-                        </button>
-                      </span>
-                    </td>
-                  </>
-                ) : (
-                  <>
-                    <td style={{ padding: "12px 12px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                        <div style={{ width: 38, height: 38, borderRadius: "50%", flexShrink: 0, background: `linear-gradient(145deg, ${CUERDAS[m.cuerda] || C.gray}, ${CUERDAS[m.cuerda] || C.gray}cc)`, border: "2px solid white", boxShadow: `0 2px 7px ${CUERDAS[m.cuerda] || C.gray}40`, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 13, fontWeight: 700, overflow: "hidden" }}>
-                          {m.foto_url ? <img src={m.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (m.nombre || "?").charAt(0).toUpperCase()}
-                        </div>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, color: C.dark, fontSize: 13, letterSpacing: "-0.01em", lineHeight: 1.25 }}>{m.nombre}</div>
-                          <div style={{ fontSize: 11, color: C.gray, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>{m.email}</div>
-                        </div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                        <button onClick={async () => { await saveEdit(m.id); setVerIntegrante(null); }} disabled={saving} style={{ flex: 1, background: C.primary, color: "#fff", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{saving ? "Guardando..." : "Guardar cambios"}</button>
+                        <button onClick={() => setEditId(null)} style={{ background: "#fff", color: C.gray, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 16px", fontSize: 13, cursor: "pointer" }}>Cancelar</button>
                       </div>
-                    </td>
-                    <td style={{ padding: "12px 12px" }}>
-                      <Chip
-                        label={rolLabel(m.cuerda, m.genero)}
-                        color={CUERDAS[m.cuerda] || C.gray}
-                      />
-                    </td>
-                    <td style={{ padding: "12px 12px", color: C.gray, fontSize: 12 }}>
-                      {m.cuerda_vocal || <span style={{ color: C.border }}>—</span>}
-                    </td>
-                    <td style={{ padding: "12px 12px", color: C.gray, fontSize: 12 }}>
-                      {m.cargo || <span style={{ color: C.border }}>—</span>}
-                    </td>
-                    <td style={{ padding: "12px 12px", color: C.gray, fontSize: 12 }}>
-                      {m.genero === "F" ? "F" : m.genero === "M" ? "M" : <span style={{ color: C.border }}>—</span>}
-                    </td>
-                    <td style={{ padding: "12px 12px", color: C.gray, fontSize: 12, whiteSpace: "nowrap" }}>
-                      {m.cumpleanos || "—"}
-                    </td>
-                    <td style={{ padding: "12px 12px" }}>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: m.activo ? "#1a8a4a" : C.gray, background: m.activo ? "rgba(26,138,74,0.10)" : "rgba(0,0,0,0.04)", borderRadius: 20, padding: "3px 9px" }}>
-                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: m.activo ? "#1a8a4a" : "#c0c0c6" }} />
-                        {m.activo ? "Activo" : "Inactivo"}
-                      </span>
-                    </td>
-                    <td style={{ padding: "12px 12px", whiteSpace: "nowrap" }}>
-                      <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                        <button
-                          onClick={() => { setEditId(m.id); setEditData({ ...m }); }}
-                          title="Editar"
-                          style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, background: C.primaryLight, color: C.primaryDark, border: "none", borderRadius: 10, cursor: "pointer", transition: "all 0.15s" }}
-                          onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
-                          onMouseLeave={e => e.currentTarget.style.transform = "none"}
-                        >✏️</button>
-                        <button
-                          onClick={() => toggleAdmin(m)}
-                          disabled={roleLoading === m.id}
-                          title="Hacer Admin"
-                          style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, background: "#fdf8ee", color: C.gold, border: `1px solid ${C.gold}45`, borderRadius: 10, cursor: "pointer", transition: "all 0.15s" }}
-                          onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
-                          onMouseLeave={e => e.currentTarget.style.transform = "none"}
-                        >{roleLoading === m.id ? "…" : "⚙️"}</button>
-                        <button
-                          onClick={() => toggleEspecial(m)}
-                          disabled={roleLoading === m.id}
-                          title={m.asistencia_especial ? "Quitar caso especial de asistencia" : "Marcar como caso especial (siempre presente: vive fuera de la ciudad / presta otros servicios pastorales)"}
-                          style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, background: m.asistencia_especial ? "#ede9fe" : "#f8f8f8", color: m.asistencia_especial ? "#6d28d9" : "#9ca3af", border: `1px solid ${m.asistencia_especial ? "#6d28d9" : "#d1d5db"}45`, borderRadius: 10, cursor: "pointer", transition: "all 0.15s" }}
-                          onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
-                          onMouseLeave={e => e.currentTarget.style.transform = "none"}
-                        >★</button>
-                        <ConfirmBtn onConfirm={() => del(m.id)} compact />
-                      </span>
-                    </td>
-                  </>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    </div>
+                  ) : (
+                    <>
+                      {campo("Email", m.email)}
+                      {campo("RUT", m.rut ? formatearRut(m.rut) : "Sin registrar")}
+                      {campo("Cuerda", m.cuerda)}
+                      {campo("Voz vocal", m.voz_vocal)}
+                      {campo("Cargo extra", m.cargo)}
+                      {campo("Género", m.genero === "F" ? "Femenino" : m.genero === "M" ? "Masculino" : "—")}
+                      {campo("Cumpleaños", m.cumpleanos)}
+                      {campo("Asistencia especial", m.asistencia_especial ? "Sí ★" : "No")}
+                      {campo("Teléfono", m.telefono)}
+
+                      {/* Acciones */}
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 18 }}>
+                        <button onClick={() => { setEditId(m.id); setEditData({}); }} style={{ flex: 1, minWidth: 130, background: C.primary, color: "#fff", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✏️ Editar datos</button>
+                        <button onClick={() => toggleEspecial(m)} disabled={roleLoading === m.id} style={{ background: m.asistencia_especial ? "#ede9fe" : "#f4f5f7", color: m.asistencia_especial ? "#6d28d9" : C.gray, border: "none", borderRadius: 10, padding: "10px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }} title="Caso especial de asistencia">★ Especial</button>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                        <button onClick={() => toggleAdmin(m)} disabled={roleLoading === m.id} style={{ flex: 1, minWidth: 130, background: "#fdf8ee", color: C.gold, border: `1px solid ${C.gold}45`, borderRadius: 10, padding: "10px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>{m.cuerda === "Admin" ? "↓ Quitar Admin" : "⚙️ Hacer Admin"}</button>
+                        <button onClick={async () => { if (confirm(`¿Eliminar a ${m.nombre}? Esta acción no se puede deshacer.`)) { await del(m.id); setVerIntegrante(null); } }} style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>🗑 Eliminar</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -18933,9 +18787,13 @@ function ReaccionesBar({ recoId, userId }) {
 
 function ReconocemeWidget({ reconocimientos, members, setSection, user }) {
   const _ahora = Date.now();
+  const _hoy = new Date();
   const recientes = (reconocimientos || [])
-    .filter(r => (_ahora - new Date(r.created_at).getTime()) < 14 * 24 * 60 * 60 * 1000)
-    .slice(0, 12);
+    .filter(r => {
+      const f = new Date(r.created_at);
+      return f.getMonth() === _hoy.getMonth() && f.getFullYear() === _hoy.getFullYear();
+    })
+    .slice(0, 15);
   const total = (reconocimientos || []).length;
   const getAvatar = (id) => (members || []).find(m => m.id === id);
   const ini = (n) => (n || "?").charAt(0).toUpperCase();
