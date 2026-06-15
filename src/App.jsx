@@ -674,6 +674,7 @@ const G = `
   }
 
   /* ── Banner destacado (premium, responsive) ── */
+  .admin-menu-btn { display: none; }
   .mj-banner {
     position: relative;
     border-radius: 20px;
@@ -731,6 +732,8 @@ const G = `
     .mj-banner-title { font-size: 19px; max-width: 100%; }
     .mj-banner-meta { max-width: 100%; gap: 7px 16px; }
     .mj-banner-eyebrow { position: absolute; top: 12px; left: 12px; z-index: 2; }
+    .admin-layout { flex-direction: column !important; }
+    .admin-menu-btn { display: flex !important; }
   }
 `;
 
@@ -12367,65 +12370,76 @@ function AdminTab({ label, active, onClick }) {
 
 // Pestañas del panel admin agrupadas por categoría — sin scroll horizontal
 const ADMIN_GRUPOS = [
-  { grupo: "Coro", ids: ["integrantes", "asistencia", "historial", "pautas", "material_coro_admin", "comunidades"] },
-  { grupo: "Contenido", ids: ["noticias", "oraciones", "preguntas", "biblioteca", "podcasts", "galeria", "links"] },
-  { grupo: "Invitados", ids: ["documentos", "material_ensayo_admin", "descargas_admin", "visitas"] },
-  { grupo: "Sistema", ids: ["cuentas", "cuenta_bancaria", "notificaciones", "api_config"] },
+  { grupo: "Coro", icon: "👥", ids: ["integrantes", "asistencia", "historial", "pautas", "material_coro_admin", "comunidades"] },
+  { grupo: "Contenido", icon: "📚", ids: ["noticias", "oraciones", "preguntas", "biblioteca", "podcasts", "galeria", "links"] },
+  { grupo: "Invitados", icon: "👋", ids: ["documentos", "material_ensayo_admin", "descargas_admin", "visitas"] },
+  { grupo: "Sistema", icon: "⚙️", ids: ["cuentas", "cuenta_bancaria", "notificaciones", "api_config"] },
 ];
 
-function AdminTabsGrid({ tabs, tab, setTab, pendientes }) {
+function AdminSideMenu({ tabs, tab, setTab, pendientes, onPick }) {
   const byId = Object.fromEntries(tabs.map((t) => [t.id, t]));
+  const [abierto, setAbierto] = useState(() => {
+    const o = {}; ADMIN_GRUPOS.forEach((g) => (o[g.grupo] = true)); return o;
+  });
   return (
-    <div style={{ marginBottom: 20, background: "var(--surface, #fff)", border: `1px solid ${C.border}`, borderRadius: 18, padding: "18px 20px", boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {ADMIN_GRUPOS.map((g, gi) => (
-          <div key={g.grupo} style={{ paddingTop: gi === 0 ? 0 : 14, borderTop: gi === 0 ? "none" : `1px solid ${C.border}` }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: C.gray, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 10 }}>
-              {g.grupo}
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {g.ids.map((id) => {
-                const t = byId[id];
-                if (!t) return null;
-                const active = tab === id;
-                const badge = id === "preguntas" && pendientes > 0 ? pendientes : null;
-                return (
-                  <button
-                    key={id}
-                    onClick={() => setTab(id)}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 7,
-                      padding: "9px 15px",
-                      borderRadius: 11,
-                      border: active ? `1px solid ${C.primary}` : `1px solid ${C.border}`,
-                      cursor: "pointer",
-                      fontSize: 13,
-                      fontWeight: active ? 600 : 500,
-                      background: active ? C.primary : "transparent",
-                      color: active ? "#fff" : C.dark,
-                      transition: "all 0.15s ease",
-                      whiteSpace: "nowrap",
-                      WebkitTapHighlightColor: "transparent",
-                    }}
-                    onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = C.bg; e.currentTarget.style.borderColor = `${C.primary}55`; } }}
-                    onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = C.border; } }}
-                  >
-                    {t.label}
-                    {badge != null && (
-                      <span style={{ background: active ? "rgba(255,255,255,0.25)" : "#ef4444", color: "#fff", fontSize: 11, fontWeight: 700, borderRadius: 999, minWidth: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>
-                        {badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+    <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {ADMIN_GRUPOS.map((g) => {
+        const exp = abierto[g.grupo];
+        return (
+          <div key={g.grupo} style={{ marginBottom: 4 }}>
+            <button
+              onClick={() => setAbierto((p) => ({ ...p, [g.grupo]: !p[g.grupo] }))}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 8,
+                background: "transparent", border: "none", cursor: "pointer",
+                padding: "8px 10px", borderRadius: 8,
+                fontSize: 11, fontWeight: 700, color: C.gray,
+                textTransform: "uppercase", letterSpacing: "0.07em",
+              }}
+            >
+              <span style={{ fontSize: 13 }}>{g.icon}</span>
+              <span style={{ flex: 1, textAlign: "left" }}>{g.grupo}</span>
+              <span style={{ fontSize: 9, transform: exp ? "rotate(90deg)" : "none", transition: "transform 0.15s", opacity: 0.6 }}>▶</span>
+            </button>
+            {exp && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2 }}>
+                {g.ids.map((id) => {
+                  const t = byId[id];
+                  if (!t) return null;
+                  const active = tab === id;
+                  const badge = id === "preguntas" && pendientes > 0 ? pendientes : null;
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => { setTab(id); onPick && onPick(); }}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 9,
+                        padding: "9px 12px 9px 18px", borderRadius: 9,
+                        border: "none", cursor: "pointer", width: "100%", textAlign: "left",
+                        fontSize: 13.5, fontWeight: active ? 600 : 500,
+                        background: active ? C.primary : "transparent",
+                        color: active ? "#fff" : C.dark,
+                        transition: "background 0.12s",
+                        position: "relative",
+                      }}
+                      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = C.bg; }}
+                      onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                    >
+                      <span style={{ flex: 1 }}>{t.label}</span>
+                      {badge != null && (
+                        <span style={{ background: active ? "rgba(255,255,255,0.25)" : "#ef4444", color: "#fff", fontSize: 11, fontWeight: 700, borderRadius: 999, minWidth: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>
+                          {badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        ))}
-      </div>
-    </div>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -20387,6 +20401,7 @@ function Admin({
   user,
 }) {
   const [tab, setTab] = useState("integrantes");
+  const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
   const pendientes = preguntas.filter((p) => !p.respuesta).length;
 
   return (
@@ -20492,8 +20507,47 @@ function Admin({
 
       <PushTestBar />
 
-      <AdminTabsGrid tabs={ADMIN_TABS} tab={tab} setTab={setTab} pendientes={pendientes} />
+      {/* Etiqueta del tab activo (label legible para encabezado móvil) */}
+      <div className="admin-layout" style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
+        {/* Menú lateral (desktop) */}
+        <aside className="admin-sidebar hide-mobile" style={{
+          width: 230, flexShrink: 0, position: "sticky", top: 12,
+          background: "var(--surface,#fff)", border: `1px solid ${C.border}`,
+          borderRadius: 16, padding: "12px 10px", boxShadow: "0 1px 3px rgba(16,24,40,0.04)",
+        }}>
+          <AdminSideMenu tabs={ADMIN_TABS} tab={tab} setTab={setTab} pendientes={pendientes} />
+        </aside>
 
+        {/* Botón de menú (solo móvil) */}
+        <button
+          className="admin-menu-btn"
+          onClick={() => setMenuMovilAbierto(true)}
+          style={{
+            alignItems: "center", gap: 10, width: "100%",
+            background: C.primary, color: "#fff", border: "none", borderRadius: 12,
+            padding: "13px 16px", fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 14,
+          }}
+        >
+          <span style={{ fontSize: 17 }}>☰</span>
+          <span>{(ADMIN_TABS.find((t) => t.id === tab) || {}).label || "Secciones"}</span>
+          <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.8 }}>Cambiar ▾</span>
+        </button>
+
+        {/* Menú lateral móvil (drawer) */}
+        {menuMovilAbierto && (
+          <div onClick={() => setMenuMovilAbierto(false)} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex" }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "82%", maxWidth: 320, background: "#fff", height: "100%", overflowY: "auto", padding: "16px 12px", boxShadow: "4px 0 24px rgba(0,0,0,0.2)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px 12px", borderBottom: `1px solid ${C.border}`, marginBottom: 10 }}>
+                <span style={{ fontSize: 15, fontWeight: 800, color: C.dark, fontFamily: "var(--font-display)" }}>Secciones</span>
+                <button onClick={() => setMenuMovilAbierto(false)} style={{ background: "none", border: "none", fontSize: 22, color: C.gray, cursor: "pointer", lineHeight: 1 }}>×</button>
+              </div>
+              <AdminSideMenu tabs={ADMIN_TABS} tab={tab} setTab={setTab} pendientes={pendientes} onPick={() => setMenuMovilAbierto(false)} />
+            </div>
+          </div>
+        )}
+
+        {/* Columna de contenido */}
+        <div style={{ flex: 1, minWidth: 0 }}>
       <Card>
         {tab === "integrantes" && (
           <AdminIntegrantes members={members} onReload={onReload} />
@@ -20557,6 +20611,8 @@ function Admin({
         {tab === "notificaciones" && <AdminNotificaciones />}
         {tab === "api_config" && <AdminApiConfig />}
       </Card>
+        </div>
+      </div>
 
       <SqlSetupBlock />
     </div>
