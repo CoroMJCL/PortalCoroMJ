@@ -672,6 +672,66 @@ const G = `
     .show-mobile { display: none !important; }
     .bottom-nav { display: none !important; }
   }
+
+  /* ── Banner destacado (premium, responsive) ── */
+  .mj-banner {
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(8,12,30,0.18);
+    background: #0c0c14;
+  }
+  .mj-banner-img { width: 100%; height: 260px; object-fit: cover; display: block; }
+  .mj-banner-scrim {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, rgba(8,10,24,0.86) 0%, rgba(8,10,24,0.55) 42%, rgba(8,10,24,0.12) 70%, transparent 100%);
+    pointer-events: none;
+  }
+  .mj-banner-topline { position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, #fbbf24, #f59e0b, #fbbf24, transparent); }
+  .mj-banner-body {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 22px 26px; gap: 12px; pointer-events: none;
+  }
+  .mj-banner-eyebrow {
+    align-self: flex-start;
+    display: inline-flex; align-items: center; gap: 7px;
+    background: linear-gradient(135deg, #b45309, #ea9213);
+    border-radius: 999px; padding: 5px 14px;
+    box-shadow: 0 4px 14px rgba(217,119,6,0.4);
+  }
+  .mj-banner-eyebrow span {
+    font-size: 10.5px; font-weight: 800; color: #fff8ec;
+    letter-spacing: 0.14em; text-transform: uppercase; font-family: var(--font-display);
+  }
+  .mj-banner-title {
+    font-family: var(--font-display); font-weight: 800; color: #fff;
+    font-size: 26px; line-height: 1.15; letter-spacing: -0.01em;
+    text-shadow: 0 2px 16px rgba(0,0,0,0.6);
+    max-width: 62%;
+  }
+  .mj-banner-meta { display: flex; flex-wrap: wrap; gap: 8px 20px; max-width: 62%; }
+  .mj-banner-meta-item { display: inline-flex; align-items: center; gap: 7px; }
+  .mj-banner-meta-item span.ico { font-size: 13px; opacity: 0.85; }
+  .mj-banner-meta-item span.txt {
+    font-size: 13.5px; font-weight: 600; color: #ffeccb;
+    text-shadow: 0 1px 8px rgba(0,0,0,0.55);
+  }
+
+  @media (max-width: 768px) {
+    /* En móvil: imagen arriba, texto en panel sólido debajo (sin montarse) */
+    .mj-banner { background: linear-gradient(160deg, #14182e, #0c0e1c); }
+    .mj-banner-img { height: 180px; }
+    .mj-banner-scrim { display: none; }
+    .mj-banner-body {
+      position: static; padding: 16px 18px 18px; gap: 10px;
+      background: linear-gradient(160deg, #161a30, #0e1020);
+    }
+    .mj-banner-title { font-size: 19px; max-width: 100%; }
+    .mj-banner-meta { max-width: 100%; gap: 7px 16px; }
+    .mj-banner-eyebrow { position: absolute; top: 12px; left: 12px; z-index: 2; }
+  }
 `;
 
 const NAV = [
@@ -6925,47 +6985,26 @@ function BannerWidget({ isAdmin }) {
   return (
     <div style={{ marginBottom: 16 }}>
       {url && (
-        <div style={{ position: "relative", borderRadius: 22, overflow: "hidden", boxShadow: "0 16px 44px rgba(0,0,0,0.22)", background: "#0c0c14" }}>
-          <img src={url} alt="Banner" style={{ width: "100%", maxHeight: 300, objectFit: "cover", display: "block", filter: "brightness(0.9)" }} />
-          {/* Degradado inferior */}
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: hasMeta ? "70%" : "0", background: "linear-gradient(to top, rgba(8,8,20,0.92) 0%, rgba(8,8,20,0.45) 55%, transparent 100%)", pointerEvents: "none" }} />
-          {/* Línea superior dorada */}
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "linear-gradient(90deg,transparent,#fbbf24,#f59e0b,#fbbf24,transparent)" }} />
-          {/* Etiqueta */}
-          {meta.etiqueta && (
-            <div style={{ position: "absolute", top: 16, left: 18, background: "linear-gradient(135deg,#92400e,#d97706)", borderRadius: 20, padding: "4px 14px", display: "flex", alignItems: "center", gap: 6, boxShadow: "0 2px 12px rgba(217,119,6,0.45)" }}>
-              <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fef3c7" }} />
-              <span style={{ fontSize: 10, fontWeight: 800, color: "#fef3c7", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-display)" }}>{meta.etiqueta}</span>
-            </div>
-          )}
-          {/* Texto inferior */}
-          {hasMeta && (
-            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "20px 22px 22px", pointerEvents: "none" }}>
-              {meta.titulo && (
-                <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 800, color: "white", lineHeight: 1.2, marginBottom: 8, textShadow: "0 2px 12px rgba(0,0,0,0.7)" }}>{meta.titulo}</div>
-              )}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px" }}>
-                {meta.fecha && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 13, opacity: 0.8 }}>📅</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "#fef3c7", textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>{meta.fecha}</span>
-                  </div>
-                )}
-                {meta.hora && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 13, opacity: 0.8 }}>🕐</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "#fef3c7", textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>{meta.hora}</span>
-                  </div>
-                )}
-                {meta.lugar && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 13, opacity: 0.8 }}>📍</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "#fef3c7", textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>{meta.lugar}</span>
-                  </div>
-                )}
+        <div className="mj-banner">
+          <img className="mj-banner-img" src={url} alt={meta.titulo || "Banner"} />
+          <div className="mj-banner-scrim" />
+          <div className="mj-banner-topline" />
+          <div className="mj-banner-body">
+            {meta.etiqueta && (
+              <div className="mj-banner-eyebrow">
+                <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fff8ec" }} />
+                <span>{meta.etiqueta}</span>
               </div>
-            </div>
-          )}
+            )}
+            {meta.titulo && <div className="mj-banner-title">{meta.titulo}</div>}
+            {(meta.fecha || meta.hora || meta.lugar) && (
+              <div className="mj-banner-meta">
+                {meta.fecha && <div className="mj-banner-meta-item"><span className="ico">📅</span><span className="txt">{meta.fecha}</span></div>}
+                {meta.hora && <div className="mj-banner-meta-item"><span className="ico">🕐</span><span className="txt">{meta.hora}</span></div>}
+                {meta.lugar && <div className="mj-banner-meta-item"><span className="ico">📍</span><span className="txt">{meta.lugar}</span></div>}
+              </div>
+            )}
+          </div>
         </div>
       )}
       {isAdmin && (
@@ -12328,53 +12367,64 @@ function AdminTab({ label, active, onClick }) {
 
 // Pestañas del panel admin agrupadas por categoría — sin scroll horizontal
 const ADMIN_GRUPOS = [
-  { grupo: "Coro", color: "#1a6fb5", ids: ["integrantes", "asistencia", "historial", "pautas", "material_coro_admin", "comunidades"] },
-  { grupo: "Contenido", color: "#7c3aed", ids: ["noticias", "oraciones", "preguntas", "biblioteca", "podcasts", "galeria", "links"] },
-  { grupo: "Invitados", color: "#0891b2", ids: ["documentos", "material_ensayo_admin", "descargas_admin", "visitas"] },
-  { grupo: "Sistema", color: "#64748b", ids: ["cuentas", "cuenta_bancaria", "notificaciones", "api_config"] },
+  { grupo: "Coro", ids: ["integrantes", "asistencia", "historial", "pautas", "material_coro_admin", "comunidades"] },
+  { grupo: "Contenido", ids: ["noticias", "oraciones", "preguntas", "biblioteca", "podcasts", "galeria", "links"] },
+  { grupo: "Invitados", ids: ["documentos", "material_ensayo_admin", "descargas_admin", "visitas"] },
+  { grupo: "Sistema", ids: ["cuentas", "cuenta_bancaria", "notificaciones", "api_config"] },
 ];
 
 function AdminTabsGrid({ tabs, tab, setTab, pendientes }) {
   const byId = Object.fromEntries(tabs.map((t) => [t.id, t]));
   return (
-    <div style={{ marginBottom: 18, display: "flex", flexDirection: "column", gap: 12 }}>
-      {ADMIN_GRUPOS.map((g) => (
-        <div key={g.grupo}>
-          <div style={{ fontSize: 10.5, fontWeight: 800, color: g.color, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 7, paddingLeft: 2 }}>
-            {g.grupo}
+    <div style={{ marginBottom: 20, background: "var(--surface, #fff)", border: `1px solid ${C.border}`, borderRadius: 18, padding: "18px 20px", boxShadow: "0 1px 3px rgba(16,24,40,0.04)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {ADMIN_GRUPOS.map((g, gi) => (
+          <div key={g.grupo} style={{ paddingTop: gi === 0 ? 0 : 14, borderTop: gi === 0 ? "none" : `1px solid ${C.border}` }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.gray, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 10 }}>
+              {g.grupo}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {g.ids.map((id) => {
+                const t = byId[id];
+                if (!t) return null;
+                const active = tab === id;
+                const badge = id === "preguntas" && pendientes > 0 ? pendientes : null;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setTab(id)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 7,
+                      padding: "9px 15px",
+                      borderRadius: 11,
+                      border: active ? `1px solid ${C.primary}` : `1px solid ${C.border}`,
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontWeight: active ? 600 : 500,
+                      background: active ? C.primary : "transparent",
+                      color: active ? "#fff" : C.dark,
+                      transition: "all 0.15s ease",
+                      whiteSpace: "nowrap",
+                      WebkitTapHighlightColor: "transparent",
+                    }}
+                    onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = C.bg; e.currentTarget.style.borderColor = `${C.primary}55`; } }}
+                    onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = C.border; } }}
+                  >
+                    {t.label}
+                    {badge != null && (
+                      <span style={{ background: active ? "rgba(255,255,255,0.25)" : "#ef4444", color: "#fff", fontSize: 11, fontWeight: 700, borderRadius: 999, minWidth: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>
+                        {badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-            {g.ids.map((id) => {
-              const t = byId[id];
-              if (!t) return null;
-              const active = tab === id;
-              const extra = id === "preguntas" && pendientes > 0 ? ` (${pendientes})` : "";
-              return (
-                <button
-                  key={id}
-                  onClick={() => setTab(id)}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: 12,
-                    border: active ? "none" : `1px solid ${g.color}22`,
-                    cursor: "pointer",
-                    fontSize: 12.5,
-                    fontWeight: active ? 700 : 500,
-                    background: active ? g.color : `${g.color}0d`,
-                    color: active ? "white" : g.color,
-                    boxShadow: active ? `0 2px 10px ${g.color}40` : "none",
-                    transition: "all 0.15s",
-                    whiteSpace: "nowrap",
-                    WebkitTapHighlightColor: "transparent",
-                  }}
-                >
-                  {t.label}{extra}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -15840,6 +15890,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const [msg, setMsg] = useState("");
   const [notifStatus, setNotifStatus] = useState("");
   const [subiendoGuion, setSubiendoGuion] = useState(false);
+  const [visorGuion, setVisorGuion] = useState(null); // URL del guion a mostrar en el visor
 
   async function subirGuion(e) {
     const file = e.target.files && e.target.files[0];
@@ -16770,6 +16821,36 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     );
     return (
       <div style={{ maxWidth: 1100 }}>
+        {/* Visor de guion (Google Drive) */}
+        {visorGuion && (
+          <div
+            onClick={() => setVisorGuion(null)}
+            style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(0,0,0,0.85)", display: "flex", flexDirection: "column", padding: 0 }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "#111", flexShrink: 0 }}>
+              <span style={{ color: "white", fontSize: 14, fontWeight: 600 }}>📖 Guion de la misa</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <a
+                  href={visorGuion}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ color: "white", fontSize: 13, background: "rgba(255,255,255,0.15)", borderRadius: 8, padding: "6px 12px", textDecoration: "none" }}
+                >Abrir aparte</a>
+                <button
+                  onClick={() => setVisorGuion(null)}
+                  style={{ color: "white", fontSize: 20, background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, width: 36, height: 32, cursor: "pointer" }}
+                >×</button>
+              </div>
+            </div>
+            <iframe
+              onClick={(e) => e.stopPropagation()}
+              src={`https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(visorGuion)}`}
+              style={{ flex: 1, width: "100%", border: "none", background: "white" }}
+              title="Guion de la misa"
+            />
+          </div>
+        )}
         <div
           style={{
             display: "flex",
@@ -16986,10 +17067,8 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   </div>
                 )}
                 {selected.guion_url && (
-                  <a
-                    href={selected.guion_url}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    onClick={() => setVisorGuion(selected.guion_url)}
                     style={{
                       marginTop: 10,
                       display: "inline-flex",
@@ -17001,11 +17080,12 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       background: C.primary,
                       borderRadius: 10,
                       padding: "9px 16px",
-                      textDecoration: "none",
+                      border: "none",
+                      cursor: "pointer",
                     }}
                   >
                     📖 Ver guion de la misa
-                  </a>
+                  </button>
                 )}
               </div>
               {selected.id &&
@@ -21471,13 +21551,32 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
         </div>
       </div>
 
-      {/* Stats del mes */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 12, marginBottom: 20 }}>
+      {/* Total acumulado — cifra principal de transparencia */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap",
+        background: `linear-gradient(135deg, ${C.primary}, ${C.primaryDark || C.primary})`,
+        borderRadius: 18, padding: "20px 24px", marginBottom: 14,
+        boxShadow: `0 8px 26px ${C.primary}38`,
+      }}>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+            🏦 Total recaudado del coro
+          </div>
+          <div style={{ fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 800, color: "#fff", lineHeight: 1 }}>
+            {finFmtCLP(totalRecaudadoGlobal)}
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", textAlign: "right", lineHeight: 1.5 }}>
+          Suma de todas las cuotas<br />de todos los meses
+        </div>
+      </div>
+
+      {/* Stats del mes seleccionado */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 20 }}>
         <StatCard icon="👥" label="En sistema" value={miembrosActivos.length} color="#3b82f6" />
         <StatCard icon="✅" label="Pagaron este mes" value={pagaron.size} color={C.primary} sub={`${pctPago}%`} />
         <StatCard icon="⚠️" label="Morosos" value={mesVencido ? miembrosActivos.length - pagaron.size : "—"} color="#ef4444" />
         <StatCard icon="💰" label="Recaudado del mes" value={finFmtCLP(totalRecaudado)} color="#2d7dd2" sub={`de ${finFmtCLP(totalEsperado)}`} />
-        <StatCard icon="🏦" label="Total recaudado (todos los meses)" value={finFmtCLP(totalRecaudadoGlobal)} color="#16a34a" sub="cuotas de todos los meses" />
       </div>
 
       {/* Barra de progreso */}
