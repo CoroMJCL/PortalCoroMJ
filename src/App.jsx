@@ -6856,93 +6856,6 @@ function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
   );
 }
 
-function BannerWidget({ isAdmin }) {
-  const [url, setUrl] = useState("");
-  const [link, setLink] = useState("");
-  const [editing, setEditing] = useState(false);
-  const [subiendo, setSubiendo] = useState(false);
-  useEffect(() => {
-    getConfig("banner_inicio_url").then((v) => setUrl(v || "")).catch(() => {});
-    getConfig("banner_inicio_link").then((v) => setLink(v || "")).catch(() => {});
-  }, []);
-
-  async function subirImagen(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    setSubiendo(true);
-    try {
-      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      const path = `banners/banner_${Date.now()}.${ext}`;
-      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
-        method: "POST",
-        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": file.type || "image/jpeg", "x-upsert": "true" },
-        body: file,
-      });
-      if (!res.ok) throw new Error("subida falló");
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/publico/${path}`;
-      setUrl(publicUrl);
-    } catch (er) { alert("No se pudo subir la imagen. Intenta de nuevo."); }
-    setSubiendo(false);
-    if (e.target) e.target.value = "";
-  }
-
-  async function guardar() {
-    try {
-      await setConfig("banner_inicio_url", url);
-      await setConfig("banner_inicio_link", link);
-      setEditing(false);
-    } catch (e) { alert("Error al guardar."); }
-  }
-
-  async function quitar() {
-    setUrl(""); setLink("");
-    try { await setConfig("banner_inicio_url", ""); await setConfig("banner_inicio_link", ""); } catch (e) {}
-    setEditing(false);
-  }
-
-  // Si no hay banner y no es admin, no mostrar nada
-  if (!url && !isAdmin) return null;
-  if (!url && isAdmin && !editing) {
-    return (
-      <div onClick={() => setEditing(true)} style={{ marginBottom: 16, border: "2px dashed #cbd5e1", borderRadius: 16, padding: "18px", textAlign: "center", cursor: "pointer", color: "#94a3b8", fontSize: 13, fontWeight: 600, background: "#f8fafc" }}>
-        🖼️ Toca para agregar un banner al inicio
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ marginBottom: 16 }}>
-      {url && (
-        link && !editing ? (
-          <a href={link} target="_blank" rel="noreferrer" style={{ display: "block" }}>
-            <img src={url} alt="Banner" style={{ width: "100%", borderRadius: 16, display: "block", boxShadow: "0 6px 18px rgba(0,0,0,0.10)" }} />
-          </a>
-        ) : (
-          <img src={url} alt="Banner" style={{ width: "100%", borderRadius: 16, display: "block", boxShadow: "0 6px 18px rgba(0,0,0,0.10)" }} />
-        )
-      )}
-      {isAdmin && (
-        editing ? (
-          <div style={{ marginTop: 10, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 8 }}>Banner del inicio</div>
-            <input type="file" accept="image/*" disabled={subiendo} onChange={subirImagen} style={{ fontSize: 13, marginBottom: 10, display: "block" }} />
-            {subiendo && <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>Subiendo imagen…</div>}
-            {url && <img src={url} alt="preview" style={{ width: "100%", borderRadius: 10, marginBottom: 10 }} />}
-            <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="Enlace al tocar el banner (opcional)" style={{ width: "100%", fontSize: 13, padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0", boxSizing: "border-box", marginBottom: 10 }} />
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={guardar} style={{ background: "#0a5ac8", color: "white", border: "none", borderRadius: 9, padding: "8px 16px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Guardar</button>
-              <button onClick={quitar} style={{ background: "white", color: "#ef4444", border: "1px solid #fecaca", borderRadius: 9, padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Quitar banner</button>
-              <button onClick={() => setEditing(false)} style={{ background: "white", color: "#6a6a70", border: "1px solid #e2e8f0", borderRadius: 9, padding: "8px 16px", fontSize: 12.5, cursor: "pointer", marginLeft: "auto" }}>Cerrar</button>
-            </div>
-          </div>
-        ) : (
-          <button onClick={() => setEditing(true)} style={{ marginTop: 6, fontSize: 11.5, fontWeight: 700, color: "#0a5ac8", background: "none", border: "none", cursor: "pointer" }}>✏️ Editar banner</button>
-        )
-      )}
-    </div>
-  );
-}
-
 function ComunicadosWidget({ isAdmin }) {
   const [html, setHtml] = useState("");
   const [editing, setEditing] = useState(false);
@@ -7555,7 +7468,6 @@ function Dashboard({
           <style>{`@keyframes pulseGold { 0% { box-shadow: 0 0 0 0 ${C.gold}77; } 70% { box-shadow: 0 0 0 6px ${C.gold}00; } 100% { box-shadow: 0 0 0 0 ${C.gold}00; } }`}</style>
         </Card>
       </div>
-      <BannerWidget isAdmin={isAdmin} />
       {esCuerdaAdmin(user) && pendientes && pendientes.length > 0 && (
         <div onClick={() => setSection("solicitudes")}
           style={{ background: "linear-gradient(180deg,#fff7e6,#fff0cf)", border: "1px solid #ffd98a", borderRadius: 16, padding: "14px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 13, cursor: "pointer" }}>
@@ -20880,6 +20792,8 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
   const [valorCuota, setValorCuota] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState(null);
+  const [multiPago, setMultiPago] = useState(null);
+  const [multiCantidad, setMultiCantidad] = useState(2);
   const fileRefs = useRef({});
 
   // Miembros activos en sistema de cuotas
@@ -21045,6 +20959,47 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
     setUploadingId(null);
   }
 
+  // Paga varios meses consecutivos con UN SOLO comprobante (pago adelantado)
+  async function pagarVariosMeses(miembro, mesInicio, cantidad, file) {
+    setUploadingId(miembro.id);
+    try {
+      // Subir el comprobante una sola vez
+      let comprobanteUrl = "";
+      if (file) {
+        const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+        const path = `comprobantes/multi/${miembro.id}_${Date.now()}.${ext}`;
+        comprobanteUrl = await finUploadFile("finanzas", path, file);
+      }
+      // Calcular los meses a registrar
+      const [y, m] = mesInicio.split("-").map(Number);
+      for (let i = 0; i < cantidad; i++) {
+        const d = new Date(y, (m - 1) + i);
+        const mesIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        // Buscar si ya existe pago de ese mes para no duplicar
+        const existentes = await finDbGet("fin_pagos", `&integrante_id=eq.${miembro.id}&mes=eq.${mesIso}&tipo=eq.cuota`);
+        if (existentes && existentes.length > 0) {
+          // Ya existe: solo actualizar el comprobante si no tenía
+          if (comprobanteUrl && !existentes[0].comprobante_url) {
+            await finDbPatch("fin_pagos", existentes[0].id, { comprobante_url: comprobanteUrl });
+          }
+          continue;
+        }
+        await finDbPost("fin_pagos", {
+          integrante_id: miembro.id,
+          mes: mesIso,
+          monto: montoParaMiembro(miembro),
+          tipo: "cuota",
+          comprobante_url: comprobanteUrl,
+        });
+      }
+      await reload();
+      setMultiPago(null);
+    } catch (e) {
+      alert("Error registrando los meses: " + e.message);
+    }
+    setUploadingId(null);
+  }
+
   const pctPago = miembrosActivos.length
     ? Math.round((pagaron.size / miembrosActivos.length) * 100)
     : 0;
@@ -21058,6 +21013,56 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
 
   return (
     <div>
+
+      {/* ══ MODAL: Pagar varios meses con un solo comprobante ══ */}
+      {multiPago && (() => {
+        const mInicio = mesSeleccionado;
+        const [yy, mm] = mInicio.split("-").map(Number);
+        const fileRefMulti = { current: null };
+        const mesesPrev = Array.from({ length: multiCantidad }, (_, i) => {
+          const d = new Date(yy, (mm - 1) + i);
+          return finMesLabel(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+        });
+        const montoUnit = montoParaMiembro(multiPago);
+        return (
+          <div onClick={() => setMultiPago(null)} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: "white", borderRadius: 18, maxWidth: 440, width: "100%", padding: 24, maxHeight: "88vh", overflow: "auto" }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: C.dark, marginBottom: 4 }}>🗓️ Pagar varios meses</div>
+              <div style={{ fontSize: 13, color: C.gray, marginBottom: 16 }}>{multiPago.nombre}</div>
+
+              <div style={{ fontSize: 12, color: C.gray, marginBottom: 6 }}>Desde el mes</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.dark, marginBottom: 14, background: "#f1f5f9", borderRadius: 10, padding: "8px 12px" }}>
+                {finMesLabel(mInicio)} <span style={{ fontSize: 11, color: C.gray, fontWeight: 400 }}>(cámbialo en el selector de Mes de arriba)</span>
+              </div>
+
+              <div style={{ fontSize: 12, color: C.gray, marginBottom: 6 }}>¿Cuántos meses pagó?</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                <button onClick={() => setMultiCantidad(c => Math.max(2, c - 1))} style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${C.border}`, background: "white", fontSize: 18, cursor: "pointer" }}>−</button>
+                <div style={{ fontSize: 22, fontWeight: 800, color: C.primary, minWidth: 40, textAlign: "center" }}>{multiCantidad}</div>
+                <button onClick={() => setMultiCantidad(c => Math.min(24, c + 1))} style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${C.border}`, background: "white", fontSize: 18, cursor: "pointer" }}>+</button>
+              </div>
+
+              <div style={{ background: "#f0fdf4", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: "#166534", lineHeight: 1.6 }}>
+                Se registrarán: <b>{mesesPrev.join(", ")}</b><br />
+                Total: <b>${(montoUnit * multiCantidad).toLocaleString("es-CL")}</b> ({multiCantidad} × ${montoUnit.toLocaleString("es-CL")})
+              </div>
+
+              <input type="file" accept="image/*" style={{ display: "none" }} ref={(el) => (fileRefMulti.current = el)}
+                onChange={(e) => e.target.files[0] && pagarVariosMeses(multiPago, mInicio, multiCantidad, e.target.files[0])} />
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <FinBtn onClick={() => fileRefMulti.current?.click()} disabled={uploadingId === multiPago.id} style={{ flex: 1 }}>
+                  {uploadingId === multiPago.id ? "Registrando..." : "📎 Adjuntar 1 comprobante y registrar"}
+                </FinBtn>
+                <button onClick={() => setMultiPago(null)} style={{ background: "white", color: C.gray, border: `1px solid ${C.border}`, borderRadius: 10, padding: "0 16px", fontSize: 13, cursor: "pointer" }}>Cancelar</button>
+              </div>
+              <div style={{ fontSize: 11, color: C.gray, marginTop: 10, textAlign: "center" }}>
+                El mismo comprobante quedará guardado en todos los meses.
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ══ MODAL: Explicación antes de pedir comprobante ══ */}
       {confirmPagarConComprobante && (
@@ -21369,6 +21374,13 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
                         >
                           {uploadingId === m.id ? "Subiendo..." : "📎 Comprobante"}
                         </FinBtn>
+                        <button
+                          onClick={() => { setMultiPago(m); setMultiCantidad(2); }}
+                          disabled={uploadingId === m.id}
+                          style={{ fontSize: 11, padding: "6px 10px", marginTop: 5, background: "none", border: `1px solid ${C.primary}55`, color: C.primary, borderRadius: 8, cursor: "pointer", display: "block", fontWeight: 600 }}
+                        >
+                          🗓️ Pagar varios meses
+                        </button>
                       </div>
                     )}
                   </div>
