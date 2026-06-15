@@ -6856,6 +6856,149 @@ function CuotaRecordatorioWidget({ members, user, setSection, onReload }) {
   );
 }
 
+// Banner destacado del inicio (estilo afiche) — editable por admin, visible para todos
+function BannerWidget({ isAdmin }) {
+  const [url, setUrl] = useState("");
+  const [meta, setMeta] = useState({ etiqueta: "", titulo: "", fecha: "", hora: "", lugar: "" });
+  const [editing, setEditing] = useState(false);
+  const [subiendo, setSubiendo] = useState(false);
+  const [cargado, setCargado] = useState(false);
+
+  useEffect(() => {
+    getConfig("banner_destacado_url").then((v) => setUrl(v || "")).catch(() => {});
+    getConfig("banner_destacado_meta").then((v) => {
+      try { if (v) setMeta((m) => ({ ...m, ...JSON.parse(v) })); } catch {}
+      setCargado(true);
+    }).catch(() => setCargado(true));
+  }, []);
+
+  async function subirImagen(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setSubiendo(true);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `banners/destacado_${Date.now()}.${ext}`;
+      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
+        method: "POST",
+        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": file.type || "image/jpeg", "x-upsert": "true" },
+        body: file,
+      });
+      if (!res.ok) throw new Error("subida falló");
+      setUrl(`${SUPABASE_URL}/storage/v1/object/public/publico/${path}`);
+    } catch (er) { alert("No se pudo subir la imagen. Intenta de nuevo."); }
+    setSubiendo(false);
+    if (e.target) e.target.value = "";
+  }
+
+  async function guardar() {
+    try {
+      await setConfig("banner_destacado_url", url);
+      await setConfig("banner_destacado_meta", JSON.stringify(meta));
+      setEditing(false);
+    } catch (e) { alert("Error al guardar."); }
+  }
+
+  async function quitar() {
+    setUrl(""); setMeta({ etiqueta: "", titulo: "", fecha: "", hora: "", lugar: "" });
+    try {
+      await setConfig("banner_destacado_url", "");
+      await setConfig("banner_destacado_meta", "");
+    } catch (e) {}
+    setEditing(false);
+  }
+
+  if (!cargado) return null;
+  // Sin banner y sin ser admin → no mostrar nada
+  if (!url && !isAdmin) return null;
+  // Sin banner pero admin → invitación a crear
+  if (!url && isAdmin && !editing) {
+    return (
+      <div onClick={() => setEditing(true)} style={{ marginBottom: 16, border: "2px dashed #cbd5e1", borderRadius: 18, padding: "20px", textAlign: "center", cursor: "pointer", color: "#94a3b8", fontSize: 13, fontWeight: 600, background: "#f8fafc" }}>
+        🖼️ Toca para agregar un banner destacado al inicio
+      </div>
+    );
+  }
+
+  const hasMeta = meta.titulo || meta.fecha || meta.hora || meta.lugar;
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      {url && (
+        <div style={{ position: "relative", borderRadius: 22, overflow: "hidden", boxShadow: "0 16px 44px rgba(0,0,0,0.22)", background: "#0c0c14" }}>
+          <img src={url} alt="Banner" style={{ width: "100%", maxHeight: 300, objectFit: "cover", display: "block", filter: "brightness(0.9)" }} />
+          {/* Degradado inferior */}
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: hasMeta ? "70%" : "0", background: "linear-gradient(to top, rgba(8,8,20,0.92) 0%, rgba(8,8,20,0.45) 55%, transparent 100%)", pointerEvents: "none" }} />
+          {/* Línea superior dorada */}
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "linear-gradient(90deg,transparent,#fbbf24,#f59e0b,#fbbf24,transparent)" }} />
+          {/* Etiqueta */}
+          {meta.etiqueta && (
+            <div style={{ position: "absolute", top: 16, left: 18, background: "linear-gradient(135deg,#92400e,#d97706)", borderRadius: 20, padding: "4px 14px", display: "flex", alignItems: "center", gap: 6, boxShadow: "0 2px 12px rgba(217,119,6,0.45)" }}>
+              <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fef3c7" }} />
+              <span style={{ fontSize: 10, fontWeight: 800, color: "#fef3c7", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-display)" }}>{meta.etiqueta}</span>
+            </div>
+          )}
+          {/* Texto inferior */}
+          {hasMeta && (
+            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "20px 22px 22px", pointerEvents: "none" }}>
+              {meta.titulo && (
+                <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 800, color: "white", lineHeight: 1.2, marginBottom: 8, textShadow: "0 2px 12px rgba(0,0,0,0.7)" }}>{meta.titulo}</div>
+              )}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px" }}>
+                {meta.fecha && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 13, opacity: 0.8 }}>📅</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#fef3c7", textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>{meta.fecha}</span>
+                  </div>
+                )}
+                {meta.hora && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 13, opacity: 0.8 }}>🕐</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#fef3c7", textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>{meta.hora}</span>
+                  </div>
+                )}
+                {meta.lugar && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 13, opacity: 0.8 }}>📍</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#fef3c7", textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>{meta.lugar}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {isAdmin && (
+        editing ? (
+          <div style={{ marginTop: 10, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 10 }}>Banner destacado del inicio</div>
+            <input type="file" accept="image/*" disabled={subiendo} onChange={subirImagen} style={{ fontSize: 13, marginBottom: 10, display: "block" }} />
+            {subiendo && <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>Subiendo imagen…</div>}
+            {url && <img src={url} alt="preview" style={{ width: "100%", borderRadius: 10, marginBottom: 10, maxHeight: 160, objectFit: "cover" }} />}
+            {[
+              ["etiqueta", "Etiqueta (ej: Próxima Celebración)"],
+              ["titulo", "Título (ej: Mes del Corazón de Jesús)"],
+              ["fecha", "Fecha (ej: Jueves 16 de julio)"],
+              ["hora", "Hora (ej: 17:00 Hrs)"],
+              ["lugar", "Lugar (ej: Templo Votivo de Maipú)"],
+            ].map(([campo, ph]) => (
+              <input key={campo} value={meta[campo]} onChange={(e) => setMeta((m) => ({ ...m, [campo]: e.target.value }))} placeholder={ph}
+                style={{ width: "100%", fontSize: 13, padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0", boxSizing: "border-box", marginBottom: 8 }} />
+            ))}
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <button onClick={guardar} style={{ background: "#0a5ac8", color: "white", border: "none", borderRadius: 9, padding: "8px 16px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Guardar</button>
+              <button onClick={quitar} style={{ background: "white", color: "#ef4444", border: "1px solid #fecaca", borderRadius: 9, padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Quitar banner</button>
+              <button onClick={() => setEditing(false)} style={{ background: "white", color: "#6a6a70", border: "1px solid #e2e8f0", borderRadius: 9, padding: "8px 16px", fontSize: 12.5, cursor: "pointer", marginLeft: "auto" }}>Cerrar</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setEditing(true)} style={{ marginTop: 6, fontSize: 11.5, fontWeight: 700, color: "#0a5ac8", background: "none", border: "none", cursor: "pointer" }}>✏️ Editar banner</button>
+        )
+      )}
+    </div>
+  );
+}
+
 function ComunicadosWidget({ isAdmin }) {
   const [html, setHtml] = useState("");
   const [editing, setEditing] = useState(false);
@@ -7468,6 +7611,7 @@ function Dashboard({
           <style>{`@keyframes pulseGold { 0% { box-shadow: 0 0 0 0 ${C.gold}77; } 70% { box-shadow: 0 0 0 6px ${C.gold}00; } 100% { box-shadow: 0 0 0 0 ${C.gold}00; } }`}</style>
         </Card>
       </div>
+      <BannerWidget isAdmin={isAdmin} />
       {esCuerdaAdmin(user) && pendientes && pendientes.length > 0 && (
         <div onClick={() => setSection("solicitudes")}
           style={{ background: "linear-gradient(180deg,#fff7e6,#fff0cf)", border: "1px solid #ffd98a", borderRadius: 16, padding: "14px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 13, cursor: "pointer" }}>
@@ -12181,6 +12325,60 @@ function AdminTab({ label, active, onClick }) {
     </button>
   );
 }
+
+// Pestañas del panel admin agrupadas por categoría — sin scroll horizontal
+const ADMIN_GRUPOS = [
+  { grupo: "Coro", color: "#1a6fb5", ids: ["integrantes", "asistencia", "historial", "pautas", "material_coro_admin", "comunidades"] },
+  { grupo: "Contenido", color: "#7c3aed", ids: ["noticias", "oraciones", "preguntas", "biblioteca", "podcasts", "galeria", "links"] },
+  { grupo: "Invitados", color: "#0891b2", ids: ["documentos", "material_ensayo_admin", "descargas_admin", "visitas"] },
+  { grupo: "Sistema", color: "#64748b", ids: ["cuentas", "cuenta_bancaria", "notificaciones", "api_config"] },
+];
+
+function AdminTabsGrid({ tabs, tab, setTab, pendientes }) {
+  const byId = Object.fromEntries(tabs.map((t) => [t.id, t]));
+  return (
+    <div style={{ marginBottom: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+      {ADMIN_GRUPOS.map((g) => (
+        <div key={g.grupo}>
+          <div style={{ fontSize: 10.5, fontWeight: 800, color: g.color, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 7, paddingLeft: 2 }}>
+            {g.grupo}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+            {g.ids.map((id) => {
+              const t = byId[id];
+              if (!t) return null;
+              const active = tab === id;
+              const extra = id === "preguntas" && pendientes > 0 ? ` (${pendientes})` : "";
+              return (
+                <button
+                  key={id}
+                  onClick={() => setTab(id)}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 12,
+                    border: active ? "none" : `1px solid ${g.color}22`,
+                    cursor: "pointer",
+                    fontSize: 12.5,
+                    fontWeight: active ? 700 : 500,
+                    background: active ? g.color : `${g.color}0d`,
+                    color: active ? "white" : g.color,
+                    boxShadow: active ? `0 2px 10px ${g.color}40` : "none",
+                    transition: "all 0.15s",
+                    whiteSpace: "nowrap",
+                    WebkitTapHighlightColor: "transparent",
+                  }}
+                >
+                  {t.label}{extra}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 
 function ConfirmBtn({ onConfirm, label = "🗑 Eliminar", compact = false }) {
   const [ask, setAsk] = useState(false);
@@ -20214,28 +20412,7 @@ function Admin({
 
       <PushTestBar />
 
-      <div
-        style={{
-          display: "flex",
-          gap: 6,
-          overflowX: "auto",
-          marginBottom: 16,
-          paddingBottom: 4,
-        }}
-      >
-        {ADMIN_TABS.map((t) => (
-          <AdminTab
-            key={t.id}
-            label={`${t.label}${
-              t.id === "preguntas" && pendientes > 0
-                ? " (" + pendientes + ")"
-                : ""
-            }`}
-            active={tab === t.id}
-            onClick={() => setTab(t.id)}
-          />
-        ))}
-      </div>
+      <AdminTabsGrid tabs={ADMIN_TABS} tab={tab} setTab={setTab} pendientes={pendientes} />
 
       <Card>
         {tab === "integrantes" && (
@@ -20794,6 +20971,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
   const [uploadingId, setUploadingId] = useState(null);
   const [multiPago, setMultiPago] = useState(null);
   const [multiCantidad, setMultiCantidad] = useState(2);
+  const [multiMonto, setMultiMonto] = useState("");
   const fileRefs = useRef({});
 
   // Miembros activos en sistema de cuotas
@@ -20870,8 +21048,10 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
       if (!pago) return;
       setConfirmBorrar({ miembro, pago });
     } else {
-      // Caso especial: la contadora está registrando su PROPIO pago
-      if (esCuerdaContador(user) && miembro.id === user.id) {
+      // Caso especial: pago de la CONTADORA (su propia cuenta corriente, sin transferencia)
+      // Lo puede registrar la contadora misma O un admin
+      const gestorPuede = esCuerdaAdmin(user) || esCuerdaContador(user);
+      if (gestorPuede && esCuerdaContador(miembro)) {
         setConfirmContadora({ miembro });
         return;
       }
@@ -20970,15 +21150,18 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
         const path = `comprobantes/multi/${miembro.id}_${Date.now()}.${ext}`;
         comprobanteUrl = await finUploadFile("finanzas", path, file);
       }
+      // Monto por mes: si se ingresó un total manual, se reparte; si no, el monto estándar
+      const totalManual = parseInt(String(multiMonto).replace(/\D/g, ""), 10);
+      const montoPorMes = totalManual && totalManual > 0
+        ? Math.round(totalManual / cantidad)
+        : montoParaMiembro(miembro);
       // Calcular los meses a registrar
       const [y, m] = mesInicio.split("-").map(Number);
       for (let i = 0; i < cantidad; i++) {
         const d = new Date(y, (m - 1) + i);
         const mesIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-        // Buscar si ya existe pago de ese mes para no duplicar
         const existentes = await finDbGet("fin_pagos", `&integrante_id=eq.${miembro.id}&mes=eq.${mesIso}&tipo=eq.cuota`);
         if (existentes && existentes.length > 0) {
-          // Ya existe: solo actualizar el comprobante si no tenía
           if (comprobanteUrl && !existentes[0].comprobante_url) {
             await finDbPatch("fin_pagos", existentes[0].id, { comprobante_url: comprobanteUrl });
           }
@@ -20987,13 +21170,14 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
         await finDbPost("fin_pagos", {
           integrante_id: miembro.id,
           mes: mesIso,
-          monto: montoParaMiembro(miembro),
+          monto: montoPorMes,
           tipo: "cuota",
           comprobante_url: comprobanteUrl,
         });
       }
       await reload();
       setMultiPago(null);
+      setMultiMonto("");
     } catch (e) {
       alert("Error registrando los meses: " + e.message);
     }
@@ -21042,10 +21226,33 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
                 <button onClick={() => setMultiCantidad(c => Math.min(24, c + 1))} style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${C.border}`, background: "white", fontSize: 18, cursor: "pointer" }}>+</button>
               </div>
 
-              <div style={{ background: "#f0fdf4", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: "#166534", lineHeight: 1.6 }}>
-                Se registrarán: <b>{mesesPrev.join(", ")}</b><br />
-                Total: <b>${(montoUnit * multiCantidad).toLocaleString("es-CL")}</b> ({multiCantidad} × ${montoUnit.toLocaleString("es-CL")})
+              <div style={{ fontSize: 12, color: C.gray, marginBottom: 6 }}>Monto total del comprobante</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: C.gray }}>$</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={multiMonto}
+                  onChange={(e) => setMultiMonto(e.target.value.replace(/\D/g, ""))}
+                  placeholder={`${montoUnit * multiCantidad}`}
+                  style={{ flex: 1, fontSize: 16, fontWeight: 700, padding: "8px 12px", borderRadius: 10, border: `1px solid ${C.border}`, boxSizing: "border-box" }}
+                />
               </div>
+              <div style={{ fontSize: 11, color: C.gray, marginBottom: 14 }}>
+                Déjalo vacío para usar el monto estándar (${(montoUnit * multiCantidad).toLocaleString("es-CL")}).
+              </div>
+
+              {(() => {
+                const totalManual = parseInt(String(multiMonto).replace(/\D/g, ""), 10);
+                const total = totalManual && totalManual > 0 ? totalManual : montoUnit * multiCantidad;
+                const porMes = Math.round(total / multiCantidad);
+                return (
+                  <div style={{ background: "#f0fdf4", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: "#166534", lineHeight: 1.6 }}>
+                    Se registrarán: <b>{mesesPrev.join(", ")}</b><br />
+                    Total: <b>${total.toLocaleString("es-CL")}</b> ({multiCantidad} meses × ${porMes.toLocaleString("es-CL")} c/u)
+                  </div>
+                );
+              })()}
 
               <input type="file" accept="image/*" style={{ display: "none" }} ref={(el) => (fileRefMulti.current = el)}
                 onChange={(e) => e.target.files[0] && pagarVariosMeses(multiPago, mInicio, multiCantidad, e.target.files[0])} />
@@ -21375,7 +21582,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
                           {uploadingId === m.id ? "Subiendo..." : "📎 Comprobante"}
                         </FinBtn>
                         <button
-                          onClick={() => { setMultiPago(m); setMultiCantidad(2); }}
+                          onClick={() => { setMultiPago(m); setMultiCantidad(2); setMultiMonto(""); }}
                           disabled={uploadingId === m.id}
                           style={{ fontSize: 11, padding: "6px 10px", marginTop: 5, background: "none", border: `1px solid ${C.primary}55`, color: C.primary, borderRadius: 8, cursor: "pointer", display: "block", fontWeight: 600 }}
                         >
