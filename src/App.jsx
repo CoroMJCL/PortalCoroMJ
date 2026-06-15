@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Component } from "react";
 import { EscuelaCanto } from "./EscuelaCanto";
 
 // ══════════════════════════════════════════
@@ -721,17 +721,18 @@ const G = `
   }
 
   @media (max-width: 768px) {
-    /* En móvil: imagen arriba, texto en panel sólido debajo (sin montarse) */
-    .mj-banner { background: linear-gradient(160deg, #14182e, #0c0e1c); }
-    .mj-banner-img { height: 180px; }
+    /* En móvil: imagen completa arriba (sin recortar), texto en panel debajo */
+    .mj-banner { background: #0e1020; }
+    .mj-banner-img { height: auto; max-height: 240px; object-fit: contain; background: #0e1020; }
     .mj-banner-scrim { display: none; }
+    .mj-banner-topline { display: none; }
     .mj-banner-body {
-      position: static; padding: 16px 18px 18px; gap: 10px;
-      background: linear-gradient(160deg, #161a30, #0e1020);
+      position: static; padding: 16px 18px 18px; gap: 9px;
+      background: linear-gradient(160deg, #1a1f38, #0e1020);
     }
-    .mj-banner-title { font-size: 19px; max-width: 100%; }
-    .mj-banner-meta { max-width: 100%; gap: 7px 16px; }
-    .mj-banner-eyebrow { position: absolute; top: 12px; left: 12px; z-index: 2; }
+    .mj-banner-title { font-size: 18px; max-width: 100%; line-height: 1.25; }
+    .mj-banner-meta { max-width: 100%; gap: 6px 16px; flex-direction: column; align-items: flex-start; }
+    .mj-banner-eyebrow { position: static; align-self: flex-start; margin-bottom: 2px; }
     .admin-layout { flex-direction: column !important; }
     .admin-menu-btn { display: flex !important; }
   }
@@ -1348,7 +1349,39 @@ function RadioMariaWidget() {
 
 
 
-export default function App() {
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, msg: "" };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, msg: error?.message || "Error inesperado" };
+  }
+  componentDidCatch(error, info) {
+    console.error("ErrorBoundary capturó:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "#f4f5f7", fontFamily: "Inter,sans-serif" }}>
+          <div style={{ background: "white", borderRadius: 18, padding: "32px 28px", maxWidth: 420, textAlign: "center", boxShadow: "0 8px 30px rgba(0,0,0,0.12)" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🙏</div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "#1c1c1e", marginBottom: 8 }}>Algo no cargó bien</div>
+            <div style={{ fontSize: 13.5, color: "#6a6a70", lineHeight: 1.6, marginBottom: 20 }}>
+              Ocurrió un problema al mostrar esta sección, pero tus datos están a salvo. Recarga la página para continuar.
+            </div>
+            <button onClick={() => window.location.reload()} style={{ background: "#1e3a5f", color: "white", border: "none", borderRadius: 12, padding: "11px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              Recargar
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AppInner() {
   // Detectar si venimos del enlace de recuperación de contraseña
   const _initialView = (() => {
     // Supabase puede enviar el token en el hash (#) o en query string (?)
@@ -7213,6 +7246,21 @@ function ComunicadosWidget({ isAdmin }) {
             <button title="Cursiva" onClick={() => cmd("italic")} style={{ ...tbBtnIcon, fontStyle: "italic", fontWeight: 700 }}>I</button>
             <button title="Subrayado" onClick={() => cmd("underline")} style={{ ...tbBtnIcon, textDecoration: "underline" }}>U</button>
             <span style={tbSep} />
+            <select title="Tipo de letra" onChange={(e) => { cmd("fontName", e.target.value); e.target.selectedIndex = 0; }} style={{ ...tbBtnIcon, padding: "5px 6px", fontSize: 12, cursor: "pointer", minWidth: 92 }}>
+              <option value="">Fuente</option>
+              <option value="Inter, sans-serif">Normal</option>
+              <option value="Georgia, serif">Serif</option>
+              <option value="'Courier New', monospace">Mono</option>
+              <option value="'Brush Script MT', cursive">Manuscrita</option>
+            </select>
+            <select title="Tamaño" onChange={(e) => { cmd("fontSize", e.target.value); e.target.selectedIndex = 0; }} style={{ ...tbBtnIcon, padding: "5px 6px", fontSize: 12, cursor: "pointer", minWidth: 70 }}>
+              <option value="">Tamaño</option>
+              <option value="2">Pequeño</option>
+              <option value="3">Normal</option>
+              <option value="5">Grande</option>
+              <option value="6">Título</option>
+            </select>
+            <span style={tbSep} />
             <button title="Alinear a la izquierda" onClick={() => cmd("justifyLeft")} style={tbBtnIcon}>{alignIcon("left")}</button>
             <button title="Centrar" onClick={() => cmd("justifyCenter")} style={tbBtnIcon}>{alignIcon("center")}</button>
             <button title="Alinear a la derecha" onClick={() => cmd("justifyRight")} style={tbBtnIcon}>{alignIcon("right")}</button>
@@ -9714,7 +9762,7 @@ function Oraciones({ oraciones, user, onReload }) {
             {o.texto}
           </p>
           <div style={{ fontSize: 11, color: C.gray }}>
-            👤 {o.autor} · {new Date(o.created_at).toLocaleDateString("es-CL")}
+            👤 {o.autor || "Anónimo"} · {o.created_at ? new Date(o.created_at).toLocaleDateString("es-CL") : ""}
           </div>
         </Card>
       ))}
@@ -16469,25 +16517,22 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
               {/* Guion de la misa */}
               <div style={{ marginTop: 14 }}>
                 <label style={{ fontSize: 11, fontWeight: 500, color: C.gray, marginBottom: 4, display: "block" }}>
-                  Guion de la misa (PDF o Word)
+                  Guion de la misa (enlace de Google Drive)
                 </label>
-                {form.guion_url ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 12px", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 13, color: C.primary, fontWeight: 600 }}>📄 Guion cargado</span>
-                    <a href={form.guion_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: C.primary }}>Ver</a>
-                    <button type="button" onClick={() => setForm((p) => ({ ...p, guion_url: "" }))} style={{ fontSize: 12, color: "#ef4444", background: "none", border: "none", cursor: "pointer", marginLeft: "auto" }}>Quitar</button>
-                  </div>
-                ) : (
-                  <div>
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                      disabled={subiendoGuion}
-                      onChange={subirGuion}
-                      style={{ fontSize: 13 }}
-                    />
-                    {subiendoGuion && <div style={{ fontSize: 12, color: C.gray, marginTop: 6 }}>Subiendo guion…</div>}
-                  </div>
+                <input
+                  type="text"
+                  value={form.guion_url || ""}
+                  onChange={(e) => setForm((p) => ({ ...p, guion_url: e.target.value }))}
+                  placeholder="Pega el enlace de Google Drive del guion (PDF)"
+                  style={{ width: "100%", fontSize: 13, padding: "9px 12px", borderRadius: 9, border: `1px solid ${C.border}`, boxSizing: "border-box" }}
+                />
+                <div style={{ fontSize: 11, color: C.gray, marginTop: 5, lineHeight: 1.5 }}>
+                  Sube el guion a Google Drive, ábrelo, toca "Compartir" → "Cualquier persona con el enlace", copia el link y pégalo aquí. Se verá dentro de la app.
+                </div>
+                {form.guion_url && (
+                  <button type="button" onClick={() => setVisorGuion(drivePreviewUrl(form.guion_url) || form.guion_url)} style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: C.primary, background: "none", border: `1px solid ${C.primary}55`, borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>
+                    👁 Previsualizar guion
+                  </button>
                 )}
               </div>
             </div>
@@ -16810,9 +16855,10 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             </div>
             <iframe
               onClick={(e) => e.stopPropagation()}
-              src={`https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(visorGuion)}`}
+              src={drivePreviewUrl(visorGuion) || visorGuion}
               style={{ flex: 1, width: "100%", border: "none", background: "white" }}
               title="Guion de la misa"
+              allow="autoplay"
             />
           </div>
         )}
@@ -24092,6 +24138,14 @@ function Cumpleanos({ members }) {
         </div>
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   );
 }
 
