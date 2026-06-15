@@ -4126,11 +4126,11 @@ function ShortsWidget({ isAdmin }) {
         </div>
       )}
 
-      {/* Fila deslizable de shorts verticales */}
+      {/* Shorts verticales apilados (columna angosta) */}
       {ids.length > 0 ? (
-        <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, maxHeight: ids.length > 1 ? 560 : "none", overflowY: ids.length > 1 ? "auto" : "visible", paddingRight: ids.length > 1 ? 4 : 0 }}>
           {ids.map((id) => (
-            <div key={id} style={{ flexShrink: 0, width: 200, scrollSnapAlign: "start" }}>
+            <div key={id} style={{ width: "100%" }}>
               <div style={{ position: "relative", width: "100%", aspectRatio: "9 / 16", borderRadius: 16, overflow: "hidden", background: "#000", boxShadow: "0 6px 18px rgba(0,0,0,0.18)" }}>
                 {activo === id ? (
                   <iframe
@@ -7770,7 +7770,6 @@ function Dashboard({
         </Card>
       </div>
       <BannerWidget isAdmin={isAdmin} />
-      <ShortsWidget isAdmin={isAdmin} />
       {esCuerdaAdmin(user) && pendientes && pendientes.length > 0 && (
         <div onClick={() => setSection("solicitudes")}
           style={{ background: "linear-gradient(180deg,#fff7e6,#fff0cf)", border: "1px solid #ffd98a", borderRadius: 16, padding: "14px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 13, cursor: "pointer" }}>
@@ -8107,48 +8106,7 @@ function Dashboard({
       <GaleriaWidget fotos={fotos} setSection={setSection} isAdmin={isAdmin} />
         </div>
         <div className="dash-col">
-      {/* ── Valores del coro ── */}
-      <ValoresWidget />
-      {/* ── Cumpleañeros de hoy (solo ese día) ── */}
-      {cumple.length > 0 && <CumpleanosHoyWidget cumple={cumple} />}
-      {/* ── Santoral (franja completa) ── */}
-      {santoral && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "linear-gradient(180deg,#fffdf6,#fdf4df)", border: `1px solid ${C.gold}40`, borderRadius: 16, padding: "12px 16px", marginBottom: 14 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 11, flexShrink: 0, background: `linear-gradient(135deg,${C.gold},#caa017)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17 }}>✨</div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 9.5, fontWeight: 800, color: "#a9780a", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 1 }}>Santoral de hoy</div>
-            <div style={{ fontSize: 14.5, fontWeight: 700, color: "#5b4708", lineHeight: 1.25 }}>{santoral}</div>
-          </div>
-        </div>
-      )}
-      <ProximosCumpleanosWidget members={members} setSection={setSection} />
-      <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} user={user} />
-      <div style={{ background: "white", borderRadius: 16, overflow: "hidden", border: "1px solid rgba(60,60,67,0.1)", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 13px 8px" }}>
-          <div style={{ width: 28, height: 28, borderRadius: 9, background: "#1DB954", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm4.59 14.42a.62.62 0 0 1-.86.21c-2.35-1.44-5.3-1.76-8.79-.96a.62.62 0 1 1-.28-1.21c3.81-.87 7.08-.5 9.71 1.11.3.18.39.57.22.85Zm1.23-2.73a.78.78 0 0 1-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.17a.78.78 0 1 1-.45-1.49c3.63-1.1 8.15-.56 11.23 1.33.37.22.49.71.26 1.07Zm.11-2.85C14.81 8.94 9.4 8.76 6.3 9.7a.93.93 0 1 1-.54-1.78c3.56-1.08 9.53-.87 13.29 1.36a.93.93 0 0 1-.96 1.6Z"/></svg>
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.dark }}>Playlist Coro MJ</div>
-            <div style={{ fontSize: 10.5, color: C.gray }}>Reproduce aquí mismo</div>
-          </div>
-        </div>
-        <iframe title="Spotify Coro MJ" src="https://open.spotify.com/embed/playlist/3ssNSNlljyYlw2La83mXZE?utm_source=generator&theme=0" width="100%" height="232" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" style={{ display: "block", border: 0 }} />
-      </div>
-        </div>
-      </div>
-
-      <div
-        className="grid-dash-main"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1.5fr 1fr",
-          gap: 14,
-          marginBottom: 14,
-          alignItems: "start",
-        }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <ShortsWidget isAdmin={isAdmin} />
         <Card>
           <div
             style={{
@@ -8269,14 +8227,40 @@ function Dashboard({
             <PodcastWidget podcasts={(podcasts || []).filter((p) => p.tipo !== "vocalizacion")} setSection={setSection} />
           </Card>
         )}
+      {/* ── Valores del coro ── */}
+      <ValoresWidget />
+      {/* ── Cumpleañeros de hoy (solo ese día) ── */}
+      {cumple.length > 0 && <CumpleanosHoyWidget cumple={cumple} />}
+      {/* ── Santoral (franja completa) ── */}
+      {santoral && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "linear-gradient(180deg,#fffdf6,#fdf4df)", border: `1px solid ${C.gold}40`, borderRadius: 16, padding: "12px 16px", marginBottom: 14 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 11, flexShrink: 0, background: `linear-gradient(135deg,${C.gold},#caa017)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17 }}>✨</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 9.5, fontWeight: 800, color: "#a9780a", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 1 }}>Santoral de hoy</div>
+            <div style={{ fontSize: 14.5, fontWeight: 700, color: "#5b4708", lineHeight: 1.25 }}>{santoral}</div>
+          </div>
+        </div>
+      )}
+      <ProximosCumpleanosWidget members={members} setSection={setSection} />
+      <ReconocemeWidget reconocimientos={reconocimientos} members={members} setSection={setSection} user={user} />
+      <div style={{ background: "white", borderRadius: 16, overflow: "hidden", border: "1px solid rgba(60,60,67,0.1)", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 13px 8px" }}>
+          <div style={{ width: 28, height: 28, borderRadius: 9, background: "#1DB954", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm4.59 14.42a.62.62 0 0 1-.86.21c-2.35-1.44-5.3-1.76-8.79-.96a.62.62 0 1 1-.28-1.21c3.81-.87 7.08-.5 9.71 1.11.3.18.39.57.22.85Zm1.23-2.73a.78.78 0 0 1-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.17a.78.78 0 1 1-.45-1.49c3.63-1.1 8.15-.56 11.23 1.33.37.22.49.71.26 1.07Zm.11-2.85C14.81 8.94 9.4 8.76 6.3 9.7a.93.93 0 1 1-.54-1.78c3.56-1.08 9.53-.87 13.29 1.36a.93.93 0 0 1-.96 1.6Z"/></svg>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.dark }}>Playlist Coro MJ</div>
+            <div style={{ fontSize: 10.5, color: C.gray }}>Reproduce aquí mismo</div>
+          </div>
+        </div>
+        <iframe title="Spotify Coro MJ" src="https://open.spotify.com/embed/playlist/3ssNSNlljyYlw2La83mXZE?utm_source=generator&theme=0" width="100%" height="232" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" style={{ display: "block", border: 0 }} />
+      </div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 14 }}>
         <VocalizacionWidget isAdmin={isAdmin} />
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <Card style={{ flex: 1 }}>
-            <YoutubeWidget compact />
-          </Card>
-          <ComunidadesWidget comunidades={comunidades} isAdmin={isAdmin} setSection={setSection} />
-        </div>
+        <ComunidadesWidget comunidades={comunidades} isAdmin={isAdmin} setSection={setSection} />
       </div>
 
       <div style={{ marginBottom: 14 }}>
