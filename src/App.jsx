@@ -2904,6 +2904,25 @@ function AppInner() {
             )}
           </div>
           <button
+            onClick={() => setView("landing")}
+            style={{
+              background: "transparent",
+              border: `1px solid ${C.border}`,
+              borderRadius: 10,
+              padding: "7px 10px",
+              cursor: "pointer",
+              color: C.gray,
+              fontSize: 13,
+              whiteSpace: "nowrap",
+              marginLeft: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            ← Sitio
+          </button>
+          <button
             onClick={handleSignOut}
             style={{
               background: C.light,
@@ -2914,7 +2933,6 @@ function AppInner() {
               color: C.gray,
               fontSize: 13,
               whiteSpace: "nowrap",
-              marginLeft: "auto",
             }}
           >
             Salir
@@ -16151,7 +16169,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     try {
       const body = {
         titulo: `Copia de ${pauta.titulo}`,
-        fecha: null,
+        fecha: pauta.fecha || new Date(Date.now() + 7*24*60*60*1000).toISOString().split("T")[0],
         hora: pauta.hora || "",
         lugar: pauta.lugar || "",
         coro: pauta.coro || "Coro Misioneros de Jesús",
