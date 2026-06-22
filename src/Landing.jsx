@@ -328,12 +328,12 @@ export default function Landing({ onPortal }) {
         .foot-adm:hover{color:rgba(255,255,255,0.25)}
 
         /* FABS */
-        .fabs{position:fixed;bottom:28px;right:24px;z-index:9000;display:flex;flex-direction:column;gap:10px;align-items:flex-end}
+        .fabs{position:fixed;bottom:28px;left:24px;z-index:9000;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
         .fab{width:50px;height:50px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .2s;position:relative;text-decoration:none;flex-shrink:0}
         .fab:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,0.3)}
         .fab-wa{background:#25D366}
         .fab-adm{background:#08122d;border:1px solid rgba(255,255,255,0.12)}
-        .fab-tip{position:absolute;right:58px;background:rgba(6,14,36,0.9);color:#fff;font-size:11px;font-weight:500;padding:4px 10px;border-radius:6px;white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none}
+        .fab-tip{position:absolute;left:58px;background:rgba(6,14,36,0.9);color:#fff;font-size:11px;font-weight:500;padding:4px 10px;border-radius:6px;white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none}
         .fab:hover .fab-tip{opacity:1}
 
         /* RESPONSIVE */
