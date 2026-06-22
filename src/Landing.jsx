@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 
 const SUPABASE_URL = "https://ttbipbhfswcwwgcwaist.supabase.co";
 const SUPABASE_KEY = "sb_publishable_mz6TyeuTP3TA6XQPOunXFQ_ad0Cp9fg";
+
 const BUCKET = `${SUPABASE_URL}/storage/v1/object/public/publico`;
 
 const SYS = `Eres el asistente del Coro Misioneros de Jesús, ensemble vocal de música litúrgica profesional en Maipú, Chile. Responde en español, de forma concisa (máx 2-3 oraciones), profesional y cercana. Solo respondes sobre el coro: ingreso, ensayos (sábados), nivel musical, repertorio litúrgico contemporáneo, cuerdas SATB. Para contacto dirígelos al formulario del sitio.`;
@@ -10,20 +11,36 @@ const DEFAULT_CONTENT = {
   hero_titulo: "Misioneros",
   hero_titulo2: "de Jesús",
   hero_kicker: "Coro · Maipú · Chile",
-  hero_sub: "Ensemble vocal de música litúrgica contemporánea. Quince años de presencia y excelencia musical en Maipú.",
+  hero_sub:
+    "Ensemble vocal de música litúrgica contemporánea. Quince años de presencia y excelencia musical en Maipú.",
   hero_img: `${BUCKET}/landing_hero.jpg`,
   about_titulo: "Un ensemble con identidad propia",
-  about_texto1: "Somos un coro de música litúrgica con más de 15 años en actividad. Cuatro cuerdas vocales —soprano, contralto, tenor y bajo— acompañadas de instrumentos en vivo, construyendo un sonido propio semana a semana.",
-  about_texto2: "Nuestra disciplina musical y compromiso con el repertorio nos definen como un conjunto vocal de alto nivel dentro de la tradición litúrgica contemporánea.",
+  about_texto1:
+    "Somos un coro de música litúrgica con más de 15 años en actividad. Cuatro cuerdas vocales —soprano, contralto, tenor y bajo— acompañadas de instrumentos en vivo, construyendo un sonido propio semana a semana.",
+  about_texto2:
+    "Nuestra disciplina musical y compromiso con el repertorio nos definen como un conjunto vocal de alto nivel dentro de la tradición litúrgica contemporánea.",
   about_img: `${BUCKET}/landing_about.jpg`,
-  stat1_n: "15+", stat1_l: "Años activos",
-  stat2_n: "30+", stat2_l: "Voces",
-  stat3_n: "400+", stat3_l: "Presentaciones",
-  gal1_label: "Navidad 2023", gal1_sub: "Diciembre", gal1_img: "",
-  gal2_label: "Semana Santa 2024", gal2_sub: "Abril", gal2_img: "",
-  gal3_label: "Fiesta Patronal", gal3_sub: "Agosto", gal3_img: "",
-  gal4_label: "Corpus Christi", gal4_sub: "Junio", gal4_img: "",
-  gal5_label: "Vigilia Pascual", gal5_sub: "Marzo", gal5_img: "",
+  stat1_n: "15+",
+  stat1_l: "Años activos",
+  stat2_n: "30+",
+  stat2_l: "Voces",
+  stat3_n: "400+",
+  stat3_l: "Presentaciones",
+  gal1_label: "Navidad 2023",
+  gal1_sub: "Diciembre",
+  gal1_img: "",
+  gal2_label: "Semana Santa 2024",
+  gal2_sub: "Abril",
+  gal2_img: "",
+  gal3_label: "Fiesta Patronal",
+  gal3_sub: "Agosto",
+  gal3_img: "",
+  gal4_label: "Corpus Christi",
+  gal4_sub: "Junio",
+  gal4_img: "",
+  gal5_label: "Vigilia Pascual",
+  gal5_sub: "Marzo",
+  gal5_img: "",
   contacto_dir: "Maipú, Santiago, Chile · Capilla Sagrada Familia",
   contacto_ensayo: "Sábados · Capilla Misioneros de Jesús",
   whatsapp: "56912345678",
@@ -32,25 +49,37 @@ const DEFAULT_CONTENT = {
 
 async function dbGet() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/landing_content?select=key,value`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-    });
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/landing_content?select=key,value`,
+      {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      }
+    );
     const rows = await r.json();
     if (!Array.isArray(rows)) return DEFAULT_CONTENT;
     const obj = { ...DEFAULT_CONTENT };
-    rows.forEach(({ key, value }) => { obj[key] = value; });
+    rows.forEach(({ key, value }) => {
+      obj[key] = value;
+    });
     return obj;
-  } catch { return DEFAULT_CONTENT; }
+  } catch {
+    return DEFAULT_CONTENT;
+  }
 }
 
 async function dbSet(key, value) {
   await fetch(`${SUPABASE_URL}/rest/v1/landing_content`, {
     method: "POST",
     headers: {
-      apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
-      "Content-Type": "application/json", Prefer: "resolution=merge-duplicates"
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates",
     },
-    body: JSON.stringify({ key, value })
+    body: JSON.stringify({ key, value }),
   });
 }
 
@@ -59,8 +88,13 @@ async function uploadImg(file, name) {
   const path = `${name}.${ext}`;
   const r = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
     method: "POST",
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": file.type, "x-upsert": "true" },
-    body: file
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": file.type,
+      "x-upsert": "true",
+    },
+    body: file,
   });
   if (!r.ok) throw new Error("Upload failed");
   return `${BUCKET}/${path}?t=${Date.now()}`;
@@ -68,7 +102,12 @@ async function uploadImg(file, name) {
 
 export default function Landing({ onPortal }) {
   const [content, setContent] = useState(DEFAULT_CONTENT);
-  const [chatMsgs, setChatMsgs] = useState([{ role: "bot", text: "Hola, soy el asistente del Coro Misioneros de Jesús. ¿En qué te puedo orientar?" }]);
+  const [chatMsgs, setChatMsgs] = useState([
+    {
+      role: "bot",
+      text: "Hola, soy el asistente del Coro Misioneros de Jesús. ¿En qué te puedo orientar?",
+    },
+  ]);
   const [chatInput, setChatInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [hist, setHist] = useState([]);
@@ -82,36 +121,60 @@ export default function Landing({ onPortal }) {
   const msgsRef = useRef(null);
   const ADMIN_PASS = "coromj2026";
 
-  useEffect(() => { dbGet().then(setContent); }, []);
-  useEffect(() => { if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight; }, [chatMsgs, typing]);
+  useEffect(() => {
+    dbGet().then(setContent);
+  }, []);
+  useEffect(() => {
+    if (msgsRef.current)
+      msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
+  }, [chatMsgs, typing]);
 
-  const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  const scrollTo = (id) =>
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
   async function sendMsg(text) {
-    const t = (text || chatInput).trim(); if (!t) return;
+    const t = (text || chatInput).trim();
+    if (!t) return;
     setChatInput("");
     const newHist = [...hist, { role: "user", content: t }];
-    setChatMsgs(prev => [...prev, { role: "user", text: t }]);
-    setHist(newHist); setTyping(true);
+    setChatMsgs((prev) => [...prev, { role: "user", text: t }]);
+    setHist(newHist);
+    setTyping(true);
     try {
       const r = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, system: SYS, messages: newHist })
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          system: SYS,
+          messages: newHist,
+        }),
       });
       const data = await r.json();
       const reply = data.content?.[0]?.text || "Intenta nuevamente.";
       setTyping(false);
-      setChatMsgs(prev => [...prev, { role: "bot", text: reply }]);
-      setHist(prev => [...prev, { role: "assistant", content: reply }]);
-    } catch { setTyping(false); setChatMsgs(prev => [...prev, { role: "bot", text: "Error de conexión." }]); }
+      setChatMsgs((prev) => [...prev, { role: "bot", text: reply }]);
+      setHist((prev) => [...prev, { role: "assistant", content: reply }]);
+    } catch {
+      setTyping(false);
+      setChatMsgs((prev) => [
+        ...prev,
+        { role: "bot", text: "Error de conexión." },
+      ]);
+    }
   }
 
   async function saveField(key) {
-    setSaving(s => ({ ...s, [key]: true }));
+    setSaving((s) => ({ ...s, [key]: true }));
     await dbSet(key, editing[key] ?? content[key]);
-    setContent(c => ({ ...c, [key]: editing[key] ?? c[key] }));
-    setEditing(e => { const n = { ...e }; delete n[key]; return n; });
-    setSaving(s => ({ ...s, [key]: false }));
+    setContent((c) => ({ ...c, [key]: editing[key] ?? c[key] }));
+    setEditing((e) => {
+      const n = { ...e };
+      delete n[key];
+      return n;
+    });
+    setSaving((s) => ({ ...s, [key]: false }));
   }
 
   async function handleImgUpload(key, file, storageName) {
@@ -119,22 +182,74 @@ export default function Landing({ onPortal }) {
     try {
       const url = await uploadImg(file, storageName);
       await dbSet(key, url);
-      setContent(c => ({ ...c, [key]: url }));
-    } catch (e) { alert("Error subiendo imagen: " + e.message); }
+      setContent((c) => ({ ...c, [key]: url }));
+    } catch (e) {
+      alert("Error subiendo imagen: " + e.message);
+    }
     setUploadingKey(null);
   }
 
   const F = ({ label, k, textarea }) => (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
-      {textarea
-        ? <textarea value={editing[k] ?? content[k]} onChange={e => setEditing(p => ({ ...p, [k]: e.target.value }))}
-            style={{ width: "100%", border: "1px solid #dde4f0", borderRadius: 8, padding: "10px 12px", fontSize: 13, fontFamily: "inherit", resize: "vertical", minHeight: 80, outline: "none" }} />
-        : <input value={editing[k] ?? content[k]} onChange={e => setEditing(p => ({ ...p, [k]: e.target.value }))}
-            style={{ width: "100%", border: "1px solid #dde4f0", borderRadius: 8, padding: "10px 12px", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-      }
-      <button onClick={() => saveField(k)} disabled={saving[k]}
-        style={{ marginTop: 6, background: "#08122d", color: "#fff", border: "none", borderRadius: 6, padding: "6px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: saving[k] ? 0.6 : 1 }}>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: "#666",
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          marginBottom: 6,
+        }}
+      >
+        {label}
+      </div>
+      {textarea ? (
+        <textarea
+          value={editing[k] ?? content[k]}
+          onChange={(e) => setEditing((p) => ({ ...p, [k]: e.target.value }))}
+          style={{
+            width: "100%",
+            border: "1px solid #dde4f0",
+            borderRadius: 8,
+            padding: "10px 12px",
+            fontSize: 13,
+            fontFamily: "inherit",
+            resize: "vertical",
+            minHeight: 80,
+            outline: "none",
+          }}
+        />
+      ) : (
+        <input
+          value={editing[k] ?? content[k]}
+          onChange={(e) => setEditing((p) => ({ ...p, [k]: e.target.value }))}
+          style={{
+            width: "100%",
+            border: "1px solid #dde4f0",
+            borderRadius: 8,
+            padding: "10px 12px",
+            fontSize: 13,
+            fontFamily: "inherit",
+            outline: "none",
+          }}
+        />
+      )}
+      <button
+        onClick={() => saveField(k)}
+        disabled={saving[k]}
+        style={{
+          marginTop: 6,
+          background: "#08122d",
+          color: "#fff",
+          border: "none",
+          borderRadius: 6,
+          padding: "6px 16px",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+          opacity: saving[k] ? 0.6 : 1,
+        }}
+      >
         {saving[k] ? "Guardando..." : "Guardar"}
       </button>
     </div>
@@ -142,59 +257,280 @@ export default function Landing({ onPortal }) {
 
   const ImgF = ({ label, k, storageName }) => (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>{label}</div>
-      {content[k] && <img src={content[k]} alt="" style={{ width: "100%", maxHeight: 140, objectFit: "cover", borderRadius: 8, marginBottom: 8 }} />}
-      <label style={{ display: "inline-block", background: "#f0f4ff", border: "1px solid #d0d8f0", borderRadius: 8, padding: "8px 16px", fontSize: 12, fontWeight: 500, cursor: "pointer", color: "#08122d" }}>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: "#666",
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          marginBottom: 8,
+        }}
+      >
+        {label}
+      </div>
+      {content[k] && (
+        <img
+          src={content[k]}
+          alt=""
+          style={{
+            width: "100%",
+            maxHeight: 140,
+            objectFit: "cover",
+            borderRadius: 8,
+            marginBottom: 8,
+          }}
+        />
+      )}
+      <label
+        style={{
+          display: "inline-block",
+          background: "#f0f4ff",
+          border: "1px solid #d0d8f0",
+          borderRadius: 8,
+          padding: "8px 16px",
+          fontSize: 12,
+          fontWeight: 500,
+          cursor: "pointer",
+          color: "#08122d",
+        }}
+      >
         {uploadingKey === k ? "Subiendo..." : "📁 Subir imagen"}
-        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && handleImgUpload(k, e.target.files[0], storageName)} />
+        <input
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) =>
+            e.target.files[0] &&
+            handleImgUpload(k, e.target.files[0], storageName)
+          }
+        />
       </label>
     </div>
   );
 
   const AdminPanel = () => (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
-      onClick={e => e.target === e.currentTarget && setShowAdmin(false)}>
-      <div style={{ background: "#fff", borderRadius: 20, width: "90%", maxWidth: 560, maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 32px 80px rgba(0,0,0,0.25)" }}>
-        <div style={{ background: "#08122d", padding: "20px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ color: "#fff", fontWeight: 700, fontSize: 16 }}>⚙️ Editor de contenido</div>
-          <button onClick={() => setShowAdmin(false)} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9998,
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+      onClick={(e) => e.target === e.currentTarget && setShowAdmin(false)}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 20,
+          width: "90%",
+          maxWidth: 560,
+          maxHeight: "90vh",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.25)",
+        }}
+      >
+        <div
+          style={{
+            background: "#08122d",
+            padding: "20px 28px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div style={{ color: "#fff", fontWeight: 700, fontSize: 16 }}>
+            ⚙️ Editor de contenido
+          </div>
+          <button
+            onClick={() => setShowAdmin(false)}
+            style={{
+              background: "rgba(255,255,255,0.15)",
+              border: "none",
+              color: "#fff",
+              borderRadius: "50%",
+              width: 32,
+              height: 32,
+              cursor: "pointer",
+              fontSize: 16,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ✕
+          </button>
         </div>
         {!adminAuth ? (
-          <div style={{ padding: 36, display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#08122d" }}>Acceso al editor</div>
-            <input type="password" placeholder="Contraseña" value={adminKey} onChange={e => setAdminKey(e.target.value)} onKeyDown={e => e.key === "Enter" && (adminKey === ADMIN_PASS ? setAdminAuth(true) : alert("Contraseña incorrecta"))}
-              style={{ border: "1px solid #dde4f0", borderRadius: 10, padding: "12px 16px", fontSize: 15, fontFamily: "inherit", outline: "none" }} />
-            <button onClick={() => adminKey === ADMIN_PASS ? setAdminAuth(true) : alert("Contraseña incorrecta")}
-              style={{ background: "#08122d", color: "#fff", border: "none", borderRadius: 10, padding: 14, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Entrar</button>
+          <div
+            style={{
+              padding: 36,
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#08122d" }}>
+              Acceso al editor
+            </div>
+            <input
+              type="password"
+              placeholder="Contraseña"
+              value={adminKey}
+              onChange={(e) => setAdminKey(e.target.value)}
+              onKeyDown={(e) =>
+                e.key === "Enter" &&
+                (adminKey === ADMIN_PASS
+                  ? setAdminAuth(true)
+                  : alert("Contraseña incorrecta"))
+              }
+              style={{
+                border: "1px solid #dde4f0",
+                borderRadius: 10,
+                padding: "12px 16px",
+                fontSize: 15,
+                fontFamily: "inherit",
+                outline: "none",
+              }}
+            />
+            <button
+              onClick={() =>
+                adminKey === ADMIN_PASS
+                  ? setAdminAuth(true)
+                  : alert("Contraseña incorrecta")
+              }
+              style={{
+                background: "#08122d",
+                color: "#fff",
+                border: "none",
+                borderRadius: 10,
+                padding: 14,
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: "pointer",
+              }}
+            >
+              Entrar
+            </button>
           </div>
         ) : (
           <div style={{ overflowY: "auto", padding: "28px 28px 40px" }}>
-            <div style={{ fontWeight: 700, fontSize: 13, color: "#08122d", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Hero</div>
-            <ImgF label="Imagen de fondo (hero)" k="hero_img" storageName="landing_hero" />
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: 13,
+                color: "#08122d",
+                marginBottom: 16,
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+              }}
+            >
+              🖼️ Hero
+            </div>
+            <ImgF
+              label="Imagen de fondo (hero)"
+              k="hero_img"
+              storageName="landing_hero"
+            />
             <F label="Título línea 1" k="hero_titulo" />
             <F label="Título línea 2 (italic)" k="hero_titulo2" />
             <F label="Subtexto hero" k="hero_sub" textarea />
 
-            <div style={{ fontWeight: 700, fontSize: 13, color: "#08122d", margin: "24px 0 16px", textTransform: "uppercase", letterSpacing: "0.1em" }}>👥 Nosotros</div>
-            <ImgF label="Imagen nosotros (fondo difuminado)" k="about_img" storageName="landing_about" />
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: 13,
+                color: "#08122d",
+                margin: "24px 0 16px",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+              }}
+            >
+              👥 Nosotros
+            </div>
+            <ImgF
+              label="Imagen nosotros (fondo difuminado)"
+              k="about_img"
+              storageName="landing_about"
+            />
             <F label="Título" k="about_titulo" />
             <F label="Párrafo 1" k="about_texto1" textarea />
             <F label="Párrafo 2" k="about_texto2" textarea />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
-              {[[1],[2],[3]].map(([n]) => <div key={n}><F label={`Stat ${n} número`} k={`stat${n}_n`} /><F label={`Stat ${n} label`} k={`stat${n}_l`} /></div>)}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 10,
+                marginBottom: 16,
+              }}
+            >
+              {[[1], [2], [3]].map(([n]) => (
+                <div key={n}>
+                  <F label={`Stat ${n} número`} k={`stat${n}_n`} />
+                  <F label={`Stat ${n} label`} k={`stat${n}_l`} />
+                </div>
+              ))}
             </div>
 
-            <div style={{ fontWeight: 700, fontSize: 13, color: "#08122d", margin: "24px 0 16px", textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Galería</div>
-            {[1,2,3,4,5].map(n => (
-              <div key={n} style={{ background: "#f8f9fc", borderRadius: 12, padding: "16px 16px 8px", marginBottom: 12 }}>
-                <div style={{ fontWeight: 600, fontSize: 12, color: "#666", marginBottom: 10 }}>Foto {n}</div>
-                <ImgF label="Imagen" k={`gal${n}_img`} storageName={`landing_gal${n}`} />
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: 13,
+                color: "#08122d",
+                margin: "24px 0 16px",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+              }}
+            >
+              🖼️ Galería
+            </div>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <div
+                key={n}
+                style={{
+                  background: "#f8f9fc",
+                  borderRadius: 12,
+                  padding: "16px 16px 8px",
+                  marginBottom: 12,
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 12,
+                    color: "#666",
+                    marginBottom: 10,
+                  }}
+                >
+                  Foto {n}
+                </div>
+                <ImgF
+                  label="Imagen"
+                  k={`gal${n}_img`}
+                  storageName={`landing_gal${n}`}
+                />
                 <F label="Título" k={`gal${n}_label`} />
                 <F label="Subtítulo" k={`gal${n}_sub`} />
               </div>
             ))}
 
-            <div style={{ fontWeight: 700, fontSize: 13, color: "#08122d", margin: "24px 0 16px", textTransform: "uppercase", letterSpacing: "0.1em" }}>📍 Contacto</div>
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: 13,
+                color: "#08122d",
+                margin: "24px 0 16px",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+              }}
+            >
+              📍 Contacto
+            </div>
             <F label="WhatsApp (solo números, ej: 56912345678)" k="whatsapp" />
             <F label="Dirección" k="contacto_dir" />
             <F label="Ensayos" k="contacto_ensayo" />
@@ -205,11 +541,29 @@ export default function Landing({ onPortal }) {
     </div>
   );
 
-  const galItems = [1,2,3,4,5].map(n => ({ label: content[`gal${n}_label`], sub: content[`gal${n}_sub`], img: content[`gal${n}_img`] }));
-  const galColors = ["linear-gradient(155deg,#0a1628,#1a3460)","linear-gradient(155deg,#0d1f3e,#0d2d55)","linear-gradient(155deg,#081228,#1a2d50)","linear-gradient(155deg,#0f1e38,#162a4a)","linear-gradient(155deg,#0a1828,#0d2540)"];
+  const galItems = [1, 2, 3, 4, 5].map((n) => ({
+    label: content[`gal${n}_label`],
+    sub: content[`gal${n}_sub`],
+    img: content[`gal${n}_img`],
+  }));
+  const galColors = [
+    "linear-gradient(155deg,#0a1628,#1a3460)",
+    "linear-gradient(155deg,#0d1f3e,#0d2d55)",
+    "linear-gradient(155deg,#081228,#1a2d50)",
+    "linear-gradient(155deg,#0f1e38,#162a4a)",
+    "linear-gradient(155deg,#0a1828,#0d2540)",
+  ];
 
   return (
-    <div style={{ fontFamily: "'DM Sans', 'Inter', -apple-system, sans-serif", background: "#fff", color: "#0a0a14", overflowX: "hidden", WebkitFontSmoothing: "antialiased" }}>
+    <div
+      style={{
+        fontFamily: "'DM Sans', 'Inter', -apple-system, sans-serif",
+        background: "#fff",
+        color: "#0a0a14",
+        overflowX: "hidden",
+        WebkitFontSmoothing: "antialiased",
+      }}
+    >
       {showAdmin && <AdminPanel />}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300;1,9..144,400;1,9..144,700&display=swap');
@@ -364,26 +718,36 @@ export default function Landing({ onPortal }) {
           <a onClick={() => scrollTo("bot")}>Únete</a>
           <a onClick={() => scrollTo("contacto")}>Contacto</a>
         </div>
-        <button className="l-nav-cta" onClick={onPortal}>Acceso Portal</button>
+        <button className="l-nav-cta" onClick={onPortal}>
+          Acceso Portal
+        </button>
       </nav>
 
       {/* HERO */}
       <section id="inicio" className="l-hero">
-        <div className="l-hero-bg" style={{ backgroundImage: `url('${content.hero_img}')` }} />
+        <div
+          className="l-hero-bg"
+          style={{ backgroundImage: `url('${content.hero_img}')` }}
+        />
         <div className="l-hero-ov" />
         <div className="l-hero-c">
           <div>
             <span className="l-kicker">{content.hero_kicker}</span>
             <h1 className="l-h1">
-              {content.hero_titulo}<br/>
+              {content.hero_titulo}
+              <br />
               <span className="ital">{content.hero_titulo2}</span>
             </h1>
           </div>
           <div className="l-hero-right">
             <p className="l-hero-sub">{content.hero_sub}</p>
             <div className="l-btns">
-              <button className="l-btn-w" onClick={() => scrollTo("nosotros")}>Conócenos</button>
-              <button className="l-btn-o" onClick={() => scrollTo("bot")}>Únete</button>
+              <button className="l-btn-w" onClick={() => scrollTo("nosotros")}>
+                Conócenos
+              </button>
+              <button className="l-btn-o" onClick={() => scrollTo("bot")}>
+                Únete
+              </button>
             </div>
           </div>
         </div>
@@ -392,9 +756,25 @@ export default function Landing({ onPortal }) {
       {/* TICKER */}
       <div className="l-ticker">
         <div className="l-ticker-i">
-          {["Música litúrgica contemporánea","Maipú · Chile","15 años de trayectoria","4 cuerdas vocales","400+ presentaciones","Ensemble vocal profesional",
-            "Música litúrgica contemporánea","Maipú · Chile","15 años de trayectoria","4 cuerdas vocales","400+ presentaciones","Ensemble vocal profesional"
-          ].map((t,i) => <span key={i} className="l-titem"><span className="l-tdot"/>{t}</span>)}
+          {[
+            "Música litúrgica contemporánea",
+            "Maipú · Chile",
+            "15 años de trayectoria",
+            "4 cuerdas vocales",
+            "400+ presentaciones",
+            "Ensemble vocal profesional",
+            "Música litúrgica contemporánea",
+            "Maipú · Chile",
+            "15 años de trayectoria",
+            "4 cuerdas vocales",
+            "400+ presentaciones",
+            "Ensemble vocal profesional",
+          ].map((t, i) => (
+            <span key={i} className="l-titem">
+              <span className="l-tdot" />
+              {t}
+            </span>
+          ))}
         </div>
       </div>
 
@@ -404,17 +784,39 @@ export default function Landing({ onPortal }) {
           <div className="l-about-grid">
             <div>
               <div className="l-ey">Quiénes somos</div>
-              <h2 className="l-h2">{content.about_titulo.includes("identidad") ? <>Un ensemble con <em>identidad propia</em></> : content.about_titulo}</h2>
+              <h2 className="l-h2">
+                {content.about_titulo.includes("identidad") ? (
+                  <>
+                    Un ensemble con <em>identidad propia</em>
+                  </>
+                ) : (
+                  content.about_titulo
+                )}
+              </h2>
               <p className="l-body">{content.about_texto1}</p>
-              <p className="l-body" style={{marginTop:14}}>{content.about_texto2}</p>
+              <p className="l-body" style={{ marginTop: 14 }}>
+                {content.about_texto2}
+              </p>
               <div className="l-stats">
-                <div className="l-stat"><div className="l-stat-n">{content.stat1_n}</div><div className="l-stat-l">{content.stat1_l}</div></div>
-                <div className="l-stat"><div className="l-stat-n">{content.stat2_n}</div><div className="l-stat-l">{content.stat2_l}</div></div>
-                <div className="l-stat"><div className="l-stat-n">{content.stat3_n}</div><div className="l-stat-l">{content.stat3_l}</div></div>
+                <div className="l-stat">
+                  <div className="l-stat-n">{content.stat1_n}</div>
+                  <div className="l-stat-l">{content.stat1_l}</div>
+                </div>
+                <div className="l-stat">
+                  <div className="l-stat-n">{content.stat2_n}</div>
+                  <div className="l-stat-l">{content.stat2_l}</div>
+                </div>
+                <div className="l-stat">
+                  <div className="l-stat-n">{content.stat3_n}</div>
+                  <div className="l-stat-l">{content.stat3_l}</div>
+                </div>
               </div>
             </div>
             <div className="l-about-img">
-              <div className="l-about-img-bg" style={{ backgroundImage: `url('${content.about_img}')` }} />
+              <div
+                className="l-about-img-bg"
+                style={{ backgroundImage: `url('${content.about_img}')` }}
+              />
               <div className="l-about-img-badge">
                 <div className="l-about-badge-l">Cuerdas vocales</div>
                 <div className="l-about-badge-v">SATB</div>
@@ -430,17 +832,34 @@ export default function Landing({ onPortal }) {
           <div className="l-gal-top">
             <div>
               <div className="l-ey">Galería</div>
-              <h2 className="l-h2" style={{marginBottom:0}}>Presencia en cada<br/><em>celebración</em></h2>
+              <h2 className="l-h2" style={{ marginBottom: 0 }}>
+                Presencia en cada
+                <br />
+                <em>celebración</em>
+              </h2>
             </div>
-            <p className="l-body" style={{maxWidth:240,textAlign:"right"}}>Momentos que capturan nuestra entrega a la música litúrgica.</p>
+            <p className="l-body" style={{ maxWidth: 240, textAlign: "right" }}>
+              Momentos que capturan nuestra entrega a la música litúrgica.
+            </p>
           </div>
           <div className="l-gal">
-            {galItems.map((g,i) => (
+            {galItems.map((g, i) => (
               <div key={i} className="l-gi">
-                <div className="l-gi-fill" style={{ backgroundImage: g.img ? `url('${g.img}')` : "none", background: g.img ? undefined : galColors[i] }} />
+                <div
+                  className="l-gi-fill"
+                  style={{
+                    backgroundImage: g.img ? `url('${g.img}')` : "none",
+                    background: g.img ? undefined : galColors[i],
+                  }}
+                />
                 <div className="l-gi-ov" />
-                <div className="l-gi-cap"><div className="l-gi-cap-t">{g.label}</div><div className="l-gi-cap-s">{g.sub}</div></div>
-                <div className="l-gi-hov"><div className="l-gi-hov-btn">Ver foto</div></div>
+                <div className="l-gi-cap">
+                  <div className="l-gi-cap-t">{g.label}</div>
+                  <div className="l-gi-cap-s">{g.sub}</div>
+                </div>
+                <div className="l-gi-hov">
+                  <div className="l-gi-hov-btn">Ver foto</div>
+                </div>
               </div>
             ))}
           </div>
@@ -453,16 +872,39 @@ export default function Landing({ onPortal }) {
           <div className="l-bot-grid">
             <div>
               <div className="l-ey">Asistente IA</div>
-              <h2 className="l-h2">¿Te sumas<br/>al <em>coro?</em></h2>
-              <p className="l-body">Respuestas inmediatas sobre cómo integrarte, ensayos y todo lo que necesitas saber.</p>
-              <div style={{marginTop:44}}>
-                {[["01","Proceso de ingreso","Cómo postular, qué se evalúa y cuándo son los ensayos de prueba."],
-                  ["02","Horarios y ensayos","Frecuencia semanal, lugar y cómo es el proceso de incorporación."],
-                  ["03","Repertorio y nivel","Qué cantamos y qué experiencia musical se valora."]
-                ].map(([n,t,d]) => (
+              <h2 className="l-h2">
+                ¿Te sumas
+                <br />
+                al <em>coro?</em>
+              </h2>
+              <p className="l-body">
+                Respuestas inmediatas sobre cómo integrarte, ensayos y todo lo
+                que necesitas saber.
+              </p>
+              <div style={{ marginTop: 44 }}>
+                {[
+                  [
+                    "01",
+                    "Proceso de ingreso",
+                    "Cómo postular, qué se evalúa y cuándo son los ensayos de prueba.",
+                  ],
+                  [
+                    "02",
+                    "Horarios y ensayos",
+                    "Frecuencia semanal, lugar y cómo es el proceso de incorporación.",
+                  ],
+                  [
+                    "03",
+                    "Repertorio y nivel",
+                    "Qué cantamos y qué experiencia musical se valora.",
+                  ],
+                ].map(([n, t, d]) => (
                   <div key={n} className="l-bfeat">
                     <div className="l-bfeat-num">{n}</div>
-                    <div><div className="l-bfeat-t">{t}</div><div className="l-bfeat-d">{d}</div></div>
+                    <div>
+                      <div className="l-bfeat-t">{t}</div>
+                      <div className="l-bfeat-d">{d}</div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -471,29 +913,78 @@ export default function Landing({ onPortal }) {
               <div className="l-chat">
                 <div className="l-chat-hd">
                   <div className="l-chat-av">🎵</div>
-                  <div><div className="l-chat-n">Coro MJ — Asistente</div><div className="l-chat-s">Responde en español · IA</div></div>
-                  <div className="l-chat-dot"/>
+                  <div>
+                    <div className="l-chat-n">Coro MJ — Asistente</div>
+                    <div className="l-chat-s">Responde en español · IA</div>
+                  </div>
+                  <div className="l-chat-dot" />
                 </div>
                 <div className="l-chat-msgs" ref={msgsRef}>
-                  {chatMsgs.map((m,i) => (
-                    <div key={i} className={`l-cm${m.role==="user"?" l-cm-u":""}`}>
-                      {m.role==="bot" && <div className="l-cm-av">🎵</div>}
-                      <div className={`l-cm-b ${m.role==="bot"?"l-cm-bot":"l-cm-usr"}`}>{m.text}</div>
-                      {m.role==="user" && <div className="l-cm-av">👤</div>}
+                  {chatMsgs.map((m, i) => (
+                    <div
+                      key={i}
+                      className={`l-cm${m.role === "user" ? " l-cm-u" : ""}`}
+                    >
+                      {m.role === "bot" && <div className="l-cm-av">🎵</div>}
+                      <div
+                        className={`l-cm-b ${
+                          m.role === "bot" ? "l-cm-bot" : "l-cm-usr"
+                        }`}
+                      >
+                        {m.text}
+                      </div>
+                      {m.role === "user" && <div className="l-cm-av">👤</div>}
                     </div>
                   ))}
-                  {typing && <div className="l-cm"><div className="l-cm-av">🎵</div><div className="l-cm-b l-cm-bot"><div className="l-tdots"><span/><span/><span/></div></div></div>}
+                  {typing && (
+                    <div className="l-cm">
+                      <div className="l-cm-av">🎵</div>
+                      <div className="l-cm-b l-cm-bot">
+                        <div className="l-tdots">
+                          <span />
+                          <span />
+                          <span />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="l-chat-pills">
-                  {["¿Cómo me uno?","¿Cuándo ensayan?","¿Qué nivel necesito?"].map(p => (
-                    <button key={p} className="l-cpill" onClick={() => sendMsg(p)}>{p}</button>
+                  {[
+                    "¿Cómo me uno?",
+                    "¿Cuándo ensayan?",
+                    "¿Qué nivel necesito?",
+                  ].map((p) => (
+                    <button
+                      key={p}
+                      className="l-cpill"
+                      onClick={() => sendMsg(p)}
+                    >
+                      {p}
+                    </button>
                   ))}
                 </div>
                 <div className="l-chat-ft">
-                  <input className="l-cin" value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendMsg()} placeholder="Escribe tu pregunta..."/>
-                  <button className="l-csnd" onClick={()=>sendMsg()}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  <input
+                    className="l-cin"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && sendMsg()}
+                    placeholder="Escribe tu pregunta..."
+                  />
+                  <button className="l-csnd" onClick={() => sendMsg()}>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#fff"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="22" y1="2" x2="11" y2="13" />
+                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
                     </svg>
                   </button>
                 </div>
@@ -509,25 +1000,88 @@ export default function Landing({ onPortal }) {
           <div className="l-ct-grid">
             <div>
               <div className="l-ey">Contacto</div>
-              <h2 className="l-h2">Hablemos<br/><em>directamente</em></h2>
-              <p className="l-body">¿Quieres invitarnos o tienes alguna consulta?</p>
-              <div style={{marginTop:36}}>
-                <div className="l-ct-item"><div className="l-ct-ico">📍</div><div><div className="l-ct-t">Ubicación</div><div className="l-ct-s">{content.contacto_dir}</div></div></div>
-                <div className="l-ct-item"><div className="l-ct-ico">🎵</div><div><div className="l-ct-t">Ensayos</div><div className="l-ct-s">{content.contacto_ensayo}</div></div></div>
-                <div className="l-ct-item"><div className="l-ct-ico">📲</div><div><div className="l-ct-t">Redes sociales</div><div className="l-ct-s">Síguenos en nuestras plataformas</div></div></div>
+              <h2 className="l-h2">
+                Hablemos
+                <br />
+                <em>directamente</em>
+              </h2>
+              <p className="l-body">
+                ¿Quieres invitarnos o tienes alguna consulta?
+              </p>
+              <div style={{ marginTop: 36 }}>
+                <div className="l-ct-item">
+                  <div className="l-ct-ico">📍</div>
+                  <div>
+                    <div className="l-ct-t">Ubicación</div>
+                    <div className="l-ct-s">{content.contacto_dir}</div>
+                  </div>
+                </div>
+                <div className="l-ct-item">
+                  <div className="l-ct-ico">🎵</div>
+                  <div>
+                    <div className="l-ct-t">Ensayos</div>
+                    <div className="l-ct-s">{content.contacto_ensayo}</div>
+                  </div>
+                </div>
+                <div className="l-ct-item">
+                  <div className="l-ct-ico">📲</div>
+                  <div>
+                    <div className="l-ct-t">Redes sociales</div>
+                    <div className="l-ct-s">
+                      Síguenos en nuestras plataformas
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="l-soc-row"><div className="l-soc">📸</div><div className="l-soc">📘</div><div className="l-soc">▶️</div><div className="l-soc">🎧</div></div>
+              <div className="l-soc-row">
+                <div className="l-soc">📸</div>
+                <div className="l-soc">📘</div>
+                <div className="l-soc">▶️</div>
+                <div className="l-soc">🎧</div>
+              </div>
             </div>
             <div className="l-cform">
-              <h3>Envíanos<br/>un mensaje</h3>
+              <h3>
+                Envíanos
+                <br />
+                un mensaje
+              </h3>
               <div className="l-frow">
-                <div className="l-fg"><label>Nombre</label><input type="text" placeholder="Juan"/></div>
-                <div className="l-fg"><label>Apellido</label><input type="text" placeholder="González"/></div>
+                <div className="l-fg">
+                  <label>Nombre</label>
+                  <input type="text" placeholder="Juan" />
+                </div>
+                <div className="l-fg">
+                  <label>Apellido</label>
+                  <input type="text" placeholder="González" />
+                </div>
               </div>
-              <div className="l-fg"><label>Correo</label><input type="email" placeholder="tu@correo.cl"/></div>
-              <div className="l-fg"><label>Asunto</label><select><option>Quiero unirme al coro</option><option>Invitación a celebración</option><option>Consulta general</option><option>Otro</option></select></div>
-              <div className="l-fg"><label>Mensaje</label><textarea placeholder="Cuéntanos..."/></div>
-              <button className="l-fsub" onClick={()=>{setFormOk(true);setTimeout(()=>setFormOk(false),3000)}}>{formOk?"✓ Enviado":"Enviar"}</button>
+              <div className="l-fg">
+                <label>Correo</label>
+                <input type="email" placeholder="tu@correo.cl" />
+              </div>
+              <div className="l-fg">
+                <label>Asunto</label>
+                <select>
+                  <option>Quiero unirme al coro</option>
+                  <option>Invitación a celebración</option>
+                  <option>Consulta general</option>
+                  <option>Otro</option>
+                </select>
+              </div>
+              <div className="l-fg">
+                <label>Mensaje</label>
+                <textarea placeholder="Cuéntanos..." />
+              </div>
+              <button
+                className="l-fsub"
+                onClick={() => {
+                  setFormOk(true);
+                  setTimeout(() => setFormOk(false), 3000);
+                }}
+              >
+                {formOk ? "✓ Enviado" : "Enviar"}
+              </button>
             </div>
           </div>
         </div>
@@ -543,35 +1097,61 @@ export default function Landing({ onPortal }) {
           <div className="l-foot-cols">
             <div className="l-foot-col">
               <h4>Sitio</h4>
-              <a onClick={()=>scrollTo("nosotros")}>Nosotros</a>
-              <a onClick={()=>scrollTo("galeria")}>Galería</a>
-              <a onClick={()=>scrollTo("bot")}>Únete</a>
-              <a onClick={()=>scrollTo("contacto")}>Contacto</a>
+              <a onClick={() => scrollTo("nosotros")}>Nosotros</a>
+              <a onClick={() => scrollTo("galeria")}>Galería</a>
+              <a onClick={() => scrollTo("bot")}>Únete</a>
+              <a onClick={() => scrollTo("contacto")}>Contacto</a>
             </div>
             <div className="l-foot-col">
               <h4>Redes</h4>
-              <a>Instagram</a><a>Facebook</a><a>YouTube</a><a>Spotify</a>
+              <a>Instagram</a>
+              <a>Facebook</a>
+              <a>YouTube</a>
+              <a>Spotify</a>
             </div>
           </div>
         </div>
         <div className="l-foot-btm">
-          <span className="l-foot-copy">© 2026 Coro Misioneros de Jesús · Desarrollado por TEMPVS7®</span>
-          <span className="l-foot-adm" onClick={()=>setShowAdmin(true)}>· · ·</span>
+          <span className="l-foot-copy">
+            © 2026 Coro Misioneros de Jesús · Desarrollado por TEMPVS7®
+          </span>
+          <span className="l-foot-adm" onClick={() => setShowAdmin(true)}>
+            · · ·
+          </span>
         </div>
       </footer>
       {/* BOTONES FLOTANTES */}
       <div className="fab-wrap">
-        <button className="fab fab-admin" onClick={() => setShowAdmin(true)} title="Admin">
+        <button
+          className="fab fab-admin"
+          onClick={() => setShowAdmin(true)}
+          title="Admin"
+        >
           <span className="fab-label">Editar sitio</span>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#fff"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
           </svg>
         </button>
-        <a className="fab fab-wa" href={`https://wa.me/${content.whatsapp}?text=Hola,%20me%20interesa%20saber%20m%C3%A1s%20sobre%20el%20Coro%20Misioneros%20de%20Jes%C3%BAs`} target="_blank" rel="noopener noreferrer" title="WhatsApp">
+        <a
+          className="fab fab-wa"
+          href={`https://wa.me/${content.whatsapp}?text=Hola,%20me%20interesa%20saber%20m%C3%A1s%20sobre%20el%20Coro%20Misioneros%20de%20Jes%C3%BAs`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="WhatsApp"
+        >
           <span className="fab-label">WhatsApp</span>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" />
           </svg>
         </a>
       </div>
