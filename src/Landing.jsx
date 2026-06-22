@@ -1,33 +1,101 @@
 import { useState, useEffect, useRef } from "react";
 
+const SUPABASE_URL = "https://ttbipbhfswcwwgcwaist.supabase.co";
+const SUPABASE_KEY = "sb_publishable_mz6TyeuTP3TA6XQPOunXFQ_ad0Cp9fg";
+const BUCKET = `${SUPABASE_URL}/storage/v1/object/public/publico`;
+
 const SYS = `Eres el asistente del Coro Misioneros de Jesús, ensemble vocal de música litúrgica profesional en Maipú, Chile. Responde en español, de forma concisa (máx 2-3 oraciones), profesional y cercana. Solo respondes sobre el coro: ingreso, ensayos (sábados), nivel musical, repertorio litúrgico contemporáneo, cuerdas SATB. Para contacto dirígelos al formulario del sitio.`;
 
+const DEFAULT_CONTENT = {
+  hero_titulo: "Misioneros",
+  hero_titulo2: "de Jesús",
+  hero_kicker: "Coro · Maipú · Chile",
+  hero_sub: "Ensemble vocal de música litúrgica contemporánea. Quince años de presencia y excelencia musical en Maipú.",
+  hero_img: `${BUCKET}/landing_hero.jpg`,
+  about_titulo: "Un ensemble con identidad propia",
+  about_texto1: "Somos un coro de música litúrgica con más de 15 años en actividad. Cuatro cuerdas vocales —soprano, contralto, tenor y bajo— acompañadas de instrumentos en vivo, construyendo un sonido propio semana a semana.",
+  about_texto2: "Nuestra disciplina musical y compromiso con el repertorio nos definen como un conjunto vocal de alto nivel dentro de la tradición litúrgica contemporánea.",
+  about_img: `${BUCKET}/landing_about.jpg`,
+  stat1_n: "15+", stat1_l: "Años activos",
+  stat2_n: "30+", stat2_l: "Voces",
+  stat3_n: "400+", stat3_l: "Presentaciones",
+  gal1_label: "Navidad 2023", gal1_sub: "Diciembre", gal1_img: "",
+  gal2_label: "Semana Santa 2024", gal2_sub: "Abril", gal2_img: "",
+  gal3_label: "Fiesta Patronal", gal3_sub: "Agosto", gal3_img: "",
+  gal4_label: "Corpus Christi", gal4_sub: "Junio", gal4_img: "",
+  gal5_label: "Vigilia Pascual", gal5_sub: "Marzo", gal5_img: "",
+  contacto_dir: "Maipú, Santiago, Chile · Capilla Sagrada Familia",
+  contacto_ensayo: "Sábados · Capilla Misioneros de Jesús",
+  whatsapp: "56912345678",
+  footer_texto: "Ensemble vocal de música litúrgica. Maipú, Santiago de Chile.",
+};
+
+async function dbGet() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/landing_content?select=key,value`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    });
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return DEFAULT_CONTENT;
+    const obj = { ...DEFAULT_CONTENT };
+    rows.forEach(({ key, value }) => { obj[key] = value; });
+    return obj;
+  } catch { return DEFAULT_CONTENT; }
+}
+
+async function dbSet(key, value) {
+  await fetch(`${SUPABASE_URL}/rest/v1/landing_content`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json", Prefer: "resolution=merge-duplicates"
+    },
+    body: JSON.stringify({ key, value })
+  });
+}
+
+async function uploadImg(file, name) {
+  const ext = file.name.split(".").pop();
+  const path = `${name}.${ext}`;
+  const r = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": file.type, "x-upsert": "true" },
+    body: file
+  });
+  if (!r.ok) throw new Error("Upload failed");
+  return `${BUCKET}/${path}?t=${Date.now()}`;
+}
+
 export default function Landing({ onPortal }) {
-  const [chatMsgs, setChatMsgs] = useState([
-    { role: "bot", text: "Hola, soy el asistente del Coro Misioneros de Jesús. ¿En qué te puedo orientar? Pregúntame sobre cómo unirte, los ensayos o nuestro repertorio." }
-  ]);
+  const [content, setContent] = useState(DEFAULT_CONTENT);
+  const [chatMsgs, setChatMsgs] = useState([{ role: "bot", text: "Hola, soy el asistente del Coro Misioneros de Jesús. ¿En qué te puedo orientar?" }]);
   const [chatInput, setChatInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [hist, setHist] = useState([]);
   const [formOk, setFormOk] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [adminKey, setAdminKey] = useState("");
+  const [adminAuth, setAdminAuth] = useState(false);
+  const [editing, setEditing] = useState({});
+  const [saving, setSaving] = useState({});
+  const [uploadingKey, setUploadingKey] = useState(null);
   const msgsRef = useRef(null);
+  const ADMIN_PASS = "coromj2026";
 
-  useEffect(() => {
-    if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
-  }, [chatMsgs, typing]);
+  useEffect(() => { dbGet().then(setContent); }, []);
+  useEffect(() => { if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight; }, [chatMsgs, typing]);
+
+  const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
   async function sendMsg(text) {
-    const t = (text || chatInput).trim();
-    if (!t) return;
+    const t = (text || chatInput).trim(); if (!t) return;
     setChatInput("");
     const newHist = [...hist, { role: "user", content: t }];
     setChatMsgs(prev => [...prev, { role: "user", text: t }]);
-    setHist(newHist);
-    setTyping(true);
+    setHist(newHist); setTyping(true);
     try {
       const r = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, system: SYS, messages: newHist })
       });
       const data = await r.json();
@@ -35,249 +103,321 @@ export default function Landing({ onPortal }) {
       setTyping(false);
       setChatMsgs(prev => [...prev, { role: "bot", text: reply }]);
       setHist(prev => [...prev, { role: "assistant", content: reply }]);
-    } catch {
-      setTyping(false);
-      setChatMsgs(prev => [...prev, { role: "bot", text: "Error de conexión, intenta de nuevo." }]);
-    }
+    } catch { setTyping(false); setChatMsgs(prev => [...prev, { role: "bot", text: "Error de conexión." }]); }
   }
 
-  function usePill(txt) { sendMsg(txt); }
+  async function saveField(key) {
+    setSaving(s => ({ ...s, [key]: true }));
+    await dbSet(key, editing[key] ?? content[key]);
+    setContent(c => ({ ...c, [key]: editing[key] ?? c[key] }));
+    setEditing(e => { const n = { ...e }; delete n[key]; return n; });
+    setSaving(s => ({ ...s, [key]: false }));
+  }
 
-  const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  async function handleImgUpload(key, file, storageName) {
+    setUploadingKey(key);
+    try {
+      const url = await uploadImg(file, storageName);
+      await dbSet(key, url);
+      setContent(c => ({ ...c, [key]: url }));
+    } catch (e) { alert("Error subiendo imagen: " + e.message); }
+    setUploadingKey(null);
+  }
+
+  const F = ({ label, k, textarea }) => (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+      {textarea
+        ? <textarea value={editing[k] ?? content[k]} onChange={e => setEditing(p => ({ ...p, [k]: e.target.value }))}
+            style={{ width: "100%", border: "1px solid #dde4f0", borderRadius: 8, padding: "10px 12px", fontSize: 13, fontFamily: "inherit", resize: "vertical", minHeight: 80, outline: "none" }} />
+        : <input value={editing[k] ?? content[k]} onChange={e => setEditing(p => ({ ...p, [k]: e.target.value }))}
+            style={{ width: "100%", border: "1px solid #dde4f0", borderRadius: 8, padding: "10px 12px", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+      }
+      <button onClick={() => saveField(k)} disabled={saving[k]}
+        style={{ marginTop: 6, background: "#08122d", color: "#fff", border: "none", borderRadius: 6, padding: "6px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: saving[k] ? 0.6 : 1 }}>
+        {saving[k] ? "Guardando..." : "Guardar"}
+      </button>
+    </div>
+  );
+
+  const ImgF = ({ label, k, storageName }) => (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>{label}</div>
+      {content[k] && <img src={content[k]} alt="" style={{ width: "100%", maxHeight: 140, objectFit: "cover", borderRadius: 8, marginBottom: 8 }} />}
+      <label style={{ display: "inline-block", background: "#f0f4ff", border: "1px solid #d0d8f0", borderRadius: 8, padding: "8px 16px", fontSize: 12, fontWeight: 500, cursor: "pointer", color: "#08122d" }}>
+        {uploadingKey === k ? "Subiendo..." : "📁 Subir imagen"}
+        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && handleImgUpload(k, e.target.files[0], storageName)} />
+      </label>
+    </div>
+  );
+
+  const AdminPanel = () => (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={e => e.target === e.currentTarget && setShowAdmin(false)}>
+      <div style={{ background: "#fff", borderRadius: 20, width: "90%", maxWidth: 560, maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 32px 80px rgba(0,0,0,0.25)" }}>
+        <div style={{ background: "#08122d", padding: "20px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ color: "#fff", fontWeight: 700, fontSize: 16 }}>⚙️ Editor de contenido</div>
+          <button onClick={() => setShowAdmin(false)} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+        </div>
+        {!adminAuth ? (
+          <div style={{ padding: 36, display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#08122d" }}>Acceso al editor</div>
+            <input type="password" placeholder="Contraseña" value={adminKey} onChange={e => setAdminKey(e.target.value)} onKeyDown={e => e.key === "Enter" && (adminKey === ADMIN_PASS ? setAdminAuth(true) : alert("Contraseña incorrecta"))}
+              style={{ border: "1px solid #dde4f0", borderRadius: 10, padding: "12px 16px", fontSize: 15, fontFamily: "inherit", outline: "none" }} />
+            <button onClick={() => adminKey === ADMIN_PASS ? setAdminAuth(true) : alert("Contraseña incorrecta")}
+              style={{ background: "#08122d", color: "#fff", border: "none", borderRadius: 10, padding: 14, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Entrar</button>
+          </div>
+        ) : (
+          <div style={{ overflowY: "auto", padding: "28px 28px 40px" }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: "#08122d", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Hero</div>
+            <ImgF label="Imagen de fondo (hero)" k="hero_img" storageName="landing_hero" />
+            <F label="Título línea 1" k="hero_titulo" />
+            <F label="Título línea 2 (italic)" k="hero_titulo2" />
+            <F label="Subtexto hero" k="hero_sub" textarea />
+
+            <div style={{ fontWeight: 700, fontSize: 13, color: "#08122d", margin: "24px 0 16px", textTransform: "uppercase", letterSpacing: "0.1em" }}>👥 Nosotros</div>
+            <ImgF label="Imagen nosotros (fondo difuminado)" k="about_img" storageName="landing_about" />
+            <F label="Título" k="about_titulo" />
+            <F label="Párrafo 1" k="about_texto1" textarea />
+            <F label="Párrafo 2" k="about_texto2" textarea />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+              {[[1],[2],[3]].map(([n]) => <div key={n}><F label={`Stat ${n} número`} k={`stat${n}_n`} /><F label={`Stat ${n} label`} k={`stat${n}_l`} /></div>)}
+            </div>
+
+            <div style={{ fontWeight: 700, fontSize: 13, color: "#08122d", margin: "24px 0 16px", textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Galería</div>
+            {[1,2,3,4,5].map(n => (
+              <div key={n} style={{ background: "#f8f9fc", borderRadius: 12, padding: "16px 16px 8px", marginBottom: 12 }}>
+                <div style={{ fontWeight: 600, fontSize: 12, color: "#666", marginBottom: 10 }}>Foto {n}</div>
+                <ImgF label="Imagen" k={`gal${n}_img`} storageName={`landing_gal${n}`} />
+                <F label="Título" k={`gal${n}_label`} />
+                <F label="Subtítulo" k={`gal${n}_sub`} />
+              </div>
+            ))}
+
+            <div style={{ fontWeight: 700, fontSize: 13, color: "#08122d", margin: "24px 0 16px", textTransform: "uppercase", letterSpacing: "0.1em" }}>📍 Contacto</div>
+            <F label="WhatsApp (solo números, ej: 56912345678)" k="whatsapp" />
+            <F label="Dirección" k="contacto_dir" />
+            <F label="Ensayos" k="contacto_ensayo" />
+            <F label="Texto footer" k="footer_texto" textarea />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const galItems = [1,2,3,4,5].map(n => ({ label: content[`gal${n}_label`], sub: content[`gal${n}_sub`], img: content[`gal${n}_img`] }));
+  const galColors = ["linear-gradient(155deg,#0a1628,#1a3460)","linear-gradient(155deg,#0d1f3e,#0d2d55)","linear-gradient(155deg,#081228,#1a2d50)","linear-gradient(155deg,#0f1e38,#162a4a)","linear-gradient(155deg,#0a1828,#0d2540)"];
 
   return (
-    <div style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", background: "#fff", color: "#0a0a14", overflowX: "hidden", WebkitFontSmoothing: "antialiased" }}>
+    <div style={{ fontFamily: "'DM Sans', 'Inter', -apple-system, sans-serif", background: "#fff", color: "#0a0a14", overflowX: "hidden", WebkitFontSmoothing: "antialiased" }}>
+      {showAdmin && <AdminPanel />}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@1,400;1,700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300;1,9..144,400;1,9..144,700&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
-        .land-nav {
-          position: fixed; top: 0; left: 0; right: 0; z-index: 999; height: 68px;
-          background: rgba(8,18,45,0.88);
-          backdrop-filter: saturate(180%) blur(24px);
-          -webkit-backdrop-filter: saturate(180%) blur(24px);
-          border-bottom: 0.5px solid rgba(255,255,255,0.1);
-          display: flex; align-items: center; justify-content: space-between; padding: 0 52px;
+        .l-nav { position:fixed;top:0;left:0;right:0;z-index:999;height:64px;background:rgba(8,18,45,0.9);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:0.5px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;padding:0 48px; }
+        .l-nav-links { display:flex;gap:36px; }
+        .l-nav-links a { font-family:'DM Sans',sans-serif;font-size:14px;font-weight:400;color:rgba(255,255,255,0.7);text-decoration:none;cursor:pointer;transition:color .2s;letter-spacing:0; }
+        .l-nav-links a:hover { color:#fff; }
+        .l-nav-cta { background:rgba(255,255,255,0.1);border:0.5px solid rgba(255,255,255,0.2);color:#fff;border-radius:980px;padding:8px 20px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .2s; }
+        .l-nav-cta:hover { background:rgba(255,255,255,0.2); }
+        .l-hero { height:100vh;position:relative;overflow:hidden;display:flex;align-items:flex-end; }
+        .l-hero-bg { position:absolute;inset:0;z-index:0;background-size:cover;background-position:center;background-repeat:no-repeat; }
+        .l-hero-ov { position:absolute;inset:0;z-index:1;background:linear-gradient(to bottom,rgba(8,18,45,0.35) 0%,rgba(8,18,45,0.15) 30%,rgba(8,18,45,0.55) 65%,rgba(8,18,45,0.96) 100%); }
+        .l-hero-c { position:relative;z-index:2;padding:0 52px 68px;width:100%;display:flex;justify-content:space-between;align-items:flex-end; }
+        .l-kicker { font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;letter-spacing:0.22em;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-bottom:14px;display:block; }
+        .l-h1 { font-family:'DM Sans',sans-serif;font-size:clamp(64px,9vw,120px);font-weight:800;line-height:0.9;color:#fff;letter-spacing:-0.03em; }
+        .l-h1 .ital { font-family:'Fraunces',serif;font-style:italic;font-weight:400;font-size:clamp(60px,8.5vw,112px);color:#fff;display:block;line-height:0.95; }
+        .l-hero-right { display:flex;flex-direction:column;align-items:flex-end;gap:18px; }
+        .l-hero-sub { font-family:'DM Sans',sans-serif;font-size:15px;font-weight:300;color:rgba(255,255,255,0.6);line-height:1.7;max-width:280px;text-align:right; }
+        .l-btns { display:flex;gap:10px; }
+        .l-btn-w { background:#fff;color:#08122d;border:none;border-radius:980px;padding:13px 26px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s; }
+        .l-btn-w:hover { background:#e8f0fc;transform:translateY(-1px); }
+        .l-btn-o { background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.35);border-radius:980px;padding:13px 26px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s; }
+        .l-btn-o:hover { border-color:#fff; }
+        .l-ticker { background:#08122d;padding:13px 0;overflow:hidden;white-space:nowrap;border-bottom:0.5px solid rgba(255,255,255,0.05); }
+        .l-ticker-i { display:inline-flex;animation:tick 30s linear infinite; }
+        @keyframes tick { from{transform:translateX(0)}to{transform:translateX(-50%)} }
+        .l-titem { display:inline-flex;align-items:center;gap:10px;padding:0 32px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.3); }
+        .l-tdot { width:3px;height:3px;border-radius:50%;background:#6aaef5;flex-shrink:0; }
+        .l-sec { padding:100px 52px;background:#fff; }
+        .l-sec-alt { padding:100px 52px;background:#f6f8fc; }
+        .l-in { max-width:1160px;margin:0 auto; }
+        .l-ey { font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:#08122d;opacity:0.35;margin-bottom:16px; }
+        .l-h2 { font-family:'DM Sans',sans-serif;font-size:clamp(36px,4.5vw,60px);font-weight:800;line-height:1.05;letter-spacing:-0.025em;color:#0a0a14;margin-bottom:22px; }
+        .l-h2 em { font-family:'Fraunces',serif;font-style:italic;font-weight:400;color:#0a0a14; }
+        .l-body { font-family:'DM Sans',sans-serif;font-size:15px;font-weight:300;line-height:1.85;color:#555; }
+        .l-about-grid { display:grid;grid-template-columns:1fr 1fr;gap:96px;align-items:center; }
+        .l-about-img { aspect-ratio:3/4;border-radius:18px;overflow:hidden;position:relative;background:#eef2fb;border:0.5px solid #e8edf5; }
+        .l-about-img-bg { position:absolute;inset:0;background-size:cover;background-position:center;opacity:0.18; }
+        .l-about-img-badge { position:absolute;bottom:0;left:0;right:0;padding:24px 28px;background:linear-gradient(to top,rgba(8,18,45,0.88),transparent); }
+        .l-about-badge-l { font-family:'DM Sans',sans-serif;font-size:9px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.4); }
+        .l-about-badge-v { font-family:'DM Sans',sans-serif;font-size:28px;font-weight:800;color:#fff;letter-spacing:-0.02em; }
+        .l-stats { display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#e4eaf5;border-radius:14px;overflow:hidden;margin-top:44px; }
+        .l-stat { background:#fff;padding:26px 22px; }
+        .l-stat-n { font-family:'DM Sans',sans-serif;font-size:44px;font-weight:800;color:#0a0a14;line-height:1;letter-spacing:-0.03em; }
+        .l-stat-n sup { font-size:20px;vertical-align:super;opacity:0.4; }
+        .l-stat-l { font-family:'DM Sans',sans-serif;font-size:11.5px;color:#aaa;margin-top:5px;letter-spacing:0.02em; }
+        .l-gal-top { display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:44px; }
+        .l-gal { display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:340px 220px;gap:10px; }
+        .l-gi { border-radius:12px;overflow:hidden;position:relative;cursor:pointer; }
+        .l-gi:nth-child(1){grid-column:span 7} .l-gi:nth-child(2){grid-column:span 5}
+        .l-gi:nth-child(3){grid-column:span 4} .l-gi:nth-child(4){grid-column:span 4} .l-gi:nth-child(5){grid-column:span 4}
+        .l-gi-fill { position:absolute;inset:0;background-size:cover;background-position:center; }
+        .l-gi-ov { position:absolute;inset:0;background:linear-gradient(to top,rgba(8,18,40,0.85) 0%,transparent 55%); }
+        .l-gi-cap { position:absolute;bottom:0;left:0;right:0;padding:20px 22px; }
+        .l-gi-cap-t { font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;color:#fff; }
+        .l-gi-cap-s { font-family:'DM Sans',sans-serif;font-size:10px;color:rgba(255,255,255,0.45);margin-top:3px;letter-spacing:0.08em;text-transform:uppercase; }
+        .l-gi-hov { position:absolute;inset:0;z-index:3;background:rgba(8,18,40,0.5);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .22s; }
+        .l-gi:hover .l-gi-hov { opacity:1; }
+        .l-gi-hov-btn { font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#fff;border:1px solid rgba(255,255,255,0.5);border-radius:980px;padding:8px 20px; }
+        .l-bot-grid { display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:start; }
+        .l-bfeat { padding:20px 0;border-bottom:0.5px solid #e4eaf5;display:flex;gap:18px;align-items:flex-start; }
+        .l-bfeat:first-child{border-top:0.5px solid #e4eaf5}
+        .l-bfeat-num { font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:#08122d;opacity:0.2;flex-shrink:0;padding-top:2px; }
+        .l-bfeat-t { font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;color:#0a0a14;margin-bottom:3px; }
+        .l-bfeat-d { font-family:'DM Sans',sans-serif;font-size:13.5px;color:#888;line-height:1.6;font-weight:300; }
+        .l-chat { background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 2px 40px rgba(8,18,45,0.09);border:0.5px solid #e4eaf5; }
+        .l-chat-hd { background:#08122d;padding:16px 20px;display:flex;align-items:center;gap:12px; }
+        .l-chat-av { width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0; }
+        .l-chat-n { font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#fff; }
+        .l-chat-s { font-family:'DM Sans',sans-serif;font-size:10.5px;color:rgba(255,255,255,0.4); }
+        .l-chat-dot { width:7px;height:7px;border-radius:50%;background:#34d399;margin-left:auto; }
+        .l-chat-msgs { padding:14px;min-height:240px;max-height:280px;overflow-y:auto;background:#f6f8fc;display:flex;flex-direction:column;gap:10px; }
+        .l-cm { display:flex;gap:8px; } .l-cm-u{flex-direction:row-reverse}
+        .l-cm-av { width:26px;height:26px;border-radius:50%;background:#e4eaf5;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;margin-top:2px; }
+        .l-cm-b { max-width:82%;padding:9px 13px;border-radius:13px;font-family:'DM Sans',sans-serif;font-size:13.5px;line-height:1.5; }
+        .l-cm-bot { background:#fff;color:#0a0a14;border-radius:4px 13px 13px 13px;box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+        .l-cm-usr { background:#08122d;color:#fff;border-radius:13px 4px 13px 13px; }
+        .l-tdots { display:flex;gap:4px;padding:9px 13px; }
+        .l-tdots span { width:6px;height:6px;border-radius:50%;background:#ccc;animation:td 1.2s infinite; }
+        .l-tdots span:nth-child(2){animation-delay:.2s} .l-tdots span:nth-child(3){animation-delay:.4s}
+        @keyframes td{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-4px)}}
+        .l-chat-pills { display:flex;gap:6px;padding:9px 14px 8px;background:#f6f8fc;flex-wrap:wrap;border-top:0.5px solid #eaeff8; }
+        .l-cpill { border:0.5px solid #cdd6ea;border-radius:980px;padding:4px 12px;font-size:12px;color:#08122d;cursor:pointer;background:#fff;font-family:'DM Sans',sans-serif;transition:all .15s; }
+        .l-cpill:hover { background:#08122d;color:#fff;border-color:#08122d; }
+        .l-chat-ft { display:flex;gap:8px;padding:10px 12px;background:#fff;border-top:0.5px solid #eaeff8; }
+        .l-cin { flex:1;border:0.5px solid #dde4f0;border-radius:980px;padding:8px 15px;font-size:13.5px;font-family:'DM Sans',sans-serif;color:#0a0a14;outline:none;background:#f6f8fc;transition:border-color .2s; }
+        .l-cin:focus { border-color:#08122d;background:#fff; }
+        .l-csnd { width:34px;height:34px;border-radius:50%;background:#08122d;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+        .l-csnd:hover { background:#0d1f45; }
+        .l-ct-grid { display:grid;grid-template-columns:1fr 1fr;gap:96px;align-items:start; }
+        .l-ct-item { display:flex;gap:16px;align-items:flex-start;padding:20px 0;border-bottom:0.5px solid #e4eaf5; }
+        .l-ct-item:first-of-type { border-top:0.5px solid #e4eaf5; }
+        .l-ct-ico { width:40px;height:40px;border-radius:10px;background:#eef2fb;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0; }
+        .l-ct-t { font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#0a0a14;margin-bottom:3px; }
+        .l-ct-s { font-family:'DM Sans',sans-serif;font-size:13.5px;color:#888;font-weight:300;line-height:1.6; }
+        .l-soc-row { display:flex;gap:8px;margin-top:28px; }
+        .l-soc { width:38px;height:38px;border-radius:10px;border:0.5px solid #e0e6f0;background:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;transition:all .2s; }
+        .l-soc:hover { background:#08122d;border-color:#08122d; }
+        .l-cform { background:#f6f8fc;border-radius:18px;padding:40px;border:0.5px solid #e4eaf5; }
+        .l-cform h3 { font-family:'DM Sans',sans-serif;font-size:26px;font-weight:800;color:#0a0a14;margin-bottom:28px;letter-spacing:-0.02em;line-height:1.2; }
+        .l-fg { margin-bottom:14px; }
+        .l-fg label { display:block;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:#aaa;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:6px; }
+        .l-fg input,.l-fg textarea,.l-fg select { width:100%;border:0.5px solid #dde4f0;border-radius:10px;padding:11px 14px;font-size:14px;font-family:'DM Sans',sans-serif;background:#fff;color:#0a0a14;outline:none;transition:border-color .2s;-webkit-appearance:none; }
+        .l-fg input:focus,.l-fg textarea:focus,.l-fg select:focus { border-color:#08122d; }
+        .l-fg input::placeholder,.l-fg textarea::placeholder { color:#c0c8d8; }
+        .l-fg textarea { resize:vertical;min-height:90px; }
+        .l-frow { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+        .l-fsub { width:100%;background:#08122d;color:#fff;border:none;border-radius:980px;padding:13px;font-size:13px;font-weight:600;letter-spacing:0.03em;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:4px;transition:background .2s; }
+        .l-fsub:hover { background:#0d1f45; }
+        .l-footer { background:#08122d;padding:64px 52px 32px; }
+        .l-foot-top { display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:44px;border-bottom:0.5px solid rgba(255,255,255,0.06);max-width:1160px;margin:0 auto; }
+        .l-foot-brand-n { font-family:'DM Sans',sans-serif;font-size:16px;font-weight:800;color:#fff;margin-bottom:8px;letter-spacing:-0.01em; }
+        .l-foot-brand-p { font-family:'DM Sans',sans-serif;font-size:13px;color:rgba(255,255,255,0.3);font-weight:300;line-height:1.7;max-width:220px; }
+        .l-foot-cols { display:flex;gap:56px; }
+        .l-foot-col h4 { font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:rgba(255,255,255,0.3);letter-spacing:0.16em;text-transform:uppercase;margin-bottom:16px; }
+        .l-foot-col a { display:block;font-family:'DM Sans',sans-serif;font-size:13.5px;color:rgba(255,255,255,0.45);text-decoration:none;margin-bottom:10px;font-weight:300;cursor:pointer;transition:color .2s; }
+        .l-foot-col a:hover { color:#fff; }
+        .l-foot-btm { display:flex;justify-content:space-between;align-items:center;padding-top:24px;max-width:1160px;margin:0 auto; }
+        .l-foot-copy { font-family:'DM Sans',sans-serif;font-size:11.5px;color:rgba(255,255,255,0.18); }
+        .l-foot-adm { font-size:11px;color:rgba(255,255,255,0.06);cursor:pointer;padding:4px 8px;user-select:none;letter-spacing:0.2em;transition:color .4s; }
+        .l-foot-adm:hover { color:rgba(255,255,255,0.3); }
+        @media(max-width:900px){
+          .l-nav{padding:0 20px} .l-nav-links{display:none}
+          .l-hero-c{padding:0 24px 52px;flex-direction:column;align-items:flex-start;gap:24px}
+          .l-hero-right{align-items:flex-start} .l-hero-sub{text-align:left}
+          .l-sec,.l-sec-alt{padding:72px 24px}
+          .l-about-grid,.l-bot-grid,.l-ct-grid{grid-template-columns:1fr;gap:48px}
+          .l-gal{grid-template-columns:1fr 1fr;grid-template-rows:auto}
+          .l-gi{aspect-ratio:4/3}.l-gi:nth-child(1),.l-gi:nth-child(2),.l-gi:nth-child(3),.l-gi:nth-child(4),.l-gi:nth-child(5){grid-column:span 1}
+          .l-stats{grid-template-columns:1fr 1fr}
+          .l-frow{grid-template-columns:1fr}.l-cform{padding:24px 20px}
+          .l-footer{padding:48px 24px 28px}.l-foot-top{flex-direction:column;gap:36px}.l-foot-cols{gap:28px}
+          .l-gal-top{flex-direction:column;gap:14px;align-items:flex-start}
         }
-        .land-nav-brand { font-family: "Inter", sans-serif; font-size: 13px; font-weight: 700; color: #fff; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
-        .land-nav-links { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 40px; }
-        .land-nav-links a { font-size: 13px; font-weight: 400; letter-spacing: 0.02em; text-transform: none; color: rgba(255,255,255,0.72); text-decoration: none; cursor: pointer; transition: color .2s; }
-        .land-nav-links a:hover { color: #fff; }
-        .land-nav-cta { background: rgba(255,255,255,0.12); border: 0.5px solid rgba(255,255,255,0.25); color: #fff; border-radius: 980px; padding: 8px 22px; font-size: 12.5px; font-weight: 500; cursor: pointer; letter-spacing: 0.04em; transition: background .2s; font-family: inherit; }
-        .land-nav-cta:hover { background: rgba(255,255,255,0.22); }
-        .land-hero {
-          height: 100vh; position: relative; overflow: hidden;
-          display: flex; align-items: flex-end;
-          background: url('https://portal-coro-mj.vercel.app/Misioneros.jpg') center/cover no-repeat;
-        }
-        .land-hero-overlay {
-          position: absolute; inset: 0; z-index: 1;
-          background: linear-gradient(to bottom, rgba(8,18,45,0.4) 0%, rgba(8,18,45,0.2) 35%, rgba(8,18,45,0.6) 68%, rgba(8,18,45,0.95) 100%);
-        }
-        .land-hero-content { position: relative; z-index: 2; padding: 0 52px 72px; width: 100%; display: flex; justify-content: space-between; align-items: flex-end; }
-        .land-hero-kicker { font-size: 11px; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 16px; display: block; }
-        .land-hero-title { font-size: clamp(60px, 8.5vw, 110px); font-weight: 900; line-height: 0.92; color: #fff; letter-spacing: -0.03em; }
-        .land-hero-title .accent { font-family: 'Playfair Display', serif; font-style: italic; font-weight: 700; color: #a8c8f8; display: block; }
-        .land-hero-right { display: flex; flex-direction: column; align-items: flex-end; gap: 16px; }
-        .land-hero-sub { font-size: 15px; font-weight: 300; color: rgba(255,255,255,0.65); line-height: 1.7; max-width: 300px; text-align: right; }
-        .land-hero-btns { display: flex; gap: 10px; }
-        .hbtn-p { background: #fff; color: #08122d; border: none; border-radius: 980px; padding: 13px 28px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s; font-family: inherit; }
-        .hbtn-p:hover { background: #e8f0fc; transform: translateY(-1px); }
-        .hbtn-o { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.4); border-radius: 980px; padding: 13px 28px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .2s; font-family: inherit; }
-        .hbtn-o:hover { border-color: #fff; }
-        .ticker { background: #08122d; padding: 14px 0; overflow: hidden; white-space: nowrap; border-bottom: 0.5px solid rgba(255,255,255,0.06); }
-        .ticker-inner { display: inline-flex; animation: tick 30s linear infinite; }
-        @keyframes tick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-        .ticker-item { display: inline-flex; align-items: center; gap: 10px; padding: 0 32px; font-size: 11px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.3); }
-        .ticker-dot { width: 4px; height: 4px; border-radius: 50%; background: #6aaef5; flex-shrink: 0; }
-        .land-sec { padding: 104px 52px; background: #fff; }
-        .land-sec-alt { padding: 104px 52px; background: #f6f8fc; }
-        .land-inner { max-width: 1180px; margin: 0 auto; }
-        .eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: #08122d; opacity: 0.4; margin-bottom: 18px; }
-        .land-h2 { font-size: clamp(38px, 5vw, 64px); font-weight: 800; line-height: 1.05; letter-spacing: -0.025em; color: #0a0a14; margin-bottom: 24px; }
-        .land-h2 em { font-family: 'Playfair Display', serif; font-style: italic; font-weight: 700; color: #08122d; }
-        .land-body { font-size: 15.5px; font-weight: 300; line-height: 1.85; color: #444; }
-        .about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 100px; align-items: center; }
-        .about-img-wrap { aspect-ratio: 3/4; border-radius: 20px; overflow: hidden; background: #fff; display: flex; align-items: center; justify-content: center; position: relative; border: 0.5px solid #eaeff8; }
-        .about-img-wrap img { display: none; } .about-img-jesus { position: absolute; inset: 0; background: url("/Misioneros.jpg") center/cover no-repeat; opacity: 0.15; }
-        .about-badge { position: absolute; bottom: 0; left: 0; right: 0; padding: 28px 32px; background: linear-gradient(to top, rgba(8,18,45,0.9), transparent); }
-        .about-badge-label { font-size: 10px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.45); }
-        .about-badge-val { font-size: 32px; font-weight: 800; color: #fff; letter-spacing: -0.02em; }
-        .stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: #e4eaf5; border-radius: 16px; overflow: hidden; margin-top: 48px; }
-        .stat { background: #fff; padding: 28px 24px; }
-        .stat-n { font-size: 46px; font-weight: 800; color: #0a0a14; line-height: 1; letter-spacing: -0.03em; }
-        .stat-n sup { font-size: 22px; vertical-align: super; color: #08122d; opacity: 0.4; }
-        .stat-l { font-size: 12px; color: #aaa; margin-top: 6px; letter-spacing: 0.04em; }
-        .gal-top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 48px; }
-        .gal-grid { display: grid; grid-template-columns: repeat(12,1fr); grid-template-rows: 360px 240px; gap: 10px; }
-        .gi { border-radius: 14px; overflow: hidden; position: relative; cursor: pointer; }
-        .gi:nth-child(1) { grid-column: span 7; }
-        .gi:nth-child(2) { grid-column: span 5; }
-        .gi:nth-child(3) { grid-column: span 4; }
-        .gi:nth-child(4) { grid-column: span 4; }
-        .gi:nth-child(5) { grid-column: span 4; }
-        .gi-bg { position: absolute; inset: 0; }
-        .gi:nth-child(1) .gi-bg { background: linear-gradient(155deg,#0a1628 0%,#1a3460 100%); }
-        .gi:nth-child(2) .gi-bg { background: linear-gradient(155deg,#0d1f3e 0%,#0d2d55 100%); }
-        .gi:nth-child(3) .gi-bg { background: linear-gradient(155deg,#081228 0%,#1a2d50 100%); }
-        .gi:nth-child(4) .gi-bg { background: linear-gradient(155deg,#0f1e38 0%,#162a4a 100%); }
-        .gi:nth-child(5) .gi-bg { background: linear-gradient(155deg,#0a1828 0%,#0d2540 100%); }
-        .gi-content { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 24px 26px; background: linear-gradient(to top, rgba(8,18,40,0.82) 0%, transparent 55%); }
-        .gi-label { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
-        .gi-sub { font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 4px; letter-spacing: 0.08em; text-transform: uppercase; }
-        .gi-hover { position: absolute; inset: 0; z-index: 3; background: rgba(8,18,40,0.5); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .22s; }
-        .gi:hover .gi-hover { opacity: 1; }
-        .gi-hover-btn { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #fff; border: 1px solid rgba(255,255,255,0.5); border-radius: 980px; padding: 9px 22px; }
-        .bot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: start; }
-        .bfeat { padding: 22px 0; border-bottom: 0.5px solid #e4eaf5; display: flex; gap: 20px; align-items: flex-start; }
-        .bfeat:first-child { border-top: 0.5px solid #e4eaf5; }
-        .bfeat-num { font-size: 12px; font-weight: 600; color: #08122d; opacity: 0.25; letter-spacing: 0.1em; flex-shrink: 0; padding-top: 2px; }
-        .bfeat-title { font-size: 14px; font-weight: 700; color: #0a0a14; margin-bottom: 4px; }
-        .bfeat-desc { font-size: 13.5px; color: #888; line-height: 1.6; font-weight: 300; }
-        .chat-card { background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 2px 48px rgba(8,18,45,0.1); border: 0.5px solid #e4eaf5; }
-        .chat-hd { background: #08122d; padding: 18px 22px; display: flex; align-items: center; gap: 14px; }
-        .chat-av { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-        .chat-info-name { font-size: 13.5px; font-weight: 600; color: #fff; }
-        .chat-info-sub { font-size: 11px; color: rgba(255,255,255,0.45); }
-        .chat-online { width: 8px; height: 8px; border-radius: 50%; background: #34d399; margin-left: auto; }
-        .chat-msgs { padding: 16px; min-height: 240px; max-height: 280px; overflow-y: auto; background: #f6f8fc; display: flex; flex-direction: column; gap: 10px; }
-        .cm { display: flex; gap: 8px; }
-        .cm-u { flex-direction: row-reverse; }
-        .cm-av { width: 28px; height: 28px; border-radius: 50%; background: #e4eaf5; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; margin-top: 2px; }
-        .cm-b { max-width: 82%; padding: 10px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.55; }
-        .cm-b-bot { background: #fff; color: #0a0a14; border-radius: 4px 14px 14px 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-        .cm-b-user { background: #08122d; color: #fff; border-radius: 14px 4px 14px 14px; }
-        .tdots { display: flex; gap: 4px; padding: 10px 14px; }
-        .tdots span { width: 7px; height: 7px; border-radius: 50%; background: #ccc; animation: td 1.2s infinite; }
-        .tdots span:nth-child(2) { animation-delay: .2s; }
-        .tdots span:nth-child(3) { animation-delay: .4s; }
-        @keyframes td { 0%,60%,100% { opacity:.3; transform:translateY(0); } 30% { opacity:1; transform:translateY(-4px); } }
-        .chat-pills { display: flex; gap: 6px; padding: 10px 16px 8px; background: #f6f8fc; flex-wrap: wrap; border-top: 0.5px solid #eaeff8; }
-        .cpill { border: 0.5px solid #cdd6ea; border-radius: 980px; padding: 5px 13px; font-size: 12px; color: #08122d; cursor: pointer; background: #fff; font-family: inherit; transition: all .15s; }
-        .cpill:hover { background: #08122d; color: #fff; border-color: #08122d; }
-        .chat-ft { display: flex; gap: 8px; padding: 12px 14px; background: #fff; border-top: 0.5px solid #eaeff8; }
-        .chat-in { flex: 1; border: 0.5px solid #dde4f0; border-radius: 980px; padding: 9px 16px; font-size: 13.5px; font-family: inherit; color: #0a0a14; outline: none; background: #f6f8fc; transition: border-color .2s; }
-        .chat-in:focus { border-color: #08122d; background: #fff; }
-        .chat-snd { width: 36px; height: 36px; border-radius: 50%; background: #08122d; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .chat-snd:hover { background: #0d1f45; }
-        .ct-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 100px; align-items: start; }
-        .ct-item { display: flex; gap: 18px; align-items: flex-start; padding: 22px 0; border-bottom: 0.5px solid #e4eaf5; }
-        .ct-item:first-of-type { border-top: 0.5px solid #e4eaf5; }
-        .ct-ico { width: 42px; height: 42px; border-radius: 12px; background: #eef2fb; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-        .ct-title { font-size: 13px; font-weight: 600; color: #0a0a14; margin-bottom: 4px; }
-        .ct-sub { font-size: 13.5px; color: #888; font-weight: 300; line-height: 1.6; }
-        .soc-row { display: flex; gap: 8px; margin-top: 32px; }
-        .soc { width: 40px; height: 40px; border-radius: 12px; border: 0.5px solid #e0e6f0; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; transition: all .2s; }
-        .soc:hover { background: #08122d; border-color: #08122d; }
-        .cform { background: #f6f8fc; border-radius: 20px; padding: 44px; border: 0.5px solid #e4eaf5; }
-        .cform h3 { font-size: 28px; font-weight: 800; color: #0a0a14; margin-bottom: 32px; letter-spacing: -0.02em; line-height: 1.2; }
-        .fg { margin-bottom: 16px; }
-        .fg label { display: block; font-size: 10.5px; font-weight: 600; color: #aaa; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 7px; }
-        .fg input, .fg textarea, .fg select { width: 100%; border: 0.5px solid #dde4f0; border-radius: 12px; padding: 12px 15px; font-size: 14px; font-family: inherit; background: #fff; color: #0a0a14; outline: none; transition: border-color .2s; -webkit-appearance: none; }
-        .fg input:focus, .fg textarea:focus, .fg select:focus { border-color: #08122d; }
-        .fg input::placeholder, .fg textarea::placeholder { color: #c0c8d8; }
-        .fg textarea { resize: vertical; min-height: 96px; }
-        .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .fsub { width: 100%; background: #08122d; color: #fff; border: none; border-radius: 980px; padding: 14px; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; cursor: pointer; font-family: inherit; margin-top: 6px; transition: background .2s; }
-        .fsub:hover { background: #0d1f45; }
-        .land-footer { background: #08122d; padding: 72px 52px 36px; }
-        .foot-top { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 52px; border-bottom: 0.5px solid rgba(255,255,255,0.07); max-width: 1180px; margin: 0 auto; }
-        .foot-brand img { height: 44px; margin-bottom: 14px; display: block; }
-        .foot-brand p { font-size: 13.5px; color: rgba(255,255,255,0.3); font-weight: 300; line-height: 1.7; max-width: 240px; }
-        .foot-cols { display: flex; gap: 64px; }
-        .foot-col h4 { font-size: 10.5px; font-weight: 600; color: rgba(255,255,255,0.3); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 18px; }
-        .foot-col a { display: block; font-size: 13.5px; color: rgba(255,255,255,0.45); text-decoration: none; margin-bottom: 11px; font-weight: 300; cursor: pointer; transition: color .2s; }
-        .foot-col a:hover { color: #fff; }
-        .foot-btm { display: flex; justify-content: space-between; align-items: center; padding-top: 28px; max-width: 1180px; margin: 0 auto; }
-        .foot-copy { font-size: 12px; color: rgba(255,255,255,0.18); }
-        .foot-adm { font-size: 12px; color: rgba(255,255,255,0.06); cursor: pointer; padding: 4px 8px; user-select: none; letter-spacing: 0.2em; transition: color .4s; }
-        .foot-adm:hover { color: rgba(255,255,255,0.3); }
-        @media(max-width:900px) {
-          .land-nav { padding: 0 20px; }
-          .land-nav-links { display: none; }
-          .land-hero-content { padding: 0 24px 56px; flex-direction: column; align-items: flex-start; gap: 24px; }
-          .land-hero-right { align-items: flex-start; }
-          .land-hero-sub { text-align: left; }
-          .land-sec, .land-sec-alt { padding: 72px 24px; }
-          .about-grid, .bot-grid, .ct-grid { grid-template-columns: 1fr; gap: 52px; }
-          .gal-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
-          .gi { aspect-ratio: 4/3; }
-          .gi:nth-child(1), .gi:nth-child(2), .gi:nth-child(3), .gi:nth-child(4), .gi:nth-child(5) { grid-column: span 1; }
-          .stats-row { grid-template-columns: 1fr 1fr; }
-          .frow { grid-template-columns: 1fr; }
-          .cform { padding: 28px 22px; }
-          .land-footer { padding: 52px 24px 28px; }
-          .foot-top { flex-direction: column; gap: 40px; }
-          .foot-cols { gap: 32px; }
-          .gal-top { flex-direction: column; gap: 16px; align-items: flex-start; }
-        }
-        @media(prefers-reduced-motion:reduce) { * { animation: none !important; transition: none !important; } }
+        @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+        .fab-wrap { position:fixed;bottom:28px;right:28px;z-index:9000;display:flex;flex-direction:column;gap:12px;align-items:flex-end; }
+        .fab { width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.2);transition:transform .2s,box-shadow .2s;position:relative; }
+        .fab:hover { transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,0.25); }
+        .fab-wa { background:#25D366; }
+        .fab-admin { background:#08122d; }
+        .fab-label { position:absolute;right:60px;background:rgba(10,10,20,0.82);color:#fff;font-family:'DM Sans',sans-serif;font-size:11.5px;font-weight:500;padding:5px 12px;border-radius:6px;white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none;backdrop-filter:blur(8px); }
+        .fab:hover .fab-label { opacity:1; }
       `}</style>
 
       {/* NAV */}
-      <nav className="land-nav">
-        <span className="land-nav-brand" onClick={() => scrollTo("inicio")}>Coro MJ</span>
-        <div className="land-nav-links">
+      <nav className="l-nav">
+        <div className="l-nav-links">
           <a onClick={() => scrollTo("nosotros")}>Nosotros</a>
           <a onClick={() => scrollTo("galeria")}>Galería</a>
           <a onClick={() => scrollTo("bot")}>Únete</a>
           <a onClick={() => scrollTo("contacto")}>Contacto</a>
         </div>
-        <button className="land-nav-cta" onClick={onPortal}>Acceso Portal</button>
+        <button className="l-nav-cta" onClick={onPortal}>Acceso Portal</button>
       </nav>
 
       {/* HERO */}
-      <section id="inicio" className="land-hero">
-        <div className="land-hero-overlay" />
-        <div className="land-hero-content">
+      <section id="inicio" className="l-hero">
+        <div className="l-hero-bg" style={{ backgroundImage: `url('${content.hero_img}')` }} />
+        <div className="l-hero-ov" />
+        <div className="l-hero-c">
           <div>
-            <span className="land-hero-kicker">Coro · Maipú · Chile</span>
-            <h1 className="land-hero-title">
-              Misioneros<br/>
-              <span className="accent">de Jesús</span>
+            <span className="l-kicker">{content.hero_kicker}</span>
+            <h1 className="l-h1">
+              {content.hero_titulo}<br/>
+              <span className="ital">{content.hero_titulo2}</span>
             </h1>
           </div>
-          <div className="land-hero-right">
-            <p className="land-hero-sub">Ensemble vocal de música litúrgica contemporánea. Quince años de presencia y excelencia musical en Maipú.</p>
-            <div className="land-hero-btns">
-              <button className="hbtn-p" onClick={() => scrollTo("nosotros")}>Conócenos</button>
-              <button className="hbtn-o" onClick={() => scrollTo("bot")}>Únete</button>
+          <div className="l-hero-right">
+            <p className="l-hero-sub">{content.hero_sub}</p>
+            <div className="l-btns">
+              <button className="l-btn-w" onClick={() => scrollTo("nosotros")}>Conócenos</button>
+              <button className="l-btn-o" onClick={() => scrollTo("bot")}>Únete</button>
             </div>
           </div>
         </div>
       </section>
 
       {/* TICKER */}
-      <div className="ticker">
-        <div className="ticker-inner">
+      <div className="l-ticker">
+        <div className="l-ticker-i">
           {["Música litúrgica contemporánea","Maipú · Chile","15 años de trayectoria","4 cuerdas vocales","400+ presentaciones","Ensemble vocal profesional",
             "Música litúrgica contemporánea","Maipú · Chile","15 años de trayectoria","4 cuerdas vocales","400+ presentaciones","Ensemble vocal profesional"
-          ].map((item, i) => (
-            <span key={i} className="ticker-item"><span className="ticker-dot" />{item}</span>
-          ))}
+          ].map((t,i) => <span key={i} className="l-titem"><span className="l-tdot"/>{t}</span>)}
         </div>
       </div>
 
       {/* NOSOTROS */}
-      <section className="land-sec" id="nosotros">
-        <div className="land-inner">
-          <div className="about-grid">
+      <section className="l-sec" id="nosotros">
+        <div className="l-in">
+          <div className="l-about-grid">
             <div>
-              <div className="eyebrow">Quiénes somos</div>
-              <h2 className="land-h2">Un ensemble<br/>con <em>identidad</em><br/>propia</h2>
-              <p className="land-body">Somos un coro de música litúrgica con más de 15 años en actividad. Cuatro cuerdas vocales —soprano, contralto, tenor y bajo— acompañadas de instrumentos en vivo, construyendo un sonido propio semana a semana.</p>
-              <p className="land-body" style={{marginTop:16}}>Nuestra disciplina musical y compromiso con el repertorio nos definen como un conjunto vocal de alto nivel dentro de la tradición litúrgica contemporánea.</p>
-              <div className="stats-row">
-                <div className="stat"><div className="stat-n">15<sup>+</sup></div><div className="stat-l">Años activos</div></div>
-                <div className="stat"><div className="stat-n">30<sup>+</sup></div><div className="stat-l">Voces</div></div>
-                <div className="stat"><div className="stat-n">400<sup>+</sup></div><div className="stat-l">Presentaciones</div></div>
+              <div className="l-ey">Quiénes somos</div>
+              <h2 className="l-h2">{content.about_titulo.includes("identidad") ? <>Un ensemble con <em>identidad propia</em></> : content.about_titulo}</h2>
+              <p className="l-body">{content.about_texto1}</p>
+              <p className="l-body" style={{marginTop:14}}>{content.about_texto2}</p>
+              <div className="l-stats">
+                <div className="l-stat"><div className="l-stat-n">{content.stat1_n}</div><div className="l-stat-l">{content.stat1_l}</div></div>
+                <div className="l-stat"><div className="l-stat-n">{content.stat2_n}</div><div className="l-stat-l">{content.stat2_l}</div></div>
+                <div className="l-stat"><div className="l-stat-n">{content.stat3_n}</div><div className="l-stat-l">{content.stat3_l}</div></div>
               </div>
             </div>
-            <div className="about-img-wrap"><div className="about-img-jesus" />
-              
-              <div className="about-badge">
-                <div className="about-badge-label">Cuerdas vocales</div>
-                <div className="about-badge-val">SATB</div>
+            <div className="l-about-img">
+              <div className="l-about-img-bg" style={{ backgroundImage: `url('${content.about_img}')` }} />
+              <div className="l-about-img-badge">
+                <div className="l-about-badge-l">Cuerdas vocales</div>
+                <div className="l-about-badge-v">SATB</div>
               </div>
             </div>
           </div>
@@ -285,80 +425,73 @@ export default function Landing({ onPortal }) {
       </section>
 
       {/* GALERÍA */}
-      <section className="land-sec-alt" id="galeria">
-        <div className="land-inner">
-          <div className="gal-top">
+      <section className="l-sec-alt" id="galeria">
+        <div className="l-in">
+          <div className="l-gal-top">
             <div>
-              <div className="eyebrow">Galería</div>
-              <h2 className="land-h2" style={{marginBottom:0}}>Presencia en cada<br/><em>celebración</em></h2>
+              <div className="l-ey">Galería</div>
+              <h2 className="l-h2" style={{marginBottom:0}}>Presencia en cada<br/><em>celebración</em></h2>
             </div>
-            <p className="land-body" style={{maxWidth:260,textAlign:"right"}}>Momentos que capturan nuestra entrega y pasión por la música litúrgica.</p>
+            <p className="l-body" style={{maxWidth:240,textAlign:"right"}}>Momentos que capturan nuestra entrega a la música litúrgica.</p>
           </div>
-          <div className="gal-grid">
-            {[["Navidad 2023","Diciembre"],["Semana Santa 2024","Abril"],["Fiesta Patronal","Agosto"],["Corpus Christi","Junio"],["Vigilia Pascual","Marzo"]].map(([label,sub],i) => (
-              <div key={i} className="gi">
-                <div className="gi-bg" />
-                <div className="gi-content">
-                  <div className="gi-label">{label}</div>
-                  <div className="gi-sub">{sub}</div>
-                </div>
-                <div className="gi-hover"><div className="gi-hover-btn">Ver foto</div></div>
+          <div className="l-gal">
+            {galItems.map((g,i) => (
+              <div key={i} className="l-gi">
+                <div className="l-gi-fill" style={{ backgroundImage: g.img ? `url('${g.img}')` : "none", background: g.img ? undefined : galColors[i] }} />
+                <div className="l-gi-ov" />
+                <div className="l-gi-cap"><div className="l-gi-cap-t">{g.label}</div><div className="l-gi-cap-s">{g.sub}</div></div>
+                <div className="l-gi-hov"><div className="l-gi-hov-btn">Ver foto</div></div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* BOT IA */}
-      <section className="land-sec" id="bot">
-        <div className="land-inner">
-          <div className="bot-grid">
+      {/* BOT */}
+      <section className="l-sec" id="bot">
+        <div className="l-in">
+          <div className="l-bot-grid">
             <div>
-              <div className="eyebrow">Asistente IA</div>
-              <h2 className="land-h2">¿Te sumas<br/>al <em>coro?</em></h2>
-              <p className="land-body">Respuestas inmediatas sobre cómo integrarte, ensayos y todo lo que necesitas saber.</p>
-              <div style={{marginTop:48}}>
+              <div className="l-ey">Asistente IA</div>
+              <h2 className="l-h2">¿Te sumas<br/>al <em>coro?</em></h2>
+              <p className="l-body">Respuestas inmediatas sobre cómo integrarte, ensayos y todo lo que necesitas saber.</p>
+              <div style={{marginTop:44}}>
                 {[["01","Proceso de ingreso","Cómo postular, qué se evalúa y cuándo son los ensayos de prueba."],
                   ["02","Horarios y ensayos","Frecuencia semanal, lugar y cómo es el proceso de incorporación."],
-                  ["03","Repertorio y nivel","Qué cantamos y qué experiencia musical se valora en los candidatos."]
-                ].map(([num,title,desc]) => (
-                  <div key={num} className="bfeat">
-                    <div className="bfeat-num">{num}</div>
-                    <div><div className="bfeat-title">{title}</div><div className="bfeat-desc">{desc}</div></div>
+                  ["03","Repertorio y nivel","Qué cantamos y qué experiencia musical se valora."]
+                ].map(([n,t,d]) => (
+                  <div key={n} className="l-bfeat">
+                    <div className="l-bfeat-num">{n}</div>
+                    <div><div className="l-bfeat-t">{t}</div><div className="l-bfeat-d">{d}</div></div>
                   </div>
                 ))}
               </div>
             </div>
             <div>
-              <div className="chat-card">
-                <div className="chat-hd">
-                  <div className="chat-av">🎵</div>
-                  <div><div className="chat-info-name">Coro MJ — Asistente</div><div className="chat-info-sub">Responde en español · IA</div></div>
-                  <div className="chat-online" />
+              <div className="l-chat">
+                <div className="l-chat-hd">
+                  <div className="l-chat-av">🎵</div>
+                  <div><div className="l-chat-n">Coro MJ — Asistente</div><div className="l-chat-s">Responde en español · IA</div></div>
+                  <div className="l-chat-dot"/>
                 </div>
-                <div className="chat-msgs" ref={msgsRef}>
+                <div className="l-chat-msgs" ref={msgsRef}>
                   {chatMsgs.map((m,i) => (
-                    <div key={i} className={`cm${m.role==="user"?" cm-u":""}`}>
-                      {m.role==="bot" && <div className="cm-av">🎵</div>}
-                      <div className={`cm-b ${m.role==="bot"?"cm-b-bot":"cm-b-user"}`}>{m.text}</div>
-                      {m.role==="user" && <div className="cm-av">👤</div>}
+                    <div key={i} className={`l-cm${m.role==="user"?" l-cm-u":""}`}>
+                      {m.role==="bot" && <div className="l-cm-av">🎵</div>}
+                      <div className={`l-cm-b ${m.role==="bot"?"l-cm-bot":"l-cm-usr"}`}>{m.text}</div>
+                      {m.role==="user" && <div className="l-cm-av">👤</div>}
                     </div>
                   ))}
-                  {typing && (
-                    <div className="cm">
-                      <div className="cm-av">🎵</div>
-                      <div className="cm-b cm-b-bot"><div className="tdots"><span/><span/><span/></div></div>
-                    </div>
-                  )}
+                  {typing && <div className="l-cm"><div className="l-cm-av">🎵</div><div className="l-cm-b l-cm-bot"><div className="l-tdots"><span/><span/><span/></div></div></div>}
                 </div>
-                <div className="chat-pills">
+                <div className="l-chat-pills">
                   {["¿Cómo me uno?","¿Cuándo ensayan?","¿Qué nivel necesito?"].map(p => (
-                    <button key={p} className="cpill" onClick={() => usePill(p)}>{p}</button>
+                    <button key={p} className="l-cpill" onClick={() => sendMsg(p)}>{p}</button>
                   ))}
                 </div>
-                <div className="chat-ft">
-                  <input className="chat-in" value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendMsg()} placeholder="Escribe tu pregunta..."/>
-                  <button className="chat-snd" onClick={()=>sendMsg()}>
+                <div className="l-chat-ft">
+                  <input className="l-cin" value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendMsg()} placeholder="Escribe tu pregunta..."/>
+                  <button className="l-csnd" onClick={()=>sendMsg()}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
                     </svg>
@@ -371,67 +504,77 @@ export default function Landing({ onPortal }) {
       </section>
 
       {/* CONTACTO */}
-      <section className="land-sec-alt" id="contacto">
-        <div className="land-inner">
-          <div className="ct-grid">
+      <section className="l-sec-alt" id="contacto">
+        <div className="l-in">
+          <div className="l-ct-grid">
             <div>
-              <div className="eyebrow">Contacto</div>
-              <h2 className="land-h2">Hablemos<br/><em>directamente</em></h2>
-              <p className="land-body">¿Quieres invitarnos o tienes alguna consulta? Escríbenos.</p>
-              <div style={{marginTop:40}}>
-                <div className="ct-item"><div className="ct-ico">📍</div><div><div className="ct-title">Ubicación</div><div className="ct-sub">Maipú, Santiago, Chile<br/>Capilla Sagrada Familia</div></div></div>
-                <div className="ct-item"><div className="ct-ico">🎵</div><div><div className="ct-title">Ensayos</div><div className="ct-sub">Sábados · Capilla Misioneros de Jesús</div></div></div>
-                <div className="ct-item"><div className="ct-ico">📲</div><div><div className="ct-title">Redes sociales</div><div className="ct-sub">Síguenos en nuestras plataformas</div></div></div>
+              <div className="l-ey">Contacto</div>
+              <h2 className="l-h2">Hablemos<br/><em>directamente</em></h2>
+              <p className="l-body">¿Quieres invitarnos o tienes alguna consulta?</p>
+              <div style={{marginTop:36}}>
+                <div className="l-ct-item"><div className="l-ct-ico">📍</div><div><div className="l-ct-t">Ubicación</div><div className="l-ct-s">{content.contacto_dir}</div></div></div>
+                <div className="l-ct-item"><div className="l-ct-ico">🎵</div><div><div className="l-ct-t">Ensayos</div><div className="l-ct-s">{content.contacto_ensayo}</div></div></div>
+                <div className="l-ct-item"><div className="l-ct-ico">📲</div><div><div className="l-ct-t">Redes sociales</div><div className="l-ct-s">Síguenos en nuestras plataformas</div></div></div>
               </div>
-              <div className="soc-row">
-                <div className="soc">📸</div><div className="soc">📘</div><div className="soc">▶️</div><div className="soc">🎧</div>
-              </div>
+              <div className="l-soc-row"><div className="l-soc">📸</div><div className="l-soc">📘</div><div className="l-soc">▶️</div><div className="l-soc">🎧</div></div>
             </div>
-            <div className="cform">
+            <div className="l-cform">
               <h3>Envíanos<br/>un mensaje</h3>
-              <div className="frow">
-                <div className="fg"><label>Nombre</label><input type="text" placeholder="Juan"/></div>
-                <div className="fg"><label>Apellido</label><input type="text" placeholder="González"/></div>
+              <div className="l-frow">
+                <div className="l-fg"><label>Nombre</label><input type="text" placeholder="Juan"/></div>
+                <div className="l-fg"><label>Apellido</label><input type="text" placeholder="González"/></div>
               </div>
-              <div className="fg"><label>Correo</label><input type="email" placeholder="tu@correo.cl"/></div>
-              <div className="fg"><label>Asunto</label>
-                <select><option>Quiero unirme al coro</option><option>Invitación a celebración</option><option>Consulta general</option><option>Otro</option></select>
-              </div>
-              <div className="fg"><label>Mensaje</label><textarea placeholder="Cuéntanos..."/></div>
-              <button className="fsub" onClick={()=>{setFormOk(true);setTimeout(()=>setFormOk(false),3000)}}>
-                {formOk ? "✓ Enviado" : "Enviar"}
-              </button>
+              <div className="l-fg"><label>Correo</label><input type="email" placeholder="tu@correo.cl"/></div>
+              <div className="l-fg"><label>Asunto</label><select><option>Quiero unirme al coro</option><option>Invitación a celebración</option><option>Consulta general</option><option>Otro</option></select></div>
+              <div className="l-fg"><label>Mensaje</label><textarea placeholder="Cuéntanos..."/></div>
+              <button className="l-fsub" onClick={()=>{setFormOk(true);setTimeout(()=>setFormOk(false),3000)}}>{formOk?"✓ Enviado":"Enviar"}</button>
             </div>
           </div>
         </div>
       </section>
 
       {/* FOOTER */}
-      <footer className="land-footer">
-        <div className="foot-top">
-          <div className="foot-brand">
-            
-            <p>Ensemble vocal de música litúrgica.<br/>Maipú, Santiago de Chile.</p>
+      <footer className="l-footer">
+        <div className="l-foot-top">
+          <div>
+            <div className="l-foot-brand-n">Coro Misioneros de Jesús</div>
+            <p className="l-foot-brand-p">{content.footer_texto}</p>
           </div>
-          <div className="foot-cols">
-            <div className="foot-col">
+          <div className="l-foot-cols">
+            <div className="l-foot-col">
               <h4>Sitio</h4>
               <a onClick={()=>scrollTo("nosotros")}>Nosotros</a>
               <a onClick={()=>scrollTo("galeria")}>Galería</a>
               <a onClick={()=>scrollTo("bot")}>Únete</a>
               <a onClick={()=>scrollTo("contacto")}>Contacto</a>
             </div>
-            <div className="foot-col">
+            <div className="l-foot-col">
               <h4>Redes</h4>
               <a>Instagram</a><a>Facebook</a><a>YouTube</a><a>Spotify</a>
             </div>
           </div>
         </div>
-        <div className="foot-btm">
-          <span className="foot-copy">© 2026 Coro Misioneros de Jesús · Desarrollado por TEMPVS7®</span>
-          <span className="foot-adm" onClick={onPortal}>· · ·</span>
+        <div className="l-foot-btm">
+          <span className="l-foot-copy">© 2026 Coro Misioneros de Jesús · Desarrollado por TEMPVS7®</span>
+          <span className="l-foot-adm" onClick={()=>setShowAdmin(true)}>· · ·</span>
         </div>
       </footer>
+      {/* BOTONES FLOTANTES */}
+      <div className="fab-wrap">
+        <button className="fab fab-admin" onClick={() => setShowAdmin(true)} title="Admin">
+          <span className="fab-label">Editar sitio</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+        <a className="fab fab-wa" href={`https://wa.me/${content.whatsapp}?text=Hola,%20me%20interesa%20saber%20m%C3%A1s%20sobre%20el%20Coro%20Misioneros%20de%20Jes%C3%BAs`} target="_blank" rel="noopener noreferrer" title="WhatsApp">
+          <span className="fab-label">WhatsApp</span>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
+          </svg>
+        </a>
+      </div>
     </div>
   );
 }
