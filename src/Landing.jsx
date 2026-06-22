@@ -54,6 +54,7 @@ export default function Landing({ onPortal }) {
   const [chat, setChat] = useState([{ role: "bot", text: "Hola, soy el asistente del Coro MJ. ¿En qué te puedo orientar?" }]);
   const [inp, setInp] = useState(""); const [typing, setTyping] = useState(false); const [hist, setHist] = useState([]);
   const [formOk, setFormOk] = useState(false);
+  const [adminPw, setAdminPw] = useState("");
   const [admin, setAdmin] = useState(false); const [adminAuth, setAdminAuth] = useState(false);
   const [editing, setEditing] = useState({}); const [saving, setSaving] = useState({}); const [upKey, setUpKey] = useState(null);
   const msgsRef = useRef(null);
@@ -104,43 +105,48 @@ export default function Landing({ onPortal }) {
     </div>
   );
 
-  const AdminPanel = () => (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={e => e.target === e.currentTarget && setAdmin(false)}>
-      <div style={{ background: "#fff", borderRadius: 20, width: "90%", maxWidth: 520, maxHeight: "88vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 32px 80px rgba(0,0,0,0.3)" }}>
-        <div style={{ background: "#08122d", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>⚙️ Editor del sitio</div>
-          <button onClick={() => setAdmin(false)} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", borderRadius: "50%", width: 30, height: 30, cursor: "pointer", fontSize: 15 }}>✕</button>
-        </div>
-        {!adminAuth ? (
-          <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#08122d" }}>Contraseña de acceso</div>
-            <input type="password" id="adm-pw" placeholder="Contraseña" style={{ border: "1px solid #dde4f0", borderRadius: 10, padding: "12px 16px", fontSize: 15, fontFamily: "inherit", outline: "none" }} onKeyDown={e => e.key === "Enter" && (document.getElementById("adm-pw").value === ADMIN_PASS ? setAdminAuth(true) : alert("Incorrecta"))} />
-            <button onClick={() => document.getElementById("adm-pw").value === ADMIN_PASS ? setAdminAuth(true) : alert("Contraseña incorrecta")} style={{ background: "#08122d", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>Entrar</button>
-          </div>
-        ) : (
-          <div style={{ overflowY: "auto", padding: "24px 24px 40px" }}>
-            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Hero</div>
-            <IF label="Imagen fondo" k="hero_img" name="landing_hero" />
-            <F label="Título 1" k="hero_titulo" /><F label="Título 2 italic" k="hero_titulo2" /><F label="Subtexto" k="hero_sub" ta />
-            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>👥 Nosotros</div>
-            <IF label="Imagen nosotros" k="about_img" name="landing_about" />
-            <F label="Título" k="about_titulo" /><F label="Párrafo 1" k="about_texto1" ta /><F label="Párrafo 2" k="about_texto2" ta />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-              {[1,2,3].map(n => <div key={n}><F label={`Stat ${n} #`} k={`stat${n}_n`} /><F label="Label" k={`stat${n}_l`} /></div>)}
-            </div>
-            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Galería</div>
-            {[1,2,3,4,5].map(n => (
-              <div key={n} style={{ background: "#f8f9fc", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
-                <div style={{ fontWeight: 600, fontSize: 11, color: "#666", marginBottom: 8 }}>Foto {n}</div>
-                <IF label="Imagen" k={`gal${n}_img`} name={`landing_gal${n}`} />
-                <F label="Título" k={`gal${n}_label`} /><F label="Subtítulo" k={`gal${n}_sub`} />
-              </div>
-            ))}
-            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>📍 Contacto</div>
-            <F label="WhatsApp (ej: 56912345678)" k="whatsapp" /><F label="Dirección" k="contacto_dir" /><F label="Ensayos" k="contacto_ensayo" /><F label="Footer texto" k="footer_texto" ta />
-          </div>
-        )}
+  const checkAdmin = () => {
+    if (adminPw === ADMIN_PASS) { setAdminAuth(true); }
+    else { alert("Contraseña incorrecta"); setAdminPw(""); }
+  };
+
+  const adminContent = adminAuth ? (
+    <div style={{ overflowY: "auto", padding: "24px 24px 40px" }}>
+      <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Hero</div>
+      <IF label="Imagen fondo" k="hero_img" name="landing_hero" />
+      <F label="Título 1" k="hero_titulo" /><F label="Título 2 italic" k="hero_titulo2" /><F label="Subtexto" k="hero_sub" ta />
+      <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>👥 Nosotros</div>
+      <IF label="Imagen nosotros" k="about_img" name="landing_about" />
+      <F label="Título" k="about_titulo" /><F label="Párrafo 1" k="about_texto1" ta /><F label="Párrafo 2" k="about_texto2" ta />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+        {[1,2,3].map(n => <div key={n}><F label={`Stat ${n} #`} k={`stat${n}_n`} /><F label="Label" k={`stat${n}_l`} /></div>)}
       </div>
+      <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Galería</div>
+      {[1,2,3,4,5].map(n => (
+        <div key={n} style={{ background: "#f8f9fc", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+          <div style={{ fontWeight: 600, fontSize: 11, color: "#666", marginBottom: 8 }}>Foto {n}</div>
+          <IF label="Imagen" k={`gal${n}_img`} name={`landing_gal${n}`} />
+          <F label="Título" k={`gal${n}_label`} /><F label="Subtítulo" k={`gal${n}_sub`} />
+        </div>
+      ))}
+      <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>📍 Contacto</div>
+      <F label="WhatsApp (ej: 56912345678)" k="whatsapp" /><F label="Dirección" k="contacto_dir" /><F label="Ensayos" k="contacto_ensayo" /><F label="Footer texto" k="footer_texto" ta />
+    </div>
+  ) : (
+    <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: "#08122d" }}>Contraseña de acceso</div>
+      <input
+        type="password"
+        value={adminPw}
+        onChange={e => setAdminPw(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") checkAdmin(); }}
+        placeholder="Contraseña"
+        autoFocus
+        style={{ border: "1px solid #dde4f0", borderRadius: 10, padding: "12px 16px", fontSize: 15, fontFamily: "inherit", outline: "none" }}
+      />
+      <button onClick={checkAdmin} style={{ background: "#08122d", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+        Entrar
+      </button>
     </div>
   );
 
@@ -148,7 +154,17 @@ export default function Landing({ onPortal }) {
 
   return (
     <div style={{ fontFamily: "'DM Sans','Inter',sans-serif", background: "#fff", color: "#0a0a14", overflowX: "hidden", WebkitFontSmoothing: "antialiased" }}>
-      {admin && <AdminPanel />}
+      {admin && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={e => e.target === e.currentTarget && setAdmin(false)}>
+          <div style={{ background: "#fff", borderRadius: 20, width: "90%", maxWidth: 520, maxHeight: "88vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 32px 80px rgba(0,0,0,0.3)" }} onClick={e => e.stopPropagation()}>
+            <div style={{ background: "#08122d", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+              <div style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>⚙️ Editor del sitio</div>
+              <button onClick={() => { setAdmin(false); setAdminAuth(false); setAdminPw(""); }} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", borderRadius: "50%", width: 30, height: 30, cursor: "pointer", fontSize: 15 }}>✕</button>
+            </div>
+            {adminContent}
+          </div>
+        </div>
+      )}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;0,9..40,800;0,9..40,900;1,9..40,300&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400;1,9..144,700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
@@ -164,8 +180,8 @@ export default function Landing({ onPortal }) {
         .nav-right{display:flex;align-items:center;gap:8px;justify-content:flex-end}
         .nav-soc{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;border:none}
         .nav-soc:hover{background:rgba(255,255,255,0.18)}
-        .nav-cta{background:#fff;color:#08122d;border:none;border-radius:980px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;margin-left:8px;letter-spacing:0.01em}
-        .nav-cta:hover{background:#e8f0fc;transform:translateY(-1px)}
+        .nav-cta{background:#F97316;color:#fff;border:none;border-radius:980px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;margin-left:8px;letter-spacing:0.01em}
+        .nav-cta:hover{background:#ea6c10;transform:translateY(-1px)}
 
         /* HERO */
         .hero{height:100vh;position:relative;overflow:hidden;display:flex;align-items:flex-end}
@@ -187,21 +203,25 @@ export default function Landing({ onPortal }) {
         .hero-wave{fill:#fff;display:block;width:100%}
 
         /* TICKER */
-        .ticker{background:#08122d;padding:0;overflow:hidden;white-space:nowrap;position:relative}
+        .ticker{background:linear-gradient(90deg,#08122d,#0d2a4a,#08122d);padding:0;overflow:hidden;white-space:nowrap;position:relative}
         .ticker::before,.ticker::after{content:'';position:absolute;top:0;bottom:0;width:80px;z-index:2}
         .ticker::before{left:0;background:linear-gradient(to right,#08122d,transparent)}
         .ticker::after{right:0;background:linear-gradient(to left,#08122d,transparent)}
-        .ticker-track{display:inline-flex;animation:tick 25s linear infinite;padding:14px 0}
+        .ticker-track{display:inline-flex;animation:tick 25s linear infinite;padding:16px 0}
         @keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-        .t-item{display:inline-flex;align-items:center;gap:10px;padding:0 28px;font-size:11px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.4)}
-        .t-dot{width:3px;height:3px;border-radius:50%;background:#5a8fff;flex-shrink:0}
+        .t-item{display:inline-flex;align-items:center;gap:10px;padding:0 28px;font-size:11px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.5)}
+        .t-item:nth-child(3n+1) .t-dot{background:#F97316}
+        .t-item:nth-child(3n+2) .t-dot{background:#f59e0b}
+        .t-item:nth-child(3n+3) .t-dot{background:#818cf8}
+        .t-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
 
         /* NOSOTROS */
         .about{padding:112px 60px;background:#fff;position:relative;overflow:hidden}
-        .about::before{content:'';position:absolute;top:-120px;right:-120px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(90,143,255,0.06) 0%,transparent 70%);pointer-events:none}
-        .about-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;max-width:1140px;margin:0 auto}
-        .ey{font-size:10px;font-weight:700;letter-spacing:0.24em;text-transform:uppercase;color:#5a8fff;margin-bottom:16px;display:flex;align-items:center;gap:10px}
-        .ey::before{content:'';width:20px;height:2px;background:#5a8fff;border-radius:2px}
+        .about::before{content:'';position:absolute;top:-120px;right:-120px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,0.08) 0%,transparent 70%);pointer-events:none}
+        .about::after{content:'';position:absolute;bottom:-80px;left:-80px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(245,158,11,0.06) 0%,transparent 70%);pointer-events:none}
+        .about-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;max-width:1140px;margin:0 auto;position:relative;z-index:1}
+        .ey{font-size:10px;font-weight:700;letter-spacing:0.24em;text-transform:uppercase;color:#F97316;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+        .ey::before{content:'';width:20px;height:2px;background:#F97316;border-radius:2px}
         .h2{font-size:clamp(36px,4.2vw,56px);font-weight:800;line-height:1.08;letter-spacing:-0.025em;color:#0a0a14;margin-bottom:22px}
         .h2 em{font-family:'Fraunces',serif;font-style:italic;font-weight:400;color:#08122d}
         .bp{font-size:15px;font-weight:300;line-height:1.85;color:#555}
@@ -211,7 +231,7 @@ export default function Landing({ onPortal }) {
         .about-img-badge{position:absolute;bottom:0;left:0;right:0;padding:28px 32px}
         .badge-l{font-size:9px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.45)}
         .badge-v{font-size:44px;font-weight:900;color:#fff;letter-spacing:-0.03em;line-height:1}
-        .about-img-accent{position:absolute;top:24px;right:24px;background:rgba(90,143,255,0.15);backdrop-filter:blur(8px);border:1px solid rgba(90,143,255,0.3);border-radius:12px;padding:12px 16px;text-align:center}
+        .about-img-accent{position:absolute;top:24px;right:24px;background:rgba(249,115,22,0.2);backdrop-filter:blur(8px);border:1px solid rgba(249,115,22,0.4);border-radius:12px;padding:12px 16px;text-align:center}
         .acc-n{font-size:22px;font-weight:800;color:#fff}
         .acc-l{font-size:9px;color:rgba(255,255,255,0.55);letter-spacing:0.1em;text-transform:uppercase;margin-top:2px}
         .stats{display:grid;grid-template-columns:repeat(3,1fr);margin-top:44px;border-top:1px solid #eaeef5;padding-top:36px;gap:0}
@@ -219,12 +239,12 @@ export default function Landing({ onPortal }) {
         .stat:last-child{padding-left:24px;padding-right:0;border-right:none}
         .stat:nth-child(2){padding:0 24px}
         .stat-n{font-size:44px;font-weight:900;color:#08122d;line-height:1;letter-spacing:-0.03em}
-        .stat-n sup{font-size:20px;color:#5a8fff}
+        .stat-n sup{font-size:20px;color:#F97316}
         .stat-l{font-size:11px;color:#aaa;margin-top:5px;font-weight:500}
 
         /* GALERÍA */
-        .gal{padding:0 0 112px;background:#fff}
-        .gal-head{padding:112px 60px 56px;display:flex;justify-content:space-between;align-items:flex-end;max-width:1140px;margin:0 auto}
+        .gal{padding:0 0 112px;background:#f8f9fc}
+        .gal-head{padding:96px 60px 48px;display:flex;justify-content:space-between;align-items:flex-end;max-width:1140px;margin:0 auto}
         .gal-note{font-size:14px;font-weight:300;color:#888;max-width:220px;text-align:right;line-height:1.7}
         .gal-strip{display:flex;gap:0;overflow-x:auto;scrollbar-width:none;padding:0 60px}
         .gal-strip::-webkit-scrollbar{display:none}
@@ -236,8 +256,13 @@ export default function Landing({ onPortal }) {
         .gi:nth-child(5){width:380px;height:520px}
         .gi-bg{position:absolute;inset:0;background-size:cover;background-position:center;transition:transform .6s ease}
         .gi:hover .gi-bg{transform:scale(1.04)}
-        .gi-ov{position:absolute;inset:0;background:linear-gradient(to top,rgba(6,14,36,0.9) 0%,rgba(6,14,36,0.2) 55%,transparent 100%);transition:opacity .3s}
-        .gi-tag{position:absolute;top:20px;left:20px;background:rgba(255,255,255,0.12);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.2);border-radius:980px;padding:5px 14px;font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.8)}
+        .gi-ov{position:absolute;inset:0;background:linear-gradient(to top,rgba(6,14,36,0.92) 0%,rgba(6,14,36,0.1) 55%,transparent 100%)}
+        .gi-tag{position:absolute;top:20px;left:20px;backdrop-filter:blur(8px);border-radius:980px;padding:6px 14px;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#fff}
+        .gi:nth-child(1) .gi-tag{background:rgba(249,115,22,0.3);border:1px solid rgba(249,115,22,0.5)}
+        .gi:nth-child(2) .gi-tag{background:rgba(245,158,11,0.3);border:1px solid rgba(245,158,11,0.5)}
+        .gi:nth-child(3) .gi-tag{background:rgba(129,140,248,0.3);border:1px solid rgba(129,140,248,0.5)}
+        .gi:nth-child(4) .gi-tag{background:rgba(239,68,68,0.3);border:1px solid rgba(239,68,68,0.5)}
+        .gi:nth-child(5) .gi-tag{background:rgba(249,115,22,0.3);border:1px solid rgba(249,115,22,0.5)}
         .gi-cap{position:absolute;bottom:0;left:0;right:0;padding:24px}
         .gi-label{font-size:17px;font-weight:700;color:#fff;line-height:1.2}
         .gi-sub{font-size:10px;color:rgba(255,255,255,0.5);letter-spacing:0.1em;text-transform:uppercase;margin-top:5px}
@@ -248,48 +273,48 @@ export default function Landing({ onPortal }) {
         /* BOT */
         .bot{padding:112px 60px;background:linear-gradient(160deg,#060e24 0%,#0d1f45 100%);position:relative;overflow:hidden}
         .bot::before{content:'♪';position:absolute;top:-20px;right:60px;font-size:320px;color:rgba(255,255,255,0.02);font-family:'Fraunces',serif;line-height:1;pointer-events:none;user-select:none}
-        .bot::after{content:'';position:absolute;bottom:-80px;left:-80px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(90,143,255,0.08) 0%,transparent 70%);pointer-events:none}
+        .bot::after{content:'';position:absolute;bottom:-80px;left:-80px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,0.08) 0%,transparent 70%);pointer-events:none}
         .bot-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:start;max-width:1140px;margin:0 auto;position:relative;z-index:1}
-        .bot-ey{color:rgba(90,143,255,0.8)}
-        .bot-ey::before{background:rgba(90,143,255,0.8)}
+        .bot-ey{color:#F97316}
+        .bot-ey::before{background:rgba(249,115,22,0.8)}
         .bot-h2{color:#fff}
         .bot-h2 em{color:rgba(255,255,255,0.85)}
         .bot-p{color:rgba(255,255,255,0.5)}
         .bfeats{margin-top:44px}
         .bfeat{padding:20px 0;border-bottom:1px solid rgba(255,255,255,0.07);display:flex;gap:18px;align-items:flex-start}
         .bfeat:first-child{border-top:1px solid rgba(255,255,255,0.07)}
-        .bnum{font-size:11px;font-weight:700;color:rgba(90,143,255,0.5);flex-shrink:0;padding-top:2px;letter-spacing:0.1em}
+        .bnum{font-size:11px;font-weight:700;color:rgba(249,115,22,0.5);flex-shrink:0;padding-top:2px;letter-spacing:0.1em}
         .btitle{font-size:14px;font-weight:700;color:#fff;margin-bottom:4px}
         .bdesc{font-size:13px;color:rgba(255,255,255,0.4);line-height:1.6;font-weight:300}
-        .chat{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:20px;overflow:hidden;backdrop-filter:blur(10px)}
-        .chat-hd{background:rgba(255,255,255,0.06);padding:16px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,0.07)}
-        .chat-av{width:34px;height:34px;border-radius:50%;background:rgba(90,143,255,0.2);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+        .chat{background:#fff;border:1px solid #e4eaf5;border-radius:20px;overflow:hidden;box-shadow:0 4px 32px rgba(0,0,0,0.12)}
+        .chat-hd{background:#08122d;padding:16px 20px;display:flex;align-items:center;gap:12px;border-bottom:none}
+        .chat-av{width:34px;height:34px;border-radius:50%;background:rgba(249,115,22,0.2);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
         .chat-nm{font-size:13px;font-weight:600;color:#fff}
         .chat-sm{font-size:10.5px;color:rgba(255,255,255,0.35)}
         .chat-dot{width:7px;height:7px;border-radius:50%;background:#34d399;margin-left:auto}
-        .chat-msgs{padding:16px;min-height:240px;max-height:270px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+        .chat-msgs{padding:16px;min-height:240px;max-height:270px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;background:#f8f9fc}
         .cm{display:flex;gap:8px}.cm-u{flex-direction:row-reverse}
-        .cm-av{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;margin-top:2px}
+        .cm-av{width:26px;height:26px;border-radius:50%;background:#e4eaf5;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;margin-top:2px}
         .cm-b{max-width:82%;padding:10px 14px;border-radius:14px;font-size:13.5px;line-height:1.5}
-        .cm-bot{background:rgba(255,255,255,0.08);color:#fff;border-radius:4px 14px 14px 14px}
-        .cm-usr{background:#5a8fff;color:#fff;border-radius:14px 4px 14px 14px}
+        .cm-bot{background:#fff;color:#0a0a14;box-shadow:0 1px 4px rgba(0,0,0,0.07);border-radius:4px 14px 14px 14px}
+        .cm-usr{background:#F97316;color:#fff;border-radius:14px 4px 14px 14px}
         .tdots{display:flex;gap:4px;padding:10px 14px}
-        .tdots span{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.3);animation:td 1.2s infinite}
+        .tdots span{width:6px;height:6px;border-radius:50%;background:#ccc;animation:td 1.2s infinite}
         .tdots span:nth-child(2){animation-delay:.2s}.tdots span:nth-child(3){animation-delay:.4s}
         @keyframes td{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-4px)}}
-        .chat-pills{display:flex;gap:6px;padding:10px 16px 8px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.06)}
-        .cpill{border:1px solid rgba(255,255,255,0.15);border-radius:980px;padding:5px 12px;font-size:11.5px;color:rgba(255,255,255,0.7);cursor:pointer;background:transparent;font-family:inherit;transition:all .15s}
-        .cpill:hover{background:rgba(255,255,255,0.1);color:#fff;border-color:rgba(255,255,255,0.3)}
-        .chat-ft{display:flex;gap:8px;padding:12px 14px;border-top:1px solid rgba(255,255,255,0.07)}
-        .cin{flex:1;border:1px solid rgba(255,255,255,0.12);border-radius:980px;padding:9px 16px;font-size:13.5px;font-family:inherit;color:#fff;outline:none;background:rgba(255,255,255,0.07);transition:border-color .2s}
-        .cin:focus{border-color:rgba(90,143,255,0.5)}
-        .cin::placeholder{color:rgba(255,255,255,0.25)}
-        .csnd{width:36px;height:36px;border-radius:50%;background:#5a8fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s}
-        .csnd:hover{background:#7aa3ff}
+        .chat-pills{display:flex;gap:6px;padding:10px 16px 8px;flex-wrap:wrap;border-top:1px solid #eaeef5;background:#fff}
+        .cpill{border:1px solid rgba(249,115,22,0.3);border-radius:980px;padding:5px 12px;font-size:11.5px;color:#F97316;cursor:pointer;background:#fff;font-family:inherit;transition:all .15s}
+        .cpill:hover{background:#F97316;color:#fff;border-color:#F97316}
+        .chat-ft{display:flex;gap:8px;padding:12px 14px;border-top:1px solid #eaeef5;background:#fff}
+        .cin{flex:1;border:1px solid #dde4f0;border-radius:980px;padding:9px 16px;font-size:13.5px;font-family:inherit;color:#0a0a14;outline:none;background:#f8f9fc;transition:border-color .2s}
+        .cin:focus{border-color:#F97316;background:#fff}
+        .cin::placeholder{color:#aab0c0}
+        .csnd{width:36px;height:36px;border-radius:50%;background:#F97316;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s}
+        .csnd:hover{background:#ea6c10}
 
         /* CONTACTO */
         .ct{padding:112px 60px;background:#f5f7fc;position:relative;overflow:hidden}
-        .ct::after{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(to right,#5a8fff,#08122d,#5a8fff)}
+        .ct::after{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(to right,#F97316,#08122d,#F97316)}
         .ct-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;max-width:1140px;margin:0 auto;align-items:start}
         .ct-item{display:flex;gap:16px;align-items:flex-start;padding:20px 0;border-bottom:1px solid #e4eaf5}
         .ct-item:first-of-type{border-top:1px solid #e4eaf5}
@@ -304,7 +329,7 @@ export default function Landing({ onPortal }) {
         .fg{margin-bottom:14px}
         .fg label{display:block;font-size:10px;font-weight:700;color:#aaa;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:6px}
         .fg input,.fg textarea,.fg select{width:100%;border:1px solid #e0e8f5;border-radius:10px;padding:11px 14px;font-size:14px;font-family:inherit;background:#fafbff;color:#0a0a14;outline:none;transition:border-color .2s;-webkit-appearance:none}
-        .fg input:focus,.fg textarea:focus,.fg select:focus{border-color:#5a8fff;background:#fff}
+        .fg input:focus,.fg textarea:focus,.fg select:focus{border-color:#F97316;background:#fff}
         .fg input::placeholder,.fg textarea::placeholder{color:#c0c8d8}
         .fg textarea{resize:vertical;min-height:90px}
         .frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -328,7 +353,13 @@ export default function Landing({ onPortal }) {
         .foot-adm:hover{color:rgba(255,255,255,0.25)}
 
         /* FABS */
-        .fabs{position:fixed;bottom:28px;left:24px;z-index:9000;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+        .fabs{position:fixed;top:50%;left:24px;transform:translateY(-50%);z-index:9000;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+        .fab-logo-widget{width:180px;border-radius:16px;overflow:hidden;background:rgba(8,18,45,0.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);box-shadow:0 8px 32px rgba(0,0,0,0.35);margin-bottom:4px}
+        .fab-logo-widget-img{width:100%;height:160px;object-fit:contain;background:rgba(255,255,255,0.03);padding:20px;display:block}
+        .fab-logo-widget-body{padding:10px 14px 14px}
+        .fab-logo-widget-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.3);border-radius:980px;padding:3px 10px}
+        .fab-logo-widget-badge-dot{width:6px;height:6px;border-radius:50%;background:#F97316;flex-shrink:0}
+        .fab-logo-widget-badge-txt{font-size:10px;font-weight:600;color:#F97316;letter-spacing:0.08em}
         .fab{width:50px;height:50px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .2s;position:relative;text-decoration:none;flex-shrink:0}
         .fab:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,0.3)}
         .fab-wa{background:#25D366}
@@ -368,12 +399,12 @@ export default function Landing({ onPortal }) {
           <a onClick={() => go("contacto")}>Contacto</a>
         </div>
         <div className="nav-logo" onClick={() => go("inicio")}>
-          <img src="/LOGOMJ2.png" alt="Coro MJ" onError={e => e.target.style.display="none"}/>
+          <img src="/LOGOMJ.jpeg" alt="Coro MJ" onError={e => e.target.style.display="none"}/>
         </div>
         <div className="nav-right">
-          <button className="nav-soc"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="rgba(255,255,255,0.7)" stroke="none"/></svg></button>
-          <button className="nav-soc"><svg width="13" height="13" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.69a8.27 8.27 0 0 0 4.83 1.55V6.79a4.85 4.85 0 0 1-1.07-.1z"/></svg></button>
-          <button className="nav-soc"><svg width="15" height="15" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg></button>
+          <button className="nav-soc" title="Instagram"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="rgba(255,255,255,0.75)" stroke="none"/></svg></button>
+          <button className="nav-soc" title="TikTok"><svg width="13" height="13" viewBox="0 0 24 24" fill="rgba(255,255,255,0.75)"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.69a8.27 8.27 0 0 0 4.83 1.55V6.79a4.85 4.85 0 0 1-1.07-.1z"/></svg></button>
+          <button className="nav-soc" title="YouTube"><svg width="15" height="15" viewBox="0 0 24 24" fill="rgba(255,255,255,0.75)"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="rgba(6,14,36,0.9)"/></svg></button>
           <button className="nav-cta" onClick={onPortal}>Acceso Portal</button>
         </div>
       </nav>
@@ -510,11 +541,39 @@ export default function Landing({ onPortal }) {
             <h2 className="h2">Hablemos<br/><em>directamente</em></h2>
             <p className="bp">¿Quieres invitarnos o tienes alguna consulta?</p>
             <div style={{marginTop:36}}>
-              <div className="ct-item"><div className="ct-ico">📍</div><div><div className="ct-t">Ubicación</div><div className="ct-s">{C.contacto_dir}</div></div></div>
-              <div className="ct-item"><div className="ct-ico">🎵</div><div><div className="ct-t">Ensayos</div><div className="ct-s">{C.contacto_ensayo}</div></div></div>
-              <div className="ct-item"><div className="ct-ico">📲</div><div><div className="ct-t">Redes sociales</div><div className="ct-s">Síguenos en nuestras plataformas</div></div></div>
+              <div className="ct-item">
+                <div className="ct-ico">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#08122d" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                </div>
+                <div><div className="ct-t">Ubicación</div><div className="ct-s">{C.contacto_dir}</div></div>
+              </div>
+              <div className="ct-item">
+                <div className="ct-ico">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#08122d" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                </div>
+                <div><div className="ct-t">Ensayos</div><div className="ct-s">{C.contacto_ensayo}</div></div>
+              </div>
+              <div className="ct-item">
+                <div className="ct-ico">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#08122d" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                </div>
+                <div><div className="ct-t">Redes sociales</div><div className="ct-s">Síguenos en nuestras plataformas</div></div>
+              </div>
             </div>
-            <div className="socs"><div className="soc">📸</div><div className="soc">📘</div><div className="soc">▶️</div><div className="soc">🎧</div></div>
+            <div className="socs">
+              <div className="soc" title="Instagram">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#08122d" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.2" fill="#08122d" stroke="none"/></svg>
+              </div>
+              <div className="soc" title="Facebook">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#08122d"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+              </div>
+              <div className="soc" title="YouTube">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#08122d"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="#fff"/></svg>
+              </div>
+              <div className="soc" title="TikTok">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#08122d"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.27 8.27 0 0 0 4.84 1.55V6.79a4.85 4.85 0 0 1-1.07-.1z"/></svg>
+              </div>
+            </div>
           </div>
           <div className="cform">
             <div className="cform-h">Envíanos<br/>un mensaje</div>
@@ -534,7 +593,7 @@ export default function Landing({ onPortal }) {
       <footer>
         <div className="foot-top">
           <div>
-            <img src="/LOGOMJ2.png" className="foot-logo" alt="Logo" onError={e=>e.target.style.display="none"}/>
+            <img src="/LOGOMJ.jpeg" className="foot-logo" alt="Logo" onError={e=>e.target.style.display="none"}/>
             <div className="foot-bn">Coro Misioneros de Jesús</div>
             <p className="foot-bp">{C.footer_texto}</p>
           </div>
@@ -560,6 +619,15 @@ export default function Landing({ onPortal }) {
 
       {/* FABS */}
       <div className="fabs">
+        <div className="fab-logo-widget">
+          <img src="/LOGOMJ.jpeg" alt="Logo" className="fab-logo-widget-img" onError={e => e.target.style.display="none"}/>
+          <div className="fab-logo-widget-body">
+            <div className="fab-logo-widget-badge">
+              <div className="fab-logo-widget-badge-dot"/>
+              <span className="fab-logo-widget-badge-txt">Activo</span>
+            </div>
+          </div>
+        </div>
         <button className="fab fab-adm" onClick={()=>setAdmin(true)}>
           <span className="fab-tip">Editar sitio</span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
