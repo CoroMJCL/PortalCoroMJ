@@ -377,10 +377,6 @@ export default function Landing({ onPortal }) {
           <div className="l-nav-logo-icon">
             <img src="/LOGOMJ2.png" alt="Coro MJ" onError={e => { e.target.style.display="none"; }}/>
           </div>
-          <div className="l-nav-logo-text">
-            <span className="l-nav-logo-coro">Coro</span>
-            <span className="l-nav-logo-sub">Misioneros de Jesús</span>
-          </div>
         </div>
         <div className="l-nav-center l-nav-links">
           <a onClick={() => scrollTo("nosotros")}>Nosotros</a>
