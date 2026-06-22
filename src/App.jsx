@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, Component } from "react";
 import { EscuelaCanto } from "./EscuelaCanto";
+import Landing from "./Landing";
 
 // ══════════════════════════════════════════
 //  SUPABASE CONFIG
@@ -1409,9 +1410,9 @@ function AppInner() {
         return "reset";
       }
     } catch(e) {}
-    return "login";
+    return "landing";
   })();
-  const [view, setView] = useState(_initialView); // "login" | "register" | "recover" | "reset" | "app"
+  const [view, setView] = useState(_initialView); // "landing" | "login" | "register" | "recover" | "reset" | "app"
   const [showPushModal, setShowPushModal] = useState(false);
   const [pushBloqueado, setPushBloqueado] = useState(false);
   const [user, setUser] = useState(null);
@@ -2233,7 +2234,7 @@ function AppInner() {
     await authSignOut();
     setUser(null);
     setAuthToken(null);
-    setView("login");
+    setView("landing");
   }
 
   const searchRes =
@@ -2305,6 +2306,9 @@ function AppInner() {
       </div>
     );
   }
+
+  if (view === "landing")
+    return <Landing onPortal={() => setView("login")} />;
 
   if (view !== "app")
     return (
@@ -16142,6 +16146,46 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     }
   }
 
+  async function duplicarPauta(pauta) {
+    if (!confirm(`¿Duplicar la pauta "${pauta.titulo}"? Se creará una copia como borrador sin fecha.`)) return;
+    try {
+      const body = {
+        titulo: `Copia de ${pauta.titulo}`,
+        fecha: null,
+        hora: pauta.hora || "",
+        lugar: pauta.lugar || "",
+        coro: pauta.coro || "Coro Misioneros de Jesús",
+        tipo_celebracion: pauta.tipo_celebracion || "",
+        notas: pauta.notas || "",
+        guion_url: pauta.guion_url || "",
+        canciones: pauta.canciones || "[]",
+        publicada: false,
+        tipo: pauta.tipo || "grupo",
+        mostrar_col_letra: pauta.mostrar_col_letra || false,
+        mostrar_col_audio: pauta.mostrar_col_audio || false,
+        visible_visita: false,
+      };
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/pautas_misa`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${_authToken}`,
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const [created] = await res.json();
+      await onReload();
+      setSelected(created);
+      setMode("view");
+      setMsg("✅ Pauta duplicada como borrador. Recuerda asignarle una fecha.");
+    } catch (e) {
+      setMsg("Error al duplicar: " + e.message);
+    }
+  }
+
   // Genera link de WhatsApp para notificar integrantes
   async function notificarIntegrantes(pauta, memberList) {
     const fechaFmt = new Date(pauta.fecha + "T00:00:00").toLocaleDateString(
@@ -16909,6 +16953,13 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                 variant="secondary"
               >
                 ✏️ Editar
+              </Btn>
+              <Btn
+                onClick={() => duplicarPauta(selected)}
+                style={{ fontSize: 12, padding: "6px 14px", background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd" }}
+                variant="secondary"
+              >
+                📋 Duplicar
               </Btn>
               <Btn
                 onClick={() => togglePublicar(selected)}
