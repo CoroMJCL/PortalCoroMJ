@@ -221,12 +221,13 @@ export default function Landing({ onPortal }) {
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300;1,9..144,400;1,9..144,700&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
-        .l-nav { position:fixed;top:0;left:0;right:0;z-index:999;height:68px;background:rgba(8,18,45,0.92);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:0.5px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;padding:0 48px; }
-        .l-nav-logo { display:flex;align-items:center;gap:12px;text-decoration:none;cursor:pointer; }
-        .l-nav-logo-icon { width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+        .l-nav { position:fixed;top:0;left:0;right:0;z-index:999;height:80px;background:rgba(8,18,45,0.92);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:0.5px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;padding:0 48px; }
+        .l-nav-logo { display:flex;align-items:center;gap:14px;text-decoration:none;cursor:pointer; }
+        .l-nav-logo-icon { width:54px;height:54px;border-radius:12px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center; }
+        .l-nav-logo-icon img { width:54px;height:54px;object-fit:cover;border-radius:12px; }
         .l-nav-logo-text { display:flex;flex-direction:column;line-height:1; }
-        .l-nav-logo-coro { font-family:'DM Sans',sans-serif;font-size:18px;font-weight:900;color:#fff;letter-spacing:0.06em;text-transform:uppercase; }
-        .l-nav-logo-sub { font-family:'Fraunces',serif;font-style:italic;font-size:11px;color:rgba(255,255,255,0.5);margin-top:1px;letter-spacing:0.02em; }
+        .l-nav-logo-coro { font-family:'DM Sans',sans-serif;font-size:20px;font-weight:900;color:#fff;letter-spacing:0.06em;text-transform:uppercase; }
+        .l-nav-logo-sub { font-family:'Fraunces',serif;font-style:italic;font-size:12px;color:rgba(255,255,255,0.5);margin-top:2px;letter-spacing:0.02em; }
         .l-nav-center { position:absolute;left:50%;transform:translateX(-50%);display:flex;gap:36px; }
         .l-nav-links a { font-family:'DM Sans',sans-serif;font-size:14px;font-weight:400;color:rgba(255,255,255,0.65);text-decoration:none;cursor:pointer;transition:color .2s; }
         .l-nav-links a:hover { color:#fff; }
@@ -361,7 +362,7 @@ export default function Landing({ onPortal }) {
           .l-gal-top{flex-direction:column;gap:14px;align-items:flex-start}
         }
         @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-        .fab-wrap { position:fixed;bottom:28px;left:28px;z-index:9000;display:flex;flex-direction:column;gap:12px;align-items:flex-start; }
+        .fab-wrap { position:fixed;bottom:38%;left:28px;z-index:9000;display:flex;flex-direction:column;gap:12px;align-items:flex-start; }
         .fab { width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.2);transition:transform .2s,box-shadow .2s;position:relative;text-decoration:none; }
         .fab:hover { transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,0.25); }
         .fab-wa { background:#25D366; }
@@ -374,10 +375,7 @@ export default function Landing({ onPortal }) {
       <nav className="l-nav">
         <div className="l-nav-logo" onClick={() => scrollTo("inicio")}>
           <div className="l-nav-logo-icon">
-            <svg width="22" height="22" viewBox="0 0 100 100" fill="none">
-              <circle cx="50" cy="50" r="48" stroke="rgba(255,255,255,0.6)" strokeWidth="3" fill="none"/>
-              <text x="50" y="62" textAnchor="middle" fill="white" fontSize="44" fontWeight="900" fontFamily="DM Sans,sans-serif">mj</text>
-            </svg>
+            <img src="/LOGOMJ2.png" alt="Coro MJ" onError={e => { e.target.style.display="none"; }}/>
           </div>
           <div className="l-nav-logo-text">
             <span className="l-nav-logo-coro">Coro</span>
