@@ -221,20 +221,17 @@ export default function Landing({ onPortal }) {
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300;1,9..144,400;1,9..144,700&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
-        .l-nav { position:fixed;top:0;left:0;right:0;z-index:999;height:80px;background:rgba(8,18,45,0.92);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:0.5px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;padding:0 48px; }
-        .l-nav-logo { display:flex;align-items:center;gap:14px;text-decoration:none;cursor:pointer; }
-        .l-nav-logo-icon { width:54px;height:54px;border-radius:12px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center; }
-        .l-nav-logo-icon img { width:54px;height:54px;object-fit:cover;border-radius:12px; }
-        .l-nav-logo-text { display:flex;flex-direction:column;line-height:1; }
-        .l-nav-logo-coro { font-family:'DM Sans',sans-serif;font-size:20px;font-weight:900;color:#fff;letter-spacing:0.06em;text-transform:uppercase; }
-        .l-nav-logo-sub { font-family:'Fraunces',serif;font-style:italic;font-size:12px;color:rgba(255,255,255,0.5);margin-top:2px;letter-spacing:0.02em; }
-        .l-nav-center { position:absolute;left:50%;transform:translateX(-50%);display:flex;gap:36px; }
-        .l-nav-links a { font-family:'DM Sans',sans-serif;font-size:14px;font-weight:400;color:rgba(255,255,255,0.65);text-decoration:none;cursor:pointer;transition:color .2s; }
-        .l-nav-links a:hover { color:#fff; }
-        .l-nav-right { display:flex;align-items:center;gap:12px; }
-        .l-nav-soc { width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.07);border:0.5px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .2s; }
-        .l-nav-soc:hover { background:rgba(255,255,255,0.18); }
-        .l-nav-cta { background:rgba(255,255,255,0.1);border:0.5px solid rgba(255,255,255,0.2);color:#fff;border-radius:980px;padding:8px 20px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .2s; }
+        .l-nav { position:fixed;top:0;left:0;right:0;z-index:999;height:80px;background:rgba(8,18,45,0.95);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:0.5px solid rgba(255,255,255,0.08);display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 40px;gap:24px; }
+        .l-nav-logo { display:flex;align-items:center;justify-content:center;cursor:pointer; }
+        .l-nav-logo-icon { width:64px;height:64px;flex-shrink:0;display:flex;align-items:center;justify-content:center; }
+        .l-nav-logo-icon img { width:64px;height:64px;object-fit:contain; }
+        .l-nav-left { display:flex;gap:32px;align-items:center;justify-content:flex-start; }
+        .l-nav-left a { font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:500;color:rgba(255,255,255,0.7);text-decoration:none;cursor:pointer;transition:color .2s; }
+        .l-nav-left a:hover { color:#fff; }
+        .l-nav-right { display:flex;align-items:center;gap:8px;justify-content:flex-end; }
+        .l-nav-soc { width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .2s;border:none; }
+        .l-nav-soc:hover { background:rgba(255,255,255,0.2); }
+        .l-nav-cta { background:rgba(255,255,255,0.1);border:0.5px solid rgba(255,255,255,0.2);color:#fff;border-radius:980px;padding:8px 20px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .2s;margin-left:6px;white-space:nowrap; }
         .l-nav-cta:hover { background:rgba(255,255,255,0.2); }
         .l-hero { height:100vh;position:relative;overflow:hidden;display:flex;align-items:flex-end; }
         .l-hero-bg { position:absolute;inset:0;z-index:0;background-size:cover;background-position:center;background-repeat:no-repeat; }
@@ -373,26 +370,26 @@ export default function Landing({ onPortal }) {
 
       {/* NAV */}
       <nav className="l-nav">
-        <div className="l-nav-logo" onClick={() => scrollTo("inicio")}>
-          <div className="l-nav-logo-icon">
-            <img src="/LOGOMJ2.png" alt="Coro MJ" onError={e => { e.target.style.display="none"; }}/>
-          </div>
-        </div>
-        <div className="l-nav-center l-nav-links">
+        <div className="l-nav-left">
           <a onClick={() => scrollTo("nosotros")}>Nosotros</a>
           <a onClick={() => scrollTo("galeria")}>Galería</a>
           <a onClick={() => scrollTo("bot")}>Únete</a>
           <a onClick={() => scrollTo("contacto")}>Contacto</a>
         </div>
+        <div className="l-nav-logo" onClick={() => scrollTo("inicio")}>
+          <div className="l-nav-logo-icon">
+            <img src="/LOGOMJ2.png" alt="Coro MJ" onError={e => { e.target.style.display="none"; }}/>
+          </div>
+        </div>
         <div className="l-nav-right">
           <div className="l-nav-soc" title="Instagram">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="rgba(255,255,255,0.7)" stroke="none"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="rgba(255,255,255,0.8)" stroke="none"/></svg>
           </div>
           <div className="l-nav-soc" title="TikTok">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.69a8.27 8.27 0 0 0 4.83 1.55V6.79a4.85 4.85 0 0 1-1.07-.1z"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.8)"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.69a8.27 8.27 0 0 0 4.83 1.55V6.79a4.85 4.85 0 0 1-1.07-.1z"/></svg>
           </div>
           <div className="l-nav-soc" title="YouTube">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="rgba(255,255,255,0.8)"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>
           </div>
           <button className="l-nav-cta" onClick={onPortal}>Acceso Portal</button>
         </div>
