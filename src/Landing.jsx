@@ -59,9 +59,9 @@ export default function Landing({ onPortal }) {
           border-bottom: 0.5px solid rgba(255,255,255,0.1);
           display: flex; align-items: center; justify-content: space-between; padding: 0 52px;
         }
-        .land-nav-logo { height: 40px; width: 40px; object-fit: contain; border-radius: 50%; cursor: pointer; }
+        .land-nav-brand { font-family: "Inter", sans-serif; font-size: 13px; font-weight: 700; color: #fff; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
         .land-nav-links { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 40px; }
-        .land-nav-links a { font-size: 12.5px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.65); text-decoration: none; cursor: pointer; transition: color .2s; }
+        .land-nav-links a { font-size: 13px; font-weight: 400; letter-spacing: 0.02em; text-transform: none; color: rgba(255,255,255,0.72); text-decoration: none; cursor: pointer; transition: color .2s; }
         .land-nav-links a:hover { color: #fff; }
         .land-nav-cta { background: rgba(255,255,255,0.12); border: 0.5px solid rgba(255,255,255,0.25); color: #fff; border-radius: 980px; padding: 8px 22px; font-size: 12.5px; font-weight: 500; cursor: pointer; letter-spacing: 0.04em; transition: background .2s; font-family: inherit; }
         .land-nav-cta:hover { background: rgba(255,255,255,0.22); }
@@ -98,8 +98,8 @@ export default function Landing({ onPortal }) {
         .land-h2 em { font-family: 'Playfair Display', serif; font-style: italic; font-weight: 700; color: #08122d; }
         .land-body { font-size: 15.5px; font-weight: 300; line-height: 1.85; color: #444; }
         .about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 100px; align-items: center; }
-        .about-img-wrap { aspect-ratio: 3/4; border-radius: 20px; overflow: hidden; background: #eef2fb; display: flex; align-items: center; justify-content: center; position: relative; }
-        .about-img-wrap img { width: 65%; object-fit: contain; }
+        .about-img-wrap { aspect-ratio: 3/4; border-radius: 20px; overflow: hidden; background: #fff; display: flex; align-items: center; justify-content: center; position: relative; border: 0.5px solid #eaeff8; }
+        .about-img-wrap img { display: none; } .about-img-jesus { position: absolute; inset: 0; background: url("/Misioneros.jpg") center/cover no-repeat; opacity: 0.15; }
         .about-badge { position: absolute; bottom: 0; left: 0; right: 0; padding: 28px 32px; background: linear-gradient(to top, rgba(8,18,45,0.9), transparent); }
         .about-badge-label { font-size: 10px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.45); }
         .about-badge-val { font-size: 32px; font-weight: 800; color: #fff; letter-spacing: -0.02em; }
@@ -216,7 +216,7 @@ export default function Landing({ onPortal }) {
 
       {/* NAV */}
       <nav className="land-nav">
-        <img className="land-nav-logo" src="/LOGOMJ.jpeg" alt="Logo" onClick={() => scrollTo("inicio")} />
+        <span className="land-nav-brand" onClick={() => scrollTo("inicio")}>Coro MJ</span>
         <div className="land-nav-links">
           <a onClick={() => scrollTo("nosotros")}>Nosotros</a>
           <a onClick={() => scrollTo("galeria")}>Galería</a>
@@ -273,8 +273,8 @@ export default function Landing({ onPortal }) {
                 <div className="stat"><div className="stat-n">400<sup>+</sup></div><div className="stat-l">Presentaciones</div></div>
               </div>
             </div>
-            <div className="about-img-wrap">
-              <img src="/LOGOMJ.jpeg" alt="Coro Misioneros de Jesús" />
+            <div className="about-img-wrap"><div className="about-img-jesus" />
+              
               <div className="about-badge">
                 <div className="about-badge-label">Cuerdas vocales</div>
                 <div className="about-badge-val">SATB</div>
@@ -410,7 +410,7 @@ export default function Landing({ onPortal }) {
       <footer className="land-footer">
         <div className="foot-top">
           <div className="foot-brand">
-            <img src="/LOGOMJ.jpeg" alt="Logo" />
+            
             <p>Ensemble vocal de música litúrgica.<br/>Maipú, Santiago de Chile.</p>
           </div>
           <div className="foot-cols">
