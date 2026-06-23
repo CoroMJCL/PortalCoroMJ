@@ -57,6 +57,44 @@ async function uploadImg(file, name) {
   return `${BUCKET}/${path}?t=${Date.now()}`;
 }
 
+// Campos de edición — fuera del AdminPanel para evitar remount en cada render
+function AdminField({ label, k, ta, type, editing, setEditing, saving, saveF, C }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: "#888", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 5 }}>{label}</div>
+      {ta
+        ? <textarea
+            value={editing[k] ?? C[k] ?? ""}
+            onChange={e => setEditing(p => ({ ...p, [k]: e.target.value }))}
+            style={{ width: "100%", border: "1px solid #e0e6f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", resize: "vertical", minHeight: 72, outline: "none", display: "block", boxSizing: "border-box" }}
+          />
+        : <input
+            type={type || "text"}
+            value={editing[k] ?? C[k] ?? ""}
+            onChange={e => setEditing(p => ({ ...p, [k]: e.target.value }))}
+            style={{ width: "100%", border: "1px solid #e0e6f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", outline: "none", display: "block", boxSizing: "border-box" }}
+          />
+      }
+      <button onClick={() => saveF(k)} disabled={saving[k]} style={{ marginTop: 5, background: "#08122d", color: "#fff", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 11, fontWeight: 600, cursor: "pointer", opacity: saving[k] ? 0.6 : 1 }}>
+        {saving[k] ? "..." : "Guardar"}
+      </button>
+    </div>
+  );
+}
+
+function AdminImgField({ label, k, name, upKey, handleImg, C }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: "#888", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+      {C[k] && <img src={C[k]} alt="" style={{ width: "100%", maxHeight: 100, objectFit: "cover", borderRadius: 8, marginBottom: 6 }} />}
+      <label style={{ display: "inline-block", background: "#f0f4ff", border: "1px solid #d0d8f0", borderRadius: 8, padding: "7px 14px", fontSize: 11, fontWeight: 500, cursor: "pointer", color: "#08122d" }}>
+        {upKey === k ? "Subiendo..." : "📁 Subir imagen"}
+        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && handleImg(k, e.target.files[0], name)} />
+      </label>
+    </div>
+  );
+}
+
 // Componente admin separado para evitar remount de inputs
 function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, handleImg }) {
   const [email, setEmail] = useState("");
@@ -93,29 +131,8 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
     setLoading(false);
   };
 
-  const F = ({ label, k, ta, type }) => (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 10, fontWeight: 600, color: "#888", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 5 }}>{label}</div>
-      {ta
-        ? <textarea value={editing[k] ?? C[k] ?? ""} onChange={e => setEditing(p => ({ ...p, [k]: e.target.value }))} style={{ width: "100%", border: "1px solid #e0e6f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", resize: "vertical", minHeight: 72, outline: "none", display: "block" }} />
-        : <input type={type||"text"} value={editing[k] ?? C[k] ?? ""} onChange={e => setEditing(p => ({ ...p, [k]: e.target.value }))} style={{ width: "100%", border: "1px solid #e0e6f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", outline: "none", display: "block" }} />
-      }
-      <button onClick={() => saveF(k)} disabled={saving[k]} style={{ marginTop: 5, background: "#08122d", color: "#fff", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 11, fontWeight: 600, cursor: "pointer", opacity: saving[k] ? 0.6 : 1 }}>
-        {saving[k] ? "..." : "Guardar"}
-      </button>
-    </div>
-  );
-
-  const IF = ({ label, k, name }) => (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 10, fontWeight: 600, color: "#888", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
-      {C[k] && <img src={C[k]} alt="" style={{ width: "100%", maxHeight: 100, objectFit: "cover", borderRadius: 8, marginBottom: 6 }} />}
-      <label style={{ display: "inline-block", background: "#f0f4ff", border: "1px solid #d0d8f0", borderRadius: 8, padding: "7px 14px", fontSize: 11, fontWeight: 500, cursor: "pointer", color: "#08122d" }}>
-        {upKey === k ? "Subiendo..." : "📁 Subir imagen"}
-        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && handleImg(k, e.target.files[0], name)} />
-      </label>
-    </div>
-  );
+  const fp = { editing, setEditing, saving, saveF, C };
+  const ifp = { upKey, handleImg, C };
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -141,34 +158,25 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
         ) : (
           <div style={{ overflowY: "auto", padding: "24px 24px 40px", flex: 1 }} onWheel={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()}>
 
-            {/* PRÓXIMO EVENTO */}
-            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.1em" }}>📅 Próximo evento (contador hero)</div>
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: "#888", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>Selecciona la pauta a mostrar</div>
-              <select value={selectedPauta} onChange={e => setSelectedPauta(e.target.value)}
-                style={{ width: "100%", border: "1px solid #e0e6f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fff", marginBottom: 8 }}>
-                <option value="">— Sin evento destacado —</option>
-                {pautas.map(p => (
-                  <option key={p.id} value={p.id}>{p.titulo} · {p.fecha} {p.hora && `· ${p.hora}`}</option>
-                ))}
-              </select>
-              <button onClick={() => saveF("proximo_evento_id", selectedPauta)} disabled={saving["proximo_evento_id"]}
-                style={{ background: "#08122d", color: "#fff", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-                {saving["proximo_evento_id"] ? "..." : "Guardar"}
-              </button>
+            {/* PRÓXIMO EVENTO - AUTO desde agenda */}
+            <div style={{ background:"#f0f7ff", border:"1px solid #bfdbfe", borderRadius:10, padding:"14px 16px", marginBottom:20 }}>
+              <div style={{ fontWeight:700, fontSize:12, color:"#1e40af", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.1em" }}>📅 Próximo evento</div>
+              <div style={{ fontSize:13, color:"#1e3a8a", lineHeight:1.6 }}>
+                El contador del hero se actualiza automáticamente con la próxima pauta publicada en la agenda del coro. No requiere configuración manual.
+              </div>
             </div>
 
             {/* HERO */}
             <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Hero</div>
-            <IF label="Imagen fondo" k="hero_img" name="landing_hero" />
-            <F label="Título 1" k="hero_titulo" /><F label="Título 2 italic" k="hero_titulo2" /><F label="Subtexto" k="hero_sub" ta />
+            <AdminImgField {...ifp} label="Imagen fondo" k="hero_img" name="landing_hero" />
+            <AdminField {...fp} label="Título 1" k="hero_titulo" /><AdminField {...fp} label="Título 2 italic" k="hero_titulo2" /><AdminField {...fp} label="Subtexto" k="hero_sub" ta />
 
             {/* NOSOTROS */}
             <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>👥 Nosotros</div>
-            <IF label="Imagen nosotros" k="about_img" name="landing_about" />
-            <F label="Título" k="about_titulo" /><F label="Párrafo 1" k="about_texto1" ta /><F label="Párrafo 2" k="about_texto2" ta />
+            <AdminImgField {...ifp} label="Imagen nosotros" k="about_img" name="landing_about" />
+            <AdminField {...fp} label="Título" k="about_titulo" /><AdminField {...fp} label="Párrafo 1" k="about_texto1" ta /><AdminField {...fp} label="Párrafo 2" k="about_texto2" ta />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-              {[1,2,3].map(n => <div key={n}><F label={`Stat ${n} número`} k={`stat${n}_n`} /><F label="Label" k={`stat${n}_l`} /></div>)}
+              {[1,2,3].map(n => <div key={n}><AdminField {...fp} label={`Stat ${n} número`} k={`stat${n}_n`} /><AdminField {...fp} label="Label" k={`stat${n}_l`} /></div>)}
             </div>
 
             {/* GALERÍA */}
@@ -176,7 +184,7 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
             {[1,2,3,4,5].map(n => (
               <div key={n} style={{ background: "#f8f9fc", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
                 <div style={{ fontWeight: 600, fontSize: 11, color: "#666", marginBottom: 8 }}>Foto {n}</div>
-                <IF label="Imagen" k={`gal${n}_img`} name={`landing_gal${n}`} />
+                <AdminImgField {...ifp} label="Imagen" k={`gal${n}_img`} name={`landing_gal${n}`} />
                 <div style={{marginBottom:12}}>
                   <div style={{fontSize:10,fontWeight:600,color:"#888",letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:5}}>Posición foto</div>
                   <select value={editing[`gal${n}_pos`] ?? C[`gal${n}_pos`] ?? "center top"}
@@ -192,7 +200,7 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
                     {saving[`gal${n}_pos`] ? "..." : "Guardar"}
                   </button>
                 </div>
-                <F label="Título" k={`gal${n}_label`} /><F label="Subtítulo" k={`gal${n}_sub`} />
+                <AdminField {...fp} label="Título" k={`gal${n}_label`} /><AdminField {...fp} label="Subtítulo" k={`gal${n}_sub`} />
               </div>
             ))}
 
@@ -201,23 +209,23 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
             {[1,2,3,4,5,6].map(n => (
               <div key={n} style={{ background: "#f8f9fc", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
                 <div style={{ fontWeight: 600, fontSize: 11, color: "#666", marginBottom: 8 }}>Servicio {n}</div>
-                <F label="Título" k={`srv${n}_title`} />
-                <F label="Descripción" k={`srv${n}_desc`} ta />
+                <AdminField {...fp} label="Título" k={`srv${n}_title`} />
+                <AdminField {...fp} label="Descripción" k={`srv${n}_desc`} ta />
               </div>
             ))}
 
             {/* REDES Y CONTACTO */}
             <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>🔗 Redes sociales</div>
-            <F label="WhatsApp (solo números, ej: 56912345678)" k="whatsapp" />
-            <F label="Instagram URL" k="instagram_url" />
-            <F label="TikTok URL" k="tiktok_url" />
-            <F label="YouTube URL" k="youtube_url" />
-            <F label="Facebook URL" k="facebook_url" />
+            <AdminField {...fp} label="WhatsApp (solo números, ej: 56912345678)" k="whatsapp" />
+            <AdminField {...fp} label="Instagram URL" k="instagram_url" />
+            <AdminField {...fp} label="TikTok URL" k="tiktok_url" />
+            <AdminField {...fp} label="YouTube URL" k="youtube_url" />
+            <AdminField {...fp} label="Facebook URL" k="facebook_url" />
 
             <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>📍 Contacto</div>
-            <F label="Dirección" k="contacto_dir" />
-            <F label="Ensayos" k="contacto_ensayo" />
-            <F label="Texto footer" k="footer_texto" ta />
+            <AdminField {...fp} label="Dirección" k="contacto_dir" />
+            <AdminField {...fp} label="Ensayos" k="contacto_ensayo" />
+            <AdminField {...fp} label="Texto footer" k="footer_texto" ta />
           </div>
         )}
       </div>
@@ -226,19 +234,19 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
 }
 
 // ── COUNTDOWN PRÓXIMA MISA ─────────────────
-function HeroCountdown({ eventoId }) {
+function HeroCountdown() {
   const [time, setTime] = useState({ d:0, h:0, m:0, s:0 });
   const [event, setEvent] = useState(null);
 
   useEffect(() => {
-    const url = eventoId
-      ? `${SUPABASE_URL}/rest/v1/pautas_misa?id=eq.${eventoId}&limit=1`
-      : `${SUPABASE_URL}/rest/v1/pautas_misa?publicada=eq.true&fecha=gte.${new Date().toISOString().split("T")[0]}&order=fecha.asc&limit=1`;
-    fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } })
-      .then(r => r.json())
-      .then(rows => { if (Array.isArray(rows) && rows[0]) setEvent(rows[0]); })
-      .catch(() => {});
-  }, [eventoId]);
+    const today = new Date().toISOString().split("T")[0];
+    fetch(`${SUPABASE_URL}/rest/v1/pautas_misa?publicada=eq.true&fecha=gte.${today}&order=fecha.asc,hora.asc&limit=1`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    })
+    .then(r => r.json())
+    .then(rows => { if (Array.isArray(rows) && rows[0]) setEvent(rows[0]); })
+    .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!event) return;
@@ -856,7 +864,7 @@ export default function Landing({ onPortal }) {
             <h1 className="hero-h1">{C.hero_titulo}<br/><span className="it">{C.hero_titulo2}</span></h1>
           </div>
           <div className="hero-right">
-            <HeroCountdown eventoId={C.proximo_evento_id} />
+            <HeroCountdown />
             <p className="hero-sub">{C.hero_sub}</p>
             <div className="hero-btns">
               <button className="btn-w" onClick={() => go("nosotros")}>Conócenos</button>
@@ -918,22 +926,20 @@ export default function Landing({ onPortal }) {
             const img = C[`gal${n}_img`]; const label = C[`gal${n}_label`]; const sub = C[`gal${n}_sub`]; const pos = C[`gal${n}_pos`] || 'center top';
             return (
               <div key={n} className="gi">
-                <div className="gi-bg" style={{
-                  background: gColors[n-1],
-                  backgroundImage: "none",
-                  position: "absolute",
-                  inset: 0,
-                  transition: "transform 0.6s ease"
-                }}/>
-                {img && <div style={{
-                  position:"absolute", inset:0,
-                  backgroundImage: `url('${img}')`,
-                  backgroundSize: "cover",
-                  backgroundPosition: pos,
-                  backgroundRepeat: "no-repeat",
-                  opacity: 0,
-                  transition: "opacity 0.5s ease",
-                }} className="gi-img-reveal"/>}
+                {img
+                  ? <div style={{
+                      position:"absolute", inset:0,
+                      backgroundImage: `url('${img}')`,
+                      backgroundSize: "cover",
+                      backgroundPosition: pos,
+                      backgroundRepeat: "no-repeat",
+                      transition: "transform 0.6s ease"
+                    }} className="gi-bg"/>
+                  : <div className="gi-bg" style={{
+                      background: gColors[n-1],
+                      position: "absolute", inset: 0
+                    }}/>
+                }
                 <div className="gi-ov"/>
                 <div className="gi-tag">{sub}</div>
                 <div className="gi-cap"><div className="gi-label">{label}</div></div>
