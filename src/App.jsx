@@ -3389,24 +3389,23 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter, onBack })
           box-shadow: 0 0 0 3.5px rgba(30,58,95,0.14) !important;
         }
       `}</style>
-      {/* Botón volver */}
-      <a
-        onClick={() => onBack && onBack()}
-        style={{
-          position: "fixed", top: 20, left: 24, zIndex: 10,
-          display: "flex", alignItems: "center", gap: 6,
-          background: "rgba(255,255,255,0.1)",
-          border: "0.5px solid rgba(255,255,255,0.2)",
-          backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-          color: "#fff", borderRadius: 980,
-          padding: "8px 18px", fontSize: 13, fontWeight: 500,
-          cursor: "pointer", textDecoration: "none",
-          letterSpacing: "0.01em",
-        }}
-      >
-        ← Volver al sitio
-      </a>
       <div style={{ position: "relative", zIndex: 2, width: "100%", maxWidth: 400, margin: "0 auto" }}>
+        {/* Botón volver */}
+        <a
+          onClick={() => onBack && onBack()}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            background: "rgba(255,255,255,0.1)",
+            border: "0.5px solid rgba(255,255,255,0.2)",
+            backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+            color: "#fff", borderRadius: 980,
+            padding: "8px 18px", fontSize: 13, fontWeight: 500,
+            cursor: "pointer", textDecoration: "none",
+            marginBottom: 16,
+          }}
+        >
+          ← Volver al sitio
+        </a>
       <div className="auth-card" style={{ width: "100%", maxWidth: 400, background: "rgba(255,255,255,0.97)", backdropFilter: "saturate(180%) blur(20px)", WebkitBackdropFilter: "saturate(180%) blur(20px)", borderRadius: 28, border: "1px solid rgba(60,60,67,0.15)", boxShadow: "0 20px 60px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.1)", padding: "36px 28px 28px", margin: "0 auto" }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 24 }}>
@@ -17749,7 +17748,24 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     )}
                   </div>
                 </div>
-                <span style={{ fontSize: 12, color: C.gray }}>Editar →</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 12, color: C.gray }}>Editar →</span>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!confirm(`¿Eliminar el borrador "${p.titulo}"? Esta acción no se puede deshacer.`)) return;
+                      await deleteRecord("pautas_misa", p.id);
+                      await onReload();
+                    }}
+                    style={{
+                      background: "#fee2e2", color: "#dc2626", border: "1px solid #fca5a5",
+                      borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 600,
+                      cursor: "pointer", whiteSpace: "nowrap",
+                    }}
+                  >
+                    🗑 Eliminar
+                  </button>
+                </div>
               </Card>
             );
           })}
