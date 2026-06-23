@@ -177,7 +177,8 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
 
             {/* HERO */}
             <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Hero</div>
-            <AdminImgField {...ifp} label="Imagen fondo" k="hero_img" name="landing_hero" />
+            <AdminImgField {...ifp} label="Imagen fondo hero" k="hero_img" name="landing_hero" />
+            <AdminImgField {...ifp} label="Imagen fondo login (pantalla de acceso)" k="login_bg" name="landing_login_bg" />
             <AdminField {...fp} label="Título 1" k="hero_titulo" /><AdminField {...fp} label="Título 2 italic" k="hero_titulo2" /><AdminField {...fp} label="Subtexto" k="hero_sub" ta />
 
             {/* NOSOTROS */}
