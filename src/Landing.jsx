@@ -12,9 +12,9 @@ const DEFAULT = {
   hero_kicker: "Coro · Maipú · Chile",
   hero_sub: "Ensemble vocal de música litúrgica contemporánea. Quince años animando la fe en Maipú.",
   about_titulo: "Un ensemble con identidad propia",
-  about_texto1: "Somos un coro de música litúrgica con más de 15 años en actividad. Soprano, contralto, tenor y bajo, acompañados de instrumentos en vivo.",
+  about_texto1: "Coro Misioneros de Jesús nació en 2024, formado por integrantes con más de 15 años de experiencia en coros litúrgicos. Soprano, contralto, tenor y bajo, acompañados de instrumentos en vivo.",
   about_texto2: "Nuestra disciplina musical y compromiso con el repertorio nos definen como un conjunto vocal de alto nivel dentro de la tradición litúrgica contemporánea.",
-  stat1_n:"15+",stat1_l:"Años activos",stat2_n:"30+",stat2_l:"Voces",stat3_n:"400+",stat3_l:"Presentaciones",
+  stat1_n:"15+",stat1_l:"Años de experiencia",stat2_n:"30+",stat2_l:"Voces",stat3_n:"400+",stat3_l:"Presentaciones",
   gal1_label:"Navidad 2023",gal1_sub:"Diciembre",gal1_img:"",gal1_pos:"center top",
   gal2_label:"Semana Santa",gal2_sub:"Abril",gal2_img:"",gal2_pos:"center top",
   gal3_label:"Fiesta Patronal",gal3_sub:"Agosto",gal3_img:"",gal3_pos:"center top",
@@ -877,7 +877,7 @@ export default function Landing({ onPortal }) {
       {/* TICKER */}
       <div className="ticker">
         <div className="ticker-track">
-          {["Música litúrgica","Maipú · Chile","15 años","4 voces SATB","400+ presentaciones","Ensemble vocal","Música litúrgica","Maipú · Chile","15 años","4 voces SATB","400+ presentaciones","Ensemble vocal"].map((t,i) => (
+          {["Música litúrgica","Maipú · Chile","Desde 2024","15+ años de experiencia","4 voces SATB","400+ presentaciones","Ensemble vocal","Música litúrgica","Maipú · Chile","Desde 2024","15+ años de experiencia","4 voces SATB","400+ presentaciones","Ensemble vocal"].map((t,i) => (
             <span key={i} className="t-item"><span className="t-dot"/>{t}</span>
           ))}
         </div>
@@ -905,8 +905,8 @@ export default function Landing({ onPortal }) {
               <div className="acc-l">Cuerdas</div>
             </div>
             <div className="about-img-badge">
-              <div className="badge-l">Desde</div>
-              <div className="badge-v">2010</div>
+              <div className="badge-l">Integrantes desde</div>
+              <div className="badge-v">2024</div>
             </div>
           </div>
         </div>
@@ -971,7 +971,7 @@ export default function Landing({ onPortal }) {
                 onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";e.currentTarget.style.transform="none"}}>
                 <div style={{width:48,height:48,borderRadius:12,background:"rgba(249,115,22,0.08)",border:"1px solid rgba(249,115,22,0.15)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:18}}>{icon}</div>
                 <div style={{fontSize:15,fontWeight:700,color:"#08122d",marginBottom:8,letterSpacing:"-0.01em"}}>{title}</div>
-                <p style={{fontSize:13.5,color:"#888",lineHeight:1.7,fontWeight:300}}>{desc}</p>
+                <p style={{fontSize:13.5,color:"#888",lineHeight:1.7,fontWeight:300,textAlign:"justify"}}>{desc}</p>
               </div>
             ))}
           </div>
