@@ -15,11 +15,11 @@ const DEFAULT = {
   about_texto1: "Somos un coro de música litúrgica con más de 15 años en actividad. Soprano, contralto, tenor y bajo, acompañados de instrumentos en vivo.",
   about_texto2: "Nuestra disciplina musical y compromiso con el repertorio nos definen como un conjunto vocal de alto nivel dentro de la tradición litúrgica contemporánea.",
   stat1_n:"15+",stat1_l:"Años activos",stat2_n:"30+",stat2_l:"Voces",stat3_n:"400+",stat3_l:"Presentaciones",
-  gal1_label:"Navidad 2023",gal1_sub:"Diciembre",gal1_img:"",
-  gal2_label:"Semana Santa",gal2_sub:"Abril",gal2_img:"",
-  gal3_label:"Fiesta Patronal",gal3_sub:"Agosto",gal3_img:"",
-  gal4_label:"Corpus Christi",gal4_sub:"Junio",gal4_img:"",
-  gal5_label:"Vigilia Pascual",gal5_sub:"Marzo",gal5_img:"",
+  gal1_label:"Navidad 2023",gal1_sub:"Diciembre",gal1_img:"",gal1_pos:"center top",
+  gal2_label:"Semana Santa",gal2_sub:"Abril",gal2_img:"",gal2_pos:"center top",
+  gal3_label:"Fiesta Patronal",gal3_sub:"Agosto",gal3_img:"",gal3_pos:"center top",
+  gal4_label:"Corpus Christi",gal4_sub:"Junio",gal4_img:"",gal4_pos:"center top",
+  gal5_label:"Vigilia Pascual",gal5_sub:"Marzo",gal5_img:"",gal5_pos:"center top",
   contacto_dir:"Maipú, Santiago, Chile · Capilla Sagrada Familia",
   contacto_ensayo:"Sábados · Capilla Misioneros de Jesús",
   whatsapp:"56912345678",
@@ -190,6 +190,21 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
               <div key={n} style={{ background: "#f8f9fc", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
                 <div style={{ fontWeight: 600, fontSize: 11, color: "#666", marginBottom: 8 }}>Foto {n}</div>
                 <IF label="Imagen" k={`gal${n}_img`} name={`landing_gal${n}`} />
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:10,fontWeight:600,color:"#888",letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:5}}>Posición foto</div>
+                  <select value={editing[`gal${n}_pos`] ?? C[`gal${n}_pos`] ?? "center top"}
+                    onChange={e=>setEditing(p=>({...p,[`gal${n}_pos`]:e.target.value}))}
+                    style={{width:"100%",border:"1px solid #e0e6f0",borderRadius:8,padding:"8px 10px",fontSize:13,fontFamily:"inherit",outline:"none",background:"#fff",marginBottom:4}}>
+                    <option value="center top">Arriba (personas)</option>
+                    <option value="center center">Centro</option>
+                    <option value="center bottom">Abajo</option>
+                    <option value="left center">Izquierda</option>
+                    <option value="right center">Derecha</option>
+                  </select>
+                  <button onClick={()=>saveF(`gal${n}_pos`)} disabled={saving[`gal${n}_pos`]} style={{background:"#08122d",color:"#fff",border:"none",borderRadius:6,padding:"5px 14px",fontSize:11,fontWeight:600,cursor:"pointer"}}>
+                    {saving[`gal${n}_pos`] ? "..." : "Guardar"}
+                  </button>
+                </div>
                 <F label="Título" k={`gal${n}_label`} /><F label="Subtítulo" k={`gal${n}_sub`} />
               </div>
             ))}
@@ -647,7 +662,7 @@ export default function Landing({ onPortal }) {
         .h2 em{font-family:'Fraunces',serif;font-style:italic;font-weight:400;color:#08122d}
         .bp{font-size:15px;font-weight:300;line-height:1.85;color:#555}
         .about-img{position:relative;aspect-ratio:3/4;border-radius:24px;overflow:hidden;background:#eef2fb}
-        .about-img-bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0.22}
+        .about-img-bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:1}
         .about-img-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(6,14,36,0.92) 100%)}
         .about-img-badge{position:absolute;bottom:0;left:0;right:0;padding:28px 32px}
         .badge-l{font-size:9px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.45)}
@@ -913,19 +928,25 @@ export default function Landing({ onPortal }) {
         </div>
         <div className="gal-strip">
           {[1,2,3,4,5].map(n => {
-            const img = C[`gal${n}_img`]; const label = C[`gal${n}_label`]; const sub = C[`gal${n}_sub`];
+            const img = C[`gal${n}_img`]; const label = C[`gal${n}_label`]; const sub = C[`gal${n}_sub`]; const pos = C[`gal${n}_pos`] || 'center top';
             return (
               <div key={n} className="gi">
                 <div className="gi-bg" style={{
-                  background: img ? undefined : gColors[n-1],
-                  backgroundImage: img ? `url('${img}')` : undefined,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                  backgroundRepeat: "no-repeat",
+                  background: gColors[n-1],
+                  backgroundImage: "none",
                   position: "absolute",
                   inset: 0,
                   transition: "transform 0.6s ease"
                 }}/>
+                {img && <div style={{
+                  position:"absolute", inset:0,
+                  backgroundImage: `url('${img}')`,
+                  backgroundSize: "cover",
+                  backgroundPosition: pos,
+                  backgroundRepeat: "no-repeat",
+                  opacity: 0,
+                  transition: "opacity 0.5s ease",
+                }} className="gi-img-reveal"/>}
                 <div className="gi-ov"/>
                 <div className="gi-tag">{sub}</div>
                 <div className="gi-cap"><div className="gi-label">{label}</div></div>
@@ -1141,8 +1162,10 @@ export default function Landing({ onPortal }) {
       {/* FABS */}
       <div className="fabs">
         <button className="fab fab-adm" onClick={()=>setAdmin(true)}>
-          <span className="fab-tip">Editar sitio</span>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span className="fab-tip">Editor del sitio</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+          </svg>
         </button>
         <a className="fab fab-wa" href={C.whatsapp ? `https://wa.me/${C.whatsapp}?text=Hola,%20me%20interesa%20el%20Coro%20Misioneros%20de%20Jes%C3%BAs` : "#"} target="_blank" rel="noopener noreferrer">
           <span className="fab-tip">WhatsApp</span>
