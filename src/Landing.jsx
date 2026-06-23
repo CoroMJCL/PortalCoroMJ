@@ -9,7 +9,7 @@ Información clave:
 - Para voces: se requiere buena afinación y oído musical. No es necesaria formación académica, pero sí cantar con seguridad y precisión.
 - Para instrumentistas: se requiere un nivel básico-intermedio y capacidad de adaptarse al repertorio litúrgico.
 - Los requisitos generales son: compromiso, estudio del repertorio y responsabilidad en la asistencia.
-- ENSAYOS: todos los sábados en la Capilla Sagrada Familia de Maipú, en horario previo a la misa.
+- ENSAYOS: se realizan en la Capilla Sagrada Familia de Maipú según las fechas que determina el encargado del coro. No son necesariamente todos los sábados.
 - MISAS REGULARES: el segundo y el último sábado de cada mes. El coro llega a las 18:00 hrs y la misa es de 20:00 a 21:00 hrs.
 - MISAS ESPECIALES: participamos en celebraciones especiales en la parroquia, que pueden requerir ensayos en fechas adicionales entre semana o sábados distintos.
 - Para unirse o consultas, contactarnos por el formulario del sitio o WhatsApp.`;
@@ -722,11 +722,13 @@ export default function Landing({ onPortal }) {
         .btitle{font-size:14px;font-weight:700;color:#fff;margin-bottom:4px}
         .bdesc{font-size:13px;color:rgba(255,255,255,0.4);line-height:1.6;font-weight:300}
         .chat{background:#fff;border:1px solid #e4eaf5;border-radius:20px;overflow:hidden;box-shadow:0 4px 32px rgba(0,0,0,0.12)}
-        .chat-hd{background:#08122d;padding:16px 20px;display:flex;align-items:center;gap:12px;border-bottom:none}
-        .chat-av{width:34px;height:34px;border-radius:50%;background:rgba(249,115,22,0.2);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
-        .chat-nm{font-size:13px;font-weight:600;color:#fff}
-        .chat-sm{font-size:10.5px;color:rgba(255,255,255,0.35)}
-        .chat-dot{width:7px;height:7px;border-radius:50%;background:#34d399;margin-left:auto}
+        .chat-hd{background:linear-gradient(135deg,#08122d 0%,#0d1f45 100%);padding:18px 22px;display:flex;align-items:center;gap:14px;border-bottom:none;position:relative;overflow:hidden}
+        .chat-hd::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;border-radius:50%;background:rgba(249,115,22,0.08);pointer-events:none}
+        .chat-hd::after{content:'';position:absolute;bottom:-40px;left:40px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.04);pointer-events:none}
+        .chat-av{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,rgba(249,115,22,0.3),rgba(249,115,22,0.1));border:1px solid rgba(249,115,22,0.3);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;position:relative;z-index:1}
+        .chat-nm{font-size:14px;font-weight:700;color:#fff;letter-spacing:-0.01em;position:relative;z-index:1}
+        .chat-sm{font-size:10.5px;color:rgba(255,255,255,0.45);margin-top:1px;position:relative;z-index:1}
+        .chat-dot{width:8px;height:8px;border-radius:50%;background:#34d399;margin-left:auto;box-shadow:0 0 6px rgba(52,211,153,0.6);position:relative;z-index:1}
         .chat-msgs{padding:16px;min-height:240px;max-height:270px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;background:#f8f9fc}
         .cm{display:flex;gap:8px}.cm-u{flex-direction:row-reverse}
         .cm-av{width:26px;height:26px;border-radius:50%;background:#e4eaf5;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;margin-top:2px}
@@ -996,7 +998,7 @@ export default function Landing({ onPortal }) {
             <h2 className="h2 bot-h2">¿Te sumas<br/><em>al coro?</em></h2>
             <p className="bp bot-p">Respuestas inmediatas sobre cómo integrarte, ensayos y todo lo que necesitas saber.</p>
             <div className="bfeats">
-              {[["01","Voces afinadas","Buscamos personas con buen oído musical y afinación. No exigimos formación académica, pero sí que cantes con seguridad y precisión."],["02","Músicos con base","Para quienes tocan un instrumento, se requiere un nivel básico-intermedio. Valoramos la lectura rítmica y la capacidad de adaptarse al repertorio litúrgico."],["03","Compromiso real","Ensayos todos los sábados en la Capilla Sagrada Familia. Misas el 2° y último sábado del mes, de 20:00 a 21:00 hrs. También participamos en celebraciones especiales."]].map(([n,t,d]) => (
+              {[["01","Voces afinadas","Buscamos personas con buen oído musical y afinación. No exigimos formación académica, pero sí que cantes con seguridad y precisión."],["02","Músicos con base","Para quienes tocan un instrumento, se requiere un nivel básico-intermedio. Valoramos la lectura rítmica y la capacidad de adaptarse al repertorio litúrgico."],["03","Compromiso real","Los ensayos se realizan en la Capilla Sagrada Familia de Maipú según las fechas que indica el encargado del coro. Las misas son el 2° y último sábado del mes, de 20:00 a 21:00 hrs."]].map(([n,t,d]) => (
                 <div key={n} className="bfeat"><div className="bnum">{n}</div><div><div className="btitle">{t}</div><div className="bdesc">{d}</div></div></div>
               ))}
             </div>
@@ -1004,8 +1006,13 @@ export default function Landing({ onPortal }) {
           <div>
             <div className="chat">
               <div className="chat-hd">
-                <div className="chat-av">🎵</div>
-                <div><div className="chat-nm">Coro MJ — Asistente</div><div className="chat-sm">Responde en español · IA</div></div>
+                <div className="chat-av">
+                  <img src="/LOGOMJ2.png" alt="MJ" style={{width:24,height:24,objectFit:"contain"}} onError={e=>{e.target.style.display="none";e.target.parentNode.innerHTML="🎵"}}/>
+                </div>
+                <div>
+                  <div className="chat-nm">Coro Misioneros de Jesús</div>
+                  <div className="chat-sm">Asistente virtual · IA</div>
+                </div>
                 <div className="chat-dot"/>
               </div>
               <div className="chat-msgs" ref={msgsRef}>
@@ -1064,12 +1071,6 @@ export default function Landing({ onPortal }) {
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#08122d" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                 </div>
                 <div><div className="ct-t">Ubicación</div><div className="ct-s">{C.contacto_dir}</div></div>
-              </div>
-              <div className="ct-item">
-                <div className="ct-ico">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#08122d" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                </div>
-                <div><div className="ct-t">Ensayos</div><div className="ct-s">{C.contacto_ensayo}</div></div>
               </div>
               <div className="ct-item">
                 <div className="ct-ico">
