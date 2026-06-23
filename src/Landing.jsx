@@ -558,10 +558,17 @@ export default function Landing({ onPortal }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ system: SYS, messages: nh })
       });
+      if (!r.ok) {
+        const err = await r.text();
+        console.error("Chat API error:", r.status, err);
+        setTyping(false);
+        setChat(p => [...p, { role: "bot", text: `Error ${r.status}: ${r.status === 404 ? "Endpoint no encontrado — sube api/chat.js a CodeSandbox" : r.status === 500 ? "Falta ANTHROPIC_API_KEY en Vercel" : err}` }]);
+        return;
+      }
       const d = await r.json();
       const reply = d.content?.[0]?.text || "Intenta nuevamente.";
       setTyping(false); setChat(p => [...p, { role: "bot", text: reply }]); setHist(p => [...p, { role: "assistant", content: reply }]);
-    } catch { setTyping(false); setChat(p => [...p, { role: "bot", text: "Error de conexión." }]); }
+    } catch(e) { setTyping(false); setChat(p => [...p, { role: "bot", text: "Error: " + e.message }]); }
   }
   async function saveF(key, valueOverride) {
     setSaving(s => ({ ...s, [key]: true }));
