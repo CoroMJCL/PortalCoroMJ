@@ -23,6 +23,7 @@ const DEFAULT = {
   contacto_dir:"Maipú, Santiago, Chile · Capilla Sagrada Familia",
   contacto_ensayo:"Sábados · Capilla Misioneros de Jesús",
   whatsapp:"56912345678",
+  evento_nombre:"", evento_fecha:"", evento_hora:"", evento_lugar:"",
   instagram_url:"",
   tiktok_url:"",
   youtube_url:"",
@@ -158,13 +159,12 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
         ) : (
           <div style={{ overflowY: "auto", padding: "24px 24px 40px", flex: 1 }} onWheel={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()}>
 
-            {/* PRÓXIMO EVENTO - AUTO desde agenda */}
-            <div style={{ background:"#f0f7ff", border:"1px solid #bfdbfe", borderRadius:10, padding:"14px 16px", marginBottom:20 }}>
-              <div style={{ fontWeight:700, fontSize:12, color:"#1e40af", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.1em" }}>📅 Próximo evento</div>
-              <div style={{ fontSize:13, color:"#1e3a8a", lineHeight:1.6 }}>
-                El contador del hero se actualiza automáticamente con la próxima pauta publicada en la agenda del coro. No requiere configuración manual.
-              </div>
-            </div>
+            {/* PRÓXIMO EVENTO */}
+            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.1em" }}>📅 Próximo evento (contador hero)</div>
+            <AdminField {...fp} label="Nombre del evento" k="evento_nombre" />
+            <AdminField {...fp} label="Fecha (ej: 2026-07-16)" k="evento_fecha" />
+            <AdminField {...fp} label="Hora (ej: 15:30)" k="evento_hora" />
+            <AdminField {...fp} label="Lugar" k="evento_lugar" />
 
             {/* HERO */}
             <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Hero</div>
@@ -234,25 +234,14 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
 }
 
 // ── COUNTDOWN PRÓXIMA MISA ─────────────────
-function HeroCountdown() {
+function HeroCountdown({ evento }) {
   const [time, setTime] = useState({ d:0, h:0, m:0, s:0 });
-  const [event, setEvent] = useState(null);
 
   useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
-    fetch(`${SUPABASE_URL}/rest/v1/pautas_misa?publicada=eq.true&fecha=gte.${today}&order=fecha.asc,hora.asc&limit=1`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-    })
-    .then(r => r.json())
-    .then(rows => { if (Array.isArray(rows) && rows[0]) setEvent(rows[0]); })
-    .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (!event) return;
+    if (!evento?.fecha) return;
     const tick = () => {
-      const [h, m] = (event.hora || "10:00").split(":").map(Number);
-      const target = new Date(event.fecha + "T" + String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0") + ":00");
+      const [h, m] = (evento.hora || "10:00").split(":").map(Number);
+      const target = new Date(`${evento.fecha}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00`);
       const diff = target - new Date();
       if (diff <= 0) { setTime({ d:0,h:0,m:0,s:0 }); return; }
       setTime({
@@ -265,17 +254,17 @@ function HeroCountdown() {
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [event]);
+  }, [evento]);
 
-  if (!event) return null;
+  if (!evento?.fecha || !evento?.nombre) return null;
 
-  const fecha = new Date(event.fecha + "T12:00:00").toLocaleDateString("es-CL", { weekday:"long", day:"numeric", month:"long" });
+  const fecha = new Date(evento.fecha + "T12:00:00").toLocaleDateString("es-CL", { weekday:"long", day:"numeric", month:"long" });
 
   return (
     <div className="hero-countdown">
       <div className="hcd-label">Próxima celebración</div>
-      <div className="hcd-event">{event.titulo}</div>
-      <div className="hcd-date">{fecha} · {event.hora} hrs · {event.lugar}</div>
+      <div className="hcd-event">{evento.nombre}</div>
+      <div className="hcd-date">{fecha}{evento.hora ? ` · ${evento.hora} hrs` : ""}{evento.lugar ? ` · ${evento.lugar}` : ""}</div>
       <div className="hcd-timer">
         <div className="hcd-unit"><span className="hcd-num">{String(time.d).padStart(2,"0")}</span><div className="hcd-txt">días</div></div>
         <div className="hcd-sep">:</div>
@@ -564,8 +553,13 @@ export default function Landing({ onPortal }) {
     const nh = [...hist, { role: "user", content: t }];
     setChat(p => [...p, { role: "user", text: t }]); setHist(nh); setTyping(true);
     try {
-      const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, system: SYS, messages: nh }) });
-      const d = await r.json(); const reply = d.content?.[0]?.text || "Intenta nuevamente.";
+      const r = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ system: SYS, messages: nh })
+      });
+      const d = await r.json();
+      const reply = d.content?.[0]?.text || "Intenta nuevamente.";
       setTyping(false); setChat(p => [...p, { role: "bot", text: reply }]); setHist(p => [...p, { role: "assistant", content: reply }]);
     } catch { setTyping(false); setChat(p => [...p, { role: "bot", text: "Error de conexión." }]); }
   }
@@ -864,7 +858,7 @@ export default function Landing({ onPortal }) {
             <h1 className="hero-h1">{C.hero_titulo}<br/><span className="it">{C.hero_titulo2}</span></h1>
           </div>
           <div className="hero-right">
-            <HeroCountdown />
+            <HeroCountdown evento={{ nombre: C.evento_nombre, fecha: C.evento_fecha, hora: C.evento_hora, lugar: C.evento_lugar }} />
             <p className="hero-sub">{C.hero_sub}</p>
             <div className="hero-btns">
               <button className="btn-w" onClick={() => go("nosotros")}>Conócenos</button>
