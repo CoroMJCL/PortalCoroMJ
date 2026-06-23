@@ -28,6 +28,12 @@ const DEFAULT = {
   youtube_url:"",
   facebook_url:"",
   footer_texto:"Ensemble vocal de música litúrgica. Maipú, Santiago de Chile.",
+  srv1_title:"Matrimonios", srv1_desc:"Animamos tu matrimonio con música litúrgica en vivo, desde el ingreso hasta la salida. Coordinamos el repertorio con el sacerdote y adaptamos cada momento de la ceremonia.",
+  srv2_title:"Misas de acción de gracias", srv2_desc:"Celebra un aniversario de bodas, cumpleaños especial o cualquier ocasión de gratitud con la presencia musical del coro. Repertorio seleccionado según el momento.",
+  srv3_title:"Celebraciones parroquiales", srv3_desc:"Acompañamos fiestas patronales, misas solemnes y eucaristías especiales de parroquias y capillas de Maipú y comunas aledañas.",
+  srv4_title:"Jornadas y retiros espirituales", srv4_desc:"Música sacra para encuentros de fe, retiros, jornadas vocacionales y cualquier instancia de oración comunitaria que requiera una atmósfera de recogimiento.",
+  srv5_title:"Conciertos de música sacra", srv5_desc:"Ofrecemos conciertos y cantatas en vivo para parroquias, colegios y espacios culturales. Repertorio que abarca desde polifonía clásica hasta música litúrgica contemporánea.",
+  srv6_title:"Comuniones, Confirmaciones y Adviento", srv6_desc:"Animamos Primeras Comuniones, Confirmaciones y las celebraciones de Adviento y Navidad con cantatas y repertorio festivo adaptado a cada etapa del año litúrgico.",
 };
 
 async function dbGet() {
@@ -182,6 +188,16 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
                 <div style={{ fontWeight: 600, fontSize: 11, color: "#666", marginBottom: 8 }}>Foto {n}</div>
                 <IF label="Imagen" k={`gal${n}_img`} name={`landing_gal${n}`} />
                 <F label="Título" k={`gal${n}_label`} /><F label="Subtítulo" k={`gal${n}_sub`} />
+              </div>
+            ))}
+
+            {/* SERVICIOS */}
+            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>🎵 Textos de servicios</div>
+            {[1,2,3,4,5,6].map(n => (
+              <div key={n} style={{ background: "#f8f9fc", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                <div style={{ fontWeight: 600, fontSize: 11, color: "#666", marginBottom: 8 }}>Servicio {n}</div>
+                <F label="Título" k={`srv${n}_title`} />
+                <F label="Descripción" k={`srv${n}_desc`} ta />
               </div>
             ))}
 
@@ -677,13 +693,13 @@ export default function Landing({ onPortal }) {
         .foot-top{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:48px;border-bottom:1px solid rgba(255,255,255,0.06);max-width:1140px;margin:0 auto}
         .foot-logo{height:52px;width:52px;object-fit:contain;margin-bottom:16px;display:block}
         .foot-bn{font-size:16px;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-0.01em}
-        .foot-bp{font-size:13px;color:rgba(255,255,255,0.28);font-weight:300;line-height:1.7;max-width:220px}
+        .foot-bp{font-size:13px;color:rgba(255,255,255,0.55);font-weight:300;line-height:1.7;max-width:260px}
         .foot-cols{display:flex;gap:56px}
         .foot-col h4{font-size:10px;font-weight:700;color:rgba(255,255,255,0.25);letter-spacing:0.18em;text-transform:uppercase;margin-bottom:16px}
-        .foot-col a{display:block;font-size:13.5px;color:rgba(255,255,255,0.4);text-decoration:none;margin-bottom:10px;font-weight:300;cursor:pointer;transition:color .2s}
+        .foot-col a{display:block;font-size:13.5px;color:rgba(255,255,255,0.7);text-decoration:none;margin-bottom:10px;font-weight:300;cursor:pointer;transition:color .2s}
         .foot-col a:hover{color:#fff}
         .foot-btm{display:flex;justify-content:space-between;align-items:center;padding-top:28px;max-width:1140px;margin:0 auto}
-        .foot-copy{font-size:11.5px;color:rgba(255,255,255,0.16)}
+        .foot-copy{font-size:11.5px;color:rgba(255,255,255,0.4)}
         .foot-adm{font-size:11px;color:rgba(255,255,255,0.05);cursor:pointer;padding:4px 8px;user-select:none;letter-spacing:0.2em;transition:color .4s}
         .foot-adm:hover{color:rgba(255,255,255,0.25)}
 
@@ -855,36 +871,12 @@ export default function Landing({ onPortal }) {
           <p className="bp" style={{marginBottom:52,maxWidth:560}}>Animamos celebraciones con música litúrgica en vivo. Contáctanos para coordinar tu evento.</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:20}}>
             {[
-              {
-                icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 12l2.5 2.5L16 9"/></svg>,
-                title:"Matrimonios",
-                desc:"Animamos tu matrimonio con música litúrgica en vivo, desde el ingreso hasta la salida. Coordinamos el repertorio con el sacerdote y adaptamos cada momento de la ceremonia."
-              },
-              {
-                icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>,
-                title:"Misas de acción de gracias",
-                desc:"Celebra un aniversario de bodas, cumpleaños especial o cualquier ocasión de gratitud con la presencia musical del coro. Repertorio seleccionado según el momento."
-              },
-              {
-                icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
-                title:"Celebraciones parroquiales",
-                desc:"Acompañamos fiestas patronales, misas solemnes y eucaristías especiales de parroquias y capillas de Maipú y comunas aledañas."
-              },
-              {
-                icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>,
-                title:"Jornadas y retiros espirituales",
-                desc:"Música sacra para encuentros de fe, retiros, jornadas vocacionales y cualquier instancia de oración comunitaria que requiera una atmósfera de recogimiento."
-              },
-              {
-                icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>,
-                title:"Conciertos de música sacra",
-                desc:"Ofrecemos conciertos y cantatas en vivo para parroquias, colegios y espacios culturales. Repertorio que abarca desde polifonía clásica hasta música litúrgica contemporánea."
-              },
-              {
-                icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
-                title:"Comuniones, Confirmaciones y Adviento",
-                desc:"Animamos Primeras Comuniones, Confirmaciones y las celebraciones de Adviento y Navidad con cantatas y repertorio festivo adaptado a cada etapa del año litúrgico."
-              },
+              {icon:<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 12l2.5 2.5L16 9"/></svg>, title:C.srv1_title, desc:C.srv1_desc},
+              {icon:<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>, title:C.srv2_title, desc:C.srv2_desc},
+              {icon:<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>, title:C.srv3_title, desc:C.srv3_desc},
+              {icon:<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>, title:C.srv4_title, desc:C.srv4_desc},
+              {icon:<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>, title:C.srv5_title, desc:C.srv5_desc},
+              {icon:<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>, title:C.srv6_title, desc:C.srv6_desc},
             ].map(({icon,title,desc}) => (
               <div key={title} style={{background:"#fff",borderRadius:16,padding:28,border:"1px solid #e4eaf5",transition:"all .2s",cursor:"default"}}
                 onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 8px 32px rgba(8,18,45,0.1)";e.currentTarget.style.transform="translateY(-2px)"}}
@@ -1037,26 +1029,37 @@ export default function Landing({ onPortal }) {
             <img src="/LOGOMJ.jpeg" className="foot-logo" alt="Logo" onError={e=>e.target.style.display="none"}/>
             <div className="foot-bn">Coro Misioneros de Jesús</div>
             <p className="foot-bp">{C.footer_texto}</p>
+            {/* Redes sociales también en la columna izquierda en mobile */}
+            <div style={{display:"flex",gap:10,marginTop:16,flexWrap:"wrap"}}>
+              {C.instagram_url && <a href={C.instagram_url} target="_blank" rel="noopener noreferrer" style={{width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="rgba(255,255,255,0.7)" stroke="none"/></svg></a>}
+              {C.tiktok_url && <a href={C.tiktok_url} target="_blank" rel="noopener noreferrer" style={{width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.69a8.27 8.27 0 0 0 4.83 1.55V6.79a4.85 4.85 0 0 1-1.07-.1z"/></svg></a>}
+              {C.youtube_url && <a href={C.youtube_url} target="_blank" rel="noopener noreferrer" style={{width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="16" height="16" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="rgba(6,14,36,0.9)"/></svg></a>}
+              {C.facebook_url && <a href={C.facebook_url} target="_blank" rel="noopener noreferrer" style={{width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="16" height="16" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></a>}
+            </div>
           </div>
           <div className="foot-cols">
             <div className="foot-col">
               <h4>Sitio</h4>
               <a onClick={()=>go("nosotros")}>Nosotros</a>
               <a onClick={()=>go("galeria")}>Galería</a>
+              <a onClick={()=>go("servicios")}>Servicios</a>
               <a onClick={()=>go("bot")}>Únete</a>
               <a onClick={()=>go("contacto")}>Contacto</a>
             </div>
             <div className="foot-col">
               <h4>Redes</h4>
-              {C.instagram_url && <a href={C.instagram_url} target="_blank" rel="noopener noreferrer">Instagram</a>}
-              {C.tiktok_url && <a href={C.tiktok_url} target="_blank" rel="noopener noreferrer">TikTok</a>}
-              {C.youtube_url && <a href={C.youtube_url} target="_blank" rel="noopener noreferrer">YouTube</a>}
-              {C.facebook_url && <a href={C.facebook_url} target="_blank" rel="noopener noreferrer">Facebook</a>}
+              {C.instagram_url ? <a href={C.instagram_url} target="_blank" rel="noopener noreferrer">Instagram</a> : <a style={{opacity:0.3,cursor:"default"}}>Instagram</a>}
+              {C.tiktok_url ? <a href={C.tiktok_url} target="_blank" rel="noopener noreferrer">TikTok</a> : <a style={{opacity:0.3,cursor:"default"}}>TikTok</a>}
+              {C.youtube_url ? <a href={C.youtube_url} target="_blank" rel="noopener noreferrer">YouTube</a> : <a style={{opacity:0.3,cursor:"default"}}>YouTube</a>}
+              {C.facebook_url ? <a href={C.facebook_url} target="_blank" rel="noopener noreferrer">Facebook</a> : <a style={{opacity:0.3,cursor:"default"}}>Facebook</a>}
             </div>
           </div>
         </div>
         <div className="foot-btm">
-          <span className="foot-copy">© 2026 Coro Misioneros de Jesús · Desarrollado por TEMPVS7®</span>
+          <span className="foot-copy">
+            © {new Date().getFullYear()} Coro Misioneros de Jesús · Todos los derechos reservados · Desarrollado por{" "}
+            <a href="http://www.tempvs7.cl" target="_blank" rel="noopener noreferrer" style={{color:"#F97316",textDecoration:"none",fontWeight:600}}>TEMPVS7®</a>
+          </span>
           <span className="foot-adm" onClick={()=>setAdmin(true)}>· · ·</span>
         </div>
       </footer>
