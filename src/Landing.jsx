@@ -8,41 +8,90 @@ const SYS = `Eres el asistente del Coro Misioneros de Jesús, ensemble vocal de 
 const DEFAULT = {
   hero_img: `${BUCKET}/Misioneros.jpg`,
   about_img: `${BUCKET}/Misioneros.jpg`,
-  hero_titulo: "Misioneros", hero_titulo2: "de Jesús",
+  hero_titulo: "Misioneros",
+  hero_titulo2: "de Jesús",
   hero_kicker: "Coro · Maipú · Chile",
-  hero_sub: "Ensemble vocal de música litúrgica contemporánea. Quince años animando la fe en Maipú.",
+  hero_sub:
+    "Ensemble vocal de música litúrgica contemporánea. Quince años animando la fe en Maipú.",
   about_titulo: "Un ensemble con identidad propia",
-  about_texto1: "Somos un coro de música litúrgica con más de 15 años en actividad. Soprano, contralto, tenor y bajo, acompañados de instrumentos en vivo.",
-  about_texto2: "Nuestra disciplina musical y compromiso con el repertorio nos definen como un conjunto vocal de alto nivel dentro de la tradición litúrgica contemporánea.",
-  stat1_n:"15+",stat1_l:"Años activos",stat2_n:"30+",stat2_l:"Voces",stat3_n:"400+",stat3_l:"Presentaciones",
-  gal1_label:"Navidad 2023",gal1_sub:"Diciembre",gal1_img:"",
-  gal2_label:"Semana Santa",gal2_sub:"Abril",gal2_img:"",
-  gal3_label:"Fiesta Patronal",gal3_sub:"Agosto",gal3_img:"",
-  gal4_label:"Corpus Christi",gal4_sub:"Junio",gal4_img:"",
-  gal5_label:"Vigilia Pascual",gal5_sub:"Marzo",gal5_img:"",
-  contacto_dir:"Maipú, Santiago, Chile · Capilla Sagrada Familia",
-  contacto_ensayo:"Sábados · Capilla Misioneros de Jesús",
-  whatsapp:"56912345678",
-  footer_texto:"Ensemble vocal de música litúrgica. Maipú, Santiago de Chile.",
+  about_texto1:
+    "Somos un coro de música litúrgica con más de 15 años en actividad. Soprano, contralto, tenor y bajo, acompañados de instrumentos en vivo.",
+  about_texto2:
+    "Nuestra disciplina musical y compromiso con el repertorio nos definen como un conjunto vocal de alto nivel dentro de la tradición litúrgica contemporánea.",
+  stat1_n: "15+",
+  stat1_l: "Años activos",
+  stat2_n: "30+",
+  stat2_l: "Voces",
+  stat3_n: "400+",
+  stat3_l: "Presentaciones",
+  gal1_label: "Navidad 2023",
+  gal1_sub: "Diciembre",
+  gal1_img: "",
+  gal2_label: "Semana Santa",
+  gal2_sub: "Abril",
+  gal2_img: "",
+  gal3_label: "Fiesta Patronal",
+  gal3_sub: "Agosto",
+  gal3_img: "",
+  gal4_label: "Corpus Christi",
+  gal4_sub: "Junio",
+  gal4_img: "",
+  gal5_label: "Vigilia Pascual",
+  gal5_sub: "Marzo",
+  gal5_img: "",
+  contacto_dir: "Maipú, Santiago, Chile · Capilla Sagrada Familia",
+  contacto_ensayo: "Sábados · Capilla Misioneros de Jesús",
+  whatsapp: "56912345678",
+  footer_texto: "Ensemble vocal de música litúrgica. Maipú, Santiago de Chile.",
 };
 
 async function dbGet() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/landing_content?select=key,value`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/landing_content?select=key,value`,
+      {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      }
+    );
     const rows = await r.json();
     if (!Array.isArray(rows)) return DEFAULT;
     const obj = { ...DEFAULT };
-    rows.forEach(({ key, value }) => { obj[key] = value; });
+    rows.forEach(({ key, value }) => {
+      obj[key] = value;
+    });
     return obj;
-  } catch { return DEFAULT; }
+  } catch {
+    return DEFAULT;
+  }
 }
 async function dbSet(key, value) {
-  await fetch(`${SUPABASE_URL}/rest/v1/landing_content`, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ key, value }) });
+  await fetch(`${SUPABASE_URL}/rest/v1/landing_content`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates",
+    },
+    body: JSON.stringify({ key, value }),
+  });
 }
 async function uploadImg(file, name) {
   const ext = file.name.split(".").pop();
   const path = `${name}.${ext}`;
-  const r = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": file.type, "x-upsert": "true" }, body: file });
+  const r = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": file.type,
+      "x-upsert": "true",
+    },
+    body: file,
+  });
   if (!r.ok) throw new Error("Upload failed");
   return `${BUCKET}/${path}?t=${Date.now()}`;
 }
@@ -50,23 +99,90 @@ async function uploadImg(file, name) {
 const ADMIN_PASS = "coromj2026";
 
 // Componente admin separado para evitar remount de inputs
-function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, handleImg }) {
+function AdminPanel({
+  onClose,
+  C,
+  editing,
+  setEditing,
+  saving,
+  saveF,
+  upKey,
+  handleImg,
+}) {
   const [pw, setPw] = useState("");
   const [auth, setAuth] = useState(false);
 
   const check = () => {
     if (pw === ADMIN_PASS) setAuth(true);
-    else { alert("Contraseña incorrecta"); setPw(""); }
+    else {
+      alert("Contraseña incorrecta");
+      setPw("");
+    }
   };
 
   const F = ({ label, k, ta }) => (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 10, fontWeight: 600, color: "#888", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 5 }}>{label}</div>
-      {ta
-        ? <textarea value={editing[k] ?? C[k] ?? ""} onChange={e => setEditing(p => ({ ...p, [k]: e.target.value }))} style={{ width: "100%", border: "1px solid #e0e6f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", resize: "vertical", minHeight: 72, outline: "none", display: "block" }} />
-        : <input value={editing[k] ?? C[k] ?? ""} onChange={e => setEditing(p => ({ ...p, [k]: e.target.value }))} style={{ width: "100%", border: "1px solid #e0e6f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", outline: "none", display: "block" }} />
-      }
-      <button onClick={() => saveF(k)} disabled={saving[k]} style={{ marginTop: 5, background: "#08122d", color: "#fff", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 11, fontWeight: 600, cursor: "pointer", opacity: saving[k] ? 0.6 : 1 }}>
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          color: "#888",
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          marginBottom: 5,
+        }}
+      >
+        {label}
+      </div>
+      {ta ? (
+        <textarea
+          value={editing[k] ?? C[k] ?? ""}
+          onChange={(e) => setEditing((p) => ({ ...p, [k]: e.target.value }))}
+          style={{
+            width: "100%",
+            border: "1px solid #e0e6f0",
+            borderRadius: 8,
+            padding: "9px 12px",
+            fontSize: 13,
+            fontFamily: "inherit",
+            resize: "vertical",
+            minHeight: 72,
+            outline: "none",
+            display: "block",
+          }}
+        />
+      ) : (
+        <input
+          value={editing[k] ?? C[k] ?? ""}
+          onChange={(e) => setEditing((p) => ({ ...p, [k]: e.target.value }))}
+          style={{
+            width: "100%",
+            border: "1px solid #e0e6f0",
+            borderRadius: 8,
+            padding: "9px 12px",
+            fontSize: 13,
+            fontFamily: "inherit",
+            outline: "none",
+            display: "block",
+          }}
+        />
+      )}
+      <button
+        onClick={() => saveF(k)}
+        disabled={saving[k]}
+        style={{
+          marginTop: 5,
+          background: "#08122d",
+          color: "#fff",
+          border: "none",
+          borderRadius: 6,
+          padding: "5px 14px",
+          fontSize: 11,
+          fontWeight: 600,
+          cursor: "pointer",
+          opacity: saving[k] ? 0.6 : 1,
+        }}
+      >
         {saving[k] ? "..." : "Guardar"}
       </button>
     </div>
@@ -74,58 +190,257 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
 
   const IF = ({ label, k, name }) => (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 10, fontWeight: 600, color: "#888", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
-      {C[k] && <img src={C[k]} alt="" style={{ width: "100%", maxHeight: 100, objectFit: "cover", borderRadius: 8, marginBottom: 6 }} />}
-      <label style={{ display: "inline-block", background: "#f0f4ff", border: "1px solid #d0d8f0", borderRadius: 8, padding: "7px 14px", fontSize: 11, fontWeight: 500, cursor: "pointer", color: "#08122d" }}>
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          color: "#888",
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          marginBottom: 6,
+        }}
+      >
+        {label}
+      </div>
+      {C[k] && (
+        <img
+          src={C[k]}
+          alt=""
+          style={{
+            width: "100%",
+            maxHeight: 100,
+            objectFit: "cover",
+            borderRadius: 8,
+            marginBottom: 6,
+          }}
+        />
+      )}
+      <label
+        style={{
+          display: "inline-block",
+          background: "#f0f4ff",
+          border: "1px solid #d0d8f0",
+          borderRadius: 8,
+          padding: "7px 14px",
+          fontSize: 11,
+          fontWeight: 500,
+          cursor: "pointer",
+          color: "#08122d",
+        }}
+      >
         {upKey === k ? "Subiendo..." : "📁 Subir"}
-        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && handleImg(k, e.target.files[0], name)} />
+        <input
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) =>
+            e.target.files[0] && handleImg(k, e.target.files[0], name)
+          }
+        />
       </label>
     </div>
   );
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "#fff", borderRadius: 20, width: "90%", maxWidth: 520, maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 32px 80px rgba(0,0,0,0.35)" }}>
-        <div style={{ background: "#08122d", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-          <div style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>⚙️ Editor del sitio</div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", borderRadius: "50%", width: 30, height: 30, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9998,
+        background: "rgba(0,0,0,0.65)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 20,
+          width: "90%",
+          maxWidth: 520,
+          maxHeight: "90vh",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.35)",
+        }}
+      >
+        <div
+          style={{
+            background: "#08122d",
+            padding: "18px 24px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>
+            ⚙️ Editor del sitio
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "rgba(255,255,255,0.15)",
+              border: "none",
+              color: "#fff",
+              borderRadius: "50%",
+              width: 30,
+              height: 30,
+              cursor: "pointer",
+              fontSize: 15,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ✕
+          </button>
         </div>
         {!auth ? (
-          <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#08122d" }}>Contraseña de acceso</div>
+          <div
+            style={{
+              padding: 32,
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+            }}
+          >
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#08122d" }}>
+              Contraseña de acceso
+            </div>
             <input
               type="password"
               value={pw}
-              onChange={e => setPw(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && check()}
+              onChange={(e) => setPw(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && check()}
               placeholder="Contraseña"
               autoFocus
-              style={{ border: "1px solid #dde4f0", borderRadius: 10, padding: "12px 16px", fontSize: 15, fontFamily: "inherit", outline: "none" }}
+              style={{
+                border: "1px solid #dde4f0",
+                borderRadius: 10,
+                padding: "12px 16px",
+                fontSize: 15,
+                fontFamily: "inherit",
+                outline: "none",
+              }}
             />
-            <button onClick={check} style={{ background: "#08122d", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+            <button
+              onClick={check}
+              style={{
+                background: "#08122d",
+                color: "#fff",
+                border: "none",
+                borderRadius: 10,
+                padding: 13,
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
               Entrar
             </button>
           </div>
         ) : (
           <div style={{ overflowY: "auto", padding: "24px 24px 40px" }}>
-            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Hero</div>
-            <IF label="Imagen fondo" k="hero_img" name="landing_hero" />
-            <F label="Título 1" k="hero_titulo" /><F label="Título 2 italic" k="hero_titulo2" /><F label="Subtexto" k="hero_sub" ta />
-            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>👥 Nosotros</div>
-            <IF label="Imagen nosotros" k="about_img" name="landing_about" />
-            <F label="Título" k="about_titulo" /><F label="Párrafo 1" k="about_texto1" ta /><F label="Párrafo 2" k="about_texto2" ta />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-              {[1,2,3].map(n => <div key={n}><F label={`Stat ${n} número`} k={`stat${n}_n`} /><F label="Label" k={`stat${n}_l`} /></div>)}
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: 12,
+                color: "#08122d",
+                marginBottom: 14,
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+              }}
+            >
+              🖼️ Hero
             </div>
-            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Galería</div>
-            {[1,2,3,4,5].map(n => (
-              <div key={n} style={{ background: "#f8f9fc", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
-                <div style={{ fontWeight: 600, fontSize: 11, color: "#666", marginBottom: 8 }}>Foto {n}</div>
+            <IF label="Imagen fondo" k="hero_img" name="landing_hero" />
+            <F label="Título 1" k="hero_titulo" />
+            <F label="Título 2 italic" k="hero_titulo2" />
+            <F label="Subtexto" k="hero_sub" ta />
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: 12,
+                color: "#08122d",
+                margin: "20px 0 14px",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+              }}
+            >
+              👥 Nosotros
+            </div>
+            <IF label="Imagen nosotros" k="about_img" name="landing_about" />
+            <F label="Título" k="about_titulo" />
+            <F label="Párrafo 1" k="about_texto1" ta />
+            <F label="Párrafo 2" k="about_texto2" ta />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 8,
+                marginBottom: 8,
+              }}
+            >
+              {[1, 2, 3].map((n) => (
+                <div key={n}>
+                  <F label={`Stat ${n} número`} k={`stat${n}_n`} />
+                  <F label="Label" k={`stat${n}_l`} />
+                </div>
+              ))}
+            </div>
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: 12,
+                color: "#08122d",
+                margin: "20px 0 14px",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+              }}
+            >
+              🖼️ Galería
+            </div>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <div
+                key={n}
+                style={{
+                  background: "#f8f9fc",
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  marginBottom: 10,
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 11,
+                    color: "#666",
+                    marginBottom: 8,
+                  }}
+                >
+                  Foto {n}
+                </div>
                 <IF label="Imagen" k={`gal${n}_img`} name={`landing_gal${n}`} />
-                <F label="Título" k={`gal${n}_label`} /><F label="Subtítulo" k={`gal${n}_sub`} />
+                <F label="Título" k={`gal${n}_label`} />
+                <F label="Subtítulo" k={`gal${n}_sub`} />
               </div>
             ))}
-            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>📍 Contacto</div>
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: 12,
+                color: "#08122d",
+                margin: "20px 0 14px",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+              }}
+            >
+              📍 Contacto
+            </div>
             <F label="WhatsApp (ej: 56912345678)" k="whatsapp" />
             <F label="Dirección" k="contacto_dir" />
             <F label="Ensayos" k="contacto_ensayo" />
@@ -139,31 +454,51 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
 
 // ── COUNTDOWN PRÓXIMA MISA ─────────────────
 function HeroCountdown() {
-  const [time, setTime] = useState({ d:0, h:0, m:0, s:0 });
+  const [time, setTime] = useState({ d: 0, h: 0, m: 0, s: 0 });
   const [event, setEvent] = useState(null);
 
   useEffect(() => {
     // Buscar próxima pauta publicada en Supabase
-    fetch(`${SUPABASE_URL}/rest/v1/pautas_misa?publicada=eq.true&fecha=gte.${new Date().toISOString().split("T")[0]}&order=fecha.asc&limit=1`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-    })
-    .then(r => r.json())
-    .then(rows => { if (Array.isArray(rows) && rows[0]) setEvent(rows[0]); })
-    .catch(() => {});
+    fetch(
+      `${SUPABASE_URL}/rest/v1/pautas_misa?publicada=eq.true&fecha=gte.${
+        new Date().toISOString().split("T")[0]
+      }&order=fecha.asc&limit=1`,
+      {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      }
+    )
+      .then((r) => r.json())
+      .then((rows) => {
+        if (Array.isArray(rows) && rows[0]) setEvent(rows[0]);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     if (!event) return;
     const tick = () => {
       const [h, m] = (event.hora || "10:00").split(":").map(Number);
-      const target = new Date(event.fecha + "T" + String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0") + ":00");
+      const target = new Date(
+        event.fecha +
+          "T" +
+          String(h).padStart(2, "0") +
+          ":" +
+          String(m).padStart(2, "0") +
+          ":00"
+      );
       const diff = target - new Date();
-      if (diff <= 0) { setTime({ d:0,h:0,m:0,s:0 }); return; }
+      if (diff <= 0) {
+        setTime({ d: 0, h: 0, m: 0, s: 0 });
+        return;
+      }
       setTime({
-        d: Math.floor(diff/86400000),
-        h: Math.floor((diff%86400000)/3600000),
-        m: Math.floor((diff%3600000)/60000),
-        s: Math.floor((diff%60000)/1000)
+        d: Math.floor(diff / 86400000),
+        h: Math.floor((diff % 86400000) / 3600000),
+        m: Math.floor((diff % 3600000) / 60000),
+        s: Math.floor((diff % 60000) / 1000),
       });
     };
     tick();
@@ -173,21 +508,38 @@ function HeroCountdown() {
 
   if (!event) return null;
 
-  const fecha = new Date(event.fecha + "T12:00:00").toLocaleDateString("es-CL", { weekday:"long", day:"numeric", month:"long" });
+  const fecha = new Date(event.fecha + "T12:00:00").toLocaleDateString(
+    "es-CL",
+    { weekday: "long", day: "numeric", month: "long" }
+  );
 
   return (
     <div className="hero-countdown">
       <div className="hcd-label">Próxima celebración</div>
       <div className="hcd-event">{event.titulo}</div>
-      <div className="hcd-date">{fecha} · {event.hora} hrs · {event.lugar}</div>
+      <div className="hcd-date">
+        {fecha} · {event.hora} hrs · {event.lugar}
+      </div>
       <div className="hcd-timer">
-        <div className="hcd-unit"><span className="hcd-num">{String(time.d).padStart(2,"0")}</span><div className="hcd-txt">días</div></div>
+        <div className="hcd-unit">
+          <span className="hcd-num">{String(time.d).padStart(2, "0")}</span>
+          <div className="hcd-txt">días</div>
+        </div>
         <div className="hcd-sep">:</div>
-        <div className="hcd-unit"><span className="hcd-num">{String(time.h).padStart(2,"0")}</span><div className="hcd-txt">hrs</div></div>
+        <div className="hcd-unit">
+          <span className="hcd-num">{String(time.h).padStart(2, "0")}</span>
+          <div className="hcd-txt">hrs</div>
+        </div>
         <div className="hcd-sep">:</div>
-        <div className="hcd-unit"><span className="hcd-num">{String(time.m).padStart(2,"0")}</span><div className="hcd-txt">min</div></div>
+        <div className="hcd-unit">
+          <span className="hcd-num">{String(time.m).padStart(2, "0")}</span>
+          <div className="hcd-txt">min</div>
+        </div>
         <div className="hcd-sep">:</div>
-        <div className="hcd-unit"><span className="hcd-num">{String(time.s).padStart(2,"0")}</span><div className="hcd-txt">seg</div></div>
+        <div className="hcd-unit">
+          <span className="hcd-num">{String(time.s).padStart(2, "0")}</span>
+          <div className="hcd-txt">seg</div>
+        </div>
       </div>
     </div>
   );
@@ -209,12 +561,18 @@ function ToolMetronome() {
       iRef.current = setInterval(() => {
         const o = ctx.current.createOscillator();
         const g = ctx.current.createGain();
-        o.connect(g); g.connect(ctx.current.destination);
+        o.connect(g);
+        g.connect(ctx.current.destination);
         o.frequency.value = b === 0 ? 880 : 440;
         g.gain.setValueAtTime(0.3, ctx.current.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.current.currentTime + 0.08);
-        o.start(); o.stop(ctx.current.currentTime + 0.1);
-        setBeat(b); b = (b + 1) % beats;
+        g.gain.exponentialRampToValueAtTime(
+          0.001,
+          ctx.current.currentTime + 0.08
+        );
+        o.start();
+        o.stop(ctx.current.currentTime + 0.1);
+        setBeat(b);
+        b = (b + 1) % beats;
       }, (60 / bpm) * 1000);
     } else {
       clearInterval(iRef.current);
@@ -224,27 +582,98 @@ function ToolMetronome() {
     return () => clearInterval(iRef.current);
   }, [running, bpm, beats]);
 
-  const card = { background:"#f8f9fc", borderRadius:20, padding:28, border:"1px solid #e4eaf5" };
+  const card = {
+    background: "#f8f9fc",
+    borderRadius: 20,
+    padding: 28,
+    border: "1px solid #e4eaf5",
+  };
   return (
     <div style={card}>
-      <div style={{fontSize:10,fontWeight:700,color:"#F97316",letterSpacing:"0.18em",textTransform:"uppercase",marginBottom:12}}>Metrónomo</div>
-      <div style={{fontSize:52,fontWeight:900,color:"#08122d",letterSpacing:"-0.03em",lineHeight:1,marginBottom:4}}>{bpm}</div>
-      <div style={{fontSize:11,color:"#aaa",marginBottom:20}}>BPM</div>
-      <input type="range" min={40} max={240} value={bpm} onChange={e=>setBpm(+e.target.value)}
-        style={{width:"100%",accentColor:"#F97316",marginBottom:16}} />
-      <div style={{display:"flex",gap:6,marginBottom:20}}>
-        {[2,3,4,6].map(n => (
-          <button key={n} onClick={()=>setBeats(n)} style={{flex:1,padding:"6px 0",border:`1.5px solid ${beats===n?"#F97316":"#e0e6f0"}`,borderRadius:8,background:beats===n?"#F97316":"#fff",color:beats===n?"#fff":"#666",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 700,
+          color: "#F97316",
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          marginBottom: 12,
+        }}
+      >
+        Metrónomo
+      </div>
+      <div
+        style={{
+          fontSize: 52,
+          fontWeight: 900,
+          color: "#08122d",
+          letterSpacing: "-0.03em",
+          lineHeight: 1,
+          marginBottom: 4,
+        }}
+      >
+        {bpm}
+      </div>
+      <div style={{ fontSize: 11, color: "#aaa", marginBottom: 20 }}>BPM</div>
+      <input
+        type="range"
+        min={40}
+        max={240}
+        value={bpm}
+        onChange={(e) => setBpm(+e.target.value)}
+        style={{ width: "100%", accentColor: "#F97316", marginBottom: 16 }}
+      />
+      <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+        {[2, 3, 4, 6].map((n) => (
+          <button
+            key={n}
+            onClick={() => setBeats(n)}
+            style={{
+              flex: 1,
+              padding: "6px 0",
+              border: `1.5px solid ${beats === n ? "#F97316" : "#e0e6f0"}`,
+              borderRadius: 8,
+              background: beats === n ? "#F97316" : "#fff",
+              color: beats === n ? "#fff" : "#666",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
             {n}/4
           </button>
         ))}
       </div>
-      <div style={{display:"flex",gap:6,marginBottom:20}}>
-        {Array.from({length:beats},(_,i)=>(
-          <div key={i} style={{flex:1,height:8,borderRadius:4,background:running&&beat===i?"#F97316":"#e0e6f0",transition:"background 0.05s"}}/>
+      <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+        {Array.from({ length: beats }, (_, i) => (
+          <div
+            key={i}
+            style={{
+              flex: 1,
+              height: 8,
+              borderRadius: 4,
+              background: running && beat === i ? "#F97316" : "#e0e6f0",
+              transition: "background 0.05s",
+            }}
+          />
         ))}
       </div>
-      <button onClick={()=>setRunning(r=>!r)} style={{width:"100%",background:running?"#08122d":"#F97316",color:"#fff",border:"none",borderRadius:10,padding:"12px 0",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit"}}>
+      <button
+        onClick={() => setRunning((r) => !r)}
+        style={{
+          width: "100%",
+          background: running ? "#08122d" : "#F97316",
+          color: "#fff",
+          border: "none",
+          borderRadius: 10,
+          padding: "12px 0",
+          fontWeight: 700,
+          fontSize: 14,
+          cursor: "pointer",
+          fontFamily: "inherit",
+        }}
+      >
         {running ? "⏹ Detener" : "▶ Iniciar"}
       </button>
     </div>
@@ -260,7 +689,20 @@ function ToolTuner() {
   const analyserRef = useRef(null);
   const streamRef = useRef(null);
 
-  const NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+  const NOTES = [
+    "C",
+    "C#",
+    "D",
+    "D#",
+    "E",
+    "F",
+    "F#",
+    "G",
+    "G#",
+    "A",
+    "A#",
+    "B",
+  ];
 
   function freq2note(freq) {
     const n = 12 * Math.log2(freq / 440) + 69;
@@ -274,60 +716,185 @@ function ToolTuner() {
     for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
     rms = Math.sqrt(rms / buf.length);
     if (rms < 0.01) return -1;
-    let r1=0,r2=buf.length-1;
-    for (let i=0;i<buf.length/2;i++) { if (Math.abs(buf[i])<0.2){r1=i;break;} }
-    for (let i=1;i<buf.length/2;i++) { if (Math.abs(buf[buf.length-i])<0.2){r2=buf.length-i;break;} }
-    buf = buf.slice(r1,r2);
+    let r1 = 0,
+      r2 = buf.length - 1;
+    for (let i = 0; i < buf.length / 2; i++) {
+      if (Math.abs(buf[i]) < 0.2) {
+        r1 = i;
+        break;
+      }
+    }
+    for (let i = 1; i < buf.length / 2; i++) {
+      if (Math.abs(buf[buf.length - i]) < 0.2) {
+        r2 = buf.length - i;
+        break;
+      }
+    }
+    buf = buf.slice(r1, r2);
     const c = new Array(buf.length).fill(0);
-    for (let i=0;i<buf.length;i++) for (let j=0;j<buf.length-i;j++) c[i]=c[i]+buf[j]*buf[j+i];
-    let d=0; while(c[d]>c[d+1]) d++;
-    let maxv=-1,maxt=0;
-    for (let i=d;i<buf.length;i++) { if (c[i]>maxv){maxv=c[i];maxt=i;} }
-    const x1=c[maxt-1],x2=c[maxt],x3=c[maxt+1];
-    const a=(x1+x3-2*x2)/2, b2=(x3-x1)/2;
-    return sr/(maxt-b2/(2*a));
+    for (let i = 0; i < buf.length; i++)
+      for (let j = 0; j < buf.length - i; j++)
+        c[i] = c[i] + buf[j] * buf[j + i];
+    let d = 0;
+    while (c[d] > c[d + 1]) d++;
+    let maxv = -1,
+      maxt = 0;
+    for (let i = d; i < buf.length; i++) {
+      if (c[i] > maxv) {
+        maxv = c[i];
+        maxt = i;
+      }
+    }
+    const x1 = c[maxt - 1],
+      x2 = c[maxt],
+      x3 = c[maxt + 1];
+    const a = (x1 + x3 - 2 * x2) / 2,
+      b2 = (x3 - x1) / 2;
+    return sr / (maxt - b2 / (2 * a));
   }
 
   async function toggle() {
     if (active) {
       cancelAnimationFrame(rafRef.current);
-      streamRef.current?.getTracks().forEach(t=>t.stop());
-      setActive(false); setNote("—"); setCents(0);
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      setActive(false);
+      setNote("—");
+      setCents(0);
     } else {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
         streamRef.current = stream;
         const ctx = new AudioContext();
         const src = ctx.createMediaStreamSource(stream);
-        const an = ctx.createAnalyser(); an.fftSize=2048;
-        src.connect(an); analyserRef.current = an;
+        const an = ctx.createAnalyser();
+        an.fftSize = 2048;
+        src.connect(an);
+        analyserRef.current = an;
         const buf = new Float32Array(an.fftSize);
         setActive(true);
         const tick = () => {
           an.getFloatTimeDomainData(buf);
           const f = autoCorrelate(buf, ctx.sampleRate);
-          if (f > 0) { const {name,cents:c} = freq2note(f); setNote(name); setCents(c); }
+          if (f > 0) {
+            const { name, cents: c } = freq2note(f);
+            setNote(name);
+            setCents(c);
+          }
           rafRef.current = requestAnimationFrame(tick);
         };
         tick();
-      } catch { alert("Necesitas permitir acceso al micrófono"); }
+      } catch {
+        alert("Necesitas permitir acceso al micrófono");
+      }
     }
   }
 
-  const color = Math.abs(cents) < 5 ? "#22c55e" : Math.abs(cents) < 15 ? "#f59e0b" : "#ef4444";
-  const card = { background:"#f8f9fc", borderRadius:20, padding:28, border:"1px solid #e4eaf5" };
+  const color =
+    Math.abs(cents) < 5
+      ? "#22c55e"
+      : Math.abs(cents) < 15
+      ? "#f59e0b"
+      : "#ef4444";
+  const card = {
+    background: "#f8f9fc",
+    borderRadius: 20,
+    padding: 28,
+    border: "1px solid #e4eaf5",
+  };
   return (
     <div style={card}>
-      <div style={{fontSize:10,fontWeight:700,color:"#F97316",letterSpacing:"0.18em",textTransform:"uppercase",marginBottom:12}}>Afinador cromático</div>
-      <div style={{fontSize:72,fontWeight:900,color:active?color:"#e0e6f0",letterSpacing:"-0.03em",lineHeight:1,textAlign:"center",marginBottom:4,transition:"color 0.2s"}}>{note}</div>
-      <div style={{position:"relative",height:8,background:"#e0e6f0",borderRadius:4,margin:"16px 0 8px"}}>
-        <div style={{position:"absolute",left:"50%",top:0,bottom:0,width:2,background:"#08122d",borderRadius:2}}/>
-        <div style={{position:"absolute",left:`calc(50% + ${cents}%)`,top:-3,width:14,height:14,borderRadius:"50%",background:color,transform:"translateX(-50%)",transition:"left 0.1s, background 0.2s"}}/>
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 700,
+          color: "#F97316",
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          marginBottom: 12,
+        }}
+      >
+        Afinador cromático
       </div>
-      <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#aaa",marginBottom:20}}>
-        <span>-50¢</span><span style={{color,fontWeight:600}}>{active?`${cents>0?"+":""}${cents}¢`:"0¢"}</span><span>+50¢</span>
+      <div
+        style={{
+          fontSize: 72,
+          fontWeight: 900,
+          color: active ? color : "#e0e6f0",
+          letterSpacing: "-0.03em",
+          lineHeight: 1,
+          textAlign: "center",
+          marginBottom: 4,
+          transition: "color 0.2s",
+        }}
+      >
+        {note}
       </div>
-      <button onClick={toggle} style={{width:"100%",background:active?"#08122d":"#F97316",color:"#fff",border:"none",borderRadius:10,padding:"12px 0",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit"}}>
+      <div
+        style={{
+          position: "relative",
+          height: 8,
+          background: "#e0e6f0",
+          borderRadius: 4,
+          margin: "16px 0 8px",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: 0,
+            bottom: 0,
+            width: 2,
+            background: "#08122d",
+            borderRadius: 2,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            left: `calc(50% + ${cents}%)`,
+            top: -3,
+            width: 14,
+            height: 14,
+            borderRadius: "50%",
+            background: color,
+            transform: "translateX(-50%)",
+            transition: "left 0.1s, background 0.2s",
+          }}
+        />
+      </div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: 10,
+          color: "#aaa",
+          marginBottom: 20,
+        }}
+      >
+        <span>-50¢</span>
+        <span style={{ color, fontWeight: 600 }}>
+          {active ? `${cents > 0 ? "+" : ""}${cents}¢` : "0¢"}
+        </span>
+        <span>+50¢</span>
+      </div>
+      <button
+        onClick={toggle}
+        style={{
+          width: "100%",
+          background: active ? "#08122d" : "#F97316",
+          color: "#fff",
+          border: "none",
+          borderRadius: 10,
+          padding: "12px 0",
+          fontWeight: 700,
+          fontSize: 14,
+          cursor: "pointer",
+          fontFamily: "inherit",
+        }}
+      >
         {active ? "⏹ Detener" : "🎤 Activar micrófono"}
       </button>
     </div>
@@ -346,39 +913,163 @@ function ToolTransposer() {
     setLoading(true);
     try {
       const r = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST", headers:{"Content-Type":"application/json"},
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model:"claude-sonnet-4-6", max_tokens:1000,
-          messages:[{role:"user",content:`Transpone estos acordes ${semis > 0 ? semis + " semitonos arriba" : Math.abs(semis) + " semitonos abajo"}. Devuelve SOLO los acordes transpuestos, manteniendo el mismo formato y espaciado. No expliques nada.\n\n${input}`}]
-        })
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          messages: [
+            {
+              role: "user",
+              content: `Transpone estos acordes ${
+                semis > 0
+                  ? semis + " semitonos arriba"
+                  : Math.abs(semis) + " semitonos abajo"
+              }. Devuelve SOLO los acordes transpuestos, manteniendo el mismo formato y espaciado. No expliques nada.\n\n${input}`,
+            },
+          ],
+        }),
       });
       const d = await r.json();
       setResult(d.content?.[0]?.text || "Error");
-    } catch { setResult("Error de conexión"); }
+    } catch {
+      setResult("Error de conexión");
+    }
     setLoading(false);
   }
 
-  const card = { background:"#f8f9fc", borderRadius:20, padding:28, border:"1px solid #e4eaf5" };
+  const card = {
+    background: "#f8f9fc",
+    borderRadius: 20,
+    padding: 28,
+    border: "1px solid #e4eaf5",
+  };
   return (
     <div style={card}>
-      <div style={{fontSize:10,fontWeight:700,color:"#F97316",letterSpacing:"0.18em",textTransform:"uppercase",marginBottom:12}}>Transpositor IA</div>
-      <textarea value={input} onChange={e=>setInput(e.target.value)}
-        style={{width:"100%",border:"1px solid #dde4f0",borderRadius:10,padding:"10px 12px",fontSize:14,fontFamily:"monospace",background:"#fff",color:"#08122d",outline:"none",resize:"vertical",minHeight:80,marginBottom:14}}
-        placeholder="Pega tus acordes aquí..."/>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-        <button onClick={()=>setSemis(s=>Math.max(-11,s-1))} style={{width:32,height:32,border:"1px solid #e0e6f0",borderRadius:8,background:"#fff",fontSize:16,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-        <div style={{flex:1,textAlign:"center"}}>
-          <div style={{fontSize:24,fontWeight:800,color:"#08122d",lineHeight:1}}>{semis>0?`+${semis}`:semis}</div>
-          <div style={{fontSize:10,color:"#aaa"}}>semitonos</div>
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 700,
+          color: "#F97316",
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          marginBottom: 12,
+        }}
+      >
+        Transpositor IA
+      </div>
+      <textarea
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        style={{
+          width: "100%",
+          border: "1px solid #dde4f0",
+          borderRadius: 10,
+          padding: "10px 12px",
+          fontSize: 14,
+          fontFamily: "monospace",
+          background: "#fff",
+          color: "#08122d",
+          outline: "none",
+          resize: "vertical",
+          minHeight: 80,
+          marginBottom: 14,
+        }}
+        placeholder="Pega tus acordes aquí..."
+      />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 14,
+        }}
+      >
+        <button
+          onClick={() => setSemis((s) => Math.max(-11, s - 1))}
+          style={{
+            width: 32,
+            height: 32,
+            border: "1px solid #e0e6f0",
+            borderRadius: 8,
+            background: "#fff",
+            fontSize: 16,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          −
+        </button>
+        <div style={{ flex: 1, textAlign: "center" }}>
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: 800,
+              color: "#08122d",
+              lineHeight: 1,
+            }}
+          >
+            {semis > 0 ? `+${semis}` : semis}
+          </div>
+          <div style={{ fontSize: 10, color: "#aaa" }}>semitonos</div>
         </div>
-        <button onClick={()=>setSemis(s=>Math.min(11,s+1))} style={{width:32,height:32,border:"1px solid #e0e6f0",borderRadius:8,background:"#fff",fontSize:16,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+        <button
+          onClick={() => setSemis((s) => Math.min(11, s + 1))}
+          style={{
+            width: 32,
+            height: 32,
+            border: "1px solid #e0e6f0",
+            borderRadius: 8,
+            background: "#fff",
+            fontSize: 16,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          +
+        </button>
       </div>
       {result && (
-        <div style={{background:"#fff",border:"1px solid #e0e6f0",borderRadius:10,padding:"10px 12px",fontFamily:"monospace",fontSize:14,color:"#08122d",whiteSpace:"pre-wrap",marginBottom:14,lineHeight:1.6}}>
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #e0e6f0",
+            borderRadius: 10,
+            padding: "10px 12px",
+            fontFamily: "monospace",
+            fontSize: 14,
+            color: "#08122d",
+            whiteSpace: "pre-wrap",
+            marginBottom: 14,
+            lineHeight: 1.6,
+          }}
+        >
           {result}
         </div>
       )}
-      <button onClick={transpose} disabled={loading||semis===0} style={{width:"100%",background:semis===0?"#e0e6f0":"#F97316",color:semis===0?"#aaa":"#fff",border:"none",borderRadius:10,padding:"12px 0",fontWeight:700,fontSize:14,cursor:semis===0?"not-allowed":"pointer",fontFamily:"inherit",opacity:loading?0.7:1}}>
+      <button
+        onClick={transpose}
+        disabled={loading || semis === 0}
+        style={{
+          width: "100%",
+          background: semis === 0 ? "#e0e6f0" : "#F97316",
+          color: semis === 0 ? "#aaa" : "#fff",
+          border: "none",
+          borderRadius: 10,
+          padding: "12px 0",
+          fontWeight: 700,
+          fontSize: 14,
+          cursor: semis === 0 ? "not-allowed" : "pointer",
+          fontFamily: "inherit",
+          opacity: loading ? 0.7 : 1,
+        }}
+      >
         {loading ? "Transponiendo..." : "⚡ Transponer con IA"}
       </button>
     </div>
@@ -387,49 +1078,111 @@ function ToolTransposer() {
 
 export default function Landing({ onPortal }) {
   const [C, setC] = useState(DEFAULT);
-  const [chat, setChat] = useState([{ role: "bot", text: "Hola, soy el asistente del Coro MJ. ¿En qué te puedo orientar?" }]);
-  const [inp, setInp] = useState(""); const [typing, setTyping] = useState(false); const [hist, setHist] = useState([]);
+  const [chat, setChat] = useState([
+    {
+      role: "bot",
+      text: "Hola, soy el asistente del Coro MJ. ¿En qué te puedo orientar?",
+    },
+  ]);
+  const [inp, setInp] = useState("");
+  const [typing, setTyping] = useState(false);
+  const [hist, setHist] = useState([]);
   const [formOk, setFormOk] = useState(false);
   const [admin, setAdmin] = useState(false);
-  const [editing, setEditing] = useState({}); const [saving, setSaving] = useState({}); const [upKey, setUpKey] = useState(null);
+  const [editing, setEditing] = useState({});
+  const [saving, setSaving] = useState({});
+  const [upKey, setUpKey] = useState(null);
   const msgsRef = useRef(null);
-  useEffect(() => { dbGet().then(setC); }, []);
-  useEffect(() => { if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight; }, [chat, typing]);
-  const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  useEffect(() => {
+    dbGet().then(setC);
+  }, []);
+  useEffect(() => {
+    if (msgsRef.current)
+      msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
+  }, [chat, typing]);
+  const go = (id) =>
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
   async function sendMsg(text) {
-    const t = (text || inp).trim(); if (!t) return; setInp("");
+    const t = (text || inp).trim();
+    if (!t) return;
+    setInp("");
     const nh = [...hist, { role: "user", content: t }];
-    setChat(p => [...p, { role: "user", text: t }]); setHist(nh); setTyping(true);
+    setChat((p) => [...p, { role: "user", text: t }]);
+    setHist(nh);
+    setTyping(true);
     try {
-      const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, system: SYS, messages: nh }) });
-      const d = await r.json(); const reply = d.content?.[0]?.text || "Intenta nuevamente.";
-      setTyping(false); setChat(p => [...p, { role: "bot", text: reply }]); setHist(p => [...p, { role: "assistant", content: reply }]);
-    } catch { setTyping(false); setChat(p => [...p, { role: "bot", text: "Error de conexión." }]); }
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          system: SYS,
+          messages: nh,
+        }),
+      });
+      const d = await r.json();
+      const reply = d.content?.[0]?.text || "Intenta nuevamente.";
+      setTyping(false);
+      setChat((p) => [...p, { role: "bot", text: reply }]);
+      setHist((p) => [...p, { role: "assistant", content: reply }]);
+    } catch {
+      setTyping(false);
+      setChat((p) => [...p, { role: "bot", text: "Error de conexión." }]);
+    }
   }
   async function saveF(key) {
-    setSaving(s => ({ ...s, [key]: true }));
+    setSaving((s) => ({ ...s, [key]: true }));
     await dbSet(key, editing[key] ?? C[key]);
-    setC(c => ({ ...c, [key]: editing[key] ?? c[key] }));
-    setEditing(e => { const n = { ...e }; delete n[key]; return n; });
-    setSaving(s => ({ ...s, [key]: false }));
+    setC((c) => ({ ...c, [key]: editing[key] ?? c[key] }));
+    setEditing((e) => {
+      const n = { ...e };
+      delete n[key];
+      return n;
+    });
+    setSaving((s) => ({ ...s, [key]: false }));
   }
   async function handleImg(key, file, name) {
     setUpKey(key);
-    try { const url = await uploadImg(file, name); await dbSet(key, url); setC(c => ({ ...c, [key]: url })); }
-    catch (e) { alert("Error: " + e.message); }
+    try {
+      const url = await uploadImg(file, name);
+      await dbSet(key, url);
+      setC((c) => ({ ...c, [key]: url }));
+    } catch (e) {
+      alert("Error: " + e.message);
+    }
     setUpKey(null);
   }
 
-  const gColors = ["linear-gradient(135deg,#0a1628,#1e3a6e)","linear-gradient(135deg,#1a0a2e,#3d1a6e)","linear-gradient(135deg,#0a2818,#1a5c3a)","linear-gradient(135deg,#2e1a0a,#6e3d1a)","linear-gradient(135deg,#0a1a2e,#1a3d5c)"];
+  const gColors = [
+    "linear-gradient(135deg,#0a1628,#1e3a6e)",
+    "linear-gradient(135deg,#1a0a2e,#3d1a6e)",
+    "linear-gradient(135deg,#0a2818,#1a5c3a)",
+    "linear-gradient(135deg,#2e1a0a,#6e3d1a)",
+    "linear-gradient(135deg,#0a1a2e,#1a3d5c)",
+  ];
 
   return (
-    <div style={{ fontFamily: "'DM Sans','Inter',sans-serif", background: "#fff", color: "#0a0a14", overflowX: "hidden", WebkitFontSmoothing: "antialiased" }}>
+    <div
+      style={{
+        fontFamily: "'DM Sans','Inter',sans-serif",
+        background: "#fff",
+        color: "#0a0a14",
+        overflowX: "hidden",
+        WebkitFontSmoothing: "antialiased",
+      }}
+    >
       {admin && (
         <AdminPanel
           onClose={() => setAdmin(false)}
-          C={C} editing={editing} setEditing={setEditing}
-          saving={saving} saveF={saveF} upKey={upKey} handleImg={handleImg}
+          C={C}
+          editing={editing}
+          setEditing={setEditing}
+          saving={saving}
+          saveF={saveF}
+          upKey={upKey}
+          handleImg={handleImg}
         />
       )}
       <style>{`
@@ -679,31 +1432,91 @@ export default function Landing({ onPortal }) {
           <a onClick={() => go("contacto")}>Contacto</a>
         </div>
         <div className="nav-logo" onClick={() => go("inicio")}>
-          <img src="/LOGOMJ2.png" alt="Coro MJ" onError={e => e.target.style.display="none"}/>
+          <img
+            src="/LOGOMJ2.png"
+            alt="Coro MJ"
+            onError={(e) => (e.target.style.display = "none")}
+          />
         </div>
         <div className="nav-right">
-          <button className="nav-soc" title="Instagram"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="rgba(255,255,255,0.75)" stroke="none"/></svg></button>
-          <button className="nav-soc" title="TikTok"><svg width="13" height="13" viewBox="0 0 24 24" fill="rgba(255,255,255,0.75)"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.69a8.27 8.27 0 0 0 4.83 1.55V6.79a4.85 4.85 0 0 1-1.07-.1z"/></svg></button>
-          <button className="nav-soc" title="YouTube"><svg width="15" height="15" viewBox="0 0 24 24" fill="rgba(255,255,255,0.75)"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="rgba(6,14,36,0.9)"/></svg></button>
-          <button className="nav-cta" onClick={onPortal}>Acceso Portal</button>
+          <button className="nav-soc" title="Instagram">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="rgba(255,255,255,0.75)"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="2" y="2" width="20" height="20" rx="5" />
+              <circle cx="12" cy="12" r="4" />
+              <circle
+                cx="17.5"
+                cy="6.5"
+                r="1"
+                fill="rgba(255,255,255,0.75)"
+                stroke="none"
+              />
+            </svg>
+          </button>
+          <button className="nav-soc" title="TikTok">
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="rgba(255,255,255,0.75)"
+            >
+              <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.69a8.27 8.27 0 0 0 4.83 1.55V6.79a4.85 4.85 0 0 1-1.07-.1z" />
+            </svg>
+          </button>
+          <button className="nav-soc" title="YouTube">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="rgba(255,255,255,0.75)"
+            >
+              <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z" />
+              <polygon
+                points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"
+                fill="rgba(6,14,36,0.9)"
+              />
+            </svg>
+          </button>
+          <button className="nav-cta" onClick={onPortal}>
+            Acceso Portal
+          </button>
         </div>
       </nav>
 
       {/* HERO */}
       <section id="inicio" className="hero">
-        <div className="hero-bg" style={{ backgroundImage: `url('${C.hero_img}')` }}/>
-        <div className="hero-ov"/>
+        <div
+          className="hero-bg"
+          style={{ backgroundImage: `url('${C.hero_img}')` }}
+        />
+        <div className="hero-ov" />
         <div className="hero-c">
           <div>
             <span className="hero-kicker">{C.hero_kicker}</span>
-            <h1 className="hero-h1">{C.hero_titulo}<br/><span className="it">{C.hero_titulo2}</span></h1>
+            <h1 className="hero-h1">
+              {C.hero_titulo}
+              <br />
+              <span className="it">{C.hero_titulo2}</span>
+            </h1>
           </div>
           <div className="hero-right">
             <HeroCountdown />
             <p className="hero-sub">{C.hero_sub}</p>
             <div className="hero-btns">
-              <button className="btn-w" onClick={() => go("nosotros")}>Conócenos</button>
-              <button className="btn-o" onClick={() => go("bot")}>Únete</button>
+              <button className="btn-w" onClick={() => go("nosotros")}>
+                Conócenos
+              </button>
+              <button className="btn-o" onClick={() => go("bot")}>
+                Únete
+              </button>
             </div>
           </div>
         </div>
@@ -712,8 +1525,24 @@ export default function Landing({ onPortal }) {
       {/* TICKER */}
       <div className="ticker">
         <div className="ticker-track">
-          {["Música litúrgica","Maipú · Chile","15 años","4 voces SATB","400+ presentaciones","Ensemble vocal","Música litúrgica","Maipú · Chile","15 años","4 voces SATB","400+ presentaciones","Ensemble vocal"].map((t,i) => (
-            <span key={i} className="t-item"><span className="t-dot"/>{t}</span>
+          {[
+            "Música litúrgica",
+            "Maipú · Chile",
+            "15 años",
+            "4 voces SATB",
+            "400+ presentaciones",
+            "Ensemble vocal",
+            "Música litúrgica",
+            "Maipú · Chile",
+            "15 años",
+            "4 voces SATB",
+            "400+ presentaciones",
+            "Ensemble vocal",
+          ].map((t, i) => (
+            <span key={i} className="t-item">
+              <span className="t-dot" />
+              {t}
+            </span>
           ))}
         </div>
       </div>
@@ -723,18 +1552,47 @@ export default function Landing({ onPortal }) {
         <div className="about-grid">
           <div>
             <div className="ey">Quiénes somos</div>
-            <h2 className="h2">Un ensemble<br/>con <em>identidad</em><br/>propia</h2>
+            <h2 className="h2">
+              Un ensemble
+              <br />
+              con <em>identidad</em>
+              <br />
+              propia
+            </h2>
             <p className="bp">{C.about_texto1}</p>
-            <p className="bp" style={{marginTop:14}}>{C.about_texto2}</p>
+            <p className="bp" style={{ marginTop: 14 }}>
+              {C.about_texto2}
+            </p>
             <div className="stats">
-              <div className="stat"><div className="stat-n">{C.stat1_n.replace("+","")}<sup>+</sup></div><div className="stat-l">{C.stat1_l}</div></div>
-              <div className="stat"><div className="stat-n">{C.stat2_n.replace("+","")}<sup>+</sup></div><div className="stat-l">{C.stat2_l}</div></div>
-              <div className="stat"><div className="stat-n">{C.stat3_n.replace("+","")}<sup>+</sup></div><div className="stat-l">{C.stat3_l}</div></div>
+              <div className="stat">
+                <div className="stat-n">
+                  {C.stat1_n.replace("+", "")}
+                  <sup>+</sup>
+                </div>
+                <div className="stat-l">{C.stat1_l}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-n">
+                  {C.stat2_n.replace("+", "")}
+                  <sup>+</sup>
+                </div>
+                <div className="stat-l">{C.stat2_l}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-n">
+                  {C.stat3_n.replace("+", "")}
+                  <sup>+</sup>
+                </div>
+                <div className="stat-l">{C.stat3_l}</div>
+              </div>
             </div>
           </div>
           <div className="about-img">
-            <div className="about-img-bg" style={{ backgroundImage: `url('${C.about_img}')` }}/>
-            <div className="about-img-overlay"/>
+            <div
+              className="about-img-bg"
+              style={{ backgroundImage: `url('${C.about_img}')` }}
+            />
+            <div className="about-img-overlay" />
             <div className="about-img-accent">
               <div className="acc-n">SATB</div>
               <div className="acc-l">Cuerdas</div>
@@ -752,20 +1610,39 @@ export default function Landing({ onPortal }) {
         <div className="gal-head">
           <div>
             <div className="ey">Galería</div>
-            <h2 className="h2" style={{marginBottom:0}}>Momentos que<br/><em>inspiran</em></h2>
+            <h2 className="h2" style={{ marginBottom: 0 }}>
+              Momentos que
+              <br />
+              <em>inspiran</em>
+            </h2>
           </div>
-          <p className="gal-note">Cada celebración es única. Aquí algunos de nuestros momentos más especiales.</p>
+          <p className="gal-note">
+            Cada celebración es única. Aquí algunos de nuestros momentos más
+            especiales.
+          </p>
         </div>
         <div className="gal-strip">
-          {[1,2,3,4,5].map(n => {
-            const img = C[`gal${n}_img`]; const label = C[`gal${n}_label`]; const sub = C[`gal${n}_sub`];
+          {[1, 2, 3, 4, 5].map((n) => {
+            const img = C[`gal${n}_img`];
+            const label = C[`gal${n}_label`];
+            const sub = C[`gal${n}_sub`];
             return (
               <div key={n} className="gi">
-                <div className="gi-bg" style={{ backgroundImage: img ? `url('${img}')` : "none", background: img ? undefined : gColors[n-1] }}/>
-                <div className="gi-ov"/>
+                <div
+                  className="gi-bg"
+                  style={{
+                    backgroundImage: img ? `url('${img}')` : "none",
+                    background: img ? undefined : gColors[n - 1],
+                  }}
+                />
+                <div className="gi-ov" />
                 <div className="gi-tag">{sub}</div>
-                <div className="gi-cap"><div className="gi-label">{label}</div></div>
-                <div className="gi-hov"><div className="gi-hov-btn">Ver foto</div></div>
+                <div className="gi-cap">
+                  <div className="gi-label">{label}</div>
+                </div>
+                <div className="gi-hov">
+                  <div className="gi-hov-btn">Ver foto</div>
+                </div>
               </div>
             );
           })}
@@ -777,11 +1654,40 @@ export default function Landing({ onPortal }) {
         <div className="bot-grid">
           <div>
             <div className="ey bot-ey">Asistente IA</div>
-            <h2 className="h2 bot-h2">¿Te sumas<br/><em>al coro?</em></h2>
-            <p className="bp bot-p">Respuestas inmediatas sobre cómo integrarte, ensayos y todo lo que necesitas saber.</p>
+            <h2 className="h2 bot-h2">
+              ¿Te sumas
+              <br />
+              <em>al coro?</em>
+            </h2>
+            <p className="bp bot-p">
+              Respuestas inmediatas sobre cómo integrarte, ensayos y todo lo que
+              necesitas saber.
+            </p>
             <div className="bfeats">
-              {[["01","Proceso de ingreso","Cómo postular, qué se evalúa y cuándo son los ensayos de prueba."],["02","Horarios y ensayos","Frecuencia semanal, lugar y cómo es el proceso de incorporación."],["03","Repertorio y nivel","Qué cantamos y qué experiencia musical se valora."]].map(([n,t,d]) => (
-                <div key={n} className="bfeat"><div className="bnum">{n}</div><div><div className="btitle">{t}</div><div className="bdesc">{d}</div></div></div>
+              {[
+                [
+                  "01",
+                  "Proceso de ingreso",
+                  "Cómo postular, qué se evalúa y cuándo son los ensayos de prueba.",
+                ],
+                [
+                  "02",
+                  "Horarios y ensayos",
+                  "Frecuencia semanal, lugar y cómo es el proceso de incorporación.",
+                ],
+                [
+                  "03",
+                  "Repertorio y nivel",
+                  "Qué cantamos y qué experiencia musical se valora.",
+                ],
+              ].map(([n, t, d]) => (
+                <div key={n} className="bfeat">
+                  <div className="bnum">{n}</div>
+                  <div>
+                    <div className="btitle">{t}</div>
+                    <div className="bdesc">{d}</div>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -789,25 +1695,76 @@ export default function Landing({ onPortal }) {
             <div className="chat">
               <div className="chat-hd">
                 <div className="chat-av">🎵</div>
-                <div><div className="chat-nm">Coro MJ — Asistente</div><div className="chat-sm">Responde en español · IA</div></div>
-                <div className="chat-dot"/>
+                <div>
+                  <div className="chat-nm">Coro MJ — Asistente</div>
+                  <div className="chat-sm">Responde en español · IA</div>
+                </div>
+                <div className="chat-dot" />
               </div>
               <div className="chat-msgs" ref={msgsRef}>
-                {chat.map((m,i) => (
-                  <div key={i} className={`cm${m.role==="user"?" cm-u":""}`}>
-                    {m.role==="bot"&&<div className="cm-av">🎵</div>}
-                    <div className={`cm-b ${m.role==="bot"?"cm-bot":"cm-usr"}`}>{m.text}</div>
-                    {m.role==="user"&&<div className="cm-av">👤</div>}
+                {chat.map((m, i) => (
+                  <div
+                    key={i}
+                    className={`cm${m.role === "user" ? " cm-u" : ""}`}
+                  >
+                    {m.role === "bot" && <div className="cm-av">🎵</div>}
+                    <div
+                      className={`cm-b ${
+                        m.role === "bot" ? "cm-bot" : "cm-usr"
+                      }`}
+                    >
+                      {m.text}
+                    </div>
+                    {m.role === "user" && <div className="cm-av">👤</div>}
                   </div>
                 ))}
-                {typing&&<div className="cm"><div className="cm-av">🎵</div><div className="cm-b cm-bot"><div className="tdots"><span/><span/><span/></div></div></div>}
+                {typing && (
+                  <div className="cm">
+                    <div className="cm-av">🎵</div>
+                    <div className="cm-b cm-bot">
+                      <div className="tdots">
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="chat-pills">
-                {["¿Cómo me uno?","¿Cuándo ensayan?","¿Qué nivel necesito?"].map(p=><button key={p} className="cpill" onClick={()=>sendMsg(p)}>{p}</button>)}
+                {[
+                  "¿Cómo me uno?",
+                  "¿Cuándo ensayan?",
+                  "¿Qué nivel necesito?",
+                ].map((p) => (
+                  <button key={p} className="cpill" onClick={() => sendMsg(p)}>
+                    {p}
+                  </button>
+                ))}
               </div>
               <div className="chat-ft">
-                <input className="cin" value={inp} onChange={e=>setInp(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendMsg()} placeholder="Escribe tu pregunta..."/>
-                <button className="csnd" onClick={()=>sendMsg()}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+                <input
+                  className="cin"
+                  value={inp}
+                  onChange={(e) => setInp(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && sendMsg()}
+                  placeholder="Escribe tu pregunta..."
+                />
+                <button className="csnd" onClick={() => sendMsg()}>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#fff"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="22" y1="2" x2="11" y2="13" />
+                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
@@ -815,13 +1772,27 @@ export default function Landing({ onPortal }) {
       </section>
 
       {/* HERRAMIENTAS MUSICALES */}
-      <section className="tools" id="herramientas" style={{padding:"100px 60px",background:"#fff"}}>
-        <div style={{maxWidth:1140,margin:"0 auto"}}>
+      <section
+        className="tools"
+        id="herramientas"
+        style={{ padding: "100px 60px", background: "#fff" }}
+      >
+        <div style={{ maxWidth: 1140, margin: "0 auto" }}>
           <div className="ey">Herramientas</div>
-          <h2 className="h2" style={{marginBottom:8}}>Utilidades <em>musicales</em></h2>
-          <p className="bp" style={{marginBottom:48}}>Herramientas para ensayar, afinar y transponer en tiempo real.</p>
-          <div className="tools-grid" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:24}}>
-
+          <h2 className="h2" style={{ marginBottom: 8 }}>
+            Utilidades <em>musicales</em>
+          </h2>
+          <p className="bp" style={{ marginBottom: 48 }}>
+            Herramientas para ensayar, afinar y transponer en tiempo real.
+          </p>
+          <div
+            className="tools-grid"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3,1fr)",
+              gap: 24,
+            }}
+          >
             {/* METRÓNOMO */}
             <ToolMetronome />
 
@@ -830,7 +1801,6 @@ export default function Landing({ onPortal }) {
 
             {/* TRANSPOSITOR IA */}
             <ToolTransposer />
-
           </div>
         </div>
       </section>
@@ -840,53 +1810,164 @@ export default function Landing({ onPortal }) {
         <div className="ct-grid">
           <div>
             <div className="ey">Contacto</div>
-            <h2 className="h2">Hablemos<br/><em>directamente</em></h2>
+            <h2 className="h2">
+              Hablemos
+              <br />
+              <em>directamente</em>
+            </h2>
             <p className="bp">¿Quieres invitarnos o tienes alguna consulta?</p>
-            <div style={{marginTop:36}}>
+            <div style={{ marginTop: 36 }}>
               <div className="ct-item">
                 <div className="ct-ico">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#08122d" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#08122d"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
                 </div>
-                <div><div className="ct-t">Ubicación</div><div className="ct-s">{C.contacto_dir}</div></div>
+                <div>
+                  <div className="ct-t">Ubicación</div>
+                  <div className="ct-s">{C.contacto_dir}</div>
+                </div>
               </div>
               <div className="ct-item">
                 <div className="ct-ico">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#08122d" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#08122d"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                  </svg>
                 </div>
-                <div><div className="ct-t">Ensayos</div><div className="ct-s">{C.contacto_ensayo}</div></div>
+                <div>
+                  <div className="ct-t">Ensayos</div>
+                  <div className="ct-s">{C.contacto_ensayo}</div>
+                </div>
               </div>
               <div className="ct-item">
                 <div className="ct-ico">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#08122d" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#08122d"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M17 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z" />
+                    <line x1="12" y1="18" x2="12.01" y2="18" />
+                  </svg>
                 </div>
-                <div><div className="ct-t">Redes sociales</div><div className="ct-s">Síguenos en nuestras plataformas</div></div>
+                <div>
+                  <div className="ct-t">Redes sociales</div>
+                  <div className="ct-s">Síguenos en nuestras plataformas</div>
+                </div>
               </div>
             </div>
             <div className="socs">
               <div className="soc" title="Instagram">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#08122d" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.2" fill="#08122d" stroke="none"/></svg>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#08122d"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="2" y="2" width="20" height="20" rx="5" />
+                  <circle cx="12" cy="12" r="4" />
+                  <circle
+                    cx="17.5"
+                    cy="6.5"
+                    r="1.2"
+                    fill="#08122d"
+                    stroke="none"
+                  />
+                </svg>
               </div>
               <div className="soc" title="Facebook">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="#08122d"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#08122d">
+                  <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+                </svg>
               </div>
               <div className="soc" title="YouTube">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="#08122d"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="#fff"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#08122d">
+                  <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z" />
+                  <polygon
+                    points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"
+                    fill="#fff"
+                  />
+                </svg>
               </div>
               <div className="soc" title="TikTok">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="#08122d"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.27 8.27 0 0 0 4.84 1.55V6.79a4.85 4.85 0 0 1-1.07-.1z"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#08122d">
+                  <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.27 8.27 0 0 0 4.84 1.55V6.79a4.85 4.85 0 0 1-1.07-.1z" />
+                </svg>
               </div>
             </div>
           </div>
           <div className="cform">
-            <div className="cform-h">Envíanos<br/>un mensaje</div>
-            <div className="frow">
-              <div className="fg"><label>Nombre</label><input type="text" placeholder="Juan"/></div>
-              <div className="fg"><label>Apellido</label><input type="text" placeholder="González"/></div>
+            <div className="cform-h">
+              Envíanos
+              <br />
+              un mensaje
             </div>
-            <div className="fg"><label>Correo</label><input type="email" placeholder="tu@correo.cl"/></div>
-            <div className="fg"><label>Asunto</label><select><option>Quiero unirme al coro</option><option>Invitación a celebración</option><option>Consulta general</option><option>Otro</option></select></div>
-            <div className="fg"><label>Mensaje</label><textarea placeholder="Cuéntanos..."/></div>
-            <button className="fsub" onClick={()=>{setFormOk(true);setTimeout(()=>setFormOk(false),3e3)}}>{formOk?"✓ Enviado":"Enviar mensaje"}</button>
+            <div className="frow">
+              <div className="fg">
+                <label>Nombre</label>
+                <input type="text" placeholder="Juan" />
+              </div>
+              <div className="fg">
+                <label>Apellido</label>
+                <input type="text" placeholder="González" />
+              </div>
+            </div>
+            <div className="fg">
+              <label>Correo</label>
+              <input type="email" placeholder="tu@correo.cl" />
+            </div>
+            <div className="fg">
+              <label>Asunto</label>
+              <select>
+                <option>Quiero unirme al coro</option>
+                <option>Invitación a celebración</option>
+                <option>Consulta general</option>
+                <option>Otro</option>
+              </select>
+            </div>
+            <div className="fg">
+              <label>Mensaje</label>
+              <textarea placeholder="Cuéntanos..." />
+            </div>
+            <button
+              className="fsub"
+              onClick={() => {
+                setFormOk(true);
+                setTimeout(() => setFormOk(false), 3e3);
+              }}
+            >
+              {formOk ? "✓ Enviado" : "Enviar mensaje"}
+            </button>
           </div>
         </div>
       </section>
@@ -895,39 +1976,70 @@ export default function Landing({ onPortal }) {
       <footer>
         <div className="foot-top">
           <div>
-            <img src="/LOGOMJ.jpeg" className="foot-logo" alt="Logo" onError={e=>e.target.style.display="none"}/>
+            <img
+              src="/LOGOMJ.jpeg"
+              className="foot-logo"
+              alt="Logo"
+              onError={(e) => (e.target.style.display = "none")}
+            />
             <div className="foot-bn">Coro Misioneros de Jesús</div>
             <p className="foot-bp">{C.footer_texto}</p>
           </div>
           <div className="foot-cols">
             <div className="foot-col">
               <h4>Sitio</h4>
-              <a onClick={()=>go("nosotros")}>Nosotros</a>
-              <a onClick={()=>go("galeria")}>Galería</a>
-              <a onClick={()=>go("bot")}>Únete</a>
-              <a onClick={()=>go("contacto")}>Contacto</a>
+              <a onClick={() => go("nosotros")}>Nosotros</a>
+              <a onClick={() => go("galeria")}>Galería</a>
+              <a onClick={() => go("bot")}>Únete</a>
+              <a onClick={() => go("contacto")}>Contacto</a>
             </div>
             <div className="foot-col">
               <h4>Redes</h4>
-              <a>Instagram</a><a>TikTok</a><a>YouTube</a><a>Spotify</a>
+              <a>Instagram</a>
+              <a>TikTok</a>
+              <a>YouTube</a>
+              <a>Spotify</a>
             </div>
           </div>
         </div>
         <div className="foot-btm">
-          <span className="foot-copy">© 2026 Coro Misioneros de Jesús · Desarrollado por TEMPVS7®</span>
-          <span className="foot-adm" onClick={()=>setAdmin(true)}>· · ·</span>
+          <span className="foot-copy">
+            © 2026 Coro Misioneros de Jesús · Desarrollado por TEMPVS7®
+          </span>
+          <span className="foot-adm" onClick={() => setAdmin(true)}>
+            · · ·
+          </span>
         </div>
       </footer>
 
       {/* FABS */}
       <div className="fabs">
-        <button className="fab fab-adm" onClick={()=>setAdmin(true)}>
+        <button className="fab fab-adm" onClick={() => setAdmin(true)}>
           <span className="fab-tip">Editar sitio</span>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#fff"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
         </button>
-        <a className="fab fab-wa" href={`https://wa.me/${C.whatsapp}?text=Hola,%20me%20interesa%20el%20Coro%20Misioneros%20de%20Jes%C3%BAs`} target="_blank" rel="noopener noreferrer">
+        <a
+          className="fab fab-wa"
+          href={`https://wa.me/${C.whatsapp}?text=Hola,%20me%20interesa%20el%20Coro%20Misioneros%20de%20Jes%C3%BAs`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <span className="fab-tip">WhatsApp</span>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" />
+          </svg>
         </a>
       </div>
     </div>
