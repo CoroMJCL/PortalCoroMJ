@@ -6,13 +6,13 @@ const BUCKET = `${SUPABASE_URL}/storage/v1/object/public/publico`;
 const SYS = `Eres el asistente del Coro Misioneros de Jesús, ensemble vocal de música litúrgica en Maipú, Chile. Responde en español, de forma concisa (máx 2-3 oraciones), cálida y cercana. Solo respondes sobre el coro.
 
 Información clave:
-- El coro es abierto a todos, no se requiere experiencia musical previa.
-- Los requisitos son: compromiso, estudio del repertorio, y responsabilidad en la asistencia.
-- Las misas regulares son dos sábados al mes: el segundo y el último sábado.
-- El coro llega a las 18:00 hrs y la misa es de 20:00 a 21:00 hrs.
-- También participamos en misas especiales en nuestra parroquia, que pueden requerir ensayos en otras fechas.
-- Los ensayos son los sábados en la Capilla Misioneros de Jesús, Maipú.
-- Para unirse deben contactarnos por el formulario del sitio o WhatsApp.`;
+- Para voces: se requiere buena afinación y oído musical. No es necesaria formación académica, pero sí cantar con seguridad y precisión.
+- Para instrumentistas: se requiere un nivel básico-intermedio y capacidad de adaptarse al repertorio litúrgico.
+- Los requisitos generales son: compromiso, estudio del repertorio y responsabilidad en la asistencia.
+- ENSAYOS: todos los sábados en la Capilla Sagrada Familia de Maipú, en horario previo a la misa.
+- MISAS REGULARES: el segundo y el último sábado de cada mes. El coro llega a las 18:00 hrs y la misa es de 20:00 a 21:00 hrs.
+- MISAS ESPECIALES: participamos en celebraciones especiales en la parroquia, que pueden requerir ensayos en fechas adicionales entre semana o sábados distintos.
+- Para unirse o consultas, contactarnos por el formulario del sitio o WhatsApp.`;
 
 const DEFAULT = {
   hero_img: `${BUCKET}/Misioneros.jpg`,
@@ -30,7 +30,7 @@ const DEFAULT = {
   gal4_label:"Corpus Christi",gal4_sub:"Junio",gal4_img:"",gal4_pos:"center top",
   gal5_label:"Vigilia Pascual",gal5_sub:"Marzo",gal5_img:"",gal5_pos:"center top",
   contacto_dir:"Maipú, Santiago, Chile · Capilla Sagrada Familia",
-  contacto_ensayo:"Sábados · Capilla Misioneros de Jesús",
+  contacto_ensayo:"Sábados · Capilla Sagrada Familia de Maipú",
   whatsapp:"56912345678",
   evento_nombre:"", evento_fecha:"", evento_hora:"", evento_lugar:"",
   instagram_url:"",
@@ -996,7 +996,7 @@ export default function Landing({ onPortal }) {
             <h2 className="h2 bot-h2">¿Te sumas<br/><em>al coro?</em></h2>
             <p className="bp bot-p">Respuestas inmediatas sobre cómo integrarte, ensayos y todo lo que necesitas saber.</p>
             <div className="bfeats">
-              {[["01","Proceso de ingreso","Cómo postular, qué se evalúa y cuándo son los ensayos de prueba."],["02","Horarios y ensayos","Frecuencia semanal, lugar y cómo es el proceso de incorporación."],["03","Repertorio y nivel","Qué cantamos y qué experiencia musical se valora."]].map(([n,t,d]) => (
+              {[["01","Voces afinadas","Buscamos personas con buen oído musical y afinación. No exigimos formación académica, pero sí que cantes con seguridad y precisión."],["02","Músicos con base","Para quienes tocan un instrumento, se requiere un nivel básico-intermedio. Valoramos la lectura rítmica y la capacidad de adaptarse al repertorio litúrgico."],["03","Compromiso real","Ensayos todos los sábados en la Capilla Sagrada Familia. Misas el 2° y último sábado del mes, de 20:00 a 21:00 hrs. También participamos en celebraciones especiales."]].map(([n,t,d]) => (
                 <div key={n} className="bfeat"><div className="bnum">{n}</div><div><div className="btitle">{t}</div><div className="bdesc">{d}</div></div></div>
               ))}
             </div>
