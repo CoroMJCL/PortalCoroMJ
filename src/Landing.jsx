@@ -137,6 +137,254 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
   );
 }
 
+// ── COUNTDOWN PRÓXIMA MISA ─────────────────
+function HeroCountdown() {
+  const [time, setTime] = useState({ d:0, h:0, m:0, s:0 });
+  const [event, setEvent] = useState(null);
+
+  useEffect(() => {
+    // Buscar próxima pauta publicada en Supabase
+    fetch(`${SUPABASE_URL}/rest/v1/pautas_misa?publicada=eq.true&fecha=gte.${new Date().toISOString().split("T")[0]}&order=fecha.asc&limit=1`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    })
+    .then(r => r.json())
+    .then(rows => { if (Array.isArray(rows) && rows[0]) setEvent(rows[0]); })
+    .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!event) return;
+    const tick = () => {
+      const [h, m] = (event.hora || "10:00").split(":").map(Number);
+      const target = new Date(event.fecha + "T" + String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0") + ":00");
+      const diff = target - new Date();
+      if (diff <= 0) { setTime({ d:0,h:0,m:0,s:0 }); return; }
+      setTime({
+        d: Math.floor(diff/86400000),
+        h: Math.floor((diff%86400000)/3600000),
+        m: Math.floor((diff%3600000)/60000),
+        s: Math.floor((diff%60000)/1000)
+      });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [event]);
+
+  if (!event) return null;
+
+  const fecha = new Date(event.fecha + "T12:00:00").toLocaleDateString("es-CL", { weekday:"long", day:"numeric", month:"long" });
+
+  return (
+    <div className="hero-countdown">
+      <div className="hcd-label">Próxima celebración</div>
+      <div className="hcd-event">{event.titulo}</div>
+      <div className="hcd-date">{fecha} · {event.hora} hrs · {event.lugar}</div>
+      <div className="hcd-timer">
+        <div className="hcd-unit"><span className="hcd-num">{String(time.d).padStart(2,"0")}</span><div className="hcd-txt">días</div></div>
+        <div className="hcd-sep">:</div>
+        <div className="hcd-unit"><span className="hcd-num">{String(time.h).padStart(2,"0")}</span><div className="hcd-txt">hrs</div></div>
+        <div className="hcd-sep">:</div>
+        <div className="hcd-unit"><span className="hcd-num">{String(time.m).padStart(2,"0")}</span><div className="hcd-txt">min</div></div>
+        <div className="hcd-sep">:</div>
+        <div className="hcd-unit"><span className="hcd-num">{String(time.s).padStart(2,"0")}</span><div className="hcd-txt">seg</div></div>
+      </div>
+    </div>
+  );
+}
+
+// ── METRÓNOMO ──────────────────────────────
+function ToolMetronome() {
+  const [bpm, setBpm] = useState(80);
+  const [running, setRunning] = useState(false);
+  const [beat, setBeat] = useState(0);
+  const [beats, setBeats] = useState(4);
+  const iRef = useRef(null);
+  const ctx = useRef(null);
+
+  useEffect(() => {
+    if (running) {
+      ctx.current = new (window.AudioContext || window.webkitAudioContext)();
+      let b = 0;
+      iRef.current = setInterval(() => {
+        const o = ctx.current.createOscillator();
+        const g = ctx.current.createGain();
+        o.connect(g); g.connect(ctx.current.destination);
+        o.frequency.value = b === 0 ? 880 : 440;
+        g.gain.setValueAtTime(0.3, ctx.current.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.current.currentTime + 0.08);
+        o.start(); o.stop(ctx.current.currentTime + 0.1);
+        setBeat(b); b = (b + 1) % beats;
+      }, (60 / bpm) * 1000);
+    } else {
+      clearInterval(iRef.current);
+      if (ctx.current) ctx.current.close();
+      setBeat(0);
+    }
+    return () => clearInterval(iRef.current);
+  }, [running, bpm, beats]);
+
+  const card = { background:"#f8f9fc", borderRadius:20, padding:28, border:"1px solid #e4eaf5" };
+  return (
+    <div style={card}>
+      <div style={{fontSize:10,fontWeight:700,color:"#F97316",letterSpacing:"0.18em",textTransform:"uppercase",marginBottom:12}}>Metrónomo</div>
+      <div style={{fontSize:52,fontWeight:900,color:"#08122d",letterSpacing:"-0.03em",lineHeight:1,marginBottom:4}}>{bpm}</div>
+      <div style={{fontSize:11,color:"#aaa",marginBottom:20}}>BPM</div>
+      <input type="range" min={40} max={240} value={bpm} onChange={e=>setBpm(+e.target.value)}
+        style={{width:"100%",accentColor:"#F97316",marginBottom:16}} />
+      <div style={{display:"flex",gap:6,marginBottom:20}}>
+        {[2,3,4,6].map(n => (
+          <button key={n} onClick={()=>setBeats(n)} style={{flex:1,padding:"6px 0",border:`1.5px solid ${beats===n?"#F97316":"#e0e6f0"}`,borderRadius:8,background:beats===n?"#F97316":"#fff",color:beats===n?"#fff":"#666",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+            {n}/4
+          </button>
+        ))}
+      </div>
+      <div style={{display:"flex",gap:6,marginBottom:20}}>
+        {Array.from({length:beats},(_,i)=>(
+          <div key={i} style={{flex:1,height:8,borderRadius:4,background:running&&beat===i?"#F97316":"#e0e6f0",transition:"background 0.05s"}}/>
+        ))}
+      </div>
+      <button onClick={()=>setRunning(r=>!r)} style={{width:"100%",background:running?"#08122d":"#F97316",color:"#fff",border:"none",borderRadius:10,padding:"12px 0",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit"}}>
+        {running ? "⏹ Detener" : "▶ Iniciar"}
+      </button>
+    </div>
+  );
+}
+
+// ── AFINADOR ───────────────────────────────
+function ToolTuner() {
+  const [note, setNote] = useState("—");
+  const [cents, setCents] = useState(0);
+  const [active, setActive] = useState(false);
+  const rafRef = useRef(null);
+  const analyserRef = useRef(null);
+  const streamRef = useRef(null);
+
+  const NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+
+  function freq2note(freq) {
+    const n = 12 * Math.log2(freq / 440) + 69;
+    const midi = Math.round(n);
+    const c = Math.round((n - midi) * 100);
+    return { name: NOTES[midi % 12], cents: c };
+  }
+
+  function autoCorrelate(buf, sr) {
+    let rms = 0;
+    for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
+    rms = Math.sqrt(rms / buf.length);
+    if (rms < 0.01) return -1;
+    let r1=0,r2=buf.length-1;
+    for (let i=0;i<buf.length/2;i++) { if (Math.abs(buf[i])<0.2){r1=i;break;} }
+    for (let i=1;i<buf.length/2;i++) { if (Math.abs(buf[buf.length-i])<0.2){r2=buf.length-i;break;} }
+    buf = buf.slice(r1,r2);
+    const c = new Array(buf.length).fill(0);
+    for (let i=0;i<buf.length;i++) for (let j=0;j<buf.length-i;j++) c[i]=c[i]+buf[j]*buf[j+i];
+    let d=0; while(c[d]>c[d+1]) d++;
+    let maxv=-1,maxt=0;
+    for (let i=d;i<buf.length;i++) { if (c[i]>maxv){maxv=c[i];maxt=i;} }
+    const x1=c[maxt-1],x2=c[maxt],x3=c[maxt+1];
+    const a=(x1+x3-2*x2)/2, b2=(x3-x1)/2;
+    return sr/(maxt-b2/(2*a));
+  }
+
+  async function toggle() {
+    if (active) {
+      cancelAnimationFrame(rafRef.current);
+      streamRef.current?.getTracks().forEach(t=>t.stop());
+      setActive(false); setNote("—"); setCents(0);
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+        streamRef.current = stream;
+        const ctx = new AudioContext();
+        const src = ctx.createMediaStreamSource(stream);
+        const an = ctx.createAnalyser(); an.fftSize=2048;
+        src.connect(an); analyserRef.current = an;
+        const buf = new Float32Array(an.fftSize);
+        setActive(true);
+        const tick = () => {
+          an.getFloatTimeDomainData(buf);
+          const f = autoCorrelate(buf, ctx.sampleRate);
+          if (f > 0) { const {name,cents:c} = freq2note(f); setNote(name); setCents(c); }
+          rafRef.current = requestAnimationFrame(tick);
+        };
+        tick();
+      } catch { alert("Necesitas permitir acceso al micrófono"); }
+    }
+  }
+
+  const color = Math.abs(cents) < 5 ? "#22c55e" : Math.abs(cents) < 15 ? "#f59e0b" : "#ef4444";
+  const card = { background:"#f8f9fc", borderRadius:20, padding:28, border:"1px solid #e4eaf5" };
+  return (
+    <div style={card}>
+      <div style={{fontSize:10,fontWeight:700,color:"#F97316",letterSpacing:"0.18em",textTransform:"uppercase",marginBottom:12}}>Afinador cromático</div>
+      <div style={{fontSize:72,fontWeight:900,color:active?color:"#e0e6f0",letterSpacing:"-0.03em",lineHeight:1,textAlign:"center",marginBottom:4,transition:"color 0.2s"}}>{note}</div>
+      <div style={{position:"relative",height:8,background:"#e0e6f0",borderRadius:4,margin:"16px 0 8px"}}>
+        <div style={{position:"absolute",left:"50%",top:0,bottom:0,width:2,background:"#08122d",borderRadius:2}}/>
+        <div style={{position:"absolute",left:`calc(50% + ${cents}%)`,top:-3,width:14,height:14,borderRadius:"50%",background:color,transform:"translateX(-50%)",transition:"left 0.1s, background 0.2s"}}/>
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#aaa",marginBottom:20}}>
+        <span>-50¢</span><span style={{color,fontWeight:600}}>{active?`${cents>0?"+":""}${cents}¢`:"0¢"}</span><span>+50¢</span>
+      </div>
+      <button onClick={toggle} style={{width:"100%",background:active?"#08122d":"#F97316",color:"#fff",border:"none",borderRadius:10,padding:"12px 0",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit"}}>
+        {active ? "⏹ Detener" : "🎤 Activar micrófono"}
+      </button>
+    </div>
+  );
+}
+
+// ── TRANSPOSITOR IA ────────────────────────
+function ToolTransposer() {
+  const [input, setInput] = useState("Am  G  F  E\nAm  G  F  E7");
+  const [semis, setSemis] = useState(0);
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function transpose() {
+    if (!input.trim() || semis === 0) return;
+    setLoading(true);
+    try {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          model:"claude-sonnet-4-6", max_tokens:1000,
+          messages:[{role:"user",content:`Transpone estos acordes ${semis > 0 ? semis + " semitonos arriba" : Math.abs(semis) + " semitonos abajo"}. Devuelve SOLO los acordes transpuestos, manteniendo el mismo formato y espaciado. No expliques nada.\n\n${input}`}]
+        })
+      });
+      const d = await r.json();
+      setResult(d.content?.[0]?.text || "Error");
+    } catch { setResult("Error de conexión"); }
+    setLoading(false);
+  }
+
+  const card = { background:"#f8f9fc", borderRadius:20, padding:28, border:"1px solid #e4eaf5" };
+  return (
+    <div style={card}>
+      <div style={{fontSize:10,fontWeight:700,color:"#F97316",letterSpacing:"0.18em",textTransform:"uppercase",marginBottom:12}}>Transpositor IA</div>
+      <textarea value={input} onChange={e=>setInput(e.target.value)}
+        style={{width:"100%",border:"1px solid #dde4f0",borderRadius:10,padding:"10px 12px",fontSize:14,fontFamily:"monospace",background:"#fff",color:"#08122d",outline:"none",resize:"vertical",minHeight:80,marginBottom:14}}
+        placeholder="Pega tus acordes aquí..."/>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+        <button onClick={()=>setSemis(s=>Math.max(-11,s-1))} style={{width:32,height:32,border:"1px solid #e0e6f0",borderRadius:8,background:"#fff",fontSize:16,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+        <div style={{flex:1,textAlign:"center"}}>
+          <div style={{fontSize:24,fontWeight:800,color:"#08122d",lineHeight:1}}>{semis>0?`+${semis}`:semis}</div>
+          <div style={{fontSize:10,color:"#aaa"}}>semitonos</div>
+        </div>
+        <button onClick={()=>setSemis(s=>Math.min(11,s+1))} style={{width:32,height:32,border:"1px solid #e0e6f0",borderRadius:8,background:"#fff",fontSize:16,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+      </div>
+      {result && (
+        <div style={{background:"#fff",border:"1px solid #e0e6f0",borderRadius:10,padding:"10px 12px",fontFamily:"monospace",fontSize:14,color:"#08122d",whiteSpace:"pre-wrap",marginBottom:14,lineHeight:1.6}}>
+          {result}
+        </div>
+      )}
+      <button onClick={transpose} disabled={loading||semis===0} style={{width:"100%",background:semis===0?"#e0e6f0":"#F97316",color:semis===0?"#aaa":"#fff",border:"none",borderRadius:10,padding:"12px 0",fontWeight:700,fontSize:14,cursor:semis===0?"not-allowed":"pointer",fontFamily:"inherit",opacity:loading?0.7:1}}>
+        {loading ? "Transponiendo..." : "⚡ Transponer con IA"}
+      </button>
+    </div>
+  );
+}
+
 export default function Landing({ onPortal }) {
   const [C, setC] = useState(DEFAULT);
   const [chat, setChat] = useState([{ role: "bot", text: "Hola, soy el asistente del Coro MJ. ¿En qué te puedo orientar?" }]);
@@ -373,21 +621,21 @@ export default function Landing({ onPortal }) {
 
         /* FABS */
         .fabs{position:fixed;top:50%;left:24px;transform:translateY(-50%);z-index:9000;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
-        .hero-logo-card{
+        .hero-countdown{
           background:rgba(8,18,45,0.7);
           backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
           border:1px solid rgba(255,255,255,0.12);
-          border-radius:20px;overflow:hidden;
-          width:200px;flex-shrink:0;
-          box-shadow:0 8px 40px rgba(0,0,0,0.4)
+          border-radius:16px;padding:18px 22px;
+          min-width:220px;
         }
-        .hero-logo-card-img{width:100%;height:150px;object-fit:contain;padding:20px;display:block;background:rgba(255,255,255,0.04)}
-        .hero-logo-card-body{padding:10px 14px 14px;border-top:1px solid rgba(255,255,255,0.07)}
-        .hero-logo-card-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.3);border-radius:980px;padding:3px 10px;margin-bottom:8px}
-        .hero-logo-card-dot{width:6px;height:6px;border-radius:50%;background:#F97316;flex-shrink:0}
-        .hero-logo-card-txt{font-size:10px;font-weight:600;color:#F97316;letter-spacing:0.08em}
-        .hero-logo-card-chips{display:flex;flex-wrap:wrap;gap:4px}
-        .hero-logo-chip{border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:3px 8px;font-size:9.5px;font-weight:500;color:rgba(255,255,255,0.5);letter-spacing:0.04em}
+        .hcd-label{font-size:9px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-bottom:10px}
+        .hcd-event{font-size:13.5px;font-weight:600;color:#fff;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .hcd-date{font-size:11px;color:rgba(255,255,255,0.45);margin-bottom:14px}
+        .hcd-timer{display:flex;gap:10px}
+        .hcd-unit{text-align:center}
+        .hcd-num{font-family:'Fraunces',serif;font-size:28px;font-weight:700;color:#F97316;line-height:1;display:block}
+        .hcd-txt{font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:0.1em;text-transform:uppercase;margin-top:2px}
+        .hcd-sep{font-size:22px;color:rgba(255,255,255,0.2);align-self:center;padding-bottom:8px}
         .fab{width:50px;height:50px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .2s;position:relative;text-decoration:none;flex-shrink:0}
         .fab:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,0.3)}
         .fab-wa{background:#25D366}
@@ -411,9 +659,13 @@ export default function Landing({ onPortal }) {
           footer{padding:52px 24px 28px}
           .foot-top{flex-direction:column;gap:36px}
           .foot-cols{gap:28px}
-          .hero-c{padding:0 24px 56px;flex-direction:column;align-items:flex-start;gap:24px}
+          .hero-c{padding:0 24px 56px;flex-direction:column;align-items:flex-start;gap:16px}
           .hero-right{align-items:flex-start;max-width:100%}
           .hero-sub{text-align:left}
+          .hero-logo-card{display:none}
+          .fabs{bottom:20px;right:16px}
+          .tools{padding:72px 24px}
+          .tools-grid{grid-template-columns:1fr;gap:20px}
         }
         @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
       `}</style>
@@ -447,25 +699,7 @@ export default function Landing({ onPortal }) {
             <h1 className="hero-h1">{C.hero_titulo}<br/><span className="it">{C.hero_titulo2}</span></h1>
           </div>
           <div className="hero-right">
-            <div className="hero-logo-card">
-              <img
-                src={`${BUCKET}/LOGOMJ.jpeg`}
-                alt="Logo"
-                className="hero-logo-card-img"
-                onError={e => { e.target.src = "/LOGOMJ.jpeg"; }}
-              />
-              <div className="hero-logo-card-body">
-                <div className="hero-logo-card-badge">
-                  <div className="hero-logo-card-dot"/>
-                  <span className="hero-logo-card-txt">Activo · Maipú</span>
-                </div>
-                <div className="hero-logo-card-chips">
-                  <span className="hero-logo-chip">SATB</span>
-                  <span className="hero-logo-chip">15+ años</span>
-                  <span className="hero-logo-chip">Litúrgico</span>
-                </div>
-              </div>
-            </div>
+            <HeroCountdown />
             <p className="hero-sub">{C.hero_sub}</p>
             <div className="hero-btns">
               <button className="btn-w" onClick={() => go("nosotros")}>Conócenos</button>
@@ -576,6 +810,27 @@ export default function Landing({ onPortal }) {
                 <button className="csnd" onClick={()=>sendMsg()}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* HERRAMIENTAS MUSICALES */}
+      <section className="tools" id="herramientas" style={{padding:"100px 60px",background:"#fff"}}>
+        <div style={{maxWidth:1140,margin:"0 auto"}}>
+          <div className="ey">Herramientas</div>
+          <h2 className="h2" style={{marginBottom:8}}>Utilidades <em>musicales</em></h2>
+          <p className="bp" style={{marginBottom:48}}>Herramientas para ensayar, afinar y transponer en tiempo real.</p>
+          <div className="tools-grid" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:24}}>
+
+            {/* METRÓNOMO */}
+            <ToolMetronome />
+
+            {/* AFINADOR */}
+            <ToolTuner />
+
+            {/* TRANSPOSITOR IA */}
+            <ToolTransposer />
+
           </div>
         </div>
       </section>
