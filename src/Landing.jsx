@@ -373,12 +373,21 @@ export default function Landing({ onPortal }) {
 
         /* FABS */
         .fabs{position:fixed;top:50%;left:24px;transform:translateY(-50%);z-index:9000;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
-        .fab-logo-widget{width:180px;border-radius:16px;overflow:hidden;background:rgba(8,18,45,0.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);box-shadow:0 8px 32px rgba(0,0,0,0.35);margin-bottom:4px}
-        .fab-logo-widget-img{width:100%;height:160px;object-fit:contain;background:rgba(255,255,255,0.03);padding:20px;display:block}
-        .fab-logo-widget-body{padding:10px 14px 14px}
-        .fab-logo-widget-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.3);border-radius:980px;padding:3px 10px}
-        .fab-logo-widget-badge-dot{width:6px;height:6px;border-radius:50%;background:#F97316;flex-shrink:0}
-        .fab-logo-widget-badge-txt{font-size:10px;font-weight:600;color:#F97316;letter-spacing:0.08em}
+        .hero-logo-card{
+          background:rgba(8,18,45,0.7);
+          backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+          border:1px solid rgba(255,255,255,0.12);
+          border-radius:20px;overflow:hidden;
+          width:200px;flex-shrink:0;
+          box-shadow:0 8px 40px rgba(0,0,0,0.4)
+        }
+        .hero-logo-card-img{width:100%;height:150px;object-fit:contain;padding:20px;display:block;background:rgba(255,255,255,0.04)}
+        .hero-logo-card-body{padding:10px 14px 14px;border-top:1px solid rgba(255,255,255,0.07)}
+        .hero-logo-card-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.3);border-radius:980px;padding:3px 10px;margin-bottom:8px}
+        .hero-logo-card-dot{width:6px;height:6px;border-radius:50%;background:#F97316;flex-shrink:0}
+        .hero-logo-card-txt{font-size:10px;font-weight:600;color:#F97316;letter-spacing:0.08em}
+        .hero-logo-card-chips{display:flex;flex-wrap:wrap;gap:4px}
+        .hero-logo-chip{border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:3px 8px;font-size:9.5px;font-weight:500;color:rgba(255,255,255,0.5);letter-spacing:0.04em}
         .fab{width:50px;height:50px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .2s;position:relative;text-decoration:none;flex-shrink:0}
         .fab:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,0.3)}
         .fab-wa{background:#25D366}
@@ -438,6 +447,25 @@ export default function Landing({ onPortal }) {
             <h1 className="hero-h1">{C.hero_titulo}<br/><span className="it">{C.hero_titulo2}</span></h1>
           </div>
           <div className="hero-right">
+            <div className="hero-logo-card">
+              <img
+                src={`${BUCKET}/LOGOMJ.jpeg`}
+                alt="Logo"
+                className="hero-logo-card-img"
+                onError={e => { e.target.src = "/LOGOMJ.jpeg"; }}
+              />
+              <div className="hero-logo-card-body">
+                <div className="hero-logo-card-badge">
+                  <div className="hero-logo-card-dot"/>
+                  <span className="hero-logo-card-txt">Activo · Maipú</span>
+                </div>
+                <div className="hero-logo-card-chips">
+                  <span className="hero-logo-chip">SATB</span>
+                  <span className="hero-logo-chip">15+ años</span>
+                  <span className="hero-logo-chip">Litúrgico</span>
+                </div>
+              </div>
+            </div>
             <p className="hero-sub">{C.hero_sub}</p>
             <div className="hero-btns">
               <button className="btn-w" onClick={() => go("nosotros")}>Conócenos</button>
@@ -638,20 +666,6 @@ export default function Landing({ onPortal }) {
 
       {/* FABS */}
       <div className="fabs">
-        <div className="fab-logo-widget">
-          <img
-            src={`${BUCKET}/LOGOMJ.jpeg`}
-            alt="Logo"
-            className="fab-logo-widget-img"
-            onError={e => { e.target.src = "/LOGOMJ.jpeg"; }}
-          />
-          <div className="fab-logo-widget-body">
-            <div className="fab-logo-widget-badge">
-              <div className="fab-logo-widget-badge-dot"/>
-              <span className="fab-logo-widget-badge-txt">Activo</span>
-            </div>
-          </div>
-        </div>
         <button className="fab fab-adm" onClick={()=>setAdmin(true)}>
           <span className="fab-tip">Editar sitio</span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
