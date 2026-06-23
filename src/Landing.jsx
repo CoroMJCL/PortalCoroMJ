@@ -620,7 +620,8 @@ export default function Landing({ onPortal }) {
 
         /* HERO */
         .hero{height:100vh;position:relative;overflow:hidden;display:flex;align-items:flex-end}
-        .hero-bg{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center}
+        .hero-bg{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center center}
+        @media(max-width:900px){.hero-bg{background-position:60% center}}
         .hero-ov{position:absolute;inset:0;z-index:1;background:linear-gradient(160deg,rgba(6,14,36,0.6) 0%,rgba(6,14,36,0.2) 40%,rgba(6,14,36,0.7) 70%,rgba(6,14,36,0.97) 100%)}
         .hero-c{position:relative;z-index:2;padding:0 60px 68px;width:100%;display:flex;justify-content:space-between;align-items:flex-end}
         .hero-kicker{font-size:11px;font-weight:700;letter-spacing:0.32em;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-bottom:18px;display:flex;align-items:center;gap:12px}
@@ -790,7 +791,7 @@ export default function Landing({ onPortal }) {
         .foot-adm:hover{color:rgba(255,255,255,0.25)}
 
         /* FABS */
-        .fabs{position:fixed;bottom:32px;left:24px;z-index:9000;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+        .fabs{position:fixed;top:50%;left:20px;transform:translateY(-50%);z-index:9000;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
         .hero-countdown{
           background:rgba(8,18,45,0.7);
           backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
@@ -833,7 +834,7 @@ export default function Landing({ onPortal }) {
           .hero-right{align-items:flex-start;max-width:100%}
           .hero-sub{text-align:left}
           .hero-logo-card{display:none}
-          .fabs{bottom:20px;left:16px}
+          .fabs{top:auto;bottom:100px;left:16px;transform:none}
           .tools{padding:72px 24px}
           .tools-grid{grid-template-columns:1fr;gap:20px}
         }
