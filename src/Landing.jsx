@@ -639,7 +639,12 @@ export default function Landing({ onPortal }) {
       {/* FABS */}
       <div className="fabs">
         <div className="fab-logo-widget">
-          <img src="/LOGOMJ.jpeg" alt="Logo" className="fab-logo-widget-img" onError={e => e.target.style.display="none"}/>
+          <img
+            src={`${BUCKET}/LOGOMJ.jpeg`}
+            alt="Logo"
+            className="fab-logo-widget-img"
+            onError={e => { e.target.src = "/LOGOMJ.jpeg"; }}
+          />
           <div className="fab-logo-widget-body">
             <div className="fab-logo-widget-badge">
               <div className="fab-logo-widget-badge-dot"/>
