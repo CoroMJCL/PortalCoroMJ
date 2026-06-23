@@ -834,7 +834,7 @@ export default function Landing({ onPortal }) {
           .hero-right{align-items:flex-start;max-width:100%}
           .hero-sub{text-align:left}
           .hero-logo-card{display:none}
-          .fabs{top:auto;bottom:100px;left:16px;transform:none}
+          .fabs{top:50%;bottom:auto;left:16px;transform:translateY(-50%)}
           .tools{padding:72px 24px}
           .tools-grid{grid-template-columns:1fr;gap:20px}
         }
