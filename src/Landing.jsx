@@ -49,13 +49,100 @@ async function uploadImg(file, name) {
 
 const ADMIN_PASS = "coromj2026";
 
+// Componente admin separado para evitar remount de inputs
+function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, handleImg }) {
+  const [pw, setPw] = useState("");
+  const [auth, setAuth] = useState(false);
+
+  const check = () => {
+    if (pw === ADMIN_PASS) setAuth(true);
+    else { alert("Contraseña incorrecta"); setPw(""); }
+  };
+
+  const F = ({ label, k, ta }) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: "#888", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 5 }}>{label}</div>
+      {ta
+        ? <textarea value={editing[k] ?? C[k] ?? ""} onChange={e => setEditing(p => ({ ...p, [k]: e.target.value }))} style={{ width: "100%", border: "1px solid #e0e6f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", resize: "vertical", minHeight: 72, outline: "none", display: "block" }} />
+        : <input value={editing[k] ?? C[k] ?? ""} onChange={e => setEditing(p => ({ ...p, [k]: e.target.value }))} style={{ width: "100%", border: "1px solid #e0e6f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", outline: "none", display: "block" }} />
+      }
+      <button onClick={() => saveF(k)} disabled={saving[k]} style={{ marginTop: 5, background: "#08122d", color: "#fff", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 11, fontWeight: 600, cursor: "pointer", opacity: saving[k] ? 0.6 : 1 }}>
+        {saving[k] ? "..." : "Guardar"}
+      </button>
+    </div>
+  );
+
+  const IF = ({ label, k, name }) => (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: "#888", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+      {C[k] && <img src={C[k]} alt="" style={{ width: "100%", maxHeight: 100, objectFit: "cover", borderRadius: 8, marginBottom: 6 }} />}
+      <label style={{ display: "inline-block", background: "#f0f4ff", border: "1px solid #d0d8f0", borderRadius: 8, padding: "7px 14px", fontSize: 11, fontWeight: 500, cursor: "pointer", color: "#08122d" }}>
+        {upKey === k ? "Subiendo..." : "📁 Subir"}
+        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && handleImg(k, e.target.files[0], name)} />
+      </label>
+    </div>
+  );
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: "#fff", borderRadius: 20, width: "90%", maxWidth: 520, maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 32px 80px rgba(0,0,0,0.35)" }}>
+        <div style={{ background: "#08122d", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+          <div style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>⚙️ Editor del sitio</div>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", borderRadius: "50%", width: 30, height: 30, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+        </div>
+        {!auth ? (
+          <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#08122d" }}>Contraseña de acceso</div>
+            <input
+              type="password"
+              value={pw}
+              onChange={e => setPw(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && check()}
+              placeholder="Contraseña"
+              autoFocus
+              style={{ border: "1px solid #dde4f0", borderRadius: 10, padding: "12px 16px", fontSize: 15, fontFamily: "inherit", outline: "none" }}
+            />
+            <button onClick={check} style={{ background: "#08122d", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+              Entrar
+            </button>
+          </div>
+        ) : (
+          <div style={{ overflowY: "auto", padding: "24px 24px 40px" }}>
+            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Hero</div>
+            <IF label="Imagen fondo" k="hero_img" name="landing_hero" />
+            <F label="Título 1" k="hero_titulo" /><F label="Título 2 italic" k="hero_titulo2" /><F label="Subtexto" k="hero_sub" ta />
+            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>👥 Nosotros</div>
+            <IF label="Imagen nosotros" k="about_img" name="landing_about" />
+            <F label="Título" k="about_titulo" /><F label="Párrafo 1" k="about_texto1" ta /><F label="Párrafo 2" k="about_texto2" ta />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+              {[1,2,3].map(n => <div key={n}><F label={`Stat ${n} número`} k={`stat${n}_n`} /><F label="Label" k={`stat${n}_l`} /></div>)}
+            </div>
+            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Galería</div>
+            {[1,2,3,4,5].map(n => (
+              <div key={n} style={{ background: "#f8f9fc", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                <div style={{ fontWeight: 600, fontSize: 11, color: "#666", marginBottom: 8 }}>Foto {n}</div>
+                <IF label="Imagen" k={`gal${n}_img`} name={`landing_gal${n}`} />
+                <F label="Título" k={`gal${n}_label`} /><F label="Subtítulo" k={`gal${n}_sub`} />
+              </div>
+            ))}
+            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>📍 Contacto</div>
+            <F label="WhatsApp (ej: 56912345678)" k="whatsapp" />
+            <F label="Dirección" k="contacto_dir" />
+            <F label="Ensayos" k="contacto_ensayo" />
+            <F label="Texto footer" k="footer_texto" ta />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Landing({ onPortal }) {
   const [C, setC] = useState(DEFAULT);
   const [chat, setChat] = useState([{ role: "bot", text: "Hola, soy el asistente del Coro MJ. ¿En qué te puedo orientar?" }]);
   const [inp, setInp] = useState(""); const [typing, setTyping] = useState(false); const [hist, setHist] = useState([]);
   const [formOk, setFormOk] = useState(false);
-  const [adminPw, setAdminPw] = useState("");
-  const [admin, setAdmin] = useState(false); const [adminAuth, setAdminAuth] = useState(false);
+  const [admin, setAdmin] = useState(false);
   const [editing, setEditing] = useState({}); const [saving, setSaving] = useState({}); const [upKey, setUpKey] = useState(null);
   const msgsRef = useRef(null);
   useEffect(() => { dbGet().then(setC); }, []);
@@ -86,84 +173,16 @@ export default function Landing({ onPortal }) {
     setUpKey(null);
   }
 
-  const F = ({ label, k, ta }) => (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 10, fontWeight: 600, color: "#888", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 5 }}>{label}</div>
-      {ta ? <textarea value={editing[k] ?? C[k]} onChange={e => setEditing(p => ({ ...p, [k]: e.target.value }))} style={{ width: "100%", border: "1px solid #e0e6f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", resize: "vertical", minHeight: 72, outline: "none" }} />
-          : <input value={editing[k] ?? C[k]} onChange={e => setEditing(p => ({ ...p, [k]: e.target.value }))} style={{ width: "100%", border: "1px solid #e0e6f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", outline: "none" }} />}
-      <button onClick={() => saveF(k)} disabled={saving[k]} style={{ marginTop: 5, background: "#08122d", color: "#fff", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 11, fontWeight: 600, cursor: "pointer", opacity: saving[k] ? 0.6 : 1 }}>{saving[k] ? "..." : "Guardar"}</button>
-    </div>
-  );
-  const IF = ({ label, k, name }) => (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 10, fontWeight: 600, color: "#888", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
-      {C[k] && <img src={C[k]} alt="" style={{ width: "100%", maxHeight: 120, objectFit: "cover", borderRadius: 8, marginBottom: 6 }} />}
-      <label style={{ display: "inline-block", background: "#f0f4ff", border: "1px solid #d0d8f0", borderRadius: 8, padding: "7px 14px", fontSize: 11, fontWeight: 500, cursor: "pointer", color: "#08122d" }}>
-        {upKey === k ? "Subiendo..." : "📁 Subir"}
-        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && handleImg(k, e.target.files[0], name)} />
-      </label>
-    </div>
-  );
-
-  const checkAdmin = () => {
-    if (adminPw === ADMIN_PASS) { setAdminAuth(true); }
-    else { alert("Contraseña incorrecta"); setAdminPw(""); }
-  };
-
-  const adminContent = adminAuth ? (
-    <div style={{ overflowY: "auto", padding: "24px 24px 40px" }}>
-      <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Hero</div>
-      <IF label="Imagen fondo" k="hero_img" name="landing_hero" />
-      <F label="Título 1" k="hero_titulo" /><F label="Título 2 italic" k="hero_titulo2" /><F label="Subtexto" k="hero_sub" ta />
-      <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>👥 Nosotros</div>
-      <IF label="Imagen nosotros" k="about_img" name="landing_about" />
-      <F label="Título" k="about_titulo" /><F label="Párrafo 1" k="about_texto1" ta /><F label="Párrafo 2" k="about_texto2" ta />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-        {[1,2,3].map(n => <div key={n}><F label={`Stat ${n} #`} k={`stat${n}_n`} /><F label="Label" k={`stat${n}_l`} /></div>)}
-      </div>
-      <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Galería</div>
-      {[1,2,3,4,5].map(n => (
-        <div key={n} style={{ background: "#f8f9fc", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
-          <div style={{ fontWeight: 600, fontSize: 11, color: "#666", marginBottom: 8 }}>Foto {n}</div>
-          <IF label="Imagen" k={`gal${n}_img`} name={`landing_gal${n}`} />
-          <F label="Título" k={`gal${n}_label`} /><F label="Subtítulo" k={`gal${n}_sub`} />
-        </div>
-      ))}
-      <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>📍 Contacto</div>
-      <F label="WhatsApp (ej: 56912345678)" k="whatsapp" /><F label="Dirección" k="contacto_dir" /><F label="Ensayos" k="contacto_ensayo" /><F label="Footer texto" k="footer_texto" ta />
-    </div>
-  ) : (
-    <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ fontSize: 15, fontWeight: 600, color: "#08122d" }}>Contraseña de acceso</div>
-      <input
-        type="password"
-        value={adminPw}
-        onChange={e => setAdminPw(e.target.value)}
-        onKeyDown={e => { if (e.key === "Enter") checkAdmin(); }}
-        placeholder="Contraseña"
-        autoFocus
-        style={{ border: "1px solid #dde4f0", borderRadius: 10, padding: "12px 16px", fontSize: 15, fontFamily: "inherit", outline: "none" }}
-      />
-      <button onClick={checkAdmin} style={{ background: "#08122d", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
-        Entrar
-      </button>
-    </div>
-  );
-
   const gColors = ["linear-gradient(135deg,#0a1628,#1e3a6e)","linear-gradient(135deg,#1a0a2e,#3d1a6e)","linear-gradient(135deg,#0a2818,#1a5c3a)","linear-gradient(135deg,#2e1a0a,#6e3d1a)","linear-gradient(135deg,#0a1a2e,#1a3d5c)"];
 
   return (
     <div style={{ fontFamily: "'DM Sans','Inter',sans-serif", background: "#fff", color: "#0a0a14", overflowX: "hidden", WebkitFontSmoothing: "antialiased" }}>
       {admin && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={e => e.target === e.currentTarget && setAdmin(false)}>
-          <div style={{ background: "#fff", borderRadius: 20, width: "90%", maxWidth: 520, maxHeight: "88vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 32px 80px rgba(0,0,0,0.3)" }} onClick={e => e.stopPropagation()}>
-            <div style={{ background: "#08122d", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-              <div style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>⚙️ Editor del sitio</div>
-              <button onClick={() => { setAdmin(false); setAdminAuth(false); setAdminPw(""); }} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", borderRadius: "50%", width: 30, height: 30, cursor: "pointer", fontSize: 15 }}>✕</button>
-            </div>
-            {adminContent}
-          </div>
-        </div>
+        <AdminPanel
+          onClose={() => setAdmin(false)}
+          C={C} editing={editing} setEditing={setEditing}
+          saving={saving} saveF={saveF} upKey={upKey} handleImg={handleImg}
+        />
       )}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;0,9..40,800;0,9..40,900;1,9..40,300&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400;1,9..144,700&display=swap');
@@ -399,7 +418,7 @@ export default function Landing({ onPortal }) {
           <a onClick={() => go("contacto")}>Contacto</a>
         </div>
         <div className="nav-logo" onClick={() => go("inicio")}>
-          <img src="/LOGOMJ.jpeg" alt="Coro MJ" onError={e => e.target.style.display="none"}/>
+          <img src="/LOGOMJ2.png" alt="Coro MJ" onError={e => e.target.style.display="none"}/>
         </div>
         <div className="nav-right">
           <button className="nav-soc" title="Instagram"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="rgba(255,255,255,0.75)" stroke="none"/></svg></button>
