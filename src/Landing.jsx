@@ -3,7 +3,16 @@ import { useState, useEffect, useRef } from "react";
 const SUPABASE_URL = "https://ttbipbhfswcwwgcwaist.supabase.co";
 const SUPABASE_KEY = "sb_publishable_mz6TyeuTP3TA6XQPOunXFQ_ad0Cp9fg";
 const BUCKET = `${SUPABASE_URL}/storage/v1/object/public/publico`;
-const SYS = `Eres el asistente del Coro Misioneros de Jesús, ensemble vocal de música litúrgica profesional en Maipú, Chile. Responde en español, de forma concisa (máx 2-3 oraciones), profesional y cercana. Solo respondes sobre el coro: ingreso, ensayos (sábados), nivel musical, repertorio litúrgico contemporáneo, cuerdas SATB. Para contacto dirígelos al formulario del sitio.`;
+const SYS = `Eres el asistente del Coro Misioneros de Jesús, ensemble vocal de música litúrgica en Maipú, Chile. Responde en español, de forma concisa (máx 2-3 oraciones), cálida y cercana. Solo respondes sobre el coro.
+
+Información clave:
+- El coro es abierto a todos, no se requiere experiencia musical previa.
+- Los requisitos son: compromiso, estudio del repertorio, y responsabilidad en la asistencia.
+- Las misas regulares son dos sábados al mes: el segundo y el último sábado.
+- El coro llega a las 18:00 hrs y la misa es de 20:00 a 21:00 hrs.
+- También participamos en misas especiales en nuestra parroquia, que pueden requerir ensayos en otras fechas.
+- Los ensayos son los sábados en la Capilla Misioneros de Jesús, Maipú.
+- Para unirse deben contactarnos por el formulario del sitio o WhatsApp.`;
 
 const DEFAULT = {
   hero_img: `${BUCKET}/Misioneros.jpg`,
