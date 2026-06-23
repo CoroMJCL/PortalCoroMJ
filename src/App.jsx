@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, Component } from "react";
 import { EscuelaCanto } from "./EscuelaCanto";
+import Landing from "./Landing";
 
 // ══════════════════════════════════════════
 //  SUPABASE CONFIG
@@ -1409,9 +1410,9 @@ function AppInner() {
         return "reset";
       }
     } catch(e) {}
-    return "login";
+    return "landing";
   })();
-  const [view, setView] = useState(_initialView); // "login" | "register" | "recover" | "reset" | "app"
+  const [view, setView] = useState(_initialView); // "landing" | "login" | "register" | "recover" | "reset" | "app"
   const [showPushModal, setShowPushModal] = useState(false);
   const [pushBloqueado, setPushBloqueado] = useState(false);
   const [user, setUser] = useState(null);
@@ -2233,7 +2234,7 @@ function AppInner() {
     await authSignOut();
     setUser(null);
     setAuthToken(null);
-    setView("login");
+    setView("landing");
   }
 
   const searchRes =
@@ -2306,6 +2307,9 @@ function AppInner() {
     );
   }
 
+  if (view === "landing")
+    return <Landing onPortal={() => setView("login")} />;
+
   if (view !== "app")
     return (
       <AuthScreen
@@ -2314,6 +2318,7 @@ function AppInner() {
         onSignIn={handleSignIn}
         onSignUp={handleSignUp}
         onGuestEnter={handleGuestEnter}
+        onBack={() => setView("landing")}
       />
     );
 
@@ -3198,7 +3203,7 @@ function AppInner() {
 // ══════════════════════════════════════════
 //  AUTH SCREEN (Login / Registro / Recuperar)
 // ══════════════════════════════════════════
-function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter }) {
+function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter, onBack }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -3386,7 +3391,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter }) {
       `}</style>
       {/* Botón volver */}
       <a
-        onClick={() => window.history.back()}
+        onClick={() => onBack && onBack()}
         style={{
           position: "fixed", top: 20, left: 24, zIndex: 10,
           display: "flex", alignItems: "center", gap: 6,
