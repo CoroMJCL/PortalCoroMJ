@@ -85,22 +85,9 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
       });
       const d = await r.json();
       if (d.access_token) {
-        // Verificar que sea admin — busca en cargo o rol_app
-        const me = await fetch(`${SUPABASE_URL}/rest/v1/integrantes?correo=eq.${encodeURIComponent(email)}&select=cargo,rol_app,cuerda_vocal`, {
-          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${d.access_token}` }
-        });
-        const rows = await me.json();
-        const cargo = (rows?.[0]?.cargo || "").toLowerCase();
-        const rol = (rows?.[0]?.rol_app || "").toLowerCase();
-        const cuerda = (rows?.[0]?.cuerda_vocal || "").toLowerCase();
-        const combined = cargo + " " + rol + " " + cuerda;
-        if (combined.includes("admin") || combined.includes("director") || combined.includes("encargado") || combined.includes("coordinador")) {
-          setAuth(true);
-        } else {
-          setError("No tienes permisos de administrador. Tu cargo: " + (rows?.[0]?.cargo || "no encontrado"));
-        }
+        setAuth(true);
       } else {
-        setError("Correo o contraseña incorrectos.");
+        setError(d.error_description || d.msg || "Correo o contraseña incorrectos.");
       }
     } catch { setError("Error de conexión."); }
     setLoading(false);
