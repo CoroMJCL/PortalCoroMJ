@@ -85,16 +85,19 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
       });
       const d = await r.json();
       if (d.access_token) {
-        // Verificar que sea admin
-        const me = await fetch(`${SUPABASE_URL}/rest/v1/integrantes?correo=eq.${encodeURIComponent(email)}&select=cargo`, {
+        // Verificar que sea admin — busca en cargo o rol_app
+        const me = await fetch(`${SUPABASE_URL}/rest/v1/integrantes?correo=eq.${encodeURIComponent(email)}&select=cargo,rol_app,cuerda_vocal`, {
           headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${d.access_token}` }
         });
         const rows = await me.json();
-        const cargo = rows?.[0]?.cargo?.toLowerCase() || "";
-        if (cargo.includes("admin") || cargo.includes("director") || cargo.includes("encargado")) {
+        const cargo = (rows?.[0]?.cargo || "").toLowerCase();
+        const rol = (rows?.[0]?.rol_app || "").toLowerCase();
+        const cuerda = (rows?.[0]?.cuerda_vocal || "").toLowerCase();
+        const combined = cargo + " " + rol + " " + cuerda;
+        if (combined.includes("admin") || combined.includes("director") || combined.includes("encargado") || combined.includes("coordinador")) {
           setAuth(true);
         } else {
-          setError("No tienes permisos de administrador.");
+          setError("No tienes permisos de administrador. Tu cargo: " + (rows?.[0]?.cargo || "no encontrado"));
         }
       } else {
         setError("Correo o contraseña incorrectos.");
@@ -417,53 +420,119 @@ function ToolTuner() {
   );
 }
 
-// ── TRANSPOSITOR IA ────────────────────────
-function ToolTransposer() {
-  const [input, setInput] = useState("Am  G  F  E\nAm  G  F  E7");
-  const [semis, setSemis] = useState(0);
-  const [result, setResult] = useState("");
-  const [loading, setLoading] = useState(false);
+// ── VISUALIZADOR DE ACORDES ───────────────
+function ToolChords() {
+  const CHORDS = {
+    "Lam":  { frets: [-1,0,2,2,1,0], fingers: [0,0,2,3,1,0], name: "La menor" },
+    "La":   { frets: [-1,0,2,2,2,0], fingers: [0,0,1,2,3,0], name: "La mayor" },
+    "La7":  { frets: [-1,0,2,0,2,0], fingers: [0,0,2,0,3,0], name: "La séptima" },
+    "Sim":  { frets: [-1,2,4,4,3,2], fingers: [0,1,3,4,2,1], name: "Si menor", barre:2 },
+    "Si7":  { frets: [-1,2,1,2,0,2], fingers: [0,2,1,3,0,4], name: "Si séptima" },
+    "Do":   { frets: [-1,3,2,0,1,0], fingers: [0,3,2,0,1,0], name: "Do mayor" },
+    "Dom":  { frets: [-1,3,5,5,4,3], fingers: [0,1,3,4,2,1], name: "Do menor", barre:3 },
+    "Do7":  { frets: [-1,3,2,3,1,0], fingers: [0,3,2,4,1,0], name: "Do séptima" },
+    "Re":   { frets: [-1,-1,0,2,3,2], fingers: [0,0,0,1,3,2], name: "Re mayor" },
+    "Rem":  { frets: [-1,-1,0,2,3,1], fingers: [0,0,0,2,3,1], name: "Re menor" },
+    "Re7":  { frets: [-1,-1,0,2,1,2], fingers: [0,0,0,2,1,3], name: "Re séptima" },
+    "Mi":   { frets: [0,2,2,1,0,0], fingers: [0,2,3,1,0,0], name: "Mi mayor" },
+    "Mim":  { frets: [0,2,2,0,0,0], fingers: [0,2,3,0,0,0], name: "Mi menor" },
+    "Mi7":  { frets: [0,2,0,1,0,0], fingers: [0,2,0,1,0,0], name: "Mi séptima" },
+    "Fa":   { frets: [1,3,3,2,1,1], fingers: [1,3,4,2,1,1], name: "Fa mayor", barre:1 },
+    "Fam":  { frets: [1,3,3,1,1,1], fingers: [1,3,4,1,1,1], name: "Fa menor", barre:1 },
+    "Sol":  { frets: [3,2,0,0,0,3], fingers: [2,1,0,0,0,3], name: "Sol mayor" },
+    "Solm": { frets: [3,5,5,3,3,3], fingers: [1,3,4,1,1,1], name: "Sol menor", barre:3 },
+    "Sol7": { frets: [3,2,0,0,0,1], fingers: [3,2,0,0,0,1], name: "Sol séptima" },
+  };
 
-  async function transpose() {
-    if (!input.trim() || semis === 0) return;
-    setLoading(true);
-    try {
-      const r = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model:"claude-sonnet-4-6", max_tokens:1000,
-          messages:[{role:"user",content:`Transpone estos acordes ${semis > 0 ? semis + " semitonos arriba" : Math.abs(semis) + " semitonos abajo"}. Devuelve SOLO los acordes transpuestos, manteniendo el mismo formato y espaciado. No expliques nada.\n\n${input}`}]
-        })
-      });
-      const d = await r.json();
-      setResult(d.content?.[0]?.text || "Error");
-    } catch { setResult("Error de conexión"); }
-    setLoading(false);
-  }
+  const [selected, setSelected] = useState("Lam");
+  const [search, setSearch] = useState("");
 
-  const card = { background:"#f8f9fc", borderRadius:20, padding:28, border:"1px solid #e4eaf5" };
+  const chord = CHORDS[selected];
+  const filtered = Object.keys(CHORDS).filter(k =>
+    k.toLowerCase().includes(search.toLowerCase()) ||
+    CHORDS[k].name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const STRINGS = 6;
+  const FRETS = 5;
+  const W = 160, H = 140;
+  const PAD = { l:28, r:14, t:28, b:10 };
+  const sw = (W - PAD.l - PAD.r) / (STRINGS - 1);
+  const fh = (H - PAD.t - PAD.b) / FRETS;
+
+  const startFret = chord.barre ? chord.barre : 1;
+  const dots = [];
+  chord.frets.forEach((f, si) => {
+    if (f > 0) {
+      const x = PAD.l + (STRINGS - 1 - si) * sw;
+      const y = PAD.t + (f - startFret + 0.5) * fh;
+      dots.push({ x, y, finger: chord.fingers[si], string: si });
+    }
+  });
+
+  const card = { background:"#f8f9fc", borderRadius:20, padding:28, border:"1px solid #e4eaf5", display:"flex", flexDirection:"column", gap:16 };
+
   return (
     <div style={card}>
-      <div style={{fontSize:10,fontWeight:700,color:"#F97316",letterSpacing:"0.18em",textTransform:"uppercase",marginBottom:12}}>Transpositor IA</div>
-      <textarea value={input} onChange={e=>setInput(e.target.value)}
-        style={{width:"100%",border:"1px solid #dde4f0",borderRadius:10,padding:"10px 12px",fontSize:14,fontFamily:"monospace",background:"#fff",color:"#08122d",outline:"none",resize:"vertical",minHeight:80,marginBottom:14}}
-        placeholder="Pega tus acordes aquí..."/>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-        <button onClick={()=>setSemis(s=>Math.max(-11,s-1))} style={{width:32,height:32,border:"1px solid #e0e6f0",borderRadius:8,background:"#fff",fontSize:16,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-        <div style={{flex:1,textAlign:"center"}}>
-          <div style={{fontSize:24,fontWeight:800,color:"#08122d",lineHeight:1}}>{semis>0?`+${semis}`:semis}</div>
-          <div style={{fontSize:10,color:"#aaa"}}>semitonos</div>
-        </div>
-        <button onClick={()=>setSemis(s=>Math.min(11,s+1))} style={{width:32,height:32,border:"1px solid #e0e6f0",borderRadius:8,background:"#fff",fontSize:16,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+      <div style={{fontSize:10,fontWeight:700,color:"#F97316",letterSpacing:"0.18em",textTransform:"uppercase"}}>Acordes de guitarra</div>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar acorde..."
+        style={{border:"1px solid #dde4f0",borderRadius:10,padding:"8px 12px",fontSize:13,fontFamily:"inherit",outline:"none",background:"#fff"}}/>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6,maxHeight:100,overflowY:"auto"}}>
+        {filtered.map(k => (
+          <button key={k} onClick={()=>setSelected(k)}
+            style={{padding:"4px 12px",borderRadius:8,border:`1.5px solid ${selected===k?"#F97316":"#e0e6f0"}`,background:selected===k?"#F97316":"#fff",color:selected===k?"#fff":"#08122d",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",transition:"all .15s"}}>
+            {k}
+          </button>
+        ))}
       </div>
-      {result && (
-        <div style={{background:"#fff",border:"1px solid #e0e6f0",borderRadius:10,padding:"10px 12px",fontFamily:"monospace",fontSize:14,color:"#08122d",whiteSpace:"pre-wrap",marginBottom:14,lineHeight:1.6}}>
-          {result}
+      <div style={{display:"flex",alignItems:"center",gap:20}}>
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+          {/* Cejilla / nut */}
+          <rect x={PAD.l} y={PAD.t - 4} width={(STRINGS-1)*sw} height={startFret===1?5:2} fill={startFret===1?"#08122d":"#ccc"} rx={2}/>
+          {/* Trastes */}
+          {Array.from({length:FRETS+1},(_,i)=>(
+            <line key={i} x1={PAD.l} y1={PAD.t+i*fh} x2={PAD.l+(STRINGS-1)*sw} y2={PAD.t+i*fh} stroke="#dde4f0" strokeWidth={1}/>
+          ))}
+          {/* Cuerdas */}
+          {Array.from({length:STRINGS},(_,i)=>(
+            <line key={i} x1={PAD.l+i*sw} y1={PAD.t} x2={PAD.l+i*sw} y2={PAD.t+FRETS*fh} stroke="#bbb" strokeWidth={i===0||i===STRINGS-1?1.5:1}/>
+          ))}
+          {/* X y O encima */}
+          {chord.frets.map((f,si)=>{
+            const x = PAD.l + (STRINGS-1-si)*sw;
+            if (f===-1) return <text key={si} x={x} y={PAD.t-10} textAnchor="middle" fontSize={11} fill="#ef4444" fontWeight="700">✕</text>;
+            if (f===0) return <text key={si} x={x} y={PAD.t-10} textAnchor="middle" fontSize={11} fill="#22c55e" fontWeight="700">○</text>;
+            return null;
+          })}
+          {/* Cejilla barre */}
+          {chord.barre && (
+            <rect x={PAD.l} y={PAD.t+0.15*fh} width={(STRINGS-1)*sw} height={fh*0.7} fill="#08122d" rx={fh*0.35} opacity={0.85}/>
+          )}
+          {/* Puntos */}
+          {dots.filter(d => !chord.barre || d.finger!==1).map((d,i)=>(
+            <g key={i}>
+              <circle cx={d.x} cy={d.y} r={fh*0.32} fill="#08122d"/>
+              <text x={d.x} y={d.y+4} textAnchor="middle" fontSize={9} fill="#fff" fontWeight="700">{d.finger}</text>
+            </g>
+          ))}
+          {/* Número de traste */}
+          {startFret > 1 && <text x={PAD.l-8} y={PAD.t+fh*0.6} textAnchor="end" fontSize={10} fill="#888">{startFret}</text>}
+        </svg>
+        <div>
+          <div style={{fontSize:28,fontWeight:900,color:"#08122d",lineHeight:1,letterSpacing:"-0.02em"}}>{selected}</div>
+          <div style={{fontSize:12,color:"#888",marginTop:4}}>{chord.name}</div>
+          <div style={{display:"flex",gap:4,marginTop:10,flexWrap:"wrap"}}>
+            {["Mi","La","Re","Sol","Si","mi"].map((s,i)=>(
+              <div key={i} style={{textAlign:"center",width:22}}>
+                <div style={{fontSize:9,color:"#aaa",marginBottom:2}}>{s}</div>
+                <div style={{fontSize:11,fontWeight:700,color:chord.frets[5-i]===-1?"#ef4444":chord.frets[5-i]===0?"#22c55e":"#08122d"}}>
+                  {chord.frets[5-i]===-1?"✕":chord.frets[5-i]===0?"○":chord.frets[5-i]}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      )}
-      <button onClick={transpose} disabled={loading||semis===0} style={{width:"100%",background:semis===0?"#e0e6f0":"#F97316",color:semis===0?"#aaa":"#fff",border:"none",borderRadius:10,padding:"12px 0",fontWeight:700,fontSize:14,cursor:semis===0?"not-allowed":"pointer",fontFamily:"inherit",opacity:loading?0.7:1}}>
-        {loading ? "Transponiendo..." : "⚡ Transponer con IA"}
-      </button>
+      </div>
     </div>
   );
 }
@@ -508,7 +577,7 @@ export default function Landing({ onPortal }) {
   const gColors = ["linear-gradient(135deg,#0a1628,#1e3a6e)","linear-gradient(135deg,#1a0a2e,#3d1a6e)","linear-gradient(135deg,#0a2818,#1a5c3a)","linear-gradient(135deg,#2e1a0a,#6e3d1a)","linear-gradient(135deg,#0a1a2e,#1a3d5c)"];
 
   return (
-    <div style={{ fontFamily: "'DM Sans','Inter',sans-serif", background: "#fff", color: "#0a0a14", overflowX: "hidden", WebkitFontSmoothing: "antialiased" }}>
+    <div style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif", background: "#fff", color: "#0a0a14", overflowX: "hidden", WebkitFontSmoothing: "antialiased" }}>
       {admin && (
         <AdminPanel
           onClose={() => setAdmin(false)}
@@ -517,7 +586,8 @@ export default function Landing({ onPortal }) {
         />
       )}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;0,9..40,800;0,9..40,900;1,9..40,300&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400;1,9..144,700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,300&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400;1,9..144,700;1,9..144,900&display=swap');
+        html,body,button,input,textarea,select{font-family:'Plus Jakarta Sans','Inter',sans-serif!important}
         *{box-sizing:border-box;margin:0;padding:0}
         html{scroll-behavior:smooth}
 
@@ -605,8 +675,8 @@ export default function Landing({ onPortal }) {
         .gi:nth-child(3){width:340px;height:520px}
         .gi:nth-child(4){width:280px;height:520px}
         .gi:nth-child(5){width:380px;height:520px}
-        .gi-bg{position:absolute;inset:0;background-size:cover;background-position:center;transition:transform .6s ease}
-        .gi:hover .gi-bg{transform:scale(1.04)}
+        .gi-bg{position:absolute;inset:0}
+        .gi:hover .gi-bg{transform:scale(1.04);background-size:cover!important;background-position:center!important}
         .gi-ov{position:absolute;inset:0;background:linear-gradient(to top,rgba(6,14,36,0.92) 0%,rgba(6,14,36,0.1) 55%,transparent 100%)}
         .gi-tag{position:absolute;top:20px;left:20px;backdrop-filter:blur(8px);border-radius:980px;padding:6px 14px;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#fff}
         .gi:nth-child(1) .gi-tag{background:rgba(249,115,22,0.3);border:1px solid rgba(249,115,22,0.5)}
@@ -847,10 +917,14 @@ export default function Landing({ onPortal }) {
             return (
               <div key={n} className="gi">
                 <div className="gi-bg" style={{
-                  backgroundImage: img ? `url('${img}')` : "none",
                   background: img ? undefined : gColors[n-1],
+                  backgroundImage: img ? `url('${img}')` : undefined,
                   backgroundSize: "cover",
-                  backgroundPosition: "center"
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                  position: "absolute",
+                  inset: 0,
+                  transition: "transform 0.6s ease"
                 }}/>
                 <div className="gi-ov"/>
                 <div className="gi-tag">{sub}</div>
@@ -952,8 +1026,8 @@ export default function Landing({ onPortal }) {
             {/* AFINADOR */}
             <ToolTuner />
 
-            {/* TRANSPOSITOR IA */}
-            <ToolTransposer />
+            {/* ACORDES GUITARRA */}
+            <ToolChords />
 
           </div>
         </div>
