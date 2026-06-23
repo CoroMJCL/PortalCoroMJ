@@ -3203,6 +3203,27 @@ function AppInner() {
 // ══════════════════════════════════════════
 //  AUTH SCREEN (Login / Registro / Recuperar)
 // ══════════════════════════════════════════
+// Fondo del login — lee imagen desde landing_content
+function AuthBg() {
+  const [img, setImg] = useState("");
+  useEffect(() => {
+    fetch(`${SUPABASE_URL}/rest/v1/landing_content?key=eq.login_bg&select=value`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    }).then(r => r.json()).then(rows => { if (rows?.[0]?.value) setImg(rows[0].value); }).catch(() => {});
+  }, []);
+  return (
+    <>
+      <div style={{ position:"fixed", inset:0, zIndex:0, background:"#08122d",
+        backgroundImage: img ? `url('${img}')` : "none",
+        backgroundSize:"cover", backgroundPosition:"center"
+      }}/>
+      <div style={{ position:"fixed", inset:0, zIndex:1,
+        background:"linear-gradient(160deg, rgba(6,14,36,0.82) 0%, rgba(6,14,36,0.75) 100%)"
+      }}/>
+    </>
+  );
+}
+
 function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter, onBack }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -3354,32 +3375,8 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter, onBack })
         overflow: "hidden",
       }}
     >
-      {/* Fondo dark tech */}
-      <div style={{
-        position: "fixed", inset: 0, zIndex: 0,
-        background: "#020d1a",
-      }}/>
-      <div style={{
-        position: "fixed", inset: 0, zIndex: 1,
-        backgroundImage: `
-          linear-gradient(rgba(0,180,255,0.045) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(0,180,255,0.045) 1px, transparent 1px)
-        `,
-        backgroundSize: "40px 40px",
-      }}/>
-      <div style={{
-        position: "fixed", inset: 0, zIndex: 2,
-        background: "radial-gradient(ellipse at 20% 50%, rgba(0,80,160,0.18) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, rgba(0,120,200,0.12) 0%, transparent 50%)",
-      }}/>
-      {/* Puntos de luz */}
-      {[[15,25],[65,55],[40,80],[80,35],[25,70]].map(([x,y],i) => (
-        <div key={i} style={{
-          position: "fixed", left: `${x}%`, top: `${y}%`, zIndex: 2,
-          width: 4, height: 4, borderRadius: "50%",
-          background: "#00b4ff",
-          boxShadow: "0 0 8px 2px rgba(0,180,255,0.6)",
-        }}/>
-      ))}
+      {/* Fondo con imagen administrable */}
+      <AuthBg />
       <style>{G}{`
         body { overflow-y: auto !important; height: auto !important; }
         html { overflow-y: auto !important; height: auto !important; }
