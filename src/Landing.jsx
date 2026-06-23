@@ -623,12 +623,12 @@ export default function Landing({ onPortal }) {
         .hero-bg{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center}
         .hero-ov{position:absolute;inset:0;z-index:1;background:linear-gradient(160deg,rgba(6,14,36,0.6) 0%,rgba(6,14,36,0.2) 40%,rgba(6,14,36,0.7) 70%,rgba(6,14,36,0.97) 100%)}
         .hero-c{position:relative;z-index:2;padding:0 60px 68px;width:100%;display:flex;justify-content:space-between;align-items:flex-end}
-        .hero-kicker{font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+        .hero-kicker{font-size:11px;font-weight:700;letter-spacing:0.32em;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-bottom:18px;display:flex;align-items:center;gap:12px}
         .hero-kicker::before{content:'';width:28px;height:1px;background:rgba(255,255,255,0.4)}
         .hero-h1{font-size:clamp(70px,9.5vw,124px);font-weight:900;line-height:0.88;color:#fff;letter-spacing:-0.03em}
         .hero-h1 .it{font-family:'Fraunces',serif;font-style:italic;font-weight:400;display:block;line-height:0.92;font-size:clamp(66px,9vw,118px)}
-        .hero-right{display:flex;flex-direction:column;align-items:flex-end;gap:20px;max-width:300px}
-        .hero-sub{font-size:14.5px;font-weight:300;color:rgba(255,255,255,0.6);line-height:1.75;text-align:right}
+        .hero-right{display:flex;flex-direction:column;align-items:flex-end;gap:16px;max-width:320px}
+        .hero-sub{font-size:13.5px;font-weight:300;color:rgba(255,255,255,0.55);line-height:1.75;text-align:right}
         .hero-btns{display:flex;gap:10px}
         .btn-w{background:#fff;color:#08122d;border:none;border-radius:980px;padding:13px 28px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}
         .btn-w:hover{background:#e8f0fc;transform:translateY(-2px);box-shadow:0 8px 24px rgba(255,255,255,0.2)}
@@ -790,7 +790,7 @@ export default function Landing({ onPortal }) {
         .foot-adm:hover{color:rgba(255,255,255,0.25)}
 
         /* FABS */
-        .fabs{position:fixed;top:50%;left:24px;transform:translateY(-50%);z-index:9000;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+        .fabs{position:fixed;bottom:32px;left:24px;z-index:9000;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
         .hero-countdown{
           background:rgba(8,18,45,0.7);
           backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
@@ -833,7 +833,7 @@ export default function Landing({ onPortal }) {
           .hero-right{align-items:flex-start;max-width:100%}
           .hero-sub{text-align:left}
           .hero-logo-card{display:none}
-          .fabs{bottom:20px;right:16px}
+          .fabs{bottom:20px;left:16px}
           .tools{padding:72px 24px}
           .tools-grid{grid-template-columns:1fr;gap:20px}
         }
@@ -866,7 +866,7 @@ export default function Landing({ onPortal }) {
         <div className="hero-ov"/>
         <div className="hero-c">
           <div>
-            <span className="hero-kicker">{C.hero_kicker}</span>
+            <div style={{fontSize:"clamp(11px,1.2vw,14px)",fontWeight:700,letterSpacing:"0.45em",textTransform:"uppercase",color:"rgba(255,255,255,0.85)",marginBottom:12,display:"block"}}>CORO</div>
             <h1 className="hero-h1">{C.hero_titulo}<br/><span className="it">{C.hero_titulo2}</span></h1>
           </div>
           <div className="hero-right">
