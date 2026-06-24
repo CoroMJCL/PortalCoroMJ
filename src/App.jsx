@@ -16642,8 +16642,18 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   placeholder="Pega el enlace de Google Drive del guion (PDF)"
                   style={{ width: "100%", fontSize: 13, padding: "9px 12px", borderRadius: 9, border: `1px solid ${C.border}`, boxSizing: "border-box" }}
                 />
+                {/* Botón subir guion directo a Supabase */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.primary, color: "white", borderRadius: 9, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: subiendoGuion ? "not-allowed" : "pointer", opacity: subiendoGuion ? 0.6 : 1 }}>
+                    {subiendoGuion ? "⏳ Subiendo..." : "📎 Subir PDF"}
+                    <input type="file" accept="application/pdf" style={{ display: "none" }} onChange={subirGuion} disabled={subiendoGuion} />
+                  </label>
+                  {form.guion_url && (
+                    <span style={{ fontSize: 11, color: "#15803d", fontWeight: 600 }}>✅ Archivo subido</span>
+                  )}
+                </div>
                 <div style={{ fontSize: 11, color: C.gray, marginTop: 5, lineHeight: 1.5 }}>
-                  Sube el guion a Google Drive, ábrelo, toca "Compartir" → "Cualquier persona con el enlace", copia el link y pégalo aquí. Se verá dentro de la app.
+                  Sube el PDF directamente o pega un enlace de Google Drive. Se verá dentro de la app.
                 </div>
                 {form.guion_url && (
                   <button type="button" onClick={() => setVisorGuion(drivePreviewUrl(form.guion_url) || form.guion_url)} style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: C.primary, background: "none", border: `1px solid ${C.primary}55`, borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>
