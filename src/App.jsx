@@ -20796,27 +20796,12 @@ function AdminNotificaciones() {
     if (!form.titulo) return;
     setSending(true);
     setMsg(null);
-    try {
-      const res = await fetch("https://api.onesignal.com/notifications", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Key ${ONESIGNAL_API_KEY}`,
-        },
-        body: JSON.stringify({
-          app_id: ONESIGNAL_APP_ID,
-          included_segments: ["Total Subscriptions"],
-          headings: { en: form.titulo, es: form.titulo },
-          contents: { en: form.cuerpo || form.titulo, es: form.cuerpo || form.titulo },
-          url: "https://portal-coro-mj.vercel.app/",
-        }),
-      });
-      const data = await res.json();
-      if (data.errors) throw new Error(JSON.stringify(data.errors));
-      setMsg({ ok: true, text: `✅ Notificación enviada a ${data.recipients ?? totalSubs} dispositivo(s).` });
+    const r = await sendPushToAll(form.titulo, form.cuerpo || form.titulo, "/");
+    if (r?.ok) {
+      setMsg({ ok: true, text: `✅ Notificación enviada a ${typeof r.recipients === "number" ? r.recipients : totalSubs} dispositivo(s).` });
       setForm({ titulo: "", cuerpo: "" });
-    } catch (e) {
-      setMsg({ ok: false, text: "❌ Error: " + e.message });
+    } else {
+      setMsg({ ok: false, text: "❌ Error: " + (r?.error || JSON.stringify(r?.data)) });
     }
     setSending(false);
   }
