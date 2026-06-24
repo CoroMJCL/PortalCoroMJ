@@ -1410,9 +1410,16 @@ function AppInner() {
         return "reset";
       }
     } catch(e) {}
+
+    // Auto-login: si hay refresh_token guardado, intentar restaurar sesión
+    try {
+      const rt = localStorage.getItem("sb_refresh_token");
+      if (rt) return "auto_login";
+    } catch(e) {}
+
     return "landing";
   })();
-  const [view, setView] = useState(_initialView); // "landing" | "login" | "register" | "recover" | "reset" | "app"
+  const [view, setView] = useState(_initialView === "auto_login" ? "landing" : _initialView);
   const [showPushModal, setShowPushModal] = useState(false);
   const [pushBloqueado, setPushBloqueado] = useState(false);
   const [user, setUser] = useState(null);
@@ -1562,6 +1569,31 @@ function AppInner() {
     } catch(e) {}
   }, []);
 
+
+  // Auto-login con refresh_token guardado
+  useEffect(() => {
+    const rt = localStorage.getItem("sb_refresh_token");
+    if (!rt || view === "app") return;
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+          method: "POST",
+          headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: rt })
+        });
+        const d = await r.json();
+        if (d.access_token && d.user) {
+          _authToken = d.access_token;
+          _refreshToken = d.refresh_token;
+          localStorage.setItem("sb_access_token", d.access_token);
+          localStorage.setItem("sb_refresh_token", d.refresh_token);
+          setUser(d.user);
+          setAuthToken(d.access_token);
+          setView("app");
+        }
+      } catch(e) {}
+    })();
+  }, []);
 
   // Cargar SDK de OneSignal dinámicamente
   useEffect(() => {
