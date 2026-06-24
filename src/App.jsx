@@ -3230,8 +3230,9 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter, onBack })
   const [success, setSuccess] = useState("");
 
   // Login
-  const [loginEmail, setLoginEmail] = useState("");
+  const [loginEmail, setLoginEmail] = useState(() => localStorage.getItem("remember_email") || "");
   const [loginPassword, setLoginPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem("remember_email"));
 
   // Registro
   const [regEmail, setRegEmail] = useState("");
@@ -3287,6 +3288,8 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter, onBack })
     setError("");
     setLoading(true);
     try {
+      if (rememberMe) localStorage.setItem("remember_email", loginEmail.trim().toLowerCase());
+      else localStorage.removeItem("remember_email");
       await onSignIn(loginEmail.trim().toLowerCase(), loginPassword);
     } catch (err) {
       setError(err.message);
@@ -3538,25 +3541,19 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter, onBack })
                   style={inp}
                 />
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setView("recover");
-                  setError("");
-                  setSuccess("");
-                }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: 12,
-                  color: "#1d6fc7",
-                  cursor: "pointer",
-                  padding: "0 0 16px",
-                  textDecoration: "underline",
-                }}
-              >
-                ¿Olvidaste tu contraseña?
-              </button>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+                <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", fontSize:13, color:"#555" }}>
+                  <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)}
+                    style={{ width:15, height:15, accentColor:"#1d6fc7", cursor:"pointer" }}/>
+                  Recordar correo
+                </label>
+                <button
+                  type="button"
+                  onClick={() => { setView("recover"); setError(""); setSuccess(""); }}
+                  style={{ background:"none", border:"none", fontSize:12, color:"#1d6fc7", cursor:"pointer", textDecoration:"underline", padding:0 }}>
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
               <button
                 type="submit"
                 disabled={loading}

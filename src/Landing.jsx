@@ -107,8 +107,9 @@ function AdminImgField({ label, k, name, upKey, handleImg, C }) {
 
 // Componente admin separado para evitar remount de inputs
 function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, handleImg }) {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => localStorage.getItem("admin_email") || "");
   const [pw, setPw] = useState("");
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem("admin_email"));
   const [auth, setAuth] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -133,6 +134,8 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
       });
       const d = await r.json();
       if (d.access_token) {
+        if (rememberMe) localStorage.setItem("admin_email", email);
+        else localStorage.removeItem("admin_email");
         setAuth(true);
       } else {
         setError(d.error_description || d.msg || "Correo o contraseña incorrectos.");
@@ -161,6 +164,11 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
               onKeyDown={e => e.key === "Enter" && check()}
               style={{ border: "1px solid #dde4f0", borderRadius: 10, padding: "12px 16px", fontSize: 14, fontFamily: "inherit", outline: "none" }} />
             {error && <div style={{ fontSize: 13, color: "#ef4444", background: "#fef2f2", borderRadius: 8, padding: "10px 14px" }}>{error}</div>}
+            <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", fontSize:13, color:"#555" }}>
+              <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)}
+                style={{ width:15, height:15, accentColor:"#08122d", cursor:"pointer" }}/>
+              Recordar correo
+            </label>
             <button onClick={check} disabled={loading} style={{ background: "#08122d", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit", opacity: loading ? 0.7 : 1 }}>
               {loading ? "Verificando..." : "Ingresar"}
             </button>
