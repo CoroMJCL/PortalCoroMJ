@@ -22435,7 +22435,7 @@ function TabResumen({ cuotas, pagos, gastos, actividades }) {
           color: "white",
         }}
       >
-        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 4 }}>Saldo disponible</div>
+        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 4 }}>Total ingresado (todos los meses)</div>
         <div
           style={{
             fontSize: 36,
@@ -22444,16 +22444,16 @@ function TabResumen({ cuotas, pagos, gastos, actividades }) {
             marginBottom: 16,
           }}
         >
-          {finFmtCLP(saldo)}
+          {finFmtCLP(totalIngresado)}
         </div>
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
           <div>
-            <div style={{ fontSize: 11, opacity: 0.75 }}>Total ingresado</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{finFmtCLP(totalIngresado)}</div>
-          </div>
-          <div>
             <div style={{ fontSize: 11, opacity: 0.75 }}>Total gastado</div>
             <div style={{ fontSize: 18, fontWeight: 700 }}>{finFmtCLP(totalGastado)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, opacity: 0.75 }}>Saldo disponible</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>{finFmtCLP(saldo)}</div>
           </div>
         </div>
       </div>
