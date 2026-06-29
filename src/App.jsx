@@ -1570,11 +1570,14 @@ function AppInner() {
   }, []);
 
 
-  // Auto-login con refresh_token guardado
-  // Solo se ejecuta si el usuario NO navegó manualmente al login
+  // Flag: bloquea auto-login cuando el usuario navega al login manualmente
+  const _autoLoginBloqueado = useRef(false);
+
+  // Auto-login con refresh_token guardado — solo si el usuario no eligió ir al login
   useEffect(() => {
+    if (_autoLoginBloqueado.current) return;
     const rt = localStorage.getItem("sb_refresh_token");
-    if (!rt || view === "app" || view === "login" || view === "guest_code" || view === "register") return;
+    if (!rt) return;
     (async () => {
       try {
         const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
@@ -2241,6 +2244,7 @@ function AppInner() {
   }
 
   function handleGuestEnter() {
+    _autoLoginBloqueado.current = true;
     // Sesión de invitado: solo en memoria, sin cuenta Supabase
     _isGuestSession = true;
     setUser({ nombre: "Invitado", cuerda: "", acceso: "aprobado", id: null });
@@ -2342,6 +2346,7 @@ function AppInner() {
 
   if (view === "landing")
     return <Landing onPortal={() => {
+      _autoLoginBloqueado.current = true;
       localStorage.removeItem("sb_access_token");
       localStorage.removeItem("sb_refresh_token");
       setView("login");
@@ -12566,7 +12571,6 @@ const ADMIN_TABS = [
   { id: "api_config", label: "Claves API", icon: "🔑" },
 ];
 
-// ── Admin premium: metadata por tab (color de acento, descripción) ──
 const ADMIN_TAB_META = {
   integrantes:          { color: "#1e3a5f", bg: "#eef2f9", desc: "Gestiona el equipo" },
   asistencia:           { color: "#0d7a4e", bg: "#e6f7f0", desc: "Marcar presente" },
@@ -12612,17 +12616,15 @@ function AdminTab({ label, active, onClick }) {
   );
 }
 
-// ── Premium AdminSideMenu (desktop) + AdminMobileNav (móvil) ──
 function AdminSideMenu({ tabs, tab, setTab, pendientes, onPick }) {
   const byId = Object.fromEntries(tabs.map((t) => [t.id, t]));
   return (
     <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       {ADMIN_GRUPOS.map((g) => (
         <div key={g.grupo} style={{ marginBottom: 4 }}>
-          <div style={{
-            fontSize: 10, fontWeight: 700, color: "#9aa3b2", textTransform: "uppercase",
-            letterSpacing: "0.09em", padding: "6px 10px 4px",
-          }}>{g.emoji} {g.grupo}</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#9aa3b2", textTransform: "uppercase", letterSpacing: "0.09em", padding: "6px 10px 4px" }}>
+            {g.emoji} {g.grupo}
+          </div>
           {g.ids.map((id) => {
             const t = byId[id]; if (!t) return null;
             const active = tab === id;
@@ -12634,20 +12636,16 @@ function AdminSideMenu({ tabs, tab, setTab, pendientes, onPick }) {
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "9px 10px", borderRadius: 10, border: "none",
                   cursor: "pointer", width: "100%", textAlign: "left",
-                  background: active ? meta.bg || `${C.primary}10` : "transparent",
-                  transition: "background 0.12s",
-                  position: "relative",
+                  background: active ? (meta.bg || `${C.primary}10`) : "transparent",
+                  transition: "background 0.12s", position: "relative",
                 }}
                 onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#f4f5f7"; }}
-                onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = active ? (meta.bg || `${C.primary}10`) : "transparent"; }}
               >
                 {active && <span style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: 3, height: 22, borderRadius: 3, background: meta.color || C.primary }} />}
-                <span style={{
-                  width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                  background: active ? (meta.bg || `${C.primary}18`) : "#f1f3f5",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 15, transition: "background 0.12s",
-                }}>{t.icon}</span>
+                <span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: active ? (meta.bg || `${C.primary}18`) : "#f1f3f5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
+                  {t.icon}
+                </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: active ? (meta.color || C.primary) : C.dark, lineHeight: 1.2 }}>{t.label}</div>
                   {active && meta.desc && <div style={{ fontSize: 10.5, color: meta.color || C.gray, opacity: 0.8, marginTop: 1 }}>{meta.desc}</div>}
@@ -12664,9 +12662,9 @@ function AdminSideMenu({ tabs, tab, setTab, pendientes, onPick }) {
   );
 }
 
-// ── Navegación móvil premium: grupos como tabs + grilla de acciones ──
+// Navegación móvil premium — grupos como pills + grilla de tarjetas
 function AdminMobileNav({ tabs, tab, setTab, pendientes }) {
-  const [grupo, setGrupo] = React.useState(() => {
+  const [grupo, setGrupo] = useState(() => {
     for (const g of ADMIN_GRUPOS) { if (g.ids.includes(tab)) return g.grupo; }
     return ADMIN_GRUPOS[0].grupo;
   });
@@ -12675,22 +12673,19 @@ function AdminMobileNav({ tabs, tab, setTab, pendientes }) {
 
   return (
     <div style={{ marginBottom: 14 }}>
-      {/* Pills de grupo */}
       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10, scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
         {ADMIN_GRUPOS.map((g) => {
           const isActive = g.grupo === grupo;
           return (
-            <button key={g.grupo} onClick={() => setGrupo(g.grupo)}
-              style={{
-                flexShrink: 0, padding: "7px 16px", borderRadius: 20,
-                border: isActive ? "none" : `1px solid ${C.border}`,
-                background: isActive ? C.primary : "white",
-                color: isActive ? "white" : C.gray,
-                fontSize: 13, fontWeight: isActive ? 700 : 500,
-                cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >
+            <button key={g.grupo} onClick={() => setGrupo(g.grupo)} style={{
+              flexShrink: 0, padding: "7px 16px", borderRadius: 20,
+              border: isActive ? "none" : `1px solid ${C.border}`,
+              background: isActive ? C.primary : "white",
+              color: isActive ? "white" : C.gray,
+              fontSize: 13, fontWeight: isActive ? 700 : 500,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+              WebkitTapHighlightColor: "transparent",
+            }}>
               {g.emoji} {g.grupo}
               {g.grupo === "Contenido" && pendientes > 0 && (
                 <span style={{ background: "#ef4444", color: "white", borderRadius: 10, fontSize: 10, fontWeight: 700, padding: "1px 5px" }}>{pendientes}</span>
@@ -12699,8 +12694,6 @@ function AdminMobileNav({ tabs, tab, setTab, pendientes }) {
           );
         })}
       </div>
-
-      {/* Grilla de acciones del grupo activo */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         {grupoActivo.ids.map((id) => {
           const t = byId[id]; if (!t) return null;
@@ -12708,24 +12701,19 @@ function AdminMobileNav({ tabs, tab, setTab, pendientes }) {
           const meta = ADMIN_TAB_META[id] || {};
           const badge = id === "preguntas" && pendientes > 0 ? pendientes : null;
           return (
-            <button key={id} onClick={() => setTab(id)}
-              style={{
-                display: "flex", flexDirection: "column", alignItems: "flex-start",
-                gap: 8, padding: "14px 12px", borderRadius: 14,
-                border: active ? `2px solid ${meta.color || C.primary}` : `1px solid ${C.border}`,
-                background: active ? (meta.bg || `${C.primary}0d`) : "white",
-                cursor: "pointer", textAlign: "left", position: "relative",
-                WebkitTapHighlightColor: "transparent",
-                boxShadow: active ? `0 4px 16px ${meta.color || C.primary}20` : "0 1px 3px rgba(0,0,0,0.04)",
-                transition: "all 0.15s",
-              }}
-            >
-              <div style={{
-                width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-                background: active ? (meta.color || C.primary) : (meta.bg || "#f1f3f5"),
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-                filter: active ? "none" : "grayscale(0.2)",
-              }}>{t.icon}</div>
+            <button key={id} onClick={() => setTab(id)} style={{
+              display: "flex", flexDirection: "column", alignItems: "flex-start",
+              gap: 8, padding: "14px 12px", borderRadius: 14,
+              border: active ? `2px solid ${meta.color || C.primary}` : `1px solid ${C.border}`,
+              background: active ? (meta.bg || `${C.primary}0d`) : "white",
+              cursor: "pointer", textAlign: "left", position: "relative",
+              WebkitTapHighlightColor: "transparent",
+              boxShadow: active ? `0 4px 16px ${meta.color || C.primary}20` : "0 1px 3px rgba(0,0,0,0.04)",
+              transition: "all 0.15s",
+            }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: active ? (meta.color || C.primary) : (meta.bg || "#f1f3f5"), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
+                {t.icon}
+              </div>
               <div>
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: active ? (meta.color || C.primary) : C.dark, lineHeight: 1.3 }}>{t.label}</div>
                 {meta.desc && <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>{meta.desc}</div>}
@@ -12740,8 +12728,6 @@ function AdminMobileNav({ tabs, tab, setTab, pendientes }) {
     </div>
   );
 }
-
-
 
 
 function ConfirmBtn({ onConfirm, label = "🗑 Eliminar", compact = false }) {
@@ -20746,17 +20732,18 @@ function Admin({
 
       <PushTestBar />
 
+      {/* Etiqueta del tab activo (label legible para encabezado móvil) */}
       <div className="admin-layout" style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
-        {/* Sidebar premium (desktop) */}
+        {/* Menú lateral (desktop) */}
         <aside className="admin-sidebar hide-mobile" style={{
-          width: 240, flexShrink: 0, position: "sticky", top: 12,
-          background: "#ffffff", border: `1px solid ${C.border}`,
-          borderRadius: 16, padding: "14px 10px", boxShadow: "0 1px 3px rgba(16,24,40,0.04)",
+          width: 230, flexShrink: 0, position: "sticky", top: 12,
+          background: "var(--surface,#fff)", border: `1px solid ${C.border}`,
+          borderRadius: 16, padding: "12px 10px", boxShadow: "0 1px 3px rgba(16,24,40,0.04)",
         }}>
           <AdminSideMenu tabs={ADMIN_TABS} tab={tab} setTab={setTab} pendientes={pendientes} />
         </aside>
 
-        {/* Navegación premium móvil (grilla de tarjetas) */}
+        {/* Navegación premium móvil */}
         <div className="admin-menu-btn" style={{ width: "100%" }}>
           <AdminMobileNav tabs={ADMIN_TABS} tab={tab} setTab={setTab} pendientes={pendientes} />
         </div>
@@ -21058,7 +21045,7 @@ function copiarTexto(text) {
 }
 
 const CUOTA_ESTUDIANTE_MONTO = 3000; // Valor fijo cuota estudiante
-const CUOTA_BASE_MONTO = 5000; // Valor base fijo cuota adulto
+const CUOTA_BASE_MONTO = 5000; // Valor base fijo cuota adulto (no cambia)
 const CUOTAS_MES_INICIO = "2026-06"; // Las cuotas empiezan en Junio 2026
 function finMesVigente() { return finCurrentMesIso() >= CUOTAS_MES_INICIO; }
 const finIni = (n) => (n || "?").charAt(0).toUpperCase();
