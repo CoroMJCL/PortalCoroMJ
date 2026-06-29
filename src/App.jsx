@@ -21059,7 +21059,6 @@ function copiarTexto(text) {
 
 const CUOTA_ESTUDIANTE_MONTO = 3000; // Valor fijo cuota estudiante
 const CUOTA_BASE_MONTO = 5000; // Valor base fijo cuota adulto
-const CUOTA_BASE_MONTO = 5000; // Valor base fijo cuota adulto (no cambia)
 const CUOTAS_MES_INICIO = "2026-06"; // Las cuotas empiezan en Junio 2026
 function finMesVigente() { return finCurrentMesIso() >= CUOTAS_MES_INICIO; }
 const finIni = (n) => (n || "?").charAt(0).toUpperCase();
