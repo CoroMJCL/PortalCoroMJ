@@ -12741,73 +12741,7 @@ function AdminMobileNav({ tabs, tab, setTab, pendientes }) {
   );
 }
 
-function AdminSideMenu({ tabs, tab, setTab, pendientes, onPick }) {
-  const byId = Object.fromEntries(tabs.map((t) => [t.id, t]));
-  const [abierto, setAbierto] = useState(() => {
-    const o = {}; ADMIN_GRUPOS.forEach((g) => (o[g.grupo] = true)); return o;
-  });
-  return (
-    <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      {ADMIN_GRUPOS.map((g, gi) => {
-        const exp = abierto[g.grupo];
-        return (
-          <div key={g.grupo} style={{ marginBottom: gi === ADMIN_GRUPOS.length - 1 ? 0 : 6 }}>
-            <button
-              onClick={() => setAbierto((p) => ({ ...p, [g.grupo]: !p[g.grupo] }))}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 7,
-                background: "transparent", border: "none", cursor: "pointer",
-                padding: "7px 10px", borderRadius: 7,
-                fontSize: 10.5, fontWeight: 700, color: "#9aa3b2",
-                textTransform: "uppercase", letterSpacing: "0.08em",
-              }}
-            >
-              <span style={{ flex: 1, textAlign: "left" }}>{g.grupo}</span>
-              <span style={{ fontSize: 8, transform: exp ? "rotate(90deg)" : "none", transition: "transform 0.15s", opacity: 0.5 }}>▶</span>
-            </button>
-            {exp && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                {g.ids.map((id) => {
-                  const t = byId[id];
-                  if (!t) return null;
-                  const active = tab === id;
-                  const badge = id === "preguntas" && pendientes > 0 ? pendientes : null;
-                  return (
-                    <button
-                      key={id}
-                      onClick={() => { setTab(id); onPick && onPick(); }}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 10,
-                        padding: "8px 12px", borderRadius: 8,
-                        border: "none", cursor: "pointer", width: "100%", textAlign: "left",
-                        fontSize: 13, fontWeight: active ? 600 : 500,
-                        background: active ? `${C.primary}0f` : "transparent",
-                        color: active ? C.primary : "#3a3f4a",
-                        position: "relative",
-                        transition: "background 0.12s, color 0.12s",
-                      }}
-                      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#f4f5f7"; }}
-                      onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
-                    >
-                      {active && <span style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: 3, height: 18, borderRadius: 3, background: C.primary }} />}
-                      <span style={{ fontSize: 14, width: 18, textAlign: "center", opacity: active ? 1 : 0.55, filter: active ? "none" : "grayscale(0.3)" }}>{t.icon}</span>
-                      <span style={{ flex: 1 }}>{t.label}</span>
-                      {badge != null && (
-                        <span style={{ background: "#ef4444", color: "#fff", fontSize: 10.5, fontWeight: 700, borderRadius: 999, minWidth: 17, height: 17, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>
-                          {badge}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </nav>
-  );
-}
+
 
 
 function ConfirmBtn({ onConfirm, label = "🗑 Eliminar", compact = false }) {
