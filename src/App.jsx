@@ -1571,9 +1571,10 @@ function AppInner() {
 
 
   // Auto-login con refresh_token guardado
+  // Solo se ejecuta si el usuario NO navegó manualmente al login
   useEffect(() => {
     const rt = localStorage.getItem("sb_refresh_token");
-    if (!rt || view === "app") return;
+    if (!rt || view === "app" || view === "login" || view === "guest_code" || view === "register") return;
     (async () => {
       try {
         const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
@@ -2340,7 +2341,11 @@ function AppInner() {
   }
 
   if (view === "landing")
-    return <Landing onPortal={() => setView("login")} />;
+    return <Landing onPortal={() => {
+      localStorage.removeItem("sb_access_token");
+      localStorage.removeItem("sb_refresh_token");
+      setView("login");
+    }} />;
 
   if (view !== "app")
     return (
@@ -12561,40 +12566,180 @@ const ADMIN_TABS = [
   { id: "api_config", label: "Claves API", icon: "🔑" },
 ];
 
+// ── Admin premium: metadata por tab (color de acento, descripción) ──
+const ADMIN_TAB_META = {
+  integrantes:          { color: "#1e3a5f", bg: "#eef2f9", desc: "Gestiona el equipo" },
+  asistencia:           { color: "#0d7a4e", bg: "#e6f7f0", desc: "Marcar presente" },
+  historial:            { color: "#0d7a4e", bg: "#e6f7f0", desc: "Ver registros" },
+  material_coro_admin:  { color: "#6d28d9", bg: "#f3e8ff", desc: "Solo integrantes" },
+  comunidades:          { color: "#b45309", bg: "#fef3c7", desc: "Gestionar grupos" },
+  noticias:             { color: "#b91c1c", bg: "#fef2f2", desc: "Comunicados" },
+  oraciones:            { color: "#1e3a5f", bg: "#eef2f9", desc: "Liturgia" },
+  preguntas:            { color: "#b45309", bg: "#fff7ed", desc: "Responder" },
+  biblioteca:           { color: "#0e7490", bg: "#e0f2fe", desc: "Documentos" },
+  podcasts:             { color: "#7c3aed", bg: "#f5f3ff", desc: "Episodios" },
+  galeria:              { color: "#be185d", bg: "#fdf2f8", desc: "Fotos del coro" },
+  links:                { color: "#0d7a4e", bg: "#e6f7f0", desc: "Recursos externos" },
+  pautas:               { color: "#1e3a5f", bg: "#eef2f9", desc: "Repertorio misa" },
+  documentos:           { color: "#0e7490", bg: "#e0f2fe", desc: "PDFs públicos" },
+  material_ensayo_admin:{ color: "#6d28d9", bg: "#f3e8ff", desc: "Vista invitado" },
+  descargas_admin:      { color: "#0e7490", bg: "#e0f2fe", desc: "Archivos libres" },
+  visitas:              { color: "#374151", bg: "#f3f4f6", desc: "Registro visitas" },
+  cuentas:              { color: "#1e3a5f", bg: "#eef2f9", desc: "Roles y accesos" },
+  cuenta_bancaria:      { color: "#0d7a4e", bg: "#e6f7f0", desc: "Transferencias" },
+  notificaciones:       { color: "#b45309", bg: "#fff7ed", desc: "Push a todos" },
+  api_config:           { color: "#374151", bg: "#f3f4f6", desc: "Claves secretas" },
+};
+
+const ADMIN_GRUPOS = [
+  { grupo: "Coro",      emoji: "👥", ids: ["integrantes", "asistencia", "historial", "material_coro_admin", "comunidades"] },
+  { grupo: "Contenido", emoji: "✏️",  ids: ["noticias", "pautas", "oraciones", "preguntas", "biblioteca", "podcasts", "galeria", "links"] },
+  { grupo: "Invitados", emoji: "👋", ids: ["documentos", "material_ensayo_admin", "descargas_admin", "visitas"] },
+  { grupo: "Sistema",   emoji: "⚙️", ids: ["cuentas", "cuenta_bancaria", "notificaciones", "api_config"] },
+];
+
 function AdminTab({ label, active, onClick }) {
   return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: "8px 16px",
-        borderRadius: 20,
-        border: active ? "none" : "1px solid rgba(60,60,67,0.15)",
-        cursor: "pointer",
-        fontSize: 13,
-        fontWeight: active ? 600 : 500,
-        background: active
-          ? `linear-gradient(135deg, ${C.primary} 0%, #0f3d6e 100%)`
-          : "rgba(255,255,255,0.8)",
-        color: active ? "white" : C.gray,
-        boxShadow: active ? `0 2px 10px ${C.primary}40` : "none",
-        transition: "all 0.18s cubic-bezier(0.25,0.46,0.45,0.94)",
-        whiteSpace: "nowrap",
-        letterSpacing: "-0.01em",
-        WebkitTapHighlightColor: "transparent",
-      }}
-    >
-      {label}
-    </button>
+    <button onClick={onClick} style={{
+      padding: "7px 15px", borderRadius: 20,
+      border: active ? "none" : "1px solid rgba(60,60,67,0.15)",
+      cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 500,
+      background: active ? `linear-gradient(135deg, ${C.primary} 0%, #0f3d6e 100%)` : "rgba(255,255,255,0.8)",
+      color: active ? "white" : C.gray,
+      boxShadow: active ? `0 2px 10px ${C.primary}40` : "none",
+      transition: "all 0.18s", whiteSpace: "nowrap", WebkitTapHighlightColor: "transparent",
+    }}>{label}</button>
   );
 }
 
-// Pestañas del panel admin agrupadas por categoría — sin scroll horizontal
-const ADMIN_GRUPOS = [
-  { grupo: "Coro", icon: "👥", ids: ["integrantes", "asistencia", "historial", "material_coro_admin", "comunidades"] },
-  { grupo: "Contenido", icon: "📚", ids: ["noticias", "oraciones", "preguntas", "biblioteca", "podcasts", "galeria", "links"] },
-  { grupo: "Invitados", icon: "👋", ids: ["documentos", "material_ensayo_admin", "descargas_admin", "visitas"] },
-  { grupo: "Sistema", icon: "⚙️", ids: ["cuentas", "cuenta_bancaria", "notificaciones", "api_config"] },
-];
+// ── Premium AdminSideMenu (desktop) + AdminMobileNav (móvil) ──
+function AdminSideMenu({ tabs, tab, setTab, pendientes, onPick }) {
+  const byId = Object.fromEntries(tabs.map((t) => [t.id, t]));
+  return (
+    <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {ADMIN_GRUPOS.map((g) => (
+        <div key={g.grupo} style={{ marginBottom: 4 }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700, color: "#9aa3b2", textTransform: "uppercase",
+            letterSpacing: "0.09em", padding: "6px 10px 4px",
+          }}>{g.emoji} {g.grupo}</div>
+          {g.ids.map((id) => {
+            const t = byId[id]; if (!t) return null;
+            const active = tab === id;
+            const meta = ADMIN_TAB_META[id] || {};
+            const badge = id === "preguntas" && pendientes > 0 ? pendientes : null;
+            return (
+              <button key={id} onClick={() => { setTab(id); onPick?.(); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "9px 10px", borderRadius: 10, border: "none",
+                  cursor: "pointer", width: "100%", textAlign: "left",
+                  background: active ? meta.bg || `${C.primary}10` : "transparent",
+                  transition: "background 0.12s",
+                  position: "relative",
+                }}
+                onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#f4f5f7"; }}
+                onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
+              >
+                {active && <span style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: 3, height: 22, borderRadius: 3, background: meta.color || C.primary }} />}
+                <span style={{
+                  width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                  background: active ? (meta.bg || `${C.primary}18`) : "#f1f3f5",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 15, transition: "background 0.12s",
+                }}>{t.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: active ? (meta.color || C.primary) : C.dark, lineHeight: 1.2 }}>{t.label}</div>
+                  {active && meta.desc && <div style={{ fontSize: 10.5, color: meta.color || C.gray, opacity: 0.8, marginTop: 1 }}>{meta.desc}</div>}
+                </div>
+                {badge != null && (
+                  <span style={{ background: "#ef4444", color: "white", borderRadius: 10, fontSize: 10, fontWeight: 700, padding: "2px 6px", minWidth: 18, textAlign: "center" }}>{badge}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+// ── Navegación móvil premium: grupos como tabs + grilla de acciones ──
+function AdminMobileNav({ tabs, tab, setTab, pendientes }) {
+  const [grupo, setGrupo] = React.useState(() => {
+    for (const g of ADMIN_GRUPOS) { if (g.ids.includes(tab)) return g.grupo; }
+    return ADMIN_GRUPOS[0].grupo;
+  });
+  const byId = Object.fromEntries(tabs.map((t) => [t.id, t]));
+  const grupoActivo = ADMIN_GRUPOS.find((g) => g.grupo === grupo) || ADMIN_GRUPOS[0];
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      {/* Pills de grupo */}
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10, scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
+        {ADMIN_GRUPOS.map((g) => {
+          const isActive = g.grupo === grupo;
+          return (
+            <button key={g.grupo} onClick={() => setGrupo(g.grupo)}
+              style={{
+                flexShrink: 0, padding: "7px 16px", borderRadius: 20,
+                border: isActive ? "none" : `1px solid ${C.border}`,
+                background: isActive ? C.primary : "white",
+                color: isActive ? "white" : C.gray,
+                fontSize: 13, fontWeight: isActive ? 700 : 500,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              {g.emoji} {g.grupo}
+              {g.grupo === "Contenido" && pendientes > 0 && (
+                <span style={{ background: "#ef4444", color: "white", borderRadius: 10, fontSize: 10, fontWeight: 700, padding: "1px 5px" }}>{pendientes}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Grilla de acciones del grupo activo */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {grupoActivo.ids.map((id) => {
+          const t = byId[id]; if (!t) return null;
+          const active = tab === id;
+          const meta = ADMIN_TAB_META[id] || {};
+          const badge = id === "preguntas" && pendientes > 0 ? pendientes : null;
+          return (
+            <button key={id} onClick={() => setTab(id)}
+              style={{
+                display: "flex", flexDirection: "column", alignItems: "flex-start",
+                gap: 8, padding: "14px 12px", borderRadius: 14,
+                border: active ? `2px solid ${meta.color || C.primary}` : `1px solid ${C.border}`,
+                background: active ? (meta.bg || `${C.primary}0d`) : "white",
+                cursor: "pointer", textAlign: "left", position: "relative",
+                WebkitTapHighlightColor: "transparent",
+                boxShadow: active ? `0 4px 16px ${meta.color || C.primary}20` : "0 1px 3px rgba(0,0,0,0.04)",
+                transition: "all 0.15s",
+              }}
+            >
+              <div style={{
+                width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                background: active ? (meta.color || C.primary) : (meta.bg || "#f1f3f5"),
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+                filter: active ? "none" : "grayscale(0.2)",
+              }}>{t.icon}</div>
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: active ? (meta.color || C.primary) : C.dark, lineHeight: 1.3 }}>{t.label}</div>
+                {meta.desc && <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>{meta.desc}</div>}
+              </div>
+              {badge != null && (
+                <span style={{ position: "absolute", top: 10, right: 10, background: "#ef4444", color: "white", borderRadius: 10, fontSize: 10, fontWeight: 700, padding: "2px 7px" }}>{badge}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function AdminSideMenu({ tabs, tab, setTab, pendientes, onPick }) {
   const byId = Object.fromEntries(tabs.map((t) => [t.id, t]));
@@ -20552,7 +20697,6 @@ function Admin({
   user,
 }) {
   const [tab, setTabRaw] = useState("integrantes");
-  const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
   const adminContentRef = useRef(null);
   const setTab = (id) => {
     setTabRaw(id);
@@ -20668,44 +20812,20 @@ function Admin({
 
       <PushTestBar />
 
-      {/* Etiqueta del tab activo (label legible para encabezado móvil) */}
       <div className="admin-layout" style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
-        {/* Menú lateral (desktop) */}
+        {/* Sidebar premium (desktop) */}
         <aside className="admin-sidebar hide-mobile" style={{
-          width: 230, flexShrink: 0, position: "sticky", top: 12,
-          background: "var(--surface,#fff)", border: `1px solid ${C.border}`,
-          borderRadius: 16, padding: "12px 10px", boxShadow: "0 1px 3px rgba(16,24,40,0.04)",
+          width: 240, flexShrink: 0, position: "sticky", top: 12,
+          background: "#ffffff", border: `1px solid ${C.border}`,
+          borderRadius: 16, padding: "14px 10px", boxShadow: "0 1px 3px rgba(16,24,40,0.04)",
         }}>
           <AdminSideMenu tabs={ADMIN_TABS} tab={tab} setTab={setTab} pendientes={pendientes} />
         </aside>
 
-        {/* Botón de menú (solo móvil) */}
-        <button
-          className="admin-menu-btn"
-          onClick={() => setMenuMovilAbierto(true)}
-          style={{
-            alignItems: "center", gap: 10, width: "100%",
-            background: C.primary, color: "#fff", border: "none", borderRadius: 12,
-            padding: "13px 16px", fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 14,
-          }}
-        >
-          <span style={{ fontSize: 17 }}>☰</span>
-          <span>{(ADMIN_TABS.find((t) => t.id === tab) || {}).label || "Secciones"}</span>
-          <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.8 }}>Cambiar ▾</span>
-        </button>
-
-        {/* Menú lateral móvil (drawer) */}
-        {menuMovilAbierto && (
-          <div onClick={() => setMenuMovilAbierto(false)} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex" }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: "82%", maxWidth: 320, background: "#fff", height: "100%", overflowY: "auto", padding: "16px 12px", boxShadow: "4px 0 24px rgba(0,0,0,0.2)" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px 12px", borderBottom: `1px solid ${C.border}`, marginBottom: 10 }}>
-                <span style={{ fontSize: 15, fontWeight: 800, color: C.dark, fontFamily: "var(--font-display)" }}>Secciones</span>
-                <button onClick={() => setMenuMovilAbierto(false)} style={{ background: "none", border: "none", fontSize: 22, color: C.gray, cursor: "pointer", lineHeight: 1 }}>×</button>
-              </div>
-              <AdminSideMenu tabs={ADMIN_TABS} tab={tab} setTab={setTab} pendientes={pendientes} onPick={() => setMenuMovilAbierto(false)} />
-            </div>
-          </div>
-        )}
+        {/* Navegación premium móvil (grilla de tarjetas) */}
+        <div className="admin-menu-btn" style={{ width: "100%" }}>
+          <AdminMobileNav tabs={ADMIN_TABS} tab={tab} setTab={setTab} pendientes={pendientes} />
+        </div>
 
         {/* Columna de contenido */}
         <div ref={adminContentRef} style={{ flex: 1, minWidth: 0, scrollMarginTop: 12 }}>
@@ -21004,6 +21124,8 @@ function copiarTexto(text) {
 }
 
 const CUOTA_ESTUDIANTE_MONTO = 3000; // Valor fijo cuota estudiante
+const CUOTA_BASE_MONTO = 5000; // Valor base fijo cuota adulto
+const CUOTA_BASE_MONTO = 5000; // Valor base fijo cuota adulto (no cambia)
 const CUOTAS_MES_INICIO = "2026-06"; // Las cuotas empiezan en Junio 2026
 function finMesVigente() { return finCurrentMesIso() >= CUOTAS_MES_INICIO; }
 const finIni = (n) => (n || "?").charAt(0).toUpperCase();
@@ -21263,7 +21385,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
   // Helper: monto que debe pagar cada integrante según su tipo
   function montoParaMiembro(miembro) {
     const reg = miembrosEnCuotas.find((r) => r.integrante_id === miembro.id);
-    return reg?.es_estudiante ? CUOTA_ESTUDIANTE_MONTO : (cuotaMes?.valor || 0);
+    return reg?.es_estudiante ? CUOTA_ESTUDIANTE_MONTO : (cuotaMes?.valor || CUOTA_BASE_MONTO);
   }
 
   // Cuota del mes seleccionado
@@ -21565,7 +21687,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
             {/* Quién */}
             <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "10px 14px", marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: "#14532d" }}>{confirmPagarConComprobante.miembro.nombre}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#15803d" }}>{finFmtCLP(cuotaMes?.valor || 0)} · {finMesLabel(mesSeleccionado)}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#15803d" }}>{finFmtCLP(cuotaMes?.valor || CUOTA_BASE_MONTO)} · {finMesLabel(mesSeleccionado)}</span>
             </div>
             {/* Explicación */}
             <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.65, marginBottom: 16 }}>
@@ -21769,10 +21891,14 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
           </div>
         </div>
         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", textAlign: "right", lineHeight: 1.5 }}>
-          Suma de todas las cuotas<br />de todos los meses
+          Suma de <strong>todos los pagos</strong> de todos los meses registrados
         </div>
       </div>
 
+      {/* Separador mes actual */}
+      <div style={{ background: "#f1f5f9", borderRadius: 12, padding: "10px 16px", marginBottom: 14 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#3b5bdb" }}>📅 Estadísticas del mes seleccionado</span>
+      </div>
       {/* Stats del mes seleccionado */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 20 }}>
         <StatCard icon="👥" label="En sistema" value={miembrosActivos.length} color="#3b82f6" />
