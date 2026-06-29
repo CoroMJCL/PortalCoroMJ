@@ -1411,15 +1411,9 @@ function AppInner() {
       }
     } catch(e) {}
 
-    // Auto-login: si hay refresh_token guardado, intentar restaurar sesión
-    try {
-      const rt = localStorage.getItem("sb_refresh_token");
-      if (rt) return "auto_login";
-    } catch(e) {}
-
     return "landing";
   })();
-  const [view, setView] = useState(_initialView === "auto_login" ? "landing" : _initialView);
+  const [view, setView] = useState(_initialView);
   const [showPushModal, setShowPushModal] = useState(false);
   const [pushBloqueado, setPushBloqueado] = useState(false);
   const [user, setUser] = useState(null);
@@ -1570,34 +1564,7 @@ function AppInner() {
   }, []);
 
 
-  // Flag: bloquea auto-login cuando el usuario navega al login manualmente
-  const _autoLoginBloqueado = useRef(false);
-
-  // Auto-login con refresh_token guardado — solo si el usuario no eligió ir al login
-  useEffect(() => {
-    if (_autoLoginBloqueado.current) return;
-    const rt = localStorage.getItem("sb_refresh_token");
-    if (!rt) return;
-    (async () => {
-      try {
-        const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-          method: "POST",
-          headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh_token: rt })
-        });
-        const d = await r.json();
-        if (d.access_token && d.user) {
-          _authToken = d.access_token;
-          _refreshToken = d.refresh_token;
-          localStorage.setItem("sb_access_token", d.access_token);
-          localStorage.setItem("sb_refresh_token", d.refresh_token);
-          setUser(d.user);
-          setAuthToken(d.access_token);
-          setView("app");
-        }
-      } catch(e) {}
-    })();
-  }, []);
+  // Auto-login eliminado — el usuario siempre ingresa manualmente
 
   // Cargar SDK de OneSignal dinámicamente
   useEffect(() => {
@@ -2244,7 +2211,6 @@ function AppInner() {
   }
 
   function handleGuestEnter() {
-    _autoLoginBloqueado.current = true;
     // Sesión de invitado: solo en memoria, sin cuenta Supabase
     _isGuestSession = true;
     setUser({ nombre: "Invitado", cuerda: "", acceso: "aprobado", id: null });
@@ -2346,7 +2312,6 @@ function AppInner() {
 
   if (view === "landing")
     return <Landing onPortal={() => {
-      _autoLoginBloqueado.current = true;
       localStorage.removeItem("sb_access_token");
       localStorage.removeItem("sb_refresh_token");
       setView("login");
@@ -12643,16 +12608,12 @@ function AdminSideMenu({ tabs, tab, setTab, pendientes, onPick }) {
                 onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = active ? (meta.bg || `${C.primary}10`) : "transparent"; }}
               >
                 {active && <span style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: 3, height: 22, borderRadius: 3, background: meta.color || C.primary }} />}
-                <span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: active ? (meta.bg || `${C.primary}18`) : "#f1f3f5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
-                  {t.icon}
-                </span>
+                <span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: active ? (meta.bg || `${C.primary}18`) : "#f1f3f5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>{t.icon}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: active ? (meta.color || C.primary) : C.dark, lineHeight: 1.2 }}>{t.label}</div>
                   {active && meta.desc && <div style={{ fontSize: 10.5, color: meta.color || C.gray, opacity: 0.8, marginTop: 1 }}>{meta.desc}</div>}
                 </div>
-                {badge != null && (
-                  <span style={{ background: "#ef4444", color: "white", borderRadius: 10, fontSize: 10, fontWeight: 700, padding: "2px 6px", minWidth: 18, textAlign: "center" }}>{badge}</span>
-                )}
+                {badge != null && <span style={{ background: "#ef4444", color: "white", borderRadius: 10, fontSize: 10, fontWeight: 700, padding: "2px 6px", minWidth: 18, textAlign: "center" }}>{badge}</span>}
               </button>
             );
           })}
@@ -12662,7 +12623,6 @@ function AdminSideMenu({ tabs, tab, setTab, pendientes, onPick }) {
   );
 }
 
-// Navegación móvil premium — grupos como pills + grilla de tarjetas
 function AdminMobileNav({ tabs, tab, setTab, pendientes }) {
   const [grupo, setGrupo] = useState(() => {
     for (const g of ADMIN_GRUPOS) { if (g.ids.includes(tab)) return g.grupo; }
@@ -12670,7 +12630,6 @@ function AdminMobileNav({ tabs, tab, setTab, pendientes }) {
   });
   const byId = Object.fromEntries(tabs.map((t) => [t.id, t]));
   const grupoActivo = ADMIN_GRUPOS.find((g) => g.grupo === grupo) || ADMIN_GRUPOS[0];
-
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10, scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
@@ -12680,16 +12639,12 @@ function AdminMobileNav({ tabs, tab, setTab, pendientes }) {
             <button key={g.grupo} onClick={() => setGrupo(g.grupo)} style={{
               flexShrink: 0, padding: "7px 16px", borderRadius: 20,
               border: isActive ? "none" : `1px solid ${C.border}`,
-              background: isActive ? C.primary : "white",
-              color: isActive ? "white" : C.gray,
-              fontSize: 13, fontWeight: isActive ? 700 : 500,
-              cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
-              WebkitTapHighlightColor: "transparent",
+              background: isActive ? C.primary : "white", color: isActive ? "white" : C.gray,
+              fontSize: 13, fontWeight: isActive ? 700 : 500, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 5, WebkitTapHighlightColor: "transparent",
             }}>
               {g.emoji} {g.grupo}
-              {g.grupo === "Contenido" && pendientes > 0 && (
-                <span style={{ background: "#ef4444", color: "white", borderRadius: 10, fontSize: 10, fontWeight: 700, padding: "1px 5px" }}>{pendientes}</span>
-              )}
+              {g.grupo === "Contenido" && pendientes > 0 && <span style={{ background: "#ef4444", color: "white", borderRadius: 10, fontSize: 10, fontWeight: 700, padding: "1px 5px" }}>{pendientes}</span>}
             </button>
           );
         })}
@@ -12711,16 +12666,12 @@ function AdminMobileNav({ tabs, tab, setTab, pendientes }) {
               boxShadow: active ? `0 4px 16px ${meta.color || C.primary}20` : "0 1px 3px rgba(0,0,0,0.04)",
               transition: "all 0.15s",
             }}>
-              <div style={{ width: 38, height: 38, borderRadius: 10, background: active ? (meta.color || C.primary) : (meta.bg || "#f1f3f5"), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
-                {t.icon}
-              </div>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: active ? (meta.color || C.primary) : (meta.bg || "#f1f3f5"), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{t.icon}</div>
               <div>
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: active ? (meta.color || C.primary) : C.dark, lineHeight: 1.3 }}>{t.label}</div>
                 {meta.desc && <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>{meta.desc}</div>}
               </div>
-              {badge != null && (
-                <span style={{ position: "absolute", top: 10, right: 10, background: "#ef4444", color: "white", borderRadius: 10, fontSize: 10, fontWeight: 700, padding: "2px 7px" }}>{badge}</span>
-              )}
+              {badge != null && <span style={{ position: "absolute", top: 10, right: 10, background: "#ef4444", color: "white", borderRadius: 10, fontSize: 10, fontWeight: 700, padding: "2px 7px" }}>{badge}</span>}
             </button>
           );
         })}
