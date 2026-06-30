@@ -1,16 +1,16 @@
 // /api/send-push.js
-//
-// IMPORTANTE: el App ID DEBE ser el mismo que usa el frontend (AppMax.jsx),
-// porque ahí es donde los dispositivos quedan suscritos. El frontend usa
-// 6a0eb997-07a6-4de5-b4dd-98fc75a4a3ab. Si aquí se apunta a otra app de
-// OneSignal, el envío "no encuentra destinatarios" (recipients: 0) aunque
-// haya gente suscrita.
 const APP_ID = process.env.ONESIGNAL_APP_ID || "6a0eb997-07a6-4de5-b4dd-98fc75a4a3ab";
-// La REST API Key NO se hardcodea (es secreta y debe pertenecer a la MISMA app
-// 6a0eb997…). Se toma solo de la variable de entorno ONESIGNAL_API_KEY en Vercel.
 const API_KEY = process.env.ONESIGNAL_API_KEY;
 
 const SITE_URL = "https://coromisionerosdejesus.cl";
+
+// OneSignal tiene dos formatos de REST API Key:
+//  - "Legacy API Key": usa el header  Authorization: Basic <key>
+//  - Key nueva (os_v2_app_...): usa    Authorization: Key <key>
+// Para no depender de cuál pegaste en Vercel, detectamos el formato.
+function authHeader(key) {
+  return key.startsWith("os_v2_") ? `Key ${key}` : `Basic ${key}`;
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -19,8 +19,7 @@ export default async function handler(req, res) {
   if (!API_KEY) {
     return res.status(500).json({
       ok: false,
-      error:
-        "Falta ONESIGNAL_API_KEY en Vercel. Debe ser la REST API Key de la app 6a0eb997… (Settings → Keys & IDs de esa app).",
+      error: "Falta ONESIGNAL_API_KEY en Vercel (REST API Key de la app 6a0eb997…).",
     });
   }
   try {
@@ -31,20 +30,22 @@ export default async function handler(req, res) {
       ? (url.startsWith("http") ? url : `${SITE_URL}${url}`)
       : `${SITE_URL}/`;
 
+    const payload = {
+      app_id: APP_ID,
+      target_channel: "push",
+      included_segments: ["Subscribed Users"],
+      headings: { en: title, es: title },
+      contents: { en: body || title, es: body || title },
+      url: destinoUrl,
+    };
+
     const osResp = await fetch("https://api.onesignal.com/notifications", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Key ${API_KEY}`,
+        Authorization: authHeader(API_KEY),
       },
-      body: JSON.stringify({
-        app_id: APP_ID,
-        target_channel: "push",
-        included_segments: ["Subscribed Users"],
-        headings: { en: title, es: title },
-        contents: { en: body || title, es: body || title },
-        url: destinoUrl,
-      }),
+      body: JSON.stringify(payload),
     });
 
     const data = await osResp.json();
@@ -55,9 +56,9 @@ export default async function handler(req, res) {
     if (!data.recipients || data.recipients === 0) {
       return res.status(200).json({
         ok: false,
-        error:
-          "OneSignal aceptó la notificación pero no encontró destinatarios (recipients: 0). Verifica que ONESIGNAL_APP_ID y ONESIGNAL_API_KEY correspondan a la app 6a0eb997… (la misma del frontend).",
+        error: "OneSignal aceptó pero recipients: 0. Revisa que la REST API Key sea de la app 6a0eb997… y esté activa.",
         app_id: APP_ID,
+        auth_usado: API_KEY.startsWith("os_v2_") ? "Key (nueva)" : "Basic (legacy)",
         onesignal: data,
       });
     }
