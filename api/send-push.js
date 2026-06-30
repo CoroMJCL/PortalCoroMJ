@@ -17,7 +17,7 @@ export default async function handler(req, res) {
       headers: { "Content-Type": "application/json", Authorization: `Key ${API_KEY}` },
       body: JSON.stringify({
         app_id: APP_ID,
-        included_segments: ["Total Subscriptions"],
+        included_segments: ["Subscribed Users"],
         headings: { en: title, es: title },
         contents: { en: body || title, es: body || title },
         url: destinoUrl,
@@ -25,6 +25,9 @@ export default async function handler(req, res) {
     });
     const data = await osResp.json();
     if (!osResp.ok) return res.status(osResp.status).json({ ok: false, onesignal: data });
+    if (!data.recipients || data.recipients === 0) {
+      return res.status(200).json({ ok: false, error: "OneSignal aceptó la notificación pero no encontró destinatarios (recipients: 0). Revisa el segmento configurado.", onesignal: data });
+    }
     return res.status(200).json({ ok: true, recipients: data.recipients ?? null, id: data.id ?? null });
   } catch (e) {
     return res.status(500).json({ ok: false, error: String(e?.message || e) });
