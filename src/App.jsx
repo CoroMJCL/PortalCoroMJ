@@ -103,17 +103,20 @@ const ONESIGNAL_API_KEY = "os_v2_app_dimbbw7ud5fr7fnmvcd65ugbaaqq47nxpvvuqee6a6s
 // Inicializa OneSignal e identifica al usuario
 async function registerPushNotifications(user) {
   try {
-    // NO llamar os.init() aquí — ya fue inicializado en el useEffect
+    // Pedir permiso primero (no requiere login)
     await window.OneSignalDeferred?.push(async (os) => {
-      // Identificar al usuario
-      if (user?.id) await os.login(String(user.id));
-      // Pedir permiso al navegador
       await os.Notifications.requestPermission();
-      // Forzar optIn si no está activo
-      if (os.User?.PushSubscription?.optedIn === false) {
-        await os.User.PushSubscription.optIn();
-      }
     });
+    // Login separado — después del permiso
+    if (user?.id) {
+      await new Promise(r => setTimeout(r, 500));
+      await window.OneSignalDeferred?.push(async (os) => {
+        try { await os.login(String(user.id)); } catch(e) { console.warn("login error:", e); }
+        if (os.User?.PushSubscription?.optedIn === false) {
+          try { await os.User.PushSubscription.optIn(); } catch(e) {}
+        }
+      });
+    }
     return true;
   } catch (e) {
     console.warn("OneSignal register error:", e);
@@ -2339,12 +2342,17 @@ function AppInner() {
       if (userId) localStorage.removeItem("push_dismissed_" + userId);
       // NO llamar os.init() — ya fue inicializado al cargar
       await window.OneSignalDeferred?.push(async (os) => {
-        if (userId) await os.login(String(userId));
         await os.Notifications.requestPermission();
-        if (os.User?.PushSubscription?.optedIn === false) {
-          await os.User.PushSubscription.optIn();
-        }
       });
+      if (userId) {
+        await new Promise(r => setTimeout(r, 500));
+        await window.OneSignalDeferred?.push(async (os) => {
+          try { await os.login(String(userId)); } catch(e) { console.warn("login:", e); }
+          if (os.User?.PushSubscription?.optedIn === false) {
+            try { await os.User.PushSubscription.optIn(); } catch(e) {}
+          }
+        });
+      }
     } catch(e) { console.warn("activarNotificaciones error:", e); }
     setShowPushModal(false);
   }
