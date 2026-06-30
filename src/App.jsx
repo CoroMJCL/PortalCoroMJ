@@ -100,6 +100,47 @@ const BANNER_URL = `${SUPABASE_URL}/storage/v1/object/public/publico/canalymj.jp
 const ONESIGNAL_APP_ID = "6a0eb997-07a6-4de5-b4dd-98fc75a4a3ab";
 // La REST API Key real NO va aquí — vive solo como variable de entorno en
 // Vercel (ONESIGNAL_API_KEY), usada por /api/send-push.js y /api/contar-dispositivos.js.
+//
+// IMPORTANTE: OneSignal solo funciona en el dominio configurado como "Site URL"
+// en el dashboard de OneSignal. Si la app se abre en otro dominio (ej. la URL
+// *.vercel.app de previsualización) el SDK lanza el error
+// "Can only be used on: https://coromisionerosdejesus.cl".
+// Esta lista debe coincidir con el dominio configurado en OneSignal.
+const PUSH_ALLOWED_HOSTS = [
+  "coromisionerosdejesus.cl",
+  "www.coromisionerosdejesus.cl",
+  "localhost",
+  "127.0.0.1",
+];
+function isPushAllowedHost() {
+  if (typeof window === "undefined") return false;
+  return PUSH_ALLOWED_HOSTS.includes(window.location.hostname);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  IA (Anthropic) — vía función de servidor /api/claude
+// ══════════════════════════════════════════════════════════════════════
+// El navegador NUNCA llama a api.anthropic.com directamente: eso (a) expone la
+// clave a cualquiera que abra DevTools y (b) falla con 401 al desplegar. Todas
+// las llamadas pasan por /api/claude.js, que añade la clave desde la variable
+// de entorno ANTHROPIC_API_KEY en Vercel.
+const CLAUDE_MODEL = "claude-sonnet-4-6"; // claude-sonnet-4-20250514 fue retirado el 15-jun-2026
+
+// Llama al modelo de Claude a través del proxy de servidor. Recibe el cuerpo
+// de la Messages API (messages, tools, max_tokens…) y devuelve la respuesta
+// cruda de Anthropic ({ content: [...] }), por lo que el parseo no cambia.
+async function callClaude(payload) {
+  const res = await fetch("/api/claude", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: CLAUDE_MODEL, ...payload }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error || `API error ${res.status}`);
+  }
+  return res.json();
+}
 
 // Inicializa OneSignal e identifica al usuario
 async function registerPushNotifications(user) {
@@ -255,7 +296,6 @@ async function fetchGoogleCalendarEvents() {
 // Token de sesión activo (se actualiza al hacer login)
 let _authToken = null;
 let _refreshToken = null;
-let _anthropicKey = ""; // Se carga desde Supabase config al iniciar sesión
 let _isGuestSession = false; // true cuando entró con código de invitado (sin auth Supabase)
 
 async function refreshSession() {
@@ -1581,6 +1621,17 @@ function AppInner() {
 
   // Cargar SDK de OneSignal — init único con config completa
   useEffect(() => {
+    // OneSignal solo se inicializa en el dominio configurado en su dashboard.
+    // En otros dominios (ej. la URL *.vercel.app) el SDK lanzaría
+    // "Can only be used on: https://coromisionerosdejesus.cl", así que lo
+    // omitimos para no ensuciar la consola ni intentar suscribir en vano.
+    if (!isPushAllowedHost()) {
+      console.info(
+        "[Push] OneSignal no se inicializa en " + window.location.hostname +
+        ". Las notificaciones solo funcionan en " + PUSH_ALLOWED_HOSTS[0] + "."
+      );
+      return;
+    }
     if (document.getElementById("onesignal-sdk")) return;
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     // Init completo aquí — NO volver a llamar os.init() en ningún otro lugar
@@ -1947,17 +1998,12 @@ function AppInner() {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 25000);
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/claude", {
         method: "POST",
         signal: controller.signal,
-        headers: {
-          "Content-Type": "application/json",
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-          ...(_anthropicKey ? { "x-api-key": _anthropicKey } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: CLAUDE_MODEL,
           max_tokens: 2000,
           tools: [{ type: "web_search_20250305", name: "web_search" }],
           messages: [
@@ -2165,8 +2211,8 @@ function AppInner() {
     setView("app");
     if (esVisita(p)) setSection("dashboard");
     registrarVisita(p, data.access_token);
-    // Cargar API key de Anthropic para funciones de IA (extracción de acordes, etc.)
-    getConfig("anthropic_api_key").then((k) => { if (k) _anthropicKey = k; }).catch(() => {});
+    // (La clave de Anthropic ya NO se carga en el navegador: vive en Vercel como
+    // ANTHROPIC_API_KEY y solo la usa /api/claude.js del lado del servidor.)
     // Mostrar modal solo si no tiene permiso aún y no es usuario Visita
     setTimeout(() => {
       if (Notification.permission !== "granted" && !esVisita(p)) setShowPushModal(true);
@@ -5790,15 +5836,10 @@ REGLAS ESTRICTAS:
           ? [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } }, { type: "text", text: PROMPT }]
           : [{ type: "image", source: { type: "base64", media_type: blob.type || "image/png", data: b64 } }, { type: "text", text: PROMPT }];
       }
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch("/api/claude", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-          ...(_anthropicKey ? { "x-api-key": _anthropicKey } : {}),
-        },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 4000, messages: [{ role: "user", content }] }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 4000, messages: [{ role: "user", content }] }),
       });
       if (!response.ok) throw new Error("api");
       const data = await response.json();
@@ -19326,12 +19367,6 @@ async function sendRecoEmail(paraEmail, paraNombre, deNombre, categoria, mensaje
   try {
     const cat = RECO_CATS.find(c => c.id === categoria);
     const catLabel = cat ? `${cat.icon} ${cat.label}` : "Reconocimiento";
-    const body = {
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 100,
-      system: "Eres un asistente que confirma el envío de correos. Responde solo 'ok'.",
-      messages: [{ role: "user", content: `Confirma: ok` }],
-    };
     // Usamos Supabase Edge Functions para el email si está disponible.
     // Si no, el reconocimiento igual se guarda públicamente en la app.
     await fetch(`${SUPABASE_URL}/functions/v1/send-reco-email`, {
@@ -20557,15 +20592,29 @@ function PushTestBar() {
       "/"
     );
     if (r?.ok) {
-      setEstado("ok");
-      setDetalle(
-        typeof r.recipients === "number"
-          ? `Enviada a ${r.recipients} dispositivo${r.recipients === 1 ? "" : "s"} suscrito${r.recipients === 1 ? "" : "s"}.`
-          : "Enviada correctamente."
-      );
+      if (r.recipients === 0) {
+        setEstado("error");
+        setDetalle(
+          isPushAllowedHost()
+            ? "OneSignal aceptó el envío pero hay 0 dispositivos suscritos. Activa las notificaciones desde un dispositivo (campanita) para registrarlo."
+            : "Estás probando en " + window.location.hostname + ". Las notificaciones solo funcionan en " + PUSH_ALLOWED_HOSTS[0] + ", donde los usuarios pueden suscribirse."
+        );
+      } else {
+        setEstado("ok");
+        setDetalle(
+          typeof r.recipients === "number"
+            ? `Enviada a ${r.recipients} dispositivo${r.recipients === 1 ? "" : "s"} suscrito${r.recipients === 1 ? "" : "s"}.`
+            : "Enviada correctamente."
+        );
+      }
     } else {
       setEstado("error");
-      setDetalle("No se pudo enviar. Revisa que /api/send-push esté publicado en Vercel.");
+      const serverErr = r?.data?.error;
+      setDetalle(
+        serverErr
+          ? "OneSignal: " + serverErr
+          : "No se pudo enviar. Revisa que /api/send-push esté publicado en Vercel."
+      );
     }
   }
 
@@ -23216,45 +23265,29 @@ function AdminVisitas() {
 //  CONFIGURACIÓN DE CLAVES API (Admin)
 // ══════════════════════════════════════════════════════════════════════
 function AdminApiConfig() {
-  const [anthropicKey, setAnthropicKey] = useState("");
-  const [guardando, setGuardando] = useState(false);
-  const [msg, setMsg] = useState(null);
-
-  useEffect(() => {
-    getConfig("anthropic_api_key").then((k) => { if (k) setAnthropicKey(k); }).catch(() => {});
-  }, []);
-
-  async function guardar() {
-    if (!anthropicKey.trim()) { setMsg({ ok: false, txt: "Pega primero tu clave de Anthropic." }); return; }
-    setGuardando(true); setMsg(null);
-    try {
-      await setConfig("anthropic_api_key", anthropicKey.trim());
-      _anthropicKey = anthropicKey.trim();
-      setMsg({ ok: true, txt: "✓ Clave guardada. Ya funcionarán la extracción de acordes y el evangelio automático." });
-    } catch { setMsg({ ok: false, txt: "Error al guardar. Intenta de nuevo." }); }
-    setGuardando(false);
-  }
-
-  const inp = { width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(60,60,67,0.2)", fontSize: 13, marginBottom: 8, boxSizing: "border-box", fontFamily: "monospace" };
+  const card = { background: "#f6f8fc", border: "1px solid rgba(10,90,200,0.15)", borderRadius: 12, padding: "12px 14px", marginTop: 12 };
+  const code = { fontFamily: "monospace", background: "rgba(10,90,200,0.08)", padding: "1px 6px", borderRadius: 6, fontSize: 12 };
   return (
     <div>
       <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1c1e", marginBottom: 6 }}>🔑 Clave API de Anthropic</div>
-      <div style={{ fontSize: 12.5, color: "#6a6a70", marginBottom: 14, lineHeight: 1.6 }}>
-        Necesaria para que funcionen: extracción automática de acordes desde PDF, cambio de tono, y el evangelio del domingo.<br />
-        Obtenla en <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" style={{ color: "#0a5ac8" }}>console.anthropic.com → API Keys</a>. Se guarda encriptada en tu base de datos Supabase.
+      <div style={{ fontSize: 12.5, color: "#6a6a70", marginBottom: 6, lineHeight: 1.6 }}>
+        Necesaria para la extracción automática de acordes desde PDF y el evangelio del domingo.
       </div>
-      <input
-        value={anthropicKey}
-        onChange={(e) => setAnthropicKey(e.target.value)}
-        placeholder="sk-ant-api03-…"
-        type="password"
-        style={inp}
-      />
-      <button onClick={guardar} disabled={guardando}
-        style={{ background: "#0a5ac8", color: "white", border: "none", borderRadius: 10, padding: "9px 18px", fontSize: 13, fontWeight: 700, cursor: guardando ? "not-allowed" : "pointer", opacity: guardando ? 0.7 : 1 }}>
-        {guardando ? "Guardando…" : "Guardar clave"}
-      </button>
-      {msg && <div style={{ marginTop: 10, fontSize: 12.5, color: msg.ok ? "#15803d" : "#b91c1c", lineHeight: 1.5 }}>{msg.txt}</div>}
+      <div style={{ fontSize: 12.5, color: "#b91c1c", marginBottom: 10, lineHeight: 1.6 }}>
+        Por seguridad, la clave ya <strong>no se guarda aquí</strong>. Si se guardara en el navegador, cualquiera podría leerla desde las herramientas de desarrollo. Ahora vive solo en el servidor (Vercel) y nunca llega al navegador.
+      </div>
+      <div style={card}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: "#0a5ac8", marginBottom: 8 }}>Cómo configurarla (una sola vez)</div>
+        <ol style={{ fontSize: 12.5, color: "#3c3c43", lineHeight: 1.7, paddingLeft: 18, margin: 0 }}>
+          <li>Obtén la clave en <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" style={{ color: "#0a5ac8" }}>console.anthropic.com → API Keys</a> (empieza con <span style={code}>sk-ant-…</span>).</li>
+          <li>En Vercel: proyecto → <strong>Settings → Environment Variables</strong>.</li>
+          <li>Agrega <span style={code}>ANTHROPIC_API_KEY</span> con tu clave como valor (entorno Production).</li>
+          <li>Vuelve a desplegar (<strong>Redeploy</strong>) para que tome la variable.</li>
+        </ol>
+        <div style={{ fontSize: 12, color: "#6a6a70", marginTop: 10, lineHeight: 1.6 }}>
+          El archivo <span style={code}>/api/claude.js</span> usa esa variable para hablar con la IA. La misma idea que ya usas con <span style={code}>ONESIGNAL_API_KEY</span> para las notificaciones.
+        </div>
+      </div>
     </div>
   );
 }
