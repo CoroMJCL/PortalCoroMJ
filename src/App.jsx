@@ -103,18 +103,17 @@ const ONESIGNAL_API_KEY = "os_v2_app_dimbbw7ud5fr7fnmvcd65ugbaaqq47nxpvvuqee6a6s
 // Inicializa OneSignal e identifica al usuario
 async function registerPushNotifications(user) {
   try {
+    // NO llamar os.init() aquí — ya fue inicializado en el useEffect
     await window.OneSignalDeferred?.push(async (os) => {
-      await os.init({
-        appId: ONESIGNAL_APP_ID,
-        allowLocalhostAsSecureOrigin: true,
-        promptOptions: { slidedown: { prompts: [{ type: "push", autoPrompt: true, text: { actionMessage: "El Coro MJ quiere enviarte avisos y novedades.", acceptButton: "Activar", cancelButton: "Ahora no" } }] } },
-      });
+      // Identificar al usuario
+      if (user?.id) await os.login(String(user.id));
+      // Pedir permiso al navegador
+      await os.Notifications.requestPermission();
+      // Forzar optIn si no está activo
+      if (os.User?.PushSubscription?.optedIn === false) {
+        await os.User.PushSubscription.optIn();
+      }
     });
-    // Identificar al usuario en OneSignal con su ID
-    if (user?.id) {
-      await window.OneSignalDeferred?.push((os) => os.login(user.id));
-    }
-    await window.OneSignalDeferred?.push((os) => os.Notifications.requestPermission());
     return true;
   } catch (e) {
     console.warn("OneSignal register error:", e);
@@ -1566,23 +1565,24 @@ function AppInner() {
 
   // Auto-login eliminado — el usuario siempre ingresa manualmente
 
-  // Cargar SDK de OneSignal dinámicamente
+  // Cargar SDK de OneSignal — init único con config completa
   useEffect(() => {
     if (document.getElementById("onesignal-sdk")) return;
     window.OneSignalDeferred = window.OneSignalDeferred || [];
+    // Init completo aquí — NO volver a llamar os.init() en ningún otro lugar
+    window.OneSignalDeferred.push(async (os) => {
+      await os.init({
+        appId: ONESIGNAL_APP_ID,
+        allowLocalhostAsSecureOrigin: true,
+        notifyButton: { enable: false },
+        serviceWorkerParam: { scope: "/" },
+        serviceWorkerPath: "/OneSignalSDKWorker.js",
+      });
+    });
     const s = document.createElement("script");
     s.id = "onesignal-sdk";
     s.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
     s.defer = true;
-    s.onload = () => {
-      window.OneSignalDeferred.push(async (os) => {
-        await os.init({
-          appId: ONESIGNAL_APP_ID,
-          allowLocalhostAsSecureOrigin: true,
-          notifyButton: { enable: false },
-        });
-      });
-    };
     document.head.appendChild(s);
   }, []);
   useEffect(() => {
@@ -2330,18 +2330,22 @@ function AppInner() {
     );
 
   async function activarNotificaciones(userId) {
-    // Si el permiso ya fue bloqueado en el navegador, no se puede pedir — cerrar y avisar
     if (Notification.permission === "denied") {
       setShowPushModal(false);
       setPushBloqueado(true);
       return;
     }
     try {
+      if (userId) localStorage.removeItem("push_dismissed_" + userId);
+      // NO llamar os.init() — ya fue inicializado al cargar
       await window.OneSignalDeferred?.push(async (os) => {
         if (userId) await os.login(String(userId));
         await os.Notifications.requestPermission();
+        if (os.User?.PushSubscription?.optedIn === false) {
+          await os.User.PushSubscription.optIn();
+        }
       });
-    } catch(e) {}
+    } catch(e) { console.warn("activarNotificaciones error:", e); }
     setShowPushModal(false);
   }
 
