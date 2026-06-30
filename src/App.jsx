@@ -97,8 +97,9 @@ const BANNER_URL = `${SUPABASE_URL}/storage/v1/object/public/publico/canalymj.jp
 // ══════════════════════════════════════════════════════════════════════
 //  NOTIFICACIONES PUSH — OneSignal
 // ══════════════════════════════════════════════════════════════════════
-const ONESIGNAL_APP_ID = "1a1810db-f41f-4b1f-95ac-a887eed0c100";
-const ONESIGNAL_API_KEY = "os_v2_app_dimbbw7ud5fr7fnmvcd65ugbaaqq47nxpvvuqee6a6s4lbzvsjkrr6mrjtb6gukmjsnlrhayze2phre25ndzkwpczhoeetgocc5do7q";
+const ONESIGNAL_APP_ID = "6a0eb997-07a6-4de5-b4dd-98fc75a4a3ab";
+// La REST API Key real NO va aquí — vive solo como variable de entorno en
+// Vercel (ONESIGNAL_API_KEY), usada por /api/send-push.js y /api/contar-dispositivos.js.
 
 // Inicializa OneSignal e identifica al usuario
 async function registerPushNotifications(user) {
@@ -2333,27 +2334,55 @@ function AppInner() {
     );
 
   async function activarNotificaciones(userId) {
-    if (Notification.permission === "denied") {
-      setShowPushModal(false);
-      setPushBloqueado(true);
-      return;
-    }
+    // Pedimos el permiso directo al navegador (sin pasar primero por la cola
+    // de OneSignal) para no perder el "user gesture" del click y para no
+    // depender de que el SDK haya terminado de inicializar.
     try {
-      if (userId) localStorage.removeItem("push_dismissed_" + userId);
-      // NO llamar os.init() — ya fue inicializado al cargar
-      await window.OneSignalDeferred?.push(async (os) => {
-        await os.Notifications.requestPermission();
-      });
-      if (userId) {
-        await new Promise(r => setTimeout(r, 500));
-        await window.OneSignalDeferred?.push(async (os) => {
-          try { await os.login(String(userId)); } catch(e) { console.warn("login:", e); }
-          if (os.User?.PushSubscription?.optedIn === false) {
-            try { await os.User.PushSubscription.optIn(); } catch(e) {}
-          }
-        });
+      if (typeof Notification === "undefined") {
+        setShowPushModal(false);
+        return;
       }
-    } catch(e) { console.warn("activarNotificaciones error:", e); }
+      if (Notification.permission === "denied") {
+        setShowPushModal(false);
+        setPushBloqueado(true);
+        return;
+      }
+      const permiso = await Notification.requestPermission();
+      if (permiso === "denied") {
+        setShowPushModal(false);
+        setPushBloqueado(true);
+        return;
+      }
+      if (permiso !== "granted") {
+        // El usuario cerró el popup nativo sin elegir: no insistimos.
+        setShowPushModal(false);
+        return;
+      }
+      if (userId) localStorage.removeItem("push_dismissed_" + userId);
+      // Ya tenemos el permiso del navegador; ahora sincronizamos con OneSignal
+      // en segundo plano. Si esto tarda o falla, el modal ya se cerró igual.
+      const sincronizarOneSignal = (async () => {
+        await window.OneSignalDeferred?.push(async (os) => {
+          try { await os.Notifications.requestPermission(); } catch (e) {}
+        });
+        if (userId) {
+          await new Promise((r) => setTimeout(r, 500));
+          await window.OneSignalDeferred?.push(async (os) => {
+            try { await os.login(String(userId)); } catch (e) { console.warn("login:", e); }
+            if (os.User?.PushSubscription?.optedIn === false) {
+              try { await os.User.PushSubscription.optIn(); } catch (e) {}
+            }
+          });
+        }
+      })();
+      // Timeout de seguridad: si OneSignal no responde en 6s, no bloqueamos al usuario.
+      await Promise.race([
+        sincronizarOneSignal,
+        new Promise((r) => setTimeout(r, 6000)),
+      ]);
+    } catch (e) {
+      console.warn("activarNotificaciones error:", e);
+    }
     setShowPushModal(false);
   }
 

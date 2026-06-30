@@ -1,6 +1,6 @@
 // /api/send-push.js
-const APP_ID = process.env.ONESIGNAL_APP_ID || "1a1810db-f41f-4b1f-95ac-a887eed0c100";
-const API_KEY = process.env.ONESIGNAL_API_KEY || "os_v2_app_dimbbw7ud5fr7fnmvcd65ugbaaqq47nxpvvuqee6a6s4lbzvsjkrr6mrjtb6gukmjsnlrhayze2phre25ndzkwpczhoeetgocc5do7q";
+const APP_ID = process.env.ONESIGNAL_APP_ID;
+const API_KEY = process.env.ONESIGNAL_API_KEY;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
