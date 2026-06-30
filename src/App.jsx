@@ -104,20 +104,29 @@ const ONESIGNAL_APP_ID = "6a0eb997-07a6-4de5-b4dd-98fc75a4a3ab";
 // Inicializa OneSignal e identifica al usuario
 async function registerPushNotifications(user) {
   try {
-    // Pedir permiso primero (no requiere login)
-    await window.OneSignalDeferred?.push(async (os) => {
-      await os.Notifications.requestPermission();
-    });
-    // Login separado — después del permiso
-    if (user?.id) {
-      await new Promise(r => setTimeout(r, 500));
+    if (typeof Notification === "undefined") return false;
+    if (Notification.permission === "denied") return false;
+    // Pedimos el permiso directo al navegador primero (preserva el gesto de
+    // click y no depende de que OneSignal haya terminado de inicializar).
+    const permiso = await Notification.requestPermission();
+    if (permiso !== "granted") return false;
+    // Ya tenemos el permiso; sincronizamos con OneSignal en segundo plano,
+    // con timeout de seguridad para no dejar la UI esperando para siempre.
+    const sincronizar = (async () => {
       await window.OneSignalDeferred?.push(async (os) => {
-        try { await os.login(String(user.id)); } catch(e) { console.warn("login error:", e); }
-        if (os.User?.PushSubscription?.optedIn === false) {
-          try { await os.User.PushSubscription.optIn(); } catch(e) {}
-        }
+        try { await os.Notifications.requestPermission(); } catch (e) {}
       });
-    }
+      if (user?.id) {
+        await new Promise(r => setTimeout(r, 500));
+        await window.OneSignalDeferred?.push(async (os) => {
+          try { await os.login(String(user.id)); } catch(e) { console.warn("login error:", e); }
+          if (os.User?.PushSubscription?.optedIn === false) {
+            try { await os.User.PushSubscription.optIn(); } catch(e) {}
+          }
+        });
+      }
+    })();
+    await Promise.race([sincronizar, new Promise((r) => setTimeout(r, 6000))]);
     return true;
   } catch (e) {
     console.warn("OneSignal register error:", e);
@@ -137,9 +146,10 @@ async function unregisterPushNotifications(userId) {
 async function checkPushSubscribed() {
   try {
     let enabled = false;
-    await window.OneSignalDeferred?.push((os) => {
+    const consultar = window.OneSignalDeferred?.push((os) => {
       enabled = os.User.PushSubscription.optedIn === true;
     });
+    await Promise.race([consultar, new Promise((r) => setTimeout(r, 3000))]);
     return enabled;
   } catch { return false; }
 }
