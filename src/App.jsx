@@ -16327,11 +16327,11 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   }
 
   async function duplicarPauta(pauta) {
-    if (!confirm(`¿Duplicar la pauta "${pauta.titulo}"? Se creará una copia como borrador sin fecha.`)) return;
+    if (!confirm(`¿Duplicar la pauta "${pauta.titulo}"? Se creará una copia como borrador con la misma fecha (puedes cambiarla después).`)) return;
     try {
       const body = {
         titulo: `Copia de ${pauta.titulo}`,
-        fecha: null,
+        fecha: pauta.fecha,
         hora: pauta.hora || "",
         lugar: pauta.lugar || "",
         coro: pauta.coro || "Coro Misioneros de Jesús",
@@ -16360,7 +16360,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       await onReload();
       setSelected(created);
       setMode("view");
-      setMsg("✅ Pauta duplicada como borrador. Recuerda asignarle una fecha.");
+      setMsg("✅ Pauta duplicada como borrador. Puedes cambiar la fecha si lo necesitas.");
     } catch (e) {
       setMsg("Error al duplicar: " + e.message);
     }
@@ -16407,6 +16407,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
         ? JSON.parse(pauta.canciones || "[]")
         : pauta.canciones || [];
     setCanciones(c);
+    setMsg("");
     setMode("edit");
   }
 
@@ -17594,6 +17595,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                 setForm(emptyPauta);
                 setCanciones([]);
                 setTituloMode("select");
+                setMsg("");
                 setMode("new");
               }}
             >
