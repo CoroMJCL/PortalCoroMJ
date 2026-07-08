@@ -3363,8 +3363,10 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter, onBack })
 
   // Login
   const [loginEmail, setLoginEmail] = useState(() => localStorage.getItem("remember_email") || "");
-  const [loginPassword, setLoginPassword] = useState("");
+  const [loginPassword, setLoginPassword] = useState(() => localStorage.getItem("remember_pass") || "");
   const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem("remember_email"));
+  const [rememberPass, setRememberPass] = useState(() => !!localStorage.getItem("remember_pass"));
+  const [showPassword, setShowPassword] = useState(false);
 
   // Registro
   const [regEmail, setRegEmail] = useState("");
@@ -3422,6 +3424,8 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter, onBack })
     try {
       if (rememberMe) localStorage.setItem("remember_email", loginEmail.trim().toLowerCase());
       else localStorage.removeItem("remember_email");
+      if (rememberPass) localStorage.setItem("remember_pass", loginPassword);
+      else localStorage.removeItem("remember_pass");
       await onSignIn(loginEmail.trim().toLowerCase(), loginPassword);
     } catch (err) {
       setError(err.message);
@@ -3664,25 +3668,42 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter, onBack })
               </div>
               <div style={{ marginBottom: 8 }}>
                 <label style={lbl}>Contraseña</label>
-                <input
-                  type="password"
-                  required
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="••••••••"
-                  style={inp}
-                />
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••"
+                    style={{ ...inp, paddingRight: 44 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                    style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 6, fontSize: 17, lineHeight: 1, color: "#8a8a90" }}
+                  >
+                    {showPassword ? "🙈" : "👁"}
+                  </button>
+                </div>
               </div>
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-                <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", fontSize:13, color:"#555" }}>
-                  <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)}
-                    style={{ width:15, height:15, accentColor:"#1d6fc7", cursor:"pointer" }}/>
-                  Recordar correo
-                </label>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16, flexWrap: "wrap", gap: 8 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", fontSize:13, color:"#555" }}>
+                    <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)}
+                      style={{ width:15, height:15, accentColor:"#1d6fc7", cursor:"pointer" }}/>
+                    Recordar correo
+                  </label>
+                  <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", fontSize:13, color:"#555" }}>
+                    <input type="checkbox" checked={rememberPass} onChange={e => setRememberPass(e.target.checked)}
+                      style={{ width:15, height:15, accentColor:"#1d6fc7", cursor:"pointer" }}/>
+                    Recordar contraseña
+                  </label>
+                </div>
                 <button
                   type="button"
                   onClick={() => { setView("recover"); setError(""); setSuccess(""); }}
-                  style={{ background:"none", border:"none", fontSize:12, color:"#1d6fc7", cursor:"pointer", textDecoration:"underline", padding:0 }}>
+                  style={{ background:"none", border:"none", fontSize:12, color:"#1d6fc7", cursor:"pointer", textDecoration:"underline", padding:0, alignSelf: "flex-start" }}>
                   ¿Olvidaste tu contraseña?
                 </button>
               </div>
@@ -5609,6 +5630,24 @@ function esVideoEnsayo(url) {
   return /\.(mp4|webm|mov|m4v|ogv)(\?|$)/i.test(url || "");
 }
 
+// Determina el Content-Type correcto según la extensión (iOS exige MIME de audio válido)
+function mimeDeArchivo(file) {
+  const t = (file && file.type) || "";
+  const name = (file && file.name) || "";
+  const ext = name.toLowerCase().split(".").pop();
+  // Si el navegador ya dio un tipo de audio/video/pdf válido, respétalo
+  if (/^(audio|video|image)\//.test(t) || t === "application/pdf") return t;
+  // Si no, dedúcelo por extensión
+  const map = {
+    mp3: "audio/mpeg", mpeg: "audio/mpeg", mpga: "audio/mpeg", mp2: "audio/mpeg",
+    m4a: "audio/mp4", aac: "audio/aac", wav: "audio/wav", weba: "audio/webm",
+    ogg: "audio/ogg", oga: "audio/ogg", opus: "audio/opus", flac: "audio/flac", "3gp": "audio/3gpp",
+    mp4: "video/mp4", m4v: "video/mp4", mov: "video/quicktime", webm: "video/webm",
+    pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
+  };
+  return map[ext] || t || "application/octet-stream";
+}
+
 // ── Reproductor de práctica: velocidad (sin cambiar tono) + bucle A–B ──
 function ReproductorPractica({ src, accent, onFirstPlay }) {
   const audioRef = useRef(null);
@@ -6024,7 +6063,7 @@ function CancionerosInvitado({ user, isAdmin }) {
       const path = `cancioneros/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
       const res = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
         method: "POST",
-        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" },
+        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": mimeDeArchivo(file), "x-upsert": "true" },
         body: file,
       });
       if (!res.ok) throw new Error("subida falló");
@@ -13793,19 +13832,22 @@ function AdminMaterialEnsayo({ materialEnsayo, onReload, tabla = "material_ensay
   // Subir archivo (mp3/mp4/pdf) directo al almacenamiento de Supabase
   async function subirArchivo(file) {
     if (!file) return;
+    const mime = mimeDeArchivo(file);
     const okTipos = ["audio/", "video/", "application/pdf"];
-    if (!okTipos.some((t) => (file.type || "").startsWith(t) || file.type === t)) {
+    if (!okTipos.some((t) => mime.startsWith(t) || mime === t)) {
       alert("Sube un archivo de audio (mp3), video (mp4) o PDF.");
       return;
     }
     if (file.size > 45 * 1024 * 1024) { alert("El archivo no puede superar 45 MB. Comprime el audio (96 kbps mono) y reintenta."); return; }
     setUploading(true);
     try {
-      const safe = file.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "_");
+      let safe = file.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "_");
+      // Limpiar dobles extensiones de audio/video (ej: .mp3.mpeg → .mp3)
+      safe = safe.replace(/\.(mp3|mpeg|mpga|m4a|aac|wav|ogg|oga|opus|flac|mp4|m4v|mov|webm)\.(mpeg|mpga|mp3|m4a|aac|wav|ogg|oga|opus|flac|mp4|m4v|mov|webm)$/i, ".$1");
       const path = `ensayo/${Date.now()}_${safe}`;
       const res = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
         method: "POST",
-        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" },
+        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": mimeDeArchivo(file), "x-upsert": "true" },
         body: file,
       });
       if (!res.ok) throw new Error(await res.text());
@@ -16140,7 +16182,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       const path = `guiones/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
       const res = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
         method: "POST",
-        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" },
+        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": mimeDeArchivo(file), "x-upsert": "true" },
         body: file,
       });
       if (!res.ok) throw new Error("subida falló");
