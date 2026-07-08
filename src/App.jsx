@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, Component } from "react";
 import { EscuelaCanto } from "./EscuelaCanto";
+import Landing from "./Landing";
 
 // ══════════════════════════════════════════
 //  SUPABASE CONFIG
@@ -96,24 +97,77 @@ const BANNER_URL = `${SUPABASE_URL}/storage/v1/object/public/publico/canalymj.jp
 // ══════════════════════════════════════════════════════════════════════
 //  NOTIFICACIONES PUSH — OneSignal
 // ══════════════════════════════════════════════════════════════════════
-const ONESIGNAL_APP_ID = "1a1810db-f41f-4b1f-95ac-a887eed0c100";
-const ONESIGNAL_API_KEY = "os_v2_app_dimbbw7ud5fr7fnmvcd65ugbaaqq47nxpvvuqee6a6s4lbzvsjkrr6mrjtb6gukmjsnlrhayze2phre25ndzkwpczhoeetgocc5do7q";
+const ONESIGNAL_APP_ID = "6a0eb997-07a6-4de5-b4dd-98fc75a4a3ab";
+// La REST API Key real NO va aquí — vive solo como variable de entorno en
+// Vercel (ONESIGNAL_API_KEY), usada por /api/send-push.js y /api/contar-dispositivos.js.
+//
+// IMPORTANTE: OneSignal solo funciona en el dominio configurado como "Site URL"
+// en el dashboard de OneSignal. Si la app se abre en otro dominio (ej. la URL
+// *.vercel.app de previsualización) el SDK lanza el error
+// "Can only be used on: https://coromisionerosdejesus.cl".
+// Esta lista debe coincidir con el dominio configurado en OneSignal.
+const PUSH_ALLOWED_HOSTS = [
+  "coromisionerosdejesus.cl",
+  "www.coromisionerosdejesus.cl",
+  "localhost",
+  "127.0.0.1",
+];
+function isPushAllowedHost() {
+  if (typeof window === "undefined") return false;
+  return PUSH_ALLOWED_HOSTS.includes(window.location.hostname);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  IA (Anthropic) — vía función de servidor /api/claude
+// ══════════════════════════════════════════════════════════════════════
+// El navegador NUNCA llama a api.anthropic.com directamente: eso (a) expone la
+// clave a cualquiera que abra DevTools y (b) falla con 401 al desplegar. Todas
+// las llamadas pasan por /api/claude.js, que añade la clave desde la variable
+// de entorno ANTHROPIC_API_KEY en Vercel.
+const CLAUDE_MODEL = "claude-sonnet-4-6"; // claude-sonnet-4-20250514 fue retirado el 15-jun-2026
+
+// Llama al modelo de Claude a través del proxy de servidor. Recibe el cuerpo
+// de la Messages API (messages, tools, max_tokens…) y devuelve la respuesta
+// cruda de Anthropic ({ content: [...] }), por lo que el parseo no cambia.
+async function callClaude(payload) {
+  const res = await fetch("/api/claude", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: CLAUDE_MODEL, ...payload }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error || `API error ${res.status}`);
+  }
+  return res.json();
+}
 
 // Inicializa OneSignal e identifica al usuario
 async function registerPushNotifications(user) {
   try {
-    await window.OneSignalDeferred?.push(async (os) => {
-      await os.init({
-        appId: ONESIGNAL_APP_ID,
-        allowLocalhostAsSecureOrigin: true,
-        promptOptions: { slidedown: { prompts: [{ type: "push", autoPrompt: true, text: { actionMessage: "El Coro MJ quiere enviarte avisos y novedades.", acceptButton: "Activar", cancelButton: "Ahora no" } }] } },
+    if (typeof Notification === "undefined") return false;
+    if (Notification.permission === "denied") return false;
+    // Pedimos el permiso directo al navegador primero (preserva el gesto de
+    // click y no depende de que OneSignal haya terminado de inicializar).
+    const permiso = await Notification.requestPermission();
+    if (permiso !== "granted") return false;
+    // Ya tenemos el permiso; sincronizamos con OneSignal en segundo plano,
+    // con timeout de seguridad para no dejar la UI esperando para siempre.
+    const sincronizar = (async () => {
+      await window.OneSignalDeferred?.push(async (os) => {
+        try { await os.Notifications.requestPermission(); } catch (e) {}
       });
-    });
-    // Identificar al usuario en OneSignal con su ID
-    if (user?.id) {
-      await window.OneSignalDeferred?.push((os) => os.login(user.id));
-    }
-    await window.OneSignalDeferred?.push((os) => os.Notifications.requestPermission());
+      if (user?.id) {
+        await new Promise(r => setTimeout(r, 500));
+        await window.OneSignalDeferred?.push(async (os) => {
+          try { await os.login(String(user.id)); } catch(e) { console.warn("login error:", e); }
+          if (os.User?.PushSubscription?.optedIn === false) {
+            try { await os.User.PushSubscription.optIn(); } catch(e) {}
+          }
+        });
+      }
+    })();
+    await Promise.race([sincronizar, new Promise((r) => setTimeout(r, 6000))]);
     return true;
   } catch (e) {
     console.warn("OneSignal register error:", e);
@@ -133,9 +187,10 @@ async function unregisterPushNotifications(userId) {
 async function checkPushSubscribed() {
   try {
     let enabled = false;
-    await window.OneSignalDeferred?.push((os) => {
+    const consultar = window.OneSignalDeferred?.push((os) => {
       enabled = os.User.PushSubscription.optedIn === true;
     });
+    await Promise.race([consultar, new Promise((r) => setTimeout(r, 3000))]);
     return enabled;
   } catch { return false; }
 }
@@ -241,7 +296,6 @@ async function fetchGoogleCalendarEvents() {
 // Token de sesión activo (se actualiza al hacer login)
 let _authToken = null;
 let _refreshToken = null;
-let _anthropicKey = ""; // Se carga desde Supabase config al iniciar sesión
 let _isGuestSession = false; // true cuando entró con código de invitado (sin auth Supabase)
 
 async function refreshSession() {
@@ -1409,9 +1463,10 @@ function AppInner() {
         return "reset";
       }
     } catch(e) {}
-    return "login";
+
+    return "landing";
   })();
-  const [view, setView] = useState(_initialView); // "login" | "register" | "recover" | "reset" | "app"
+  const [view, setView] = useState(_initialView);
   const [showPushModal, setShowPushModal] = useState(false);
   const [pushBloqueado, setPushBloqueado] = useState(false);
   const [user, setUser] = useState(null);
@@ -1562,25 +1617,78 @@ function AppInner() {
   }, []);
 
 
-  // Cargar SDK de OneSignal dinámicamente
+  // Auto-login eliminado — el usuario siempre ingresa manualmente
+
+  // Cargar SDK de OneSignal — init único con config completa
   useEffect(() => {
+    // OneSignal solo se inicializa en el dominio configurado en su dashboard.
+    // En otros dominios (ej. la URL *.vercel.app) el SDK lanzaría
+    // "Can only be used on: https://coromisionerosdejesus.cl", así que lo
+    // omitimos para no ensuciar la consola ni intentar suscribir en vano.
+    if (!isPushAllowedHost()) {
+      console.info(
+        "[Push] OneSignal no se inicializa en " + window.location.hostname +
+        ". Las notificaciones solo funcionan en " + PUSH_ALLOWED_HOSTS[0] + "."
+      );
+      return;
+    }
     if (document.getElementById("onesignal-sdk")) return;
     window.OneSignalDeferred = window.OneSignalDeferred || [];
-    const s = document.createElement("script");
-    s.id = "onesignal-sdk";
-    s.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
-    s.defer = true;
-    s.onload = () => {
-      window.OneSignalDeferred.push(async (os) => {
+    // Init completo aquí — NO volver a llamar os.init() en ningún otro lugar
+    window.OneSignalDeferred.push(async (os) => {
+      try {
+        console.info("[Push] Inicializando OneSignal en el origen:", window.location.origin);
         await os.init({
           appId: ONESIGNAL_APP_ID,
           allowLocalhostAsSecureOrigin: true,
           notifyButton: { enable: false },
+          serviceWorkerParam: { scope: "/" },
+          serviceWorkerPath: "/OneSignalSDKWorker.js",
         });
-      });
-    };
+        console.info("[Push] OneSignal inicializado correctamente.");
+      } catch (e) {
+        // Típicamente "Can only be used on: https://...": el origen actual no
+        // coincide con el "Site URL" configurado en el dashboard de OneSignal.
+        console.warn(
+          "[Push] OneSignal NO pudo inicializar. Origen actual: " +
+            window.location.origin +
+            ". Revisa que el 'Site URL' en OneSignal sea exactamente ese mismo origen. Detalle:",
+          e?.message || e
+        );
+      }
+    });
+    const s = document.createElement("script");
+    s.id = "onesignal-sdk";
+    s.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
+    s.defer = true;
     document.head.appendChild(s);
   }, []);
+
+  // Si el usuario ya concedió permiso pero por algún motivo no quedó suscrito en
+  // OneSignal (p. ej. dio permiso antes de corregir el dominio), re-aseguramos
+  // la suscripción al cargar — sin molestarlo con ningún popup.
+  useEffect(() => {
+    if (view !== "app" || !user?.id) return;
+    if (!isPushAllowedHost()) return;
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    let cancelado = false;
+    (async () => {
+      await new Promise((r) => setTimeout(r, 1500));
+      if (cancelado) return;
+      try {
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        window.OneSignalDeferred.push(async (os) => {
+          try { await os.login(String(user.id)); } catch (e) {}
+          try {
+            if (os.User?.PushSubscription?.optedIn === false) {
+              await os.User.PushSubscription.optIn();
+            }
+          } catch (e) {}
+        });
+      } catch (e) { /* silencioso */ }
+    })();
+    return () => { cancelado = true; };
+  }, [view, user?.id]);
   useEffect(() => {
     if (view === "app") {
       loadData();
@@ -1927,42 +2035,26 @@ function AppInner() {
     const domingoISO = domingo.toISOString().split("T")[0];
 
     try {
+      // El evangelio se genera vía Groq (gratis) en /api/evangelio.
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 25000);
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        signal: controller.signal,
-        headers: {
-          "Content-Type": "application/json",
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-          ...(_anthropicKey ? { "x-api-key": _anthropicKey } : {}),
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2000,
-          tools: [{ type: "web_search_20250305", name: "web_search" }],
-          messages: [
-            {
-              role: "user",
-              content: `Busca en internet el evangelio oficial de la misa dominical del ${domingoStr} (${domingoISO}) según el calendario litúrgico romano. Busca en evangelio.es, vaticano.va o catholic.net. Responde SOLO con JSON puro sin markdown:\n{"referencia":"Ej: Jn 15,9-17","texto":"texto completo del evangelio sin recortar","reflexion":"reflexión de 3 a 4 líneas para un coro de música sacra con aplicación al canto litúrgico","oracion":"oración breve de 2 líneas para rezar antes de ensayar","domingo":"nombre de la celebración litúrgica","fuente":"nombre del sitio web"}`,
-            },
-          ],
-        }),
-      });
-      clearTimeout(timer);
-      if (!res.ok) throw new Error("API error");
-      const d = await res.json();
-      const raw = (d.content || [])
-        .filter((i) => i.type === "text")
-        .map((i) => i.text || "")
-        .join("")
-        .replace(/```json|```/g, "")
-        .trim();
-      const jsonMatch = raw.match(/\{[\s\S]*?\}/);
-      if (!jsonMatch) throw new Error("No JSON");
-      const parsed = JSON.parse(jsonMatch[0]);
-      if (!parsed.referencia || !parsed.texto)
+      let parsed;
+      try {
+        const res = await fetch("/api/evangelio", {
+          method: "POST",
+          signal: controller.signal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fecha: domingoStr, fechaISO: domingoISO }),
+        });
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          throw new Error(errBody?.error || `HTTP ${res.status}`);
+        }
+        parsed = await res.json();
+      } finally {
+        clearTimeout(timer);
+      }
+      if (!parsed || !parsed.referencia || !parsed.texto)
         throw new Error("Datos incompletos");
       return parsed;
     } catch (e) {
@@ -2147,8 +2239,8 @@ function AppInner() {
     setView("app");
     if (esVisita(p)) setSection("dashboard");
     registrarVisita(p, data.access_token);
-    // Cargar API key de Anthropic para funciones de IA (extracción de acordes, etc.)
-    getConfig("anthropic_api_key").then((k) => { if (k) _anthropicKey = k; }).catch(() => {});
+    // (La clave de Anthropic ya NO se carga en el navegador: vive en Vercel como
+    // ANTHROPIC_API_KEY y solo la usa /api/claude.js del lado del servidor.)
     // Mostrar modal solo si no tiene permiso aún y no es usuario Visita
     setTimeout(() => {
       if (Notification.permission !== "granted" && !esVisita(p)) setShowPushModal(true);
@@ -2233,7 +2325,7 @@ function AppInner() {
     await authSignOut();
     setUser(null);
     setAuthToken(null);
-    setView("login");
+    setView("landing");
   }
 
   const searchRes =
@@ -2306,6 +2398,13 @@ function AppInner() {
     );
   }
 
+  if (view === "landing")
+    return <Landing onPortal={() => {
+      localStorage.removeItem("sb_access_token");
+      localStorage.removeItem("sb_refresh_token");
+      setView("login");
+    }} />;
+
   if (view !== "app")
     return (
       <AuthScreen
@@ -2314,22 +2413,60 @@ function AppInner() {
         onSignIn={handleSignIn}
         onSignUp={handleSignUp}
         onGuestEnter={handleGuestEnter}
+        onBack={() => setView("landing")}
       />
     );
 
   async function activarNotificaciones(userId) {
-    // Si el permiso ya fue bloqueado en el navegador, no se puede pedir — cerrar y avisar
-    if (Notification.permission === "denied") {
-      setShowPushModal(false);
-      setPushBloqueado(true);
-      return;
-    }
+    // Pedimos el permiso directo al navegador (sin pasar primero por la cola
+    // de OneSignal) para no perder el "user gesture" del click y para no
+    // depender de que el SDK haya terminado de inicializar.
     try {
-      await window.OneSignalDeferred?.push(async (os) => {
-        if (userId) await os.login(String(userId));
-        await os.Notifications.requestPermission();
-      });
-    } catch(e) {}
+      if (typeof Notification === "undefined") {
+        setShowPushModal(false);
+        return;
+      }
+      if (Notification.permission === "denied") {
+        setShowPushModal(false);
+        setPushBloqueado(true);
+        return;
+      }
+      const permiso = await Notification.requestPermission();
+      if (permiso === "denied") {
+        setShowPushModal(false);
+        setPushBloqueado(true);
+        return;
+      }
+      if (permiso !== "granted") {
+        // El usuario cerró el popup nativo sin elegir: no insistimos.
+        setShowPushModal(false);
+        return;
+      }
+      if (userId) localStorage.removeItem("push_dismissed_" + userId);
+      // Ya tenemos el permiso del navegador; ahora sincronizamos con OneSignal
+      // en segundo plano. Si esto tarda o falla, el modal ya se cerró igual.
+      const sincronizarOneSignal = (async () => {
+        await window.OneSignalDeferred?.push(async (os) => {
+          try { await os.Notifications.requestPermission(); } catch (e) {}
+        });
+        if (userId) {
+          await new Promise((r) => setTimeout(r, 500));
+          await window.OneSignalDeferred?.push(async (os) => {
+            try { await os.login(String(userId)); } catch (e) { console.warn("login:", e); }
+            if (os.User?.PushSubscription?.optedIn === false) {
+              try { await os.User.PushSubscription.optIn(); } catch (e) {}
+            }
+          });
+        }
+      })();
+      // Timeout de seguridad: si OneSignal no responde en 6s, no bloqueamos al usuario.
+      await Promise.race([
+        sincronizarOneSignal,
+        new Promise((r) => setTimeout(r, 6000)),
+      ]);
+    } catch (e) {
+      console.warn("activarNotificaciones error:", e);
+    }
     setShowPushModal(false);
   }
 
@@ -3198,14 +3335,36 @@ function AppInner() {
 // ══════════════════════════════════════════
 //  AUTH SCREEN (Login / Registro / Recuperar)
 // ══════════════════════════════════════════
-function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter }) {
+// Fondo del login — lee imagen desde landing_content
+function AuthBg() {
+  const [img, setImg] = useState("");
+  useEffect(() => {
+    fetch(`${SUPABASE_URL}/rest/v1/landing_content?key=eq.login_bg&select=value`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    }).then(r => r.json()).then(rows => { if (rows?.[0]?.value) setImg(rows[0].value); }).catch(() => {});
+  }, []);
+  return (
+    <>
+      <div style={{ position:"fixed", inset:0, zIndex:0, background:"#08122d",
+        backgroundImage: img ? `url('${img}')` : "none",
+        backgroundSize:"cover", backgroundPosition:"center"
+      }}/>
+      <div style={{ position:"fixed", inset:0, zIndex:1,
+        background:"linear-gradient(160deg, rgba(6,14,36,0.82) 0%, rgba(6,14,36,0.75) 100%)"
+      }}/>
+    </>
+  );
+}
+
+function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter, onBack }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   // Login
-  const [loginEmail, setLoginEmail] = useState("");
+  const [loginEmail, setLoginEmail] = useState(() => localStorage.getItem("remember_email") || "");
   const [loginPassword, setLoginPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem("remember_email"));
 
   // Registro
   const [regEmail, setRegEmail] = useState("");
@@ -3261,6 +3420,8 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter }) {
     setError("");
     setLoading(true);
     try {
+      if (rememberMe) localStorage.setItem("remember_email", loginEmail.trim().toLowerCase());
+      else localStorage.removeItem("remember_email");
       await onSignIn(loginEmail.trim().toLowerCase(), loginPassword);
     } catch (err) {
       setError(err.message);
@@ -3344,10 +3505,13 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter }) {
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "center",
-        background: "var(--bg-base, #f2f2f7)",
         padding: "40px 16px 80px",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
+      {/* Fondo con imagen administrable */}
+      <AuthBg />
       <style>{G}{`
         body { overflow-y: auto !important; height: auto !important; }
         html { overflow-y: auto !important; height: auto !important; }
@@ -3357,7 +3521,24 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter }) {
           box-shadow: 0 0 0 3.5px rgba(30,58,95,0.14) !important;
         }
       `}</style>
-      <div className="auth-card" style={{ width: "100%", maxWidth: 400, background: "rgba(255,255,255,0.95)", backdropFilter: "saturate(180%) blur(20px)", WebkitBackdropFilter: "saturate(180%) blur(20px)", borderRadius: 28, border: "1px solid rgba(60,60,67,0.15)", boxShadow: "0 20px 60px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.06)", padding: "36px 28px 28px", margin: "0 auto" }}>
+      <div style={{ position: "relative", zIndex: 2, width: "100%", maxWidth: 400, margin: "0 auto" }}>
+        {/* Botón volver */}
+        <a
+          onClick={() => onBack && onBack()}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            background: "rgba(255,255,255,0.1)",
+            border: "0.5px solid rgba(255,255,255,0.2)",
+            backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+            color: "#fff", borderRadius: 980,
+            padding: "8px 18px", fontSize: 13, fontWeight: 500,
+            cursor: "pointer", textDecoration: "none",
+            marginBottom: 16,
+          }}
+        >
+          ← Volver al sitio
+        </a>
+      <div className="auth-card" style={{ width: "100%", maxWidth: 400, background: "rgba(255,255,255,0.97)", backdropFilter: "saturate(180%) blur(20px)", WebkitBackdropFilter: "saturate(180%) blur(20px)", borderRadius: 28, border: "1px solid rgba(60,60,67,0.15)", boxShadow: "0 20px 60px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.1)", padding: "36px 28px 28px", margin: "0 auto" }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <img
@@ -3492,25 +3673,19 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter }) {
                   style={inp}
                 />
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setView("recover");
-                  setError("");
-                  setSuccess("");
-                }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: 12,
-                  color: "#1d6fc7",
-                  cursor: "pointer",
-                  padding: "0 0 16px",
-                  textDecoration: "underline",
-                }}
-              >
-                ¿Olvidaste tu contraseña?
-              </button>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+                <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", fontSize:13, color:"#555" }}>
+                  <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)}
+                    style={{ width:15, height:15, accentColor:"#1d6fc7", cursor:"pointer" }}/>
+                  Recordar correo
+                </label>
+                <button
+                  type="button"
+                  onClick={() => { setView("recover"); setError(""); setSuccess(""); }}
+                  style={{ background:"none", border:"none", fontSize:12, color:"#1d6fc7", cursor:"pointer", textDecoration:"underline", padding:0 }}>
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
               <button
                 type="submit"
                 disabled={loading}
@@ -3856,6 +4031,7 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter }) {
         >
           Tus datos están protegidos con Supabase Auth
         </p>
+      </div>
       </div>
     </div>
   );
@@ -5469,7 +5645,6 @@ function ReproductorPractica({ src, accent, onFirstPlay }) {
     const a = audioRef.current; if (!a) return;
     if (playing) { a.pause(); setPlaying(false); }
     else {
-      // iOS: limpiar error y forzar carga en el gesto del usuario
       setLoadErr(false);
       if (a.readyState === 0) { try { a.load(); } catch {} }
       const p = a.play();
@@ -5700,17 +5875,16 @@ REGLAS ESTRICTAS:
           ? [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } }, { type: "text", text: PROMPT }]
           : [{ type: "image", source: { type: "base64", media_type: blob.type || "image/png", data: b64 } }, { type: "text", text: PROMPT }];
       }
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch("/api/claude", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-          ...(_anthropicKey ? { "x-api-key": _anthropicKey } : {}),
-        },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 4000, messages: [{ role: "user", content }] }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 4000, messages: [{ role: "user", content }] }),
       });
-      if (!response.ok) throw new Error("api");
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        console.warn("Extracción de acordes — error:", errBody?.error || ("HTTP " + response.status));
+        throw new Error(errBody?.error || "api");
+      }
       const data = await response.json();
       const t = (data.content || []).map((b) => b.text || "").join("").trim();
       if (t && t.length > 20) { setTexto(t); setTab("acordes"); } else throw new Error("vacio");
@@ -12497,106 +12671,147 @@ const ADMIN_TABS = [
   { id: "api_config", label: "Claves API", icon: "🔑" },
 ];
 
+const ADMIN_TAB_META = {
+  integrantes:          { color: "#1e3a5f", bg: "#eef2f9", desc: "Gestiona el equipo" },
+  asistencia:           { color: "#0d7a4e", bg: "#e6f7f0", desc: "Marcar presente" },
+  historial:            { color: "#0d7a4e", bg: "#e6f7f0", desc: "Ver registros" },
+  material_coro_admin:  { color: "#6d28d9", bg: "#f3e8ff", desc: "Solo integrantes" },
+  comunidades:          { color: "#b45309", bg: "#fef3c7", desc: "Gestionar grupos" },
+  noticias:             { color: "#b91c1c", bg: "#fef2f2", desc: "Comunicados" },
+  oraciones:            { color: "#1e3a5f", bg: "#eef2f9", desc: "Liturgia" },
+  preguntas:            { color: "#b45309", bg: "#fff7ed", desc: "Responder" },
+  biblioteca:           { color: "#0e7490", bg: "#e0f2fe", desc: "Documentos" },
+  podcasts:             { color: "#7c3aed", bg: "#f5f3ff", desc: "Episodios" },
+  galeria:              { color: "#be185d", bg: "#fdf2f8", desc: "Fotos del coro" },
+  links:                { color: "#0d7a4e", bg: "#e6f7f0", desc: "Recursos externos" },
+  pautas:               { color: "#1e3a5f", bg: "#eef2f9", desc: "Repertorio misa" },
+  documentos:           { color: "#0e7490", bg: "#e0f2fe", desc: "PDFs públicos" },
+  material_ensayo_admin:{ color: "#6d28d9", bg: "#f3e8ff", desc: "Vista invitado" },
+  descargas_admin:      { color: "#0e7490", bg: "#e0f2fe", desc: "Archivos libres" },
+  visitas:              { color: "#374151", bg: "#f3f4f6", desc: "Registro visitas" },
+  cuentas:              { color: "#1e3a5f", bg: "#eef2f9", desc: "Roles y accesos" },
+  cuenta_bancaria:      { color: "#0d7a4e", bg: "#e6f7f0", desc: "Transferencias" },
+  notificaciones:       { color: "#b45309", bg: "#fff7ed", desc: "Push a todos" },
+  api_config:           { color: "#374151", bg: "#f3f4f6", desc: "Claves secretas" },
+};
+
+const ADMIN_GRUPOS = [
+  { grupo: "Coro",      emoji: "👥", ids: ["integrantes", "asistencia", "historial", "material_coro_admin", "comunidades"] },
+  { grupo: "Contenido", emoji: "✏️",  ids: ["noticias", "pautas", "oraciones", "preguntas", "biblioteca", "podcasts", "galeria", "links"] },
+  { grupo: "Invitados", emoji: "👋", ids: ["documentos", "material_ensayo_admin", "descargas_admin", "visitas"] },
+  { grupo: "Sistema",   emoji: "⚙️", ids: ["cuentas", "cuenta_bancaria", "notificaciones", "api_config"] },
+];
+
 function AdminTab({ label, active, onClick }) {
   return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: "8px 16px",
-        borderRadius: 20,
-        border: active ? "none" : "1px solid rgba(60,60,67,0.15)",
-        cursor: "pointer",
-        fontSize: 13,
-        fontWeight: active ? 600 : 500,
-        background: active
-          ? `linear-gradient(135deg, ${C.primary} 0%, #0f3d6e 100%)`
-          : "rgba(255,255,255,0.8)",
-        color: active ? "white" : C.gray,
-        boxShadow: active ? `0 2px 10px ${C.primary}40` : "none",
-        transition: "all 0.18s cubic-bezier(0.25,0.46,0.45,0.94)",
-        whiteSpace: "nowrap",
-        letterSpacing: "-0.01em",
-        WebkitTapHighlightColor: "transparent",
-      }}
-    >
-      {label}
-    </button>
+    <button onClick={onClick} style={{
+      padding: "7px 15px", borderRadius: 20,
+      border: active ? "none" : "1px solid rgba(60,60,67,0.15)",
+      cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 500,
+      background: active ? `linear-gradient(135deg, ${C.primary} 0%, #0f3d6e 100%)` : "rgba(255,255,255,0.8)",
+      color: active ? "white" : C.gray,
+      boxShadow: active ? `0 2px 10px ${C.primary}40` : "none",
+      transition: "all 0.18s", whiteSpace: "nowrap", WebkitTapHighlightColor: "transparent",
+    }}>{label}</button>
   );
 }
 
-// Pestañas del panel admin agrupadas por categoría — sin scroll horizontal
-const ADMIN_GRUPOS = [
-  { grupo: "Coro", icon: "👥", ids: ["integrantes", "asistencia", "historial", "material_coro_admin", "comunidades"] },
-  { grupo: "Contenido", icon: "📚", ids: ["noticias", "oraciones", "preguntas", "biblioteca", "podcasts", "galeria", "links"] },
-  { grupo: "Invitados", icon: "👋", ids: ["documentos", "material_ensayo_admin", "descargas_admin", "visitas"] },
-  { grupo: "Sistema", icon: "⚙️", ids: ["cuentas", "cuenta_bancaria", "notificaciones", "api_config"] },
-];
-
 function AdminSideMenu({ tabs, tab, setTab, pendientes, onPick }) {
   const byId = Object.fromEntries(tabs.map((t) => [t.id, t]));
-  const [abierto, setAbierto] = useState(() => {
-    const o = {}; ADMIN_GRUPOS.forEach((g) => (o[g.grupo] = true)); return o;
-  });
   return (
-    <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      {ADMIN_GRUPOS.map((g, gi) => {
-        const exp = abierto[g.grupo];
-        return (
-          <div key={g.grupo} style={{ marginBottom: gi === ADMIN_GRUPOS.length - 1 ? 0 : 6 }}>
-            <button
-              onClick={() => setAbierto((p) => ({ ...p, [g.grupo]: !p[g.grupo] }))}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 7,
-                background: "transparent", border: "none", cursor: "pointer",
-                padding: "7px 10px", borderRadius: 7,
-                fontSize: 10.5, fontWeight: 700, color: "#9aa3b2",
-                textTransform: "uppercase", letterSpacing: "0.08em",
-              }}
-            >
-              <span style={{ flex: 1, textAlign: "left" }}>{g.grupo}</span>
-              <span style={{ fontSize: 8, transform: exp ? "rotate(90deg)" : "none", transition: "transform 0.15s", opacity: 0.5 }}>▶</span>
-            </button>
-            {exp && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                {g.ids.map((id) => {
-                  const t = byId[id];
-                  if (!t) return null;
-                  const active = tab === id;
-                  const badge = id === "preguntas" && pendientes > 0 ? pendientes : null;
-                  return (
-                    <button
-                      key={id}
-                      onClick={() => { setTab(id); onPick && onPick(); }}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 10,
-                        padding: "8px 12px", borderRadius: 8,
-                        border: "none", cursor: "pointer", width: "100%", textAlign: "left",
-                        fontSize: 13, fontWeight: active ? 600 : 500,
-                        background: active ? `${C.primary}0f` : "transparent",
-                        color: active ? C.primary : "#3a3f4a",
-                        position: "relative",
-                        transition: "background 0.12s, color 0.12s",
-                      }}
-                      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#f4f5f7"; }}
-                      onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
-                    >
-                      {active && <span style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: 3, height: 18, borderRadius: 3, background: C.primary }} />}
-                      <span style={{ fontSize: 14, width: 18, textAlign: "center", opacity: active ? 1 : 0.55, filter: active ? "none" : "grayscale(0.3)" }}>{t.icon}</span>
-                      <span style={{ flex: 1 }}>{t.label}</span>
-                      {badge != null && (
-                        <span style={{ background: "#ef4444", color: "#fff", fontSize: 10.5, fontWeight: 700, borderRadius: 999, minWidth: 17, height: 17, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>
-                          {badge}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+    <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {ADMIN_GRUPOS.map((g) => (
+        <div key={g.grupo} style={{ marginBottom: 4 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#9aa3b2", textTransform: "uppercase", letterSpacing: "0.09em", padding: "6px 10px 4px" }}>
+            {g.emoji} {g.grupo}
           </div>
-        );
-      })}
+          {g.ids.map((id) => {
+            const t = byId[id]; if (!t) return null;
+            const active = tab === id;
+            const meta = ADMIN_TAB_META[id] || {};
+            const badge = id === "preguntas" && pendientes > 0 ? pendientes : null;
+            return (
+              <button key={id} onClick={() => { setTab(id); onPick?.(); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "9px 10px", borderRadius: 10, border: "none",
+                  cursor: "pointer", width: "100%", textAlign: "left",
+                  background: active ? (meta.bg || `${C.primary}10`) : "transparent",
+                  transition: "background 0.12s", position: "relative",
+                }}
+                onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#f4f5f7"; }}
+                onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = active ? (meta.bg || `${C.primary}10`) : "transparent"; }}
+              >
+                {active && <span style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: 3, height: 22, borderRadius: 3, background: meta.color || C.primary }} />}
+                <span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: active ? (meta.bg || `${C.primary}18`) : "#f1f3f5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>{t.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: active ? (meta.color || C.primary) : C.dark, lineHeight: 1.2 }}>{t.label}</div>
+                  {active && meta.desc && <div style={{ fontSize: 10.5, color: meta.color || C.gray, opacity: 0.8, marginTop: 1 }}>{meta.desc}</div>}
+                </div>
+                {badge != null && <span style={{ background: "#ef4444", color: "white", borderRadius: 10, fontSize: 10, fontWeight: 700, padding: "2px 6px", minWidth: 18, textAlign: "center" }}>{badge}</span>}
+              </button>
+            );
+          })}
+        </div>
+      ))}
     </nav>
+  );
+}
+
+function AdminMobileNav({ tabs, tab, setTab, pendientes }) {
+  const [grupo, setGrupo] = useState(() => {
+    for (const g of ADMIN_GRUPOS) { if (g.ids.includes(tab)) return g.grupo; }
+    return ADMIN_GRUPOS[0].grupo;
+  });
+  const byId = Object.fromEntries(tabs.map((t) => [t.id, t]));
+  const grupoActivo = ADMIN_GRUPOS.find((g) => g.grupo === grupo) || ADMIN_GRUPOS[0];
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10, scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
+        {ADMIN_GRUPOS.map((g) => {
+          const isActive = g.grupo === grupo;
+          return (
+            <button key={g.grupo} onClick={() => setGrupo(g.grupo)} style={{
+              flexShrink: 0, padding: "7px 16px", borderRadius: 20,
+              border: isActive ? "none" : `1px solid ${C.border}`,
+              background: isActive ? C.primary : "white", color: isActive ? "white" : C.gray,
+              fontSize: 13, fontWeight: isActive ? 700 : 500, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 5, WebkitTapHighlightColor: "transparent",
+            }}>
+              {g.emoji} {g.grupo}
+              {g.grupo === "Contenido" && pendientes > 0 && <span style={{ background: "#ef4444", color: "white", borderRadius: 10, fontSize: 10, fontWeight: 700, padding: "1px 5px" }}>{pendientes}</span>}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {grupoActivo.ids.map((id) => {
+          const t = byId[id]; if (!t) return null;
+          const active = tab === id;
+          const meta = ADMIN_TAB_META[id] || {};
+          const badge = id === "preguntas" && pendientes > 0 ? pendientes : null;
+          return (
+            <button key={id} onClick={() => setTab(id)} style={{
+              display: "flex", flexDirection: "column", alignItems: "flex-start",
+              gap: 8, padding: "14px 12px", borderRadius: 14,
+              border: active ? `2px solid ${meta.color || C.primary}` : `1px solid ${C.border}`,
+              background: active ? (meta.bg || `${C.primary}0d`) : "white",
+              cursor: "pointer", textAlign: "left", position: "relative",
+              WebkitTapHighlightColor: "transparent",
+              boxShadow: active ? `0 4px 16px ${meta.color || C.primary}20` : "0 1px 3px rgba(0,0,0,0.04)",
+              transition: "all 0.15s",
+            }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: active ? (meta.color || C.primary) : (meta.bg || "#f1f3f5"), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{t.icon}</div>
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: active ? (meta.color || C.primary) : C.dark, lineHeight: 1.3 }}>{t.label}</div>
+                {meta.desc && <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>{meta.desc}</div>}
+              </div>
+              {badge != null && <span style={{ position: "absolute", top: 10, right: 10, background: "#ef4444", color: "white", borderRadius: 10, fontSize: 10, fontWeight: 700, padding: "2px 7px" }}>{badge}</span>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -16154,6 +16369,46 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     }
   }
 
+  async function duplicarPauta(pauta) {
+    if (!confirm(`¿Duplicar la pauta "${pauta.titulo}"? Se creará una copia como borrador sin fecha.`)) return;
+    try {
+      const body = {
+        titulo: `Copia de ${pauta.titulo}`,
+        fecha: null,
+        hora: pauta.hora || "",
+        lugar: pauta.lugar || "",
+        coro: pauta.coro || "Coro Misioneros de Jesús",
+        tipo_celebracion: pauta.tipo_celebracion || "",
+        notas: pauta.notas || "",
+        guion_url: pauta.guion_url || "",
+        canciones: pauta.canciones || "[]",
+        publicada: false,
+        tipo: pauta.tipo || "grupo",
+        mostrar_col_letra: pauta.mostrar_col_letra || false,
+        mostrar_col_audio: pauta.mostrar_col_audio || false,
+        visible_visita: false,
+      };
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/pautas_misa`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${_authToken}`,
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const [created] = await res.json();
+      await onReload();
+      setSelected(created);
+      setMode("view");
+      setMsg("✅ Pauta duplicada como borrador. Recuerda asignarle una fecha.");
+    } catch (e) {
+      setMsg("Error al duplicar: " + e.message);
+    }
+  }
+
   // Genera link de WhatsApp para notificar integrantes
   async function notificarIntegrantes(pauta, memberList) {
     const fechaFmt = new Date(pauta.fecha + "T00:00:00").toLocaleDateString(
@@ -16538,8 +16793,18 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   placeholder="Pega el enlace de Google Drive del guion (PDF)"
                   style={{ width: "100%", fontSize: 13, padding: "9px 12px", borderRadius: 9, border: `1px solid ${C.border}`, boxSizing: "border-box" }}
                 />
+                {/* Botón subir guion directo a Supabase */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.primary, color: "white", borderRadius: 9, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: subiendoGuion ? "not-allowed" : "pointer", opacity: subiendoGuion ? 0.6 : 1 }}>
+                    {subiendoGuion ? "⏳ Subiendo..." : "📎 Subir PDF"}
+                    <input type="file" accept="application/pdf" style={{ display: "none" }} onChange={subirGuion} disabled={subiendoGuion} />
+                  </label>
+                  {form.guion_url && (
+                    <span style={{ fontSize: 11, color: "#15803d", fontWeight: 600 }}>✅ Archivo subido</span>
+                  )}
+                </div>
                 <div style={{ fontSize: 11, color: C.gray, marginTop: 5, lineHeight: 1.5 }}>
-                  Sube el guion a Google Drive, ábrelo, toca "Compartir" → "Cualquier persona con el enlace", copia el link y pégalo aquí. Se verá dentro de la app.
+                  Sube el PDF directamente o pega un enlace de Google Drive. Se verá dentro de la app.
                 </div>
                 {form.guion_url && (
                   <button type="button" onClick={() => setVisorGuion(drivePreviewUrl(form.guion_url) || form.guion_url)} style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: C.primary, background: "none", border: `1px solid ${C.primary}55`, borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>
@@ -16921,6 +17186,13 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                 variant="secondary"
               >
                 ✏️ Editar
+              </Btn>
+              <Btn
+                onClick={() => duplicarPauta(selected)}
+                style={{ fontSize: 12, padding: "6px 14px", background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd" }}
+                variant="secondary"
+              >
+                📋 Duplicar
               </Btn>
               <Btn
                 onClick={() => togglePublicar(selected)}
@@ -17663,7 +17935,24 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     )}
                   </div>
                 </div>
-                <span style={{ fontSize: 12, color: C.gray }}>Editar →</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 12, color: C.gray }}>Editar →</span>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!confirm(`¿Eliminar el borrador "${p.titulo}"? Esta acción no se puede deshacer.`)) return;
+                      await deleteRecord("pautas_misa", p.id);
+                      await onReload();
+                    }}
+                    style={{
+                      background: "#fee2e2", color: "#dc2626", border: "1px solid #fca5a5",
+                      borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 600,
+                      cursor: "pointer", whiteSpace: "nowrap",
+                    }}
+                  >
+                    🗑 Eliminar
+                  </button>
+                </div>
               </Card>
             );
           })}
@@ -19121,12 +19410,6 @@ async function sendRecoEmail(paraEmail, paraNombre, deNombre, categoria, mensaje
   try {
     const cat = RECO_CATS.find(c => c.id === categoria);
     const catLabel = cat ? `${cat.icon} ${cat.label}` : "Reconocimiento";
-    const body = {
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 100,
-      system: "Eres un asistente que confirma el envío de correos. Responde solo 'ok'.",
-      messages: [{ role: "user", content: `Confirma: ok` }],
-    };
     // Usamos Supabase Edge Functions para el email si está disponible.
     // Si no, el reconocimiento igual se guarda públicamente en la app.
     await fetch(`${SUPABASE_URL}/functions/v1/send-reco-email`, {
@@ -20352,15 +20635,29 @@ function PushTestBar() {
       "/"
     );
     if (r?.ok) {
-      setEstado("ok");
-      setDetalle(
-        typeof r.recipients === "number"
-          ? `Enviada a ${r.recipients} dispositivo${r.recipients === 1 ? "" : "s"} suscrito${r.recipients === 1 ? "" : "s"}.`
-          : "Enviada correctamente."
-      );
+      if (r.recipients === 0) {
+        setEstado("error");
+        setDetalle(
+          isPushAllowedHost()
+            ? "OneSignal aceptó el envío pero hay 0 dispositivos suscritos. Activa las notificaciones desde un dispositivo (campanita) para registrarlo."
+            : "Estás probando en " + window.location.hostname + ". Las notificaciones solo funcionan en " + PUSH_ALLOWED_HOSTS[0] + ", donde los usuarios pueden suscribirse."
+        );
+      } else {
+        setEstado("ok");
+        setDetalle(
+          typeof r.recipients === "number"
+            ? `Enviada a ${r.recipients} dispositivo${r.recipients === 1 ? "" : "s"} suscrito${r.recipients === 1 ? "" : "s"}.`
+            : "Enviada correctamente."
+        );
+      }
     } else {
       setEstado("error");
-      setDetalle("No se pudo enviar. Revisa que /api/send-push esté publicado en Vercel.");
+      const serverErr = r?.data?.error;
+      setDetalle(
+        serverErr
+          ? "OneSignal: " + serverErr
+          : "No se pudo enviar. Revisa que /api/send-push esté publicado en Vercel."
+      );
     }
   }
 
@@ -20414,7 +20711,6 @@ function Admin({
   user,
 }) {
   const [tab, setTabRaw] = useState("integrantes");
-  const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
   const adminContentRef = useRef(null);
   const setTab = (id) => {
     setTabRaw(id);
@@ -20541,33 +20837,10 @@ function Admin({
           <AdminSideMenu tabs={ADMIN_TABS} tab={tab} setTab={setTab} pendientes={pendientes} />
         </aside>
 
-        {/* Botón de menú (solo móvil) */}
-        <button
-          className="admin-menu-btn"
-          onClick={() => setMenuMovilAbierto(true)}
-          style={{
-            alignItems: "center", gap: 10, width: "100%",
-            background: C.primary, color: "#fff", border: "none", borderRadius: 12,
-            padding: "13px 16px", fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 14,
-          }}
-        >
-          <span style={{ fontSize: 17 }}>☰</span>
-          <span>{(ADMIN_TABS.find((t) => t.id === tab) || {}).label || "Secciones"}</span>
-          <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.8 }}>Cambiar ▾</span>
-        </button>
-
-        {/* Menú lateral móvil (drawer) */}
-        {menuMovilAbierto && (
-          <div onClick={() => setMenuMovilAbierto(false)} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex" }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: "82%", maxWidth: 320, background: "#fff", height: "100%", overflowY: "auto", padding: "16px 12px", boxShadow: "4px 0 24px rgba(0,0,0,0.2)" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px 12px", borderBottom: `1px solid ${C.border}`, marginBottom: 10 }}>
-                <span style={{ fontSize: 15, fontWeight: 800, color: C.dark, fontFamily: "var(--font-display)" }}>Secciones</span>
-                <button onClick={() => setMenuMovilAbierto(false)} style={{ background: "none", border: "none", fontSize: 22, color: C.gray, cursor: "pointer", lineHeight: 1 }}>×</button>
-              </div>
-              <AdminSideMenu tabs={ADMIN_TABS} tab={tab} setTab={setTab} pendientes={pendientes} onPick={() => setMenuMovilAbierto(false)} />
-            </div>
-          </div>
-        )}
+        {/* Navegación premium móvil */}
+        <div className="admin-menu-btn" style={{ width: "100%" }}>
+          <AdminMobileNav tabs={ADMIN_TABS} tab={tab} setTab={setTab} pendientes={pendientes} />
+        </div>
 
         {/* Columna de contenido */}
         <div ref={adminContentRef} style={{ flex: 1, minWidth: 0, scrollMarginTop: 12 }}>
@@ -20668,27 +20941,12 @@ function AdminNotificaciones() {
     if (!form.titulo) return;
     setSending(true);
     setMsg(null);
-    try {
-      const res = await fetch("https://api.onesignal.com/notifications", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Key ${ONESIGNAL_API_KEY}`,
-        },
-        body: JSON.stringify({
-          app_id: ONESIGNAL_APP_ID,
-          included_segments: ["Total Subscriptions"],
-          headings: { en: form.titulo, es: form.titulo },
-          contents: { en: form.cuerpo || form.titulo, es: form.cuerpo || form.titulo },
-          url: "https://portal-coro-mj.vercel.app/",
-        }),
-      });
-      const data = await res.json();
-      if (data.errors) throw new Error(JSON.stringify(data.errors));
-      setMsg({ ok: true, text: `✅ Notificación enviada a ${data.recipients ?? totalSubs} dispositivo(s).` });
+    const r = await sendPushToAll(form.titulo, form.cuerpo || form.titulo, "/");
+    if (r?.ok) {
+      setMsg({ ok: true, text: `✅ Notificación enviada a ${typeof r.recipients === "number" ? r.recipients : totalSubs} dispositivo(s).` });
       setForm({ titulo: "", cuerpo: "" });
-    } catch (e) {
-      setMsg({ ok: false, text: "❌ Error: " + e.message });
+    } else {
+      setMsg({ ok: false, text: "❌ Error: " + (r?.error || JSON.stringify(r?.data)) });
     }
     setSending(false);
   }
@@ -20881,6 +21139,7 @@ function copiarTexto(text) {
 }
 
 const CUOTA_ESTUDIANTE_MONTO = 3000; // Valor fijo cuota estudiante
+const CUOTA_BASE_MONTO = 5000; // Valor base fijo cuota adulto (no cambia)
 const CUOTAS_MES_INICIO = "2026-06"; // Las cuotas empiezan en Junio 2026
 function finMesVigente() { return finCurrentMesIso() >= CUOTAS_MES_INICIO; }
 const finIni = (n) => (n || "?").charAt(0).toUpperCase();
@@ -21140,7 +21399,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
   // Helper: monto que debe pagar cada integrante según su tipo
   function montoParaMiembro(miembro) {
     const reg = miembrosEnCuotas.find((r) => r.integrante_id === miembro.id);
-    return reg?.es_estudiante ? CUOTA_ESTUDIANTE_MONTO : (cuotaMes?.valor || 0);
+    return reg?.es_estudiante ? CUOTA_ESTUDIANTE_MONTO : (cuotaMes?.valor || CUOTA_BASE_MONTO);
   }
 
   // Cuota del mes seleccionado
@@ -21442,7 +21701,7 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
             {/* Quién */}
             <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "10px 14px", marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: "#14532d" }}>{confirmPagarConComprobante.miembro.nombre}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#15803d" }}>{finFmtCLP(cuotaMes?.valor || 0)} · {finMesLabel(mesSeleccionado)}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#15803d" }}>{finFmtCLP(cuotaMes?.valor || CUOTA_BASE_MONTO)} · {finMesLabel(mesSeleccionado)}</span>
             </div>
             {/* Explicación */}
             <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.65, marginBottom: 16 }}>
@@ -21646,10 +21905,14 @@ function TabCuotas({ members, cuotas, pagos, miembrosEnCuotas, reload, user }) {
           </div>
         </div>
         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", textAlign: "right", lineHeight: 1.5 }}>
-          Suma de todas las cuotas<br />de todos los meses
+          Suma de <strong>todos los pagos</strong> de todos los meses registrados
         </div>
       </div>
 
+      {/* Separador mes actual */}
+      <div style={{ background: "#f1f5f9", borderRadius: 12, padding: "10px 16px", marginBottom: 14 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#3b5bdb" }}>📅 Estadísticas del mes seleccionado</span>
+      </div>
       {/* Stats del mes seleccionado */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 20 }}>
         <StatCard icon="👥" label="En sistema" value={miembrosActivos.length} color="#3b82f6" />
@@ -22312,7 +22575,7 @@ function TabResumen({ cuotas, pagos, gastos, actividades }) {
           color: "white",
         }}
       >
-        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 4 }}>Saldo disponible</div>
+        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 4 }}>Total ingresado (todos los meses)</div>
         <div
           style={{
             fontSize: 36,
@@ -22321,16 +22584,16 @@ function TabResumen({ cuotas, pagos, gastos, actividades }) {
             marginBottom: 16,
           }}
         >
-          {finFmtCLP(saldo)}
+          {finFmtCLP(totalIngresado)}
         </div>
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
           <div>
-            <div style={{ fontSize: 11, opacity: 0.75 }}>Total ingresado</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{finFmtCLP(totalIngresado)}</div>
-          </div>
-          <div>
             <div style={{ fontSize: 11, opacity: 0.75 }}>Total gastado</div>
             <div style={{ fontSize: 18, fontWeight: 700 }}>{finFmtCLP(totalGastado)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, opacity: 0.75 }}>Saldo disponible</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>{finFmtCLP(saldo)}</div>
           </div>
         </div>
       </div>
@@ -23045,45 +23308,29 @@ function AdminVisitas() {
 //  CONFIGURACIÓN DE CLAVES API (Admin)
 // ══════════════════════════════════════════════════════════════════════
 function AdminApiConfig() {
-  const [anthropicKey, setAnthropicKey] = useState("");
-  const [guardando, setGuardando] = useState(false);
-  const [msg, setMsg] = useState(null);
-
-  useEffect(() => {
-    getConfig("anthropic_api_key").then((k) => { if (k) setAnthropicKey(k); }).catch(() => {});
-  }, []);
-
-  async function guardar() {
-    if (!anthropicKey.trim()) { setMsg({ ok: false, txt: "Pega primero tu clave de Anthropic." }); return; }
-    setGuardando(true); setMsg(null);
-    try {
-      await setConfig("anthropic_api_key", anthropicKey.trim());
-      _anthropicKey = anthropicKey.trim();
-      setMsg({ ok: true, txt: "✓ Clave guardada. Ya funcionarán la extracción de acordes y el evangelio automático." });
-    } catch { setMsg({ ok: false, txt: "Error al guardar. Intenta de nuevo." }); }
-    setGuardando(false);
-  }
-
-  const inp = { width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(60,60,67,0.2)", fontSize: 13, marginBottom: 8, boxSizing: "border-box", fontFamily: "monospace" };
+  const card = { background: "#f6f8fc", border: "1px solid rgba(10,90,200,0.15)", borderRadius: 12, padding: "12px 14px", marginTop: 12 };
+  const code = { fontFamily: "monospace", background: "rgba(10,90,200,0.08)", padding: "1px 6px", borderRadius: 6, fontSize: 12 };
   return (
     <div>
       <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1c1e", marginBottom: 6 }}>🔑 Clave API de Anthropic</div>
-      <div style={{ fontSize: 12.5, color: "#6a6a70", marginBottom: 14, lineHeight: 1.6 }}>
-        Necesaria para que funcionen: extracción automática de acordes desde PDF, cambio de tono, y el evangelio del domingo.<br />
-        Obtenla en <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" style={{ color: "#0a5ac8" }}>console.anthropic.com → API Keys</a>. Se guarda encriptada en tu base de datos Supabase.
+      <div style={{ fontSize: 12.5, color: "#6a6a70", marginBottom: 6, lineHeight: 1.6 }}>
+        Necesaria para la extracción automática de acordes desde PDF y el evangelio del domingo.
       </div>
-      <input
-        value={anthropicKey}
-        onChange={(e) => setAnthropicKey(e.target.value)}
-        placeholder="sk-ant-api03-…"
-        type="password"
-        style={inp}
-      />
-      <button onClick={guardar} disabled={guardando}
-        style={{ background: "#0a5ac8", color: "white", border: "none", borderRadius: 10, padding: "9px 18px", fontSize: 13, fontWeight: 700, cursor: guardando ? "not-allowed" : "pointer", opacity: guardando ? 0.7 : 1 }}>
-        {guardando ? "Guardando…" : "Guardar clave"}
-      </button>
-      {msg && <div style={{ marginTop: 10, fontSize: 12.5, color: msg.ok ? "#15803d" : "#b91c1c", lineHeight: 1.5 }}>{msg.txt}</div>}
+      <div style={{ fontSize: 12.5, color: "#b91c1c", marginBottom: 10, lineHeight: 1.6 }}>
+        Por seguridad, la clave ya <strong>no se guarda aquí</strong>. Si se guardara en el navegador, cualquiera podría leerla desde las herramientas de desarrollo. Ahora vive solo en el servidor (Vercel) y nunca llega al navegador.
+      </div>
+      <div style={card}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: "#0a5ac8", marginBottom: 8 }}>Cómo configurarla (una sola vez)</div>
+        <ol style={{ fontSize: 12.5, color: "#3c3c43", lineHeight: 1.7, paddingLeft: 18, margin: 0 }}>
+          <li>Obtén la clave en <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" style={{ color: "#0a5ac8" }}>console.anthropic.com → API Keys</a> (empieza con <span style={code}>sk-ant-…</span>).</li>
+          <li>En Vercel: proyecto → <strong>Settings → Environment Variables</strong>.</li>
+          <li>Agrega <span style={code}>ANTHROPIC_API_KEY</span> con tu clave como valor (entorno Production).</li>
+          <li>Vuelve a desplegar (<strong>Redeploy</strong>) para que tome la variable.</li>
+        </ol>
+        <div style={{ fontSize: 12, color: "#6a6a70", marginTop: 10, lineHeight: 1.6 }}>
+          El archivo <span style={code}>/api/claude.js</span> usa esa variable para hablar con la IA. La misma idea que ya usas con <span style={code}>ONESIGNAL_API_KEY</span> para las notificaciones.
+        </div>
+      </div>
     </div>
   );
 }
