@@ -3384,11 +3384,15 @@ function AuthScreen({ view, setView, onSignIn, onSignUp, onGuestEnter, onBack })
 
   // Invitado
   const [guestCode, setGuestCode] = useState("");
+  const [codigoValido, setCodigoValido] = useState(GUEST_CODE);
+  useEffect(() => {
+    getConfig("codigo_invitado").then((v) => { if (v && v.trim()) setCodigoValido(v.trim()); }).catch(() => {});
+  }, []);
 
   function doGuestEnter() {
     setError("");
     if (!guestCode.trim()) { setError("Ingresa el código de acceso."); return; }
-    if (guestCode.trim() !== GUEST_CODE) { setError("Código incorrecto. Pídele el código al administrador del coro."); return; }
+    if (guestCode.trim() !== codigoValido) { setError("Código incorrecto. Pídele el código al administrador del coro."); return; }
     onGuestEnter();
   }
 
@@ -12817,6 +12821,7 @@ const ADMIN_TABS = [
   { id: "galeria", label: "Galería", icon: "🖼️" },
   { id: "comunidades", label: "Comunidades", icon: "⛪" },
   { id: "cuentas", label: "Cuentas", icon: "🔐" },
+  { id: "codigo_invitado", label: "Código Invitados", icon: "🔑" },
   { id: "historial", label: "Historial Asistencia", icon: "📅" },
   { id: "cuenta_bancaria", label: "Cuenta Bancaria", icon: "🏦" },
   { id: "visitas", label: "Visitas", icon: "📊" },
@@ -12852,7 +12857,7 @@ const ADMIN_GRUPOS = [
   { grupo: "Coro",      emoji: "👥", ids: ["integrantes", "asistencia", "historial", "material_coro_admin", "comunidades"] },
   { grupo: "Contenido", emoji: "✏️",  ids: ["noticias", "pautas", "oraciones", "preguntas", "biblioteca", "podcasts", "galeria", "links"] },
   { grupo: "Invitados", emoji: "👋", ids: ["documentos", "material_ensayo_admin", "descargas_admin", "visitas"] },
-  { grupo: "Sistema",   emoji: "⚙️", ids: ["cuentas", "cuenta_bancaria", "notificaciones", "api_config"] },
+  { grupo: "Sistema",   emoji: "⚙️", ids: ["cuentas", "codigo_invitado", "cuenta_bancaria", "notificaciones", "api_config"] },
 ];
 
 function AdminTab({ label, active, onClick }) {
@@ -18811,6 +18816,61 @@ function AdminAsistencia({ members, eventos, asistencia: asistenciaProp, onReloa
 // ══════════════════════════════════════════
 //  ADMIN CUENTAS
 // ══════════════════════════════════════════
+function AdminCodigoInvitado() {
+  const [codigo, setCodigo] = useState("");
+  const [original, setOriginal] = useState("");
+  const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [ok, setOk] = useState(false);
+  useEffect(() => {
+    getConfig("codigo_invitado").then((v) => {
+      const val = (v && v.trim()) ? v.trim() : GUEST_CODE;
+      setCodigo(val); setOriginal(val); setCargando(false);
+    }).catch(() => { setCodigo(GUEST_CODE); setOriginal(GUEST_CODE); setCargando(false); });
+  }, []);
+  async function guardar() {
+    const nuevo = codigo.trim();
+    if (!nuevo) { alert("El código no puede estar vacío."); return; }
+    if (nuevo.length < 4) { alert("El código debe tener al menos 4 caracteres."); return; }
+    setGuardando(true); setOk(false);
+    try {
+      await setConfig("codigo_invitado", nuevo);
+      setOriginal(nuevo); setOk(true);
+      setTimeout(() => setOk(false), 3000);
+    } catch (e) { alert("Error al guardar: " + e.message); }
+    setGuardando(false);
+  }
+  if (cargando) return <div style={{ padding: 20, color: C.gray, fontSize: 13 }}>Cargando…</div>;
+  return (
+    <div style={{ maxWidth: 480 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+        <span style={{ fontSize: 20 }}>🔑</span>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.dark }}>Código de acceso de invitados</div>
+      </div>
+      <p style={{ fontSize: 13, color: C.gray, lineHeight: 1.6, marginBottom: 18 }}>
+        Este es el código que compartes con las visitas para que entren al portal como invitados. Cámbialo cuando quieras; el anterior dejará de funcionar de inmediato.
+      </p>
+      <label style={{ fontSize: 11, fontWeight: 700, color: C.gray, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6 }}>Código actual</label>
+      <input
+        value={codigo}
+        onChange={(e) => { setCodigo(e.target.value); setOk(false); }}
+        placeholder="Ej: Coromj1234"
+        style={{ width: "100%", fontSize: 15, padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.border}`, boxSizing: "border-box", fontWeight: 600, letterSpacing: "0.02em" }}
+      />
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+        <button onClick={guardar} disabled={guardando || codigo.trim() === original}
+          style={{ background: codigo.trim() === original ? "#c7c7cc" : C.primary, color: "#fff", border: "none", borderRadius: 11, padding: "11px 22px", fontSize: 14, fontWeight: 700, cursor: codigo.trim() === original ? "default" : "pointer" }}>
+          {guardando ? "Guardando…" : "Guardar código"}
+        </button>
+        {ok && <span style={{ fontSize: 13, color: "#16a34a", fontWeight: 600 }}>✓ Código actualizado</span>}
+      </div>
+      <div style={{ marginTop: 20, background: "#fdf6e3", border: "1px solid #ecdfb0", borderRadius: 12, padding: "12px 14px", fontSize: 12.5, color: "#8a6d1a", lineHeight: 1.6 }}>
+        💡 Comparte este código con las visitas por WhatsApp o en persona. Cuando lo cambies, avísales el nuevo.
+      </div>
+    </div>
+  );
+}
+
 function AdminCuentas({ members, onReload }) {
   const [selectedId, setSelectedId] = useState(null);
   const [newPass, setNewPass] = useState("");
@@ -21057,6 +21117,7 @@ function Admin({
         {tab === "galeria" && <AdminGaleria fotos={fotos} onReload={onReload} />}
         {tab === "comunidades" && <AdminComunidades comunidades={comunidades} onReload={onReload} />}
         {tab === "cuentas" && <AdminCuentas members={members} onReload={onReload} />}
+        {tab === "codigo_invitado" && <AdminCodigoInvitado />}
         {tab === "historial" && <AdminHistorialAsistencia members={members} />}
         {tab === "cuenta_bancaria" && <AdminCuentaBancaria />}
         {tab === "visitas" && <AdminVisitas />}
