@@ -5970,7 +5970,6 @@ REGLAS ESTRICTAS:
         <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
           <button onClick={() => setTab("pdf")} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 9, cursor: "pointer", border: `1.5px solid ${tab === "pdf" ? ac : "rgba(60,60,67,0.18)"}`, background: tab === "pdf" ? `${ac}12` : "white", color: tab === "pdf" ? ac : "#8a8a90", fontWeight: tab === "pdf" ? 700 : 500 }}>📄 PDF original</button>
           <button onClick={() => setTab("acordes")} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 9, cursor: "pointer", border: `1.5px solid ${tab === "acordes" ? ac : "rgba(60,60,67,0.18)"}`, background: tab === "acordes" ? `${ac}12` : "white", color: tab === "acordes" ? ac : "#8a8a90", fontWeight: tab === "acordes" ? 700 : 500 }}>🎵 Acordes · cambiar tono</button>
-          <a href={drivePreviewUrl(sel.url) || sel.url} target="_blank" rel="noopener noreferrer" style={{ marginLeft: "auto", fontSize: 11, color: ac, textDecoration: "none", fontWeight: 600, alignSelf: "center" }}>Pantalla completa ↗</a>
         </div>
       </div>
 
@@ -6278,7 +6277,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
               <div style={{ marginBottom: 6 }}><strong>2. Toca un canto</strong> de la lista para abrirlo.</div>
               <div style={{ marginBottom: 6 }}><strong>3. Escucha tu pista:</strong> ▶ para reproducir. Baja la <strong>velocidad</strong> (0.75x / 0.9x) para aprender un pasaje difícil, y fija un tramo con <strong>A</strong> y <strong>B</strong> para repetirlo en bucle.</div>
               <div style={{ marginBottom: 6 }}><strong>4. Cambia de voz</strong> cuando quieras: toca otra cuerda y sonará esa pista.</div>
-              <div style={{ marginBottom: 6 }}><strong>5. Lee la partitura y la letra</strong> en pantalla, y descarga tu pista con <strong>↓ Descargar</strong>.</div>
+              <div style={{ marginBottom: 6 }}><strong>5. Lee la partitura y la letra</strong> en pantalla mientras escuchas tu pista.</div>
               <div><strong>6. Marca tu avance</strong> en cada canto: Pendiente → En práctica → Aprendido.</div>
             </div>
           </details>
@@ -6437,9 +6436,6 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                   </div>
                 )}
                 <ReproductorPista doc={track.doc} accent={trackAccent} onFirstPlay={() => setProyAbierto(true)} />
-                <div style={{ marginTop: 8, textAlign: "right" }}>
-                  <a href={urlDoc(track.doc)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: C.primary, textDecoration: "none", fontWeight: 600 }}>↓ Descargar esta pista</a>
-                </div>
 
                 {/* Proyector de letra / PDF (se abre al reproducir) */}
                 {(() => {
@@ -11138,10 +11134,18 @@ function transponerTextoCompleto(texto, semis) {
 
 function drivePreviewUrl(url) {
   if (!url) return "";
-  // Convertir cualquier variante de URL de Drive a preview embebible
-  return url
-    .replace(/\/view(\?.*)?$/, "/preview")
-    .replace(/\/edit(\?.*)?$/, "/preview");
+  // Si es de Google Drive: convertir a /preview (su visor no muestra descarga si el archivo lo restringe)
+  if (/drive\.google\.com/i.test(url)) {
+    return url
+      .replace(/\/view(\?.*)?$/, "/preview")
+      .replace(/\/edit(\?.*)?$/, "/preview");
+  }
+  // Si es un PDF directo (ej: Supabase): ocultar la barra del visor del navegador (descarga/imprimir)
+  if (/\.pdf(\?|$)/i.test(url)) {
+    const limpia = url.split("#")[0];
+    return `${limpia}#toolbar=0&navpanes=0`;
+  }
+  return url;
 }
 
 // ── Componente QR pequeño usando api.qrserver.com (gratis, sin clave) ──
