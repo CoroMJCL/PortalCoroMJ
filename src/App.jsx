@@ -5486,6 +5486,9 @@ function DashboardVisita({ user, pautas, setSection, isAdmin, evangelio, comunid
         </div>
       </div>
 
+      {/* ── Informaciones (avisos e indicaciones del admin) ── */}
+      <InformacionesWidget isAdmin={isAdmin} />
+
       {/* ── Próxima pauta parroquial ── */}
       {proxima ? (
         <div className="vc vp-tappable" onClick={() => setSection("pauta_misa")} style={{
@@ -7519,6 +7522,113 @@ function ComunicadosWidget({ isAdmin }) {
       ) : (
         <div style={{ fontSize: 12.5, color: C.gray, fontStyle: "italic", padding: "8px 0" }}>
           {isAdmin ? "Aún no hay comunicados. Toca “Editar” para escribir uno." : "Sin comunicados por ahora."}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InformacionesWidget({ isAdmin }) {
+  const [html, setHtml] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => { getConfig("informaciones_html").then((v) => setHtml(v || "")).catch(() => {}); }, []);
+  useEffect(() => { if (editing && ref.current) ref.current.innerHTML = html || ""; }, [editing]);
+  function cmd(c, v) { document.execCommand(c, false, v != null ? v : null); if (ref.current) ref.current.focus(); }
+  async function guardar() {
+    setSaving(true);
+    const h = ref.current ? ref.current.innerHTML : html;
+    try { await setConfig("informaciones_html", h); setHtml(h); setEditing(false); } catch (e) {}
+    setSaving(false);
+  }
+  const ORO = "#b8860b";
+  const ORO_CLARO = "#fdf6e3";
+  const tbBtn = { border: "1px solid rgba(60,60,67,0.2)", background: "white", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, cursor: "pointer", fontWeight: 700, color: "#3a3a40" };
+  const tbBtnIcon = { ...tbBtn, padding: "6px 8px", minWidth: 32, display: "inline-flex", alignItems: "center", justifyContent: "center" };
+  const tbSep = { width: 1, alignSelf: "stretch", background: "#e6d9a8", margin: "2px 4px" };
+  function alignIcon(kind) {
+    const L = { left: [[3, 15], [3, 21], [3, 13]], center: [[6, 18], [3, 21], [7, 17]], right: [[9, 21], [3, 21], [11, 21]], justify: [[3, 21], [3, 21], [3, 21]] }[kind];
+    return (
+      <svg width="15" height="15" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none">
+        {[6, 12, 18].map((y, i) => (<line key={i} x1={L[i][0]} y1={y} x2={L[i][1]} y2={y} />))}
+      </svg>
+    );
+  }
+  // Si no hay info y no es admin, no mostrar nada
+  if (!html && !isAdmin) return null;
+  return (
+    <div style={{ background: "linear-gradient(180deg,#fffdf6,#ffffff)", borderRadius: 18, border: "1px solid #ecdfb0", borderLeft: `4px solid ${ORO}`, padding: "16px 18px", boxShadow: "0 6px 18px rgba(184,134,11,0.10)", marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(184,134,11,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ORO} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+          </div>
+          <div>
+            <div style={{ fontSize: 14.5, fontWeight: 800, color: "#1c1c1e", letterSpacing: "-0.01em" }}>Informaciones</div>
+            <div style={{ fontSize: 11, color: "#a9832d", fontWeight: 600 }}>Avisos e indicaciones del coro</div>
+          </div>
+        </div>
+        {isAdmin && !editing && (
+          <button onClick={() => setEditing(true)} style={{ fontSize: 12, fontWeight: 700, color: ORO, background: "none", border: "none", cursor: "pointer" }}>✏️ Editar</button>
+        )}
+      </div>
+      {editing ? (
+        <div>
+          <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap", alignItems: "center", background: ORO_CLARO, border: "1px solid #ecdfb0", borderRadius: 12, padding: 6 }}>
+            <button title="Negrita" onClick={() => cmd("bold")} style={{ ...tbBtnIcon, fontWeight: 800 }}>B</button>
+            <button title="Cursiva" onClick={() => cmd("italic")} style={{ ...tbBtnIcon, fontStyle: "italic", fontWeight: 700 }}>I</button>
+            <button title="Subrayado" onClick={() => cmd("underline")} style={{ ...tbBtnIcon, textDecoration: "underline" }}>U</button>
+            <span style={tbSep} />
+            <select title="Tipo de letra" onChange={(e) => { cmd("fontName", e.target.value); e.target.selectedIndex = 0; }} style={{ ...tbBtnIcon, padding: "5px 6px", fontSize: 12, cursor: "pointer", minWidth: 92 }}>
+              <option value="">Fuente</option>
+              <option value="Inter, sans-serif">Normal</option>
+              <option value="Georgia, serif">Serif</option>
+              <option value="'Courier New', monospace">Mono</option>
+              <option value="'Brush Script MT', cursive">Manuscrita</option>
+            </select>
+            <select title="Tamaño" onChange={(e) => { cmd("fontSize", e.target.value); e.target.selectedIndex = 0; }} style={{ ...tbBtnIcon, padding: "5px 6px", fontSize: 12, cursor: "pointer", minWidth: 70 }}>
+              <option value="">Tamaño</option>
+              <option value="2">Pequeño</option>
+              <option value="3">Normal</option>
+              <option value="5">Grande</option>
+              <option value="6">Título</option>
+            </select>
+            <span style={tbSep} />
+            <button title="Alinear a la izquierda" onClick={() => cmd("justifyLeft")} style={tbBtnIcon}>{alignIcon("left")}</button>
+            <button title="Centrar" onClick={() => cmd("justifyCenter")} style={tbBtnIcon}>{alignIcon("center")}</button>
+            <button title="Alinear a la derecha" onClick={() => cmd("justifyRight")} style={tbBtnIcon}>{alignIcon("right")}</button>
+            <button title="Justificar" onClick={() => cmd("justifyFull")} style={tbBtnIcon}>{alignIcon("justify")}</button>
+            <span style={tbSep} />
+            <button title="Lista con viñetas" onClick={() => cmd("insertUnorderedList")} style={tbBtnIcon}>•</button>
+            <button title="Texto dorado" onClick={() => cmd("foreColor", "#b8860b")} style={{ ...tbBtnIcon, color: "#b8860b", fontWeight: 800 }}>A</button>
+            <button title="Texto rojo" onClick={() => cmd("foreColor", "#c0392b")} style={{ ...tbBtnIcon, color: "#c0392b", fontWeight: 800 }}>A</button>
+            <button title="Quitar formato" onClick={() => cmd("removeFormat")} style={{ ...tbBtnIcon, color: "#8a8a90" }}>⨯</button>
+            <span style={tbSep} />
+            <div style={{ position: "relative", display: "inline-block" }}>
+              <button title="Insertar emoji" onClick={() => setEmojiOpen(o => !o)} style={tbBtnIcon}>😊</button>
+              {emojiOpen && (
+                <div style={{ position: "absolute", top: "110%", left: 0, zIndex: 50, background: "white", border: "1px solid #ecdfb0", borderRadius: 12, padding: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.15)", display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 2, width: 280 }}>
+                  {["😀","😊","😍","🥳","🙏","❤️","🎉","✨","🔥","👏","👍","🙌","🎶","🎵","⛪","✝️","📢","📣","📅","⏰","✅","⚠️","💪","🌟","😇","🕊️","🎸","🎤","💒","🌹","☀️","💙"].map(em => (
+                    <button key={em} onClick={() => { cmd("insertText", em); setEmojiOpen(false); }} style={{ border: "none", background: "none", fontSize: 18, cursor: "pointer", padding: 4, borderRadius: 6 }} onMouseEnter={e => e.currentTarget.style.background = ORO_CLARO} onMouseLeave={e => e.currentTarget.style.background = "none"}>{em}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <div ref={ref} contentEditable suppressContentEditableWarning
+            style={{ minHeight: 130, border: `1px solid ${ORO}55`, borderRadius: 10, padding: "12px 14px", fontSize: 13.5, lineHeight: 1.6, color: "#2a2a30", outline: "none", background: "#fffdf6" }} />
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button onClick={guardar} disabled={saving} style={{ background: ORO, color: "white", border: "none", borderRadius: 9, padding: "8px 16px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>{saving ? "Guardando…" : "Guardar"}</button>
+            <button onClick={() => setEditing(false)} style={{ background: "white", color: "#6a6a70", border: "1px solid rgba(60,60,67,0.2)", borderRadius: 9, padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
+          </div>
+        </div>
+      ) : html ? (
+        <div style={{ fontSize: 13.5, lineHeight: 1.6, color: "#2a2a30" }} dangerouslySetInnerHTML={{ __html: html }} />
+      ) : (
+        <div style={{ fontSize: 12.5, color: C.gray, fontStyle: "italic", padding: "8px 0" }}>
+          Aún no hay informaciones. Toca “Editar” para escribir un aviso o indicación.
         </div>
       )}
     </div>
