@@ -32,7 +32,7 @@ const DEFAULT = {
   contacto_dir:"Maipú, Santiago, Chile · Capilla Sagrada Familia",
   contacto_ensayo:"Sábados · Capilla Sagrada Familia de Maipú",
   whatsapp:"56912345678",
-  evento_nombre:"", evento_fecha:"", evento_hora:"", evento_lugar:"",
+  pm_modo:"auto", evento_nombre:"", evento_fecha:"", evento_hora:"", evento_lugar:"",
   instagram_url:"",
   tiktok_url:"",
   youtube_url:"",
@@ -182,6 +182,24 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
             <AdminImgField {...ifp} label="Imagen fondo login (pantalla de acceso)" k="login_bg" name="landing_login_bg" />
             <AdminField {...fp} label="Título 1" k="hero_titulo" /><AdminField {...fp} label="Título 2 italic" k="hero_titulo2" /><AdminField {...fp} label="Subtexto" k="hero_sub" ta />
 
+            {/* PRÓXIMA MISA */}
+            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>📅 Próxima misa (portada)</div>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: "#888", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 5 }}>Qué mostrar</div>
+              <select value={editing.pm_modo ?? C.pm_modo ?? "auto"} onChange={e => setEditing(p => ({ ...p, pm_modo: e.target.value }))}
+                style={{ width: "100%", border: "1px solid #e0e6f0", borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fff", marginBottom: 4 }}>
+                <option value="auto">Automático (próxima pauta publicada)</option>
+                <option value="manual">Manual (los datos de abajo)</option>
+                <option value="oculto">No mostrar</option>
+              </select>
+              <button onClick={() => saveF("pm_modo")} disabled={saving.pm_modo} style={{ background: "#08122d", color: "#fff", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                {saving.pm_modo ? "..." : "Guardar"}
+              </button>
+            </div>
+            <AdminField {...fp} label="Fecha (modo manual)" k="evento_fecha" type="date" />
+            <AdminField {...fp} label="Hora (modo manual)" k="evento_hora" type="time" />
+            <AdminField {...fp} label="Lugar (modo manual)" k="evento_lugar" />
+
             {/* NOSOTROS */}
             <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>👥 Nosotros</div>
             <AdminImgField {...ifp} label="Imagen nosotros" k="about_img" name="landing_about" />
@@ -244,50 +262,33 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
   );
 }
 
-// ── BANDERA DE CHILE (a trazo, sin asta ni fondo) ─────────────────
-// Línea fina con degradado blanco → oro. El pentagrama nace de las ondas de
-// la bandera, la estrella lleva una cruz grabada y una nota cierra la composición.
-// Sin rellenos de color ni caja: toma el fondo que ya existe.
-function BanderaChile({ width = 132 }) {
-  const top = "M6 14C26 6 44 22 66 14S104 6 126 14";
+// ── Próxima misa (portada) ──
+function ProximaMisa({ C }) {
+  const [m, setM] = useState(null);
+  const modo = C.pm_modo || "auto";
+  useEffect(() => {
+    if (modo !== "auto") return;
+    const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Santiago" });
+    fetch(`${SUPABASE_URL}/rest/v1/pautas_misa?publicada=eq.true&fecha=gte.${hoy}&order=fecha.asc&limit=1`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    }).then(r => r.json()).then(rows => { if (Array.isArray(rows) && rows[0]) setM(rows[0]); }).catch(() => {});
+  }, [modo]);
+  if (modo === "oculto") return null;
+  const src = modo === "manual" ? { fecha: C.evento_fecha, hora: C.evento_hora, lugar: C.evento_lugar } : m;
+  if (!src || !src.fecha) return null;
+  const d = new Date(src.fecha + "T12:00:00");
+  const dia = d.toLocaleDateString("es-CL", { weekday: "short" }).replace(".", "").slice(0, 3).toUpperCase();
+  const mes = d.toLocaleDateString("es-CL", { month: "short" }).replace(".", "").slice(0, 3).toUpperCase();
+  const hora = (src.hora || "").slice(0, 5);
   return (
-    <svg
-      role="img"
-      aria-label="Bandera de Chile con pentagrama, estrella y cruz"
-      width={width}
-      height={(width * 80) / 132}
-      viewBox="0 0 132 80"
-      fill="none"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{ display: "block", overflow: "visible", filter: "drop-shadow(0 2px 10px rgba(0,0,0,0.38))" }}
-    >
-      <defs>
-        <linearGradient id="mjOro" gradientUnits="userSpaceOnUse" x1="6" y1="0" x2="126" y2="0">
-          <stop offset="0" stopColor="#ffffff" />
-          <stop offset=".55" stopColor="#fff6e0" />
-          <stop offset="1" stopColor="#f1cf86" />
-        </linearGradient>
-        <mask id="mjCruz" maskUnits="userSpaceOnUse" x="0" y="0" width="132" height="80">
-          <rect width="132" height="80" fill="#fff" />
-          <path d="M25 21.25v7.6M21.7 24.05h6.6" stroke="#000" strokeWidth="1.5" />
-        </mask>
-      </defs>
-      <g stroke="url(#mjOro)">
-        <path d={top} strokeWidth="2" />
-        <path d={top} transform="translate(0 44)" strokeWidth="2" />
-        <path d="M6 14V58M126 14V58" strokeWidth="2" />
-        <path d={top} transform="translate(0 22)" strokeWidth="1.5" />
-        <path d={top} transform="translate(0 29)" strokeWidth="1.2" opacity=".85" />
-        <path d={top} transform="translate(0 36)" strokeWidth="1.2" opacity=".7" />
-        <path d="M44 15.62V37.62" strokeWidth="1.5" />
-        <path d="M99.6 39.50V19.50C99.6 19.50 105 21.50 105.5 28.50" strokeWidth="1.6" />
-      </g>
-      <g fill="url(#mjOro)" stroke="none">
-        <polygon points="25.00,13.35 27.45,20.38 34.89,20.53 28.96,25.03 31.11,32.16 25.00,27.91 18.89,32.16 21.04,25.03 15.11,20.53 22.55,20.38" mask="url(#mjCruz)" />
-        <ellipse cx="96" cy="40.50" rx="4.3" ry="3.1" transform="rotate(-22 96 40.50)" />
-      </g>
-    </svg>
+    <div className="pm">
+      <div className="pm-k">Próxima misa</div>
+      <div className="pm-row">
+        <span>{dia}</span><i /><span>{String(d.getDate()).padStart(2, "0")}</span><i /><span>{mes}</span>
+        {hora && <><i /><span className="pm-h">{hora}<small>HRS</small></span></>}
+      </div>
+      {src.lugar && <div className="pm-l">{src.lugar}</div>}
+    </div>
   );
 }
 
@@ -604,7 +605,7 @@ export default function Landing({ onPortal }) {
         />
       )}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,300&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400;1,9..144,700;1,9..144,900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,300&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400;1,9..144,700;1,9..144,900&display=swap');
         html,body,button,input,textarea,select{font-family:'Plus Jakarta Sans','Inter',sans-serif!important}
         *{box-sizing:border-box;margin:0;padding:0}
         html{scroll-behavior:smooth}
@@ -633,8 +634,13 @@ export default function Landing({ onPortal }) {
         .hero-kicker::before{content:'';width:28px;height:1px;background:rgba(255,255,255,0.4)}
         .hero-h1{font-size:clamp(70px,9.5vw,124px);font-weight:900;line-height:0.88;color:#fff;letter-spacing:-0.03em}
         .hero-h1 .it{font-family:'Fraunces',serif;font-style:italic;font-weight:400;display:block;line-height:0.92;font-size:clamp(66px,9vw,118px)}
-        .hero-flag{position:absolute;z-index:3;top:108px;left:clamp(20px,4.2vw,64px);width:clamp(112px,12.5vw,176px);pointer-events:none}
-        .hero-flag svg{width:100%;height:auto}
+        .pm{margin-top:34px;color:#fff}
+        .pm-k{font-size:11px;font-weight:700;letter-spacing:0.32em;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-bottom:10px}
+        .pm-row{display:flex;align-items:center;gap:clamp(12px,1.8vw,22px);font-family:'Outfit','Plus Jakarta Sans',sans-serif;font-weight:200;font-size:clamp(34px,4.6vw,60px);line-height:1;letter-spacing:0.06em;font-variant-numeric:tabular-nums}
+        .pm-row i{display:block;width:1px;height:1.05em;background:rgba(255,255,255,0.75)}
+        .pm-h{display:flex;align-items:baseline;gap:6px}
+        .pm-h small{font-family:inherit;font-weight:400;font-size:0.28em;letter-spacing:0.28em;opacity:0.7}
+        .pm-l{margin-top:16px;font-family:'Outfit','Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:400;letter-spacing:0.22em;text-transform:uppercase;color:rgba(255,255,255,0.85)}
         .hero-right{display:flex;flex-direction:column;align-items:flex-end;gap:16px;max-width:320px}
         .hero-sub{font-size:13.5px;font-weight:300;color:rgba(255,255,255,0.55);line-height:1.75;text-align:right}
         .hero-btns{display:flex;gap:10px}
@@ -826,7 +832,7 @@ export default function Landing({ onPortal }) {
           .hero-right{align-items:flex-start;max-width:100%}
           .hero-sub{text-align:left}
           .hero-logo-card{display:none}
-          .fabs{top:30%;bottom:auto;left:16px;transform:translateY(-50%)}
+          .fabs{top:30%;bottom:auto;left:auto;right:14px;align-items:flex-end;transform:translateY(-50%)}
           .tools{padding:72px 24px}
           .tools-grid{grid-template-columns:1fr;gap:20px}
         }
@@ -857,11 +863,11 @@ export default function Landing({ onPortal }) {
       <section id="inicio" className="hero">
         <div className="hero-bg" style={{ backgroundImage: `url('${C.hero_img}')` }}/>
         <div className="hero-ov"/>
-        <div className="hero-flag"><BanderaChile /></div>
         <div className="hero-c">
           <div>
             <div style={{fontSize:"clamp(11px,1.2vw,14px)",fontWeight:700,letterSpacing:"0.45em",textTransform:"uppercase",color:"rgba(255,255,255,0.85)",marginBottom:12,display:"block"}}>CORO</div>
             <h1 className="hero-h1">{C.hero_titulo}<br/><span className="it">{C.hero_titulo2}</span></h1>
+            <ProximaMisa C={C} />
           </div>
           <div className="hero-right">
             <p className="hero-sub">{C.hero_sub}</p>

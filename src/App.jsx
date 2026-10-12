@@ -791,7 +791,7 @@ const G = `
     box-shadow: 0 12px 40px rgba(8,12,30,0.18);
     background: #0c0c14;
   }
-  .mj-banner-img { width: 100%; height: 260px; object-fit: cover; display: block; }
+  .mj-banner-img { width: 100%; height: 172px; object-fit: cover; display: block; }
   .mj-banner-scrim {
     position: absolute; inset: 0;
     background: linear-gradient(90deg, rgba(8,10,24,0.86) 0%, rgba(8,10,24,0.55) 42%, rgba(8,10,24,0.12) 70%, transparent 100%);
@@ -15614,205 +15614,8 @@ function Dashboard({
       )}
       {isVisita ? null : (
         <>
-          {/* ── Aviso pauta en borrador (solo Admin) ── */}
-          {isAdmin && pautasBorrador.length > 0 && (
-            <div
-              onClick={() => setSection("pauta_misa")}
-              style={{
-                background: "linear-gradient(135deg,#fffbeb,#fef3c7)",
-                borderRadius: 18,
-                padding: "14px 18px",
-                marginBottom: 12,
-                border: "2px solid #fbbf24",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-                boxShadow: "0 4px 16px rgba(251,191,36,0.2)",
-                transition: "box-shadow 0.2s",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.boxShadow =
-                  "0 6px 24px rgba(251,191,36,0.35)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.boxShadow =
-                  "0 4px 16px rgba(251,191,36,0.2)")
-              }
-            >
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 11,
-                  background: "linear-gradient(135deg,#92400e,#f59e0b)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 22,
-                  flexShrink: 0,
-                }}
-              >
-                🎼
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: "#92400e",
-                    marginBottom: 2,
-                  }}
-                >
-                  {pautasBorrador.length === 1
-                    ? `Tienes una pauta en borrador`
-                    : `Tienes ${pautasBorrador.length} pautas en borrador`}
-                  <span
-                    style={{
-                      marginLeft: 8,
-                      fontSize: 11,
-                      background: "#fef08a",
-                      color: "#713f12",
-                      padding: "2px 8px",
-                      borderRadius: 12,
-                      fontWeight: 600,
-                    }}
-                  >
-                    BORRADOR
-                  </span>
-                </div>
-                <div style={{ fontSize: 12, color: "#b45309" }}>
-                  {pautasBorrador.map((p) => p.titulo).join(" · ")} — Abre para
-                  revisar y publicar
-                </div>
-              </div>
-              <span
-                style={{
-                  fontSize: 12,
-                  color: "#b45309",
-                  fontWeight: 600,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Revisar →
-              </span>
-            </div>
-          )}
-
-          {/* ── Avisos pautas publicadas próximas (todas, todos los integrantes) ── */}
-          {pautasProximas.map((p) => (
-            <div
-              key={p.id}
-              onClick={() => setSection("pauta_misa")}
-              style={{
-                background: "linear-gradient(135deg,#f0fdf4,#dcfce7)",
-                borderRadius: 18,
-                padding: "14px 18px",
-                marginBottom: 10,
-                border: `2px solid ${C.primary}50`,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-                boxShadow: `0 4px 16px ${C.primary}20`,
-                transition: "box-shadow 0.2s",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.boxShadow = `0 6px 24px ${C.primary}35`)
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.boxShadow = `0 4px 16px ${C.primary}20`)
-              }
-            >
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 11,
-                  background: `linear-gradient(135deg,#1a3a2a,${C.primary})`,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 800,
-                    color: "white",
-                    lineHeight: 1,
-                  }}
-                >
-                  {new Date(p.fecha + "T00:00:00").getDate()}
-                </div>
-                <div
-                  style={{
-                    fontSize: 8,
-                    color: "rgba(255,255,255,0.8)",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {new Date(p.fecha + "T00:00:00").toLocaleDateString("es-CL", {
-                    month: "short",
-                  })}
-                </div>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: C.primaryDark,
-                    marginBottom: 2,
-                  }}
-                >
-                  🎼 {p.titulo}
-                  <span
-                    style={{
-                      marginLeft: 8,
-                      fontSize: 11,
-                      background: C.primaryLight,
-                      color: C.primaryDark,
-                      padding: "2px 8px",
-                      borderRadius: 12,
-                      fontWeight: 600,
-                    }}
-                  >
-                    ✅ PUBLICADA
-                  </span>
-                </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: C.gray,
-                    textTransform: "capitalize",
-                  }}
-                >
-                  {new Date(p.fecha + "T00:00:00").toLocaleDateString("es-CL", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                  })}{" "}
-                  · {p.hora} Hrs{p.lugar ? " · " + p.lugar : ""}
-                </div>
-              </div>
-              <span
-                style={{
-                  fontSize: 12,
-                  color: C.primary,
-                  fontWeight: 600,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Ver pauta →
-              </span>
-            </div>
-          ))}
-
           {/* ── Inicio: hero + cuota a lo ancho, luego 2 columnas ── */}
-          <style>{`.dash-2col{display:grid;grid-template-columns:1.65fr 1fr;gap:14px;align-items:start}.dash-col{display:flex;flex-direction:column;gap:14px;min-width:0}@media(max-width:860px){.dash-2col{grid-template-columns:1fr}}`}</style>
+          <style>{`.dash-2col{display:grid;grid-template-columns:1.45fr 1fr 1fr;gap:10px;align-items:start}.dash-col{display:flex;flex-direction:column;gap:10px;min-width:0}@media(max-width:1180px){.dash-2col{grid-template-columns:1.6fr 1fr}.dash-right{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:start}}@media(max-width:860px){.dash-2col{grid-template-columns:1fr}.dash-right{display:flex}}`}</style>
           {/* ── Stats con foto de usuario ── */}
           <div
             className="grid-stats"
@@ -16265,9 +16068,7 @@ function Dashboard({
           <CumpleanosCompacto members={members} setSection={setSection} />
           <div className="dash-2col">
             <div className="dash-col">
-              <div style={{ marginBottom: 16 }}>
-                <ComunicadosWidget isAdmin={isAdmin} />
-              </div>
+              <ComunicadosWidget isAdmin={isAdmin} />
               {/* ── Avisos del Coro ── */}
               {avisos && avisos.length > 0 && (
                 <div style={{ marginBottom: 14 }}>
@@ -16678,6 +16479,8 @@ function Dashboard({
                   </div>
                 </div>
               )}
+            </div>
+            <div className="dash-col">
               <GaleriaWidget
                 fotos={fotos}
                 setSection={setSection}
@@ -16685,7 +16488,12 @@ function Dashboard({
               />
               <VocalizacionWidget isAdmin={isAdmin} />
             </div>
-            <div className="dash-col">
+            <div className="dash-col dash-right">
+              <PautasCompacto
+                pautas={pautas}
+                isAdmin={isAdmin}
+                setSection={setSection}
+              />
               {/* ── Santoral (franja completa) ── */}
               {santoral && (
                 <div
@@ -16786,262 +16594,6 @@ function Dashboard({
             ))}
           </div>
 
-          {/* ── Pauta de Misa vigente con QR ── */}
-          {(() => {
-            const hoy = new Date();
-            hoy.setHours(0, 0, 0, 0);
-            const publicadas = (pautas || [])
-              .filter(
-                (p) => p.publicada && new Date(p.fecha + "T00:00:00") >= hoy
-              )
-              .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-            const proxima = publicadas[0];
-            if (!proxima) return null;
-            const fechaFmt = new Date(
-              proxima.fecha + "T00:00:00"
-            ).toLocaleDateString("es-CL", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            });
-            const cancArr =
-              typeof proxima.canciones === "string"
-                ? JSON.parse(proxima.canciones || "[]")
-                : proxima.canciones || [];
-            // URL del QR — página pública sin login
-            const qrData = `https://343mhn.csb.app/pauta-publica.html?pauta=${proxima.id}`;
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(
-              qrData
-            )}&color=1a3a2a&bgcolor=ffffff&margin=10`;
-            return (
-              <div style={{ marginTop: 14 }}>
-                <Card
-                  style={{
-                    background: `linear-gradient(135deg,#0f2a1e,#1a3a2a)`,
-                    border: "none",
-                    padding: 0,
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      alignItems: "stretch",
-                    }}
-                  >
-                    {/* Info de la pauta */}
-                    <div style={{ flex: 1, padding: "20px 24px", minWidth: 0 }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          marginBottom: 12,
-                        }}
-                      >
-                        <span style={{ fontSize: 20 }}>🎼</span>
-                        <div>
-                          <div
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: "rgba(255,255,255,0.6)",
-                              letterSpacing: "0.08em",
-                              textTransform: "uppercase",
-                            }}
-                          >
-                            Pauta de Misa
-                          </div>
-                          <div
-                            style={{
-                              fontFamily: "var(--font-display)",
-                              fontSize: 16,
-                              fontWeight: 700,
-                              color: "white",
-                              lineHeight: 1.2,
-                            }}
-                          >
-                            {proxima.titulo}
-                          </div>
-                        </div>
-                        <span
-                          style={{
-                            marginLeft: "auto",
-                            background: "#22c55e",
-                            color: "white",
-                            fontSize: 10,
-                            fontWeight: 700,
-                            padding: "3px 10px",
-                            borderRadius: 20,
-                          }}
-                        >
-                          ✅ PUBLICADA
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "rgba(255,255,255,0.8)",
-                          marginBottom: 4,
-                          textTransform: "capitalize",
-                        }}
-                      >
-                        📅 {fechaFmt}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "rgba(255,255,255,0.7)",
-                          marginBottom: 4,
-                        }}
-                      >
-                        🕐 {proxima.hora} Hrs
-                        {proxima.lugar ? ` · 📍 ${proxima.lugar}` : ""}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: "rgba(255,255,255,0.55)",
-                          marginBottom: 12,
-                        }}
-                      >
-                        {proxima.tipo_celebracion} · {cancArr.length} canciones
-                      </div>
-                      {cancArr.slice(0, 3).map((c, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            display: "flex",
-                            gap: 8,
-                            alignItems: "center",
-                            marginBottom: 4,
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: "#4ade80",
-                              minWidth: 20,
-                            }}
-                          >
-                            {c.n}.
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              color: "rgba(255,255,255,0.85)",
-                              fontWeight: 500,
-                              flex: 1,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {c.orden}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              color: "rgba(255,255,255,0.65)",
-                              flex: 2,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {c.cancion || "—"}
-                          </span>
-                        </div>
-                      ))}
-                      {cancArr.length > 3 && (
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "rgba(255,255,255,0.4)",
-                            marginTop: 4,
-                          }}
-                        >
-                          +{cancArr.length - 3} canciones más…
-                        </div>
-                      )}
-                      <button
-                        onClick={() => setSection("pauta_misa")}
-                        style={{
-                          marginTop: 14,
-                          background: "rgba(255,255,255,0.12)",
-                          color: "white",
-                          border: "1px solid rgba(255,255,255,0.25)",
-                          borderRadius: 10,
-                          padding: "7px 16px",
-                          cursor: "pointer",
-                          fontSize: 12,
-                          fontWeight: 600,
-                        }}
-                      >
-                        Ver pauta completa →
-                      </button>
-                    </div>
-                    {/* QR */}
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: "20px 24px",
-                        background: "rgba(255,255,255,0.05)",
-                        borderLeft: "1px solid rgba(255,255,255,0.08)",
-                        gap: 10,
-                        flexShrink: 0,
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: "rgba(255,255,255,0.6)",
-                          fontWeight: 600,
-                          letterSpacing: "0.06em",
-                          textTransform: "uppercase",
-                          textAlign: "center",
-                        }}
-                      >
-                        Código QR
-                      </div>
-                      <div
-                        style={{
-                          background: "white",
-                          borderRadius: 14,
-                          padding: 8,
-                          boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-                        }}
-                      >
-                        <img
-                          src={qrUrl}
-                          alt="QR Pauta"
-                          width={130}
-                          height={130}
-                          style={{ display: "block", borderRadius: 6 }}
-                        />
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 10,
-                          color: "rgba(255,255,255,0.4)",
-                          textAlign: "center",
-                          maxWidth: 130,
-                        }}
-                      >
-                        Escanea para ver la pauta
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            );
-          })()}
         </>
       )}
     </div>
@@ -30230,11 +29782,13 @@ function pdfsDePauta(pauta, canciones) {
 }
 
 function mensajePautaWhatsapp(pauta, items) {
-  const fecha = new Date(pauta.fecha + "T00:00:00").toLocaleDateString("es-CL", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+  const fecha = pauta.fecha
+    ? new Date(pauta.fecha + "T00:00:00").toLocaleDateString("es-CL", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      })
+    : "";
   const lineas = items.map((it, i) => `${i + 1}. ${it.etiqueta}\n${it.url}`);
   return (
     `🎼 *Pauta de Misa* – ${pauta.titulo || ""}\n` +
@@ -30243,13 +29797,13 @@ function mensajePautaWhatsapp(pauta, items) {
   );
 }
 
-function PautaWhatsappBoton({ pauta, canciones }) {
+function PautaWhatsappBoton({ pauta, canciones, compacto = false }) {
   // estado: idle → preparando → listo (archivos para compartir) | enlaces (plan B)
   const [estado, setEstado] = useState("idle");
   const [progreso, setProgreso] = useState("");
   const archivosRef = useRef([]);
   const items = pdfsDePauta(pauta, canciones);
-  if (items.length === 0) return null;
+  const sinPdf = items.length === 0;
 
   const puedeCompartirArchivos = () => {
     try {
@@ -30308,6 +29862,7 @@ function PautaWhatsappBoton({ pauta, canciones }) {
   }
 
   function onClick() {
+    if (sinPdf) return;
     if (estado === "listo") return compartir();
     if (estado === "enlaces") return abrirConEnlaces();
     if (estado === "preparando") return;
@@ -30323,14 +29878,26 @@ function PautaWhatsappBoton({ pauta, canciones }) {
       ? `📤 Enviar ${items.length} PDF por WhatsApp`
       : estado === "enlaces"
       ? "💬 Enviar enlaces por WhatsApp"
-      : "💬 Pauta Whatsapp";
+      : `💬 Pauta Whatsapp${sinPdf ? "" : ` (${items.length} PDF)`}`;
 
   return (
-    <span style={{ display: "inline-flex", flexDirection: "column", marginTop: 10, marginLeft: 8, verticalAlign: "top" }}>
+    <span
+      style={{
+        display: "inline-flex",
+        flexDirection: "column",
+        marginTop: compacto ? 0 : 10,
+        marginLeft: compacto ? 0 : 8,
+        verticalAlign: "top",
+      }}
+    >
       <button
         onClick={onClick}
-        disabled={estado === "preparando"}
-        title="Envía por WhatsApp los PDF de la pauta, en el orden de la misa"
+        disabled={estado === "preparando" || sinPdf}
+        title={
+          sinPdf
+            ? "Agrega las letras (PDF) a las canciones para poder enviarlas"
+            : "Envía por WhatsApp los PDF de la pauta, en el orden de la misa"
+        }
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -30342,12 +29909,17 @@ function PautaWhatsappBoton({ pauta, canciones }) {
           borderRadius: 10,
           padding: "9px 16px",
           border: "none",
-          cursor: estado === "preparando" ? "wait" : "pointer",
-          opacity: estado === "preparando" ? 0.85 : 1,
+          cursor: sinPdf ? "not-allowed" : estado === "preparando" ? "wait" : "pointer",
+          opacity: sinPdf ? 0.45 : estado === "preparando" ? 0.85 : 1,
         }}
       >
         {etiqueta}
       </button>
+      {sinPdf && (
+        <span style={{ fontSize: 11, color: C.gray, marginTop: 4, maxWidth: 260 }}>
+          Aún no hay letras (PDF) en la pauta.
+        </span>
+      )}
       {estado === "enlaces" && (
         <span style={{ fontSize: 11, color: C.gray, marginTop: 4, maxWidth: 260 }}>
           No se pudieron adjuntar los archivos; se enviarán los enlaces en el orden de la pauta.
@@ -30619,9 +30191,17 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       const found = pautas.find((p) => p.id === deepPautaId);
       if (found) {
         setSelected(found);
-        setShowColLetra(found.mostrar_col_letra || false);
-        setShowColAudio(found.mostrar_col_audio || false);
+        setShowColLetra(found.mostrar_col_letra ?? true);
+        setShowColAudio(found.mostrar_col_audio ?? true);
         setMode("view");
+        // El parámetro ya cumplió su función: se limpia para que la lista no se reabra sola.
+        try {
+          const u = new URL(window.location.href);
+          if (u.searchParams.get("pauta")) {
+            u.searchParams.delete("pauta");
+            window.history.replaceState(null, "", u.toString());
+          }
+        } catch (e) {}
       }
     }
   }, [deepPautaId, pautas]);
@@ -31004,6 +30584,11 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     const pautaEdit = mode === "edit" ? selected : null;
     return (
       <div style={{ maxWidth: 1100 }}>
+        <datalist id="pauta-interpretes">
+          {INTERPRETE_OPTIONS.map((o) => (
+            <option key={o} value={o} />
+          ))}
+        </datalist>
         <datalist id="pauta-dir-canciones">
           {dirLetras.map((x) => (
             <option key={x.id} value={x.nombre} />
@@ -31657,24 +31242,17 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       />
                     </td>
                     <td style={tdEditStyle}>
-                      <select
+                      <input
+                        list="pauta-interpretes"
                         value={c.salmista || ""}
                         onChange={(e) =>
                           updateFila(i, "salmista", e.target.value)
                         }
-                        style={{ ...inpTd, minWidth: 130 }}
-                      >
-                        <option value="">Seleccionar…</option>
-                        {INTERPRETE_OPTIONS.map((o) => (
-                          <option key={o} value={o}>
-                            {o}
-                          </option>
-                        ))}
-                        {/* Valores antiguos escritos a mano se conservan hasta que se cambien */}
-                        {c.salmista && !INTERPRETE_OPTIONS.includes(c.salmista) && (
-                          <option value={c.salmista}>{c.salmista}</option>
-                        )}
-                      </select>
+                        placeholder="Todos, Salmista, Solista…"
+                        title="Elige una opción de la lista o escribe el nombre del intérprete"
+                        autoComplete="off"
+                        style={{ ...inpTd, minWidth: 150 }}
+                      />
                     </td>
                     {showColLetra && (
                       <td style={tdEditStyle}>
@@ -31836,6 +31414,17 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
           <Btn variant="ghost" onClick={() => setMode(null)}>
             Cancelar
           </Btn>
+          <PautaWhatsappBoton
+            compacto
+            pauta={{
+              titulo: form.titulo,
+              fecha: form.fecha || selected?.fecha,
+              hora: form.hora,
+              lugar: form.lugar,
+              guion_url: form.guion_url,
+            }}
+            canciones={canciones}
+          />
         </div>
         {msg && (
           <div
@@ -46769,6 +46358,156 @@ function Reglamento() {
   );
 }
 
+// ── Pautas de misa en el inicio: lista compacta (la pauta completa se ve en su pantalla) ──
+function PautasCompacto({ pautas, isAdmin, setSection }) {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const publicadas = (pautas || [])
+    .filter((p) => p.publicada && new Date(p.fecha + "T00:00:00") >= hoy)
+    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+  const borradores = isAdmin ? (pautas || []).filter((p) => !p.publicada) : [];
+  if (publicadas.length === 0 && borradores.length === 0) return null;
+  const NAVY = "#1e3a5f";
+  // Abre la pauta elegida directamente en su pantalla de Pauta de Misa
+  function abrir(id) {
+    try {
+      const u = new URL(window.location.href);
+      if (id) u.searchParams.set("pauta", id);
+      window.history.replaceState(null, "", u.toString());
+    } catch (e) {}
+    setSection("pauta_misa");
+  }
+  return (
+    <div
+      style={{
+        background: C.white,
+        border: `1px solid ${C.border}`,
+        borderRadius: 16,
+        padding: "10px 12px",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 6,
+        }}
+      >
+        <div style={{ fontSize: 13, fontWeight: 800, color: C.dark }}>
+          🎼 Pautas de misa
+        </div>
+        <button
+          onClick={() => abrir(null)}
+          style={{
+            background: "none",
+            border: "none",
+            fontSize: 11.5,
+            fontWeight: 700,
+            color: C.primary,
+            cursor: "pointer",
+            padding: 0,
+          }}
+        >
+          Ver todas
+        </button>
+      </div>
+      {publicadas.slice(0, 3).map((p) => {
+        const f = new Date(p.fecha + "T00:00:00");
+        return (
+          <button
+            key={p.id}
+            onClick={() => abrir(p.id)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              width: "100%",
+              textAlign: "left",
+              background: "transparent",
+              border: "none",
+              borderTop: `1px solid ${C.border}`,
+              padding: "7px 2px",
+              cursor: "pointer",
+            }}
+          >
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 9,
+                background: NAVY,
+                color: "white",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                lineHeight: 1,
+              }}
+            >
+              <span style={{ fontSize: 14, fontWeight: 800 }}>{f.getDate()}</span>
+              <span style={{ fontSize: 8, textTransform: "uppercase", opacity: 0.8 }}>
+                {f.toLocaleDateString("es-CL", { month: "short" })}
+              </span>
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  color: C.dark,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {p.titulo}
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: C.gray,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {p.hora ? `${p.hora} hrs` : ""}
+                {p.lugar ? ` · ${p.lugar}` : ""}
+              </div>
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 700, color: C.primary, flexShrink: 0 }}>
+              Ver pauta
+            </span>
+          </button>
+        );
+      })}
+      {borradores.length > 0 && (
+        <button
+          onClick={() => abrir(null)}
+          style={{
+            width: "100%",
+            textAlign: "left",
+            background: "#fff7e0",
+            border: "1px solid #fbbf2455",
+            borderRadius: 10,
+            padding: "6px 10px",
+            marginTop: 6,
+            fontSize: 11.5,
+            fontWeight: 700,
+            color: "#92600a",
+            cursor: "pointer",
+          }}
+        >
+          {borradores.length} pauta{borradores.length !== 1 ? "s" : ""} en borrador
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Cumpleaños compacto: el más próximo en una franja horizontal + "Ver más" ──
 function CumpleanosCompacto({ members, setSection }) {
   const [abierto, setAbierto] = useState(false);
@@ -46850,19 +46589,20 @@ function CumpleanosCompacto({ members, setSection }) {
           ? "linear-gradient(90deg,#0f2d5c 0%,#1d6fc7 100%)"
           : C.white,
         border: `1px solid ${esHoy ? "#1d6fc760" : C.border}`,
-        borderRadius: 16,
-        marginBottom: 14,
+        borderRadius: 14,
+        marginBottom: 10,
         boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
         overflow: "hidden",
+        maxWidth: 380,
       }}
     >
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 12,
-          padding: "9px 14px",
-          minHeight: 52,
+          gap: 9,
+          padding: "6px 10px",
+          minHeight: 44,
         }}
       >
         <span style={{ fontSize: 18, flexShrink: 0 }}>{esHoy ? "🎉" : "🎂"}</span>
