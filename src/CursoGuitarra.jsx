@@ -842,14 +842,14 @@ export default function CursoGuitarra() {
   const css = `
 .cg{max-width:1100px;font-family:inherit;color:#1e293b}
 .cg *{box-sizing:border-box}
-.cg-hero{position:relative;overflow:hidden;border-radius:22px;padding:26px 28px;color:#fff;background:radial-gradient(120% 140% at 85% 0%,#2a4d7a 0%,#0f2744 55%,#08162b 100%);box-shadow:0 14px 40px rgba(15,39,68,.28)}
+.cg-hero{position:relative;overflow:hidden;border-radius:22px;padding:18px 22px;color:#fff;background:radial-gradient(120% 140% at 85% 0%,#2a4d7a 0%,#0f2744 55%,#08162b 100%);box-shadow:0 14px 40px rgba(15,39,68,.28)}
 .cg-hero:after{content:"";position:absolute;right:-40px;top:-40px;width:220px;height:220px;border-radius:50%;border:1px solid rgba(201,162,39,.35);box-shadow:0 0 0 24px rgba(201,162,39,.06),0 0 0 54px rgba(201,162,39,.04)}
 .cg-kick{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:${ORO};font-weight:700}
-.cg-title{font-family:Georgia,'Times New Roman',serif;font-size:clamp(24px,3.6vw,36px);line-height:1.1;margin:8px 0 8px;font-weight:700}
+.cg-title{font-family:Georgia,'Times New Roman',serif;font-size:clamp(20px,2.6vw,26px);line-height:1.1;margin:0 0 6px;font-weight:700}
 .cg-sub{max-width:620px;font-size:13.5px;line-height:1.6;color:rgba(255,255,255,.82)}
-.cg-stats{display:flex;gap:22px;flex-wrap:wrap;margin-top:16px}
+.cg-stats{display:flex;gap:20px;flex-wrap:wrap;margin-top:12px}
 .cg-stats div{font-size:11px;color:rgba(255,255,255,.7);letter-spacing:.06em;text-transform:uppercase}
-.cg-stats b{display:block;font-size:22px;color:#fff;letter-spacing:0;font-family:Georgia,serif}
+.cg-stats b{display:block;font-size:18px;color:#fff;letter-spacing:0;font-family:Georgia,serif}
 .cg-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:16px 0 12px}
 .cg-levels{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px}
 .cg-level{text-align:left;border:1.5px solid #e2e8f0;background:#fff;border-radius:18px;padding:14px 16px;cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s}
@@ -922,8 +922,7 @@ export default function CursoGuitarra() {
     <div className="cg" ref={topRef}>
       <style>{css}</style>
       <div className="cg-hero">
-        <div className="cg-kick">Academia del coro · Música litúrgica</div>
-        <div className="cg-title">Curso de Guitarra Litúrgica</div>
+        <div className="cg-title">Curso de Guitarra</div>
         <div className="cg-sub">
           Del primer acorde al acompañamiento profesional. Cada acorde con diagrama, dedos y <b>audio</b>; cada nivel con ensayos guiados, ritmos con metrónomo y autoevaluación.
         </div>
