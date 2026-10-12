@@ -875,12 +875,19 @@ const NAV = [
   { id: "audios", icon: "🎧", label: "Audios" },
 ];
 
+// Secciones que no se muestran en el menú del portal (para todos los perfiles).
+const NAV_OCULTOS = new Set(["reconoceme", "noticias", "integrantes", "qanda"]);
+
+// Finanzas y gastos: solo Administración y Contador/a Coro; el resto (integrantes) no los ve.
+function verFinanzas(u) {
+  return esCuerdaAdmin(u) || esCuerdaContador(u);
+}
+
 const BOTTOM_NAV = [
   { id: "dashboard", icon: "⊞", label: "Inicio" },
   { id: "agenda", icon: "◫", label: "Agenda" },
   { id: "oraciones", icon: "✦", label: "Oraciones" },
-  { id: "integrantes", icon: "◎", label: "Coro" },
-  { id: "__menu__", icon: "☰", label: "Más" },
+    { id: "__menu__", icon: "☰", label: "Más" },
 ];
 
 const CUERDAS = {
@@ -1228,6 +1235,7 @@ function MobileMenu({
           </button>
         </div>
         {NAV.filter((item) => {
+          if (NAV_OCULTOS.has(item.id)) return false;
           const isVisita = esVisita(user);
           if (isVisita) {
             return [
@@ -1238,12 +1246,7 @@ function MobileMenu({
             ].includes(item.id);
           }
           if (item.id === "cancioneros") return false;
-          if (
-            item.id === "info_gastos" &&
-            !esCuerdaAdmin(user) &&
-            !cuotaInscritos.has(user?.id)
-          )
-            return false;
+          if (item.id === "info_gastos" && !verFinanzas(user)) return false;
           if (item.id === "vista_invitado" && !esCuerdaAdmin(user))
             return false;
           if (item.id === "solicitudes" && !esCuerdaAdmin(user)) return false;
@@ -3417,6 +3420,7 @@ function AppInner() {
         </div>
         <nav style={{ flex: 1, overflowY: "auto", padding: "6px 5px" }}>
           {NAV.filter((item) => {
+          if (NAV_OCULTOS.has(item.id)) return false;
             const isVisita = esVisita(user);
             if (isVisita) {
               return [
@@ -3429,12 +3433,7 @@ function AppInner() {
             // Sala de Ensayo: visible a TODOS los integrantes (el admin la habilita/deshabilita dentro)
             // Vista Invitado: solo Admin
             if (item.id === "cancioneros") return false;
-            if (
-              item.id === "info_gastos" &&
-              !esCuerdaAdmin(user) &&
-              !cuotaInscritos.has(user?.id)
-            )
-              return false;
+            if (item.id === "info_gastos" && !verFinanzas(user)) return false;
             if (item.id === "vista_invitado" && !esCuerdaAdmin(user))
               return false;
             if (item.id === "solicitudes" && !esCuerdaAdmin(user)) return false;
@@ -4211,7 +4210,7 @@ function AppInner() {
                     onReload={loadData}
                   />
                 )}
-              {section === "info_gastos" && (
+              {section === "info_gastos" && verFinanzas(user) && (
                 <InfoGastos user={user} members={members} />
               )}
               {section === "cancioneros" && (
@@ -16209,12 +16208,14 @@ function Dashboard({
               </span>
             </div>
           )}
-          <CuotaRecordatorioWidget
-            members={members}
-            user={user}
-            setSection={setSection}
-            onReload={onReload}
-          />
+          {verFinanzas(user) && (
+            <CuotaRecordatorioWidget
+              members={members}
+              user={user}
+              setSection={setSection}
+              onReload={onReload}
+            />
+          )}
           <div className="dash-2col">
             <div className="dash-col">
               <div style={{ marginBottom: 16 }}>
@@ -16637,11 +16638,6 @@ function Dashboard({
                 isAdmin={isAdmin}
               />
               <VocalizacionWidget isAdmin={isAdmin} />
-              <ComunidadesWidget
-                comunidades={comunidades}
-                isAdmin={isAdmin}
-                setSection={setSection}
-              />
             </div>
             <div className="dash-col">
               {/* ── Santoral (franja completa) ── */}
@@ -16700,157 +16696,9 @@ function Dashboard({
                 </div>
               )}
               <ValoresWidget />
-              <ReconocemeWidget
-                reconocimientos={reconocimientos}
-                members={members}
-                setSection={setSection}
-                user={user}
-              />
               <ShortsWidget isAdmin={isAdmin} />
               {/* ── Cumpleañeros de hoy (solo ese día) ── */}
               {cumple.length > 0 && <CumpleanosHoyWidget cumple={cumple} />}
-              <Card>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 12,
-                  }}
-                >
-                  <span style={{ fontSize: 18 }}>📖</span>
-                  <div style={{ flex: 1 }}>
-                    <span
-                      style={{
-                        fontFamily: "var(--font-display)",
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: C.dark,
-                      }}
-                    >
-                      Evangelio del Domingo
-                    </span>
-                    {evangelio?.domingo && (
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: C.gray,
-                          marginTop: 1,
-                          fontStyle: "italic",
-                        }}
-                      >
-                        {evangelio.domingo}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {loading ? (
-                  <Spinner />
-                ) : evangelio ? (
-                  <>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: C.gold,
-                        marginBottom: 8,
-                      }}
-                    >
-                      {evangelio.referencia}
-                    </div>
-                    <p
-                      style={{
-                        fontSize: 13,
-                        lineHeight: 1.75,
-                        color: "var(--text-secondary)",
-                        marginBottom: 12,
-                        borderLeft: `3px solid ${C.border}`,
-                        paddingLeft: 12,
-                      }}
-                    >
-                      {evangelio.texto}
-                    </p>
-                    <div
-                      style={{
-                        background: C.primaryLight,
-                        borderRadius: 10,
-                        padding: "10px 14px",
-                        borderLeft: `3px solid ${C.primary}`,
-                        marginBottom: 10,
-                      }}
-                    >
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: 12,
-                          color: C.primaryDark,
-                          lineHeight: 1.6,
-                          fontWeight: 500,
-                        }}
-                      >
-                        {evangelio.reflexion}
-                      </p>
-                    </div>
-                    {evangelio.oracion && (
-                      <div
-                        style={{
-                          background: C.goldLight,
-                          borderRadius: 10,
-                          padding: "10px 14px",
-                          borderLeft: `3px solid ${C.gold}`,
-                          marginBottom: 10,
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: C.gold,
-                            letterSpacing: "0.06em",
-                            textTransform: "uppercase",
-                            marginBottom: 4,
-                          }}
-                        >
-                          🙏 Oración antes del ensayo
-                        </div>
-                        <p
-                          style={{
-                            margin: 0,
-                            fontSize: 12,
-                            color: "var(--text-secondary)",
-                            lineHeight: 1.6,
-                            fontStyle: "italic",
-                          }}
-                        >
-                          {evangelio.oracion}
-                        </p>
-                      </div>
-                    )}
-                    {evangelio.fuente && (
-                      <div
-                        style={{
-                          marginTop: 8,
-                          fontSize: 10,
-                          color: C.gray,
-                          textAlign: "right",
-                        }}
-                      >
-                        Fuente: {evangelio.fuente}
-                      </div>
-                    )}
-                  </>
-                ) : null}
-              </Card>
-              {podcasts && podcasts.length > 0 && (
-                <Card style={{ overflow: "hidden", padding: "14px 16px" }}>
-                  <PodcastWidget
-                    podcasts={(podcasts || []).filter(
-                      (p) => p.tipo !== "vocalizacion"
-                    )}
-                    setSection={setSection}
-                  />
-                </Card>
-              )}
               {/* ── Valores del coro ── */}
               <ProximosCumpleanosWidget
                 members={members}
@@ -16859,136 +16707,6 @@ function Dashboard({
             </div>
           </div>
 
-          <div style={{ marginBottom: 14 }}>
-            <Card>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginBottom: 12,
-                }}
-              >
-                <div
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 10,
-                    background: "rgba(185,28,28,0.10)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <svg
-                    width="17"
-                    height="17"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#b91c1c"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M4 5h13v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5Z" />
-                    <path d="M17 8.5h2.5A1.5 1.5 0 0 1 21 10v8a1 1 0 0 1-1 1" />
-                    <path d="M7 9h7M7 12.5h7M7 16h4" />
-                  </svg>
-                </div>
-                <span
-                  style={{
-                    fontSize: 14.5,
-                    fontWeight: 800,
-                    color: "#1c1c1e",
-                    letterSpacing: "-0.01em",
-                  }}
-                >
-                  Noticias Católicas
-                </span>
-                {noticiasLoading && noticias.length > 0 && (
-                  <span
-                    style={{ fontSize: 10, color: C.gray, fontStyle: "italic" }}
-                  >
-                    actualizando...
-                  </span>
-                )}
-                <a
-                  href="https://twitter.com/vaticannews_es"
-                  target="_blank"
-                  rel="noopener"
-                  style={{
-                    marginLeft: "auto",
-                    fontSize: 10,
-                    color: C.primary,
-                    fontWeight: 500,
-                    textDecoration: "none",
-                  }}
-                >
-                  Vatican News →
-                </a>
-              </div>
-              {noticias.length > 0 ? (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fill, minmax(230px, 1fr))",
-                    gap: 10,
-                  }}
-                >
-                  {noticias.slice(0, 6).map((n, i) => (
-                    <a
-                      key={n.id || i}
-                      href={n.url}
-                      target="_blank"
-                      rel="noopener"
-                      style={{
-                        textDecoration: "none",
-                        display: "block",
-                        border: "1px solid rgba(60,60,67,0.12)",
-                        borderRadius: 12,
-                        padding: "12px 14px",
-                        background: "white",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: 12.5,
-                          fontWeight: 700,
-                          color: "#1c1c1e",
-                          lineHeight: 1.4,
-                          marginBottom: 6,
-                        }}
-                      >
-                        {n.titulo}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 10.5,
-                          color: C.primary,
-                          fontWeight: 600,
-                        }}
-                      >
-                        {n.fuente || "Vatican News"} →
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: C.gray,
-                    fontStyle: "italic",
-                    textAlign: "center",
-                    padding: "12px 0",
-                  }}
-                >
-                  ⏳ Cargando noticias...
-                </div>
-              )}
-            </Card>
-          </div>
 
           <div
             className="links-bar"
@@ -19886,28 +19604,6 @@ function Integrantes({ members, setSection, setPreParaId, user }) {
                       >
                         🎂 {m.cumpleanos}
                       </div>
-                    )}
-                    {setSection && user && m.id !== user?.id && (
-                      <button
-                        onClick={() => {
-                          setPreParaId(m.id);
-                          setSection("reconoceme");
-                        }}
-                        style={{
-                          padding: "4px 10px",
-                          flexShrink: 0,
-                          background: C.primaryLight,
-                          color: C.primaryDark,
-                          border: `1px solid ${C.primary}40`,
-                          borderRadius: 9,
-                          fontSize: 10,
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        🌟 Reconocer
-                      </button>
                     )}
                   </div>
                 );
@@ -30458,6 +30154,230 @@ function NotasEditor({ value, onChange, placeholder }) {
   );
 }
 
+// ══════════════════════════════════════════
+//  PAUTA DE MISA — intérprete seleccionable y directorio de letras
+// ══════════════════════════════════════════
+const INTERPRETE_OPTIONS = ["Todos", "Salmista", "Solista", "Solista y Coro"];
+
+// Se guarda el listado de Drive para no volver a pedirlo cada vez que se abre el selector.
+let _letrasDriveCache = null;
+
+const normBusquedaLetra = (t) =>
+  (t || "")
+    .toString()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+
+function DirectorioLetrasModal({ initialQuery = "", onSelect, onClose }) {
+  const [items, setItems] = useState(_letrasDriveCache || []);
+  const [loading, setLoading] = useState(!_letrasDriveCache);
+  const [error, setError] = useState("");
+  const [q, setQ] = useState("");
+
+  useEffect(() => {
+    let vivo = true;
+    // Si la fila ya tiene nombre de canción y hay coincidencias, se filtra por ese nombre.
+    const prefiltrar = (lista) => {
+      const base = normBusquedaLetra(initialQuery);
+      if (base && lista.some((x) => normBusquedaLetra(x.nombre).includes(base)))
+        setQ(initialQuery.trim());
+    };
+    if (_letrasDriveCache) {
+      prefiltrar(_letrasDriveCache);
+      return () => {
+        vivo = false;
+      };
+    }
+    listarTodosDrive()
+      .then((lista) => {
+        if (!vivo) return;
+        if (lista.length) _letrasDriveCache = lista;
+        else setError("No se encontraron letras en el directorio.");
+        setItems(lista);
+        setLoading(false);
+        prefiltrar(lista);
+      })
+      .catch(() => {
+        if (!vivo) return;
+        setLoading(false);
+        setError("No se pudo cargar el directorio de letras.");
+      });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const nq = normBusquedaLetra(q);
+  const visibles = nq
+    ? items.filter((x) => normBusquedaLetra(x.nombre).includes(nq))
+    : items;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        zIndex: 10000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "white",
+          borderRadius: 18,
+          width: "min(560px, 100%)",
+          maxHeight: "80vh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "14px 16px",
+            borderBottom: `1px solid ${C.border}`,
+          }}
+        >
+          <span style={{ fontSize: 18 }}>📂</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.dark }}>
+              Directorio de letras
+            </div>
+            <div style={{ fontSize: 11, color: C.gray }}>
+              Elige la letra y se carga en la canción de esta fila
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: 22,
+              lineHeight: 1,
+              cursor: "pointer",
+              color: C.gray,
+            }}
+          >
+            ×
+          </button>
+        </div>
+        <div style={{ padding: "12px 16px 8px" }}>
+          <input
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar letra por nombre…"
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              padding: "9px 12px",
+              borderRadius: 10,
+              border: `1px solid ${C.border}`,
+              fontSize: 13,
+              outline: "none",
+            }}
+          />
+          {!loading && !error && (
+            <div style={{ fontSize: 11, color: C.gray, marginTop: 6 }}>
+              {visibles.length} de {items.length} letras
+            </div>
+          )}
+        </div>
+        <div style={{ overflowY: "auto", padding: "0 8px 12px", flex: 1 }}>
+          {loading && (
+            <div
+              style={{
+                padding: 24,
+                textAlign: "center",
+                color: C.gray,
+                fontSize: 13,
+              }}
+            >
+              ⏳ Cargando directorio…
+            </div>
+          )}
+          {!loading && error && (
+            <div
+              style={{
+                padding: 24,
+                textAlign: "center",
+                color: C.danger,
+                fontSize: 13,
+              }}
+            >
+              {error}
+            </div>
+          )}
+          {!loading && !error && visibles.length === 0 && (
+            <div
+              style={{
+                padding: 24,
+                textAlign: "center",
+                color: C.gray,
+                fontSize: 13,
+              }}
+            >
+              Ninguna letra coincide con la búsqueda.
+            </div>
+          )}
+          {visibles.map((x) => (
+            <button
+              key={x.id}
+              type="button"
+              onClick={() => onSelect(x)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                width: "100%",
+                textAlign: "left",
+                padding: "9px 10px",
+                background: "transparent",
+                border: "none",
+                borderRadius: 10,
+                cursor: "pointer",
+                fontSize: 13,
+                color: C.dark,
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "rgba(10,90,200,0.08)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "transparent")
+              }
+            >
+              <span style={{ fontSize: 15 }}>📄</span>
+              <span style={{ flex: 1 }}>{x.nombre}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const isAdmin = user?.cuerda === "Admin";
   const isVisita = esVisita(user);
@@ -30539,8 +30459,9 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const [form, setForm] = useState(emptyPauta);
   const [tituloMode, setTituloMode] = useState("select"); // "select" | "custom"
   const [canciones, setCanciones] = useState([]); // filas de la pauta
-  const [showColLetra, setShowColLetra] = useState(false);
+  const [showColLetra, setShowColLetra] = useState(true);
   const [showColAudio, setShowColAudio] = useState(false);
+  const [letraFila, setLetraFila] = useState(null); // índice de la fila que elige letra del directorio
 
   function toggleColLetra() {
     setShowColLetra((v) => !v);
@@ -30876,6 +30797,19 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     const pautaEdit = mode === "edit" ? selected : null;
     return (
       <div style={{ maxWidth: 1100 }}>
+        {letraFila !== null && (
+          <DirectorioLetrasModal
+            initialQuery={canciones[letraFila]?.cancion || ""}
+            onClose={() => setLetraFila(null)}
+            onSelect={(item) => {
+              // La letra elegida se carga en la canción de la fila que abrió el selector.
+              updateFila(letraFila, "url_letra", item.url);
+              if (!(canciones[letraFila]?.cancion || "").trim())
+                updateFila(letraFila, "cancion", item.nombre);
+              setLetraFila(null);
+            }}
+          />
+        )}
         <div
           style={{
             display: "flex",
@@ -31502,25 +31436,58 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       />
                     </td>
                     <td style={tdEditStyle}>
-                      <input
+                      <select
                         value={c.salmista || ""}
                         onChange={(e) =>
                           updateFila(i, "salmista", e.target.value)
                         }
-                        placeholder="Intérprete(s) / Coro"
-                        style={{ ...inpTd, minWidth: 120 }}
-                      />
+                        style={{ ...inpTd, minWidth: 130 }}
+                      >
+                        <option value="">Seleccionar…</option>
+                        {INTERPRETE_OPTIONS.map((o) => (
+                          <option key={o} value={o}>
+                            {o}
+                          </option>
+                        ))}
+                        {/* Valores antiguos escritos a mano se conservan hasta que se cambien */}
+                        {c.salmista && !INTERPRETE_OPTIONS.includes(c.salmista) && (
+                          <option value={c.salmista}>{c.salmista}</option>
+                        )}
+                      </select>
                     </td>
                     {showColLetra && (
                       <td style={tdEditStyle}>
-                        <input
-                          value={c.url_letra}
-                          onChange={(e) =>
-                            updateFila(i, "url_letra", e.target.value)
-                          }
-                          placeholder="https://..."
-                          style={{ ...inpTd, minWidth: 130 }}
-                        />
+                        <div
+                          style={{ display: "flex", alignItems: "center", gap: 6 }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setLetraFila(i)}
+                            title="Elegir la letra desde el directorio de letras"
+                            style={{
+                              flexShrink: 0,
+                              background: c.url_letra ? "#dcfce7" : "#0a5ac8",
+                              color: c.url_letra ? "#166534" : "white",
+                              border: "none",
+                              borderRadius: 8,
+                              padding: "6px 10px",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {c.url_letra ? "✓ Cambiar" : "📂 Directorio"}
+                          </button>
+                          <input
+                            value={c.url_letra}
+                            onChange={(e) =>
+                              updateFila(i, "url_letra", e.target.value)
+                            }
+                            placeholder="o pega un enlace https://..."
+                            style={{ ...inpTd, minWidth: 130 }}
+                          />
+                        </div>
                       </td>
                     )}
                     {showColAudio && (

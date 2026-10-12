@@ -176,15 +176,8 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
         ) : (
           <div style={{ overflowY: "auto", padding: "24px 24px 40px", flex: 1 }} onWheel={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()}>
 
-            {/* PRÓXIMO EVENTO */}
-            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.1em" }}>📅 Próximo evento (contador hero)</div>
-            <AdminField {...fp} label="Nombre del evento" k="evento_nombre" />
-            <AdminField {...fp} label="Fecha (ej: 2026-07-16)" k="evento_fecha" />
-            <AdminField {...fp} label="Hora (ej: 15:30)" k="evento_hora" />
-            <AdminField {...fp} label="Lugar" k="evento_lugar" />
-
             {/* HERO */}
-            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Hero</div>
+            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "0 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>🖼️ Hero</div>
             <AdminImgField {...ifp} label="Imagen fondo hero" k="hero_img" name="landing_hero" />
             <AdminImgField {...ifp} label="Imagen fondo login (pantalla de acceso)" k="login_bg" name="landing_login_bg" />
             <AdminField {...fp} label="Título 1" k="hero_titulo" /><AdminField {...fp} label="Título 2 italic" k="hero_titulo2" /><AdminField {...fp} label="Subtexto" k="hero_sub" ta />
@@ -251,48 +244,41 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
   );
 }
 
-// ── COUNTDOWN PRÓXIMA MISA ─────────────────
-function HeroCountdown({ evento }) {
-  const [time, setTime] = useState({ d:0, h:0, m:0, s:0 });
-
-  useEffect(() => {
-    if (!evento?.fecha) return;
-    const tick = () => {
-      const [h, m] = (evento.hora || "10:00").split(":").map(Number);
-      const target = new Date(`${evento.fecha}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00`);
-      const diff = target - new Date();
-      if (diff <= 0) { setTime({ d:0,h:0,m:0,s:0 }); return; }
-      setTime({
-        d: Math.floor(diff/86400000),
-        h: Math.floor((diff%86400000)/3600000),
-        m: Math.floor((diff%3600000)/60000),
-        s: Math.floor((diff%60000)/1000)
-      });
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [evento]);
-
-  if (!evento?.fecha || !evento?.nombre) return null;
-
-  const fecha = new Date(evento.fecha + "T12:00:00").toLocaleDateString("es-CL", { weekday:"long", day:"numeric", month:"long" });
-
+// ── BANDERA DE CHILE (dibujada a trazo, sin fondo) ─────────────────
+// Solo líneas blancas y la estrella sólida, igual que el ícono del coro:
+// no lleva rellenos de color ni caja, así toma el fondo que ya existe.
+function BanderaChile({ width = 84 }) {
+  const trazo = "rgba(255,255,255,0.92)";
   return (
-    <div className="hero-countdown">
-      <div className="hcd-label">Próxima celebración</div>
-      <div className="hcd-event">{evento.nombre}</div>
-      <div className="hcd-date">{fecha}{evento.hora ? ` · ${evento.hora} hrs` : ""}{evento.lugar ? ` · ${evento.lugar}` : ""}</div>
-      <div className="hcd-timer">
-        <div className="hcd-unit"><span className="hcd-num">{String(time.d).padStart(2,"0")}</span><div className="hcd-txt">días</div></div>
-        <div className="hcd-sep">:</div>
-        <div className="hcd-unit"><span className="hcd-num">{String(time.h).padStart(2,"0")}</span><div className="hcd-txt">hrs</div></div>
-        <div className="hcd-sep">:</div>
-        <div className="hcd-unit"><span className="hcd-num">{String(time.m).padStart(2,"0")}</span><div className="hcd-txt">min</div></div>
-        <div className="hcd-sep">:</div>
-        <div className="hcd-unit"><span className="hcd-num">{String(time.s).padStart(2,"0")}</span><div className="hcd-txt">seg</div></div>
-      </div>
-    </div>
+    <svg
+      role="img"
+      aria-label="Bandera de Chile"
+      width={width}
+      height={(width * 56) / 84}
+      viewBox="0 0 96 64"
+      fill="none"
+      stroke={trazo}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: "block", filter: "drop-shadow(0 1px 6px rgba(0,0,0,0.35))" }}
+    >
+      {/* asta */}
+      <line x1="6" y1="5" x2="6" y2="62" strokeWidth="2.6" />
+      {/* contorno de la bandera, con una leve ondulación */}
+      <path d="M8 10 C26 5 44 15 62 10 C80 5 82 6 90 9 L90 45 C82 42 80 41 62 46 C44 51 26 41 8 46 Z" />
+      {/* cuadro del cantón */}
+      <path d="M8 28 C17 25.5 26 26.75 35 28" />
+      <line x1="35" y1="10" x2="35" y2="28" />
+      {/* división entre blanco y rojo */}
+      <path d="M35 28 C44 29.25 53 30.5 62 28 C80 23 82 24 90 27" />
+      {/* estrella sólida */}
+      <polygon
+        fill={trazo}
+        strokeWidth="0.6"
+        points="21.5,12.5 23.03,16.9 27.68,16.99 23.97,19.8 25.32,24.26 21.5,21.6 17.68,24.26 19.03,19.8 15.32,16.99 19.97,16.9"
+      />
+    </svg>
   );
 }
 
@@ -624,8 +610,9 @@ export default function Landing({ onPortal }) {
         .nav-right{display:flex;align-items:center;gap:8px;justify-content:flex-end}
         .nav-soc{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;border:none}
         .nav-soc:hover{background:rgba(255,255,255,0.18)}
-        .nav-cta{background:#F97316;color:#fff;border:none;border-radius:980px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;margin-left:8px;letter-spacing:0.01em}
+        .nav-cta{white-space:nowrap;background:#F97316;color:#fff;border:none;border-radius:980px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;margin-left:8px;letter-spacing:0.01em}
         .nav-cta:hover{background:#ea6c10;transform:translateY(-1px)}
+        @media(max-width:520px){.nav-cta{padding:8px 14px;font-size:12px;margin-left:2px}.nav-right{gap:4px}}
 
         /* HERO */
         .hero{height:100vh;position:relative;overflow:hidden;display:flex;align-items:flex-end}
@@ -801,21 +788,6 @@ export default function Landing({ onPortal }) {
 
         /* FABS */
         .fabs{position:fixed;top:50%;left:20px;transform:translateY(-50%);z-index:9000;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
-        .hero-countdown{
-          background:rgba(8,18,45,0.7);
-          backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-          border:1px solid rgba(255,255,255,0.12);
-          border-radius:16px;padding:18px 22px;
-          min-width:220px;
-        }
-        .hcd-label{font-size:9px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-bottom:10px}
-        .hcd-event{font-size:13.5px;font-weight:600;color:#fff;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .hcd-date{font-size:11px;color:rgba(255,255,255,0.45);margin-bottom:14px}
-        .hcd-timer{display:flex;gap:10px}
-        .hcd-unit{text-align:center}
-        .hcd-num{font-family:'Fraunces',serif;font-size:28px;font-weight:700;color:#F97316;line-height:1;display:block}
-        .hcd-txt{font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:0.1em;text-transform:uppercase;margin-top:2px}
-        .hcd-sep{font-size:22px;color:rgba(255,255,255,0.2);align-self:center;padding-bottom:8px}
         .fab{width:50px;height:50px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .2s;position:relative;text-decoration:none;flex-shrink:0}
         .fab:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,0.3)}
         .fab-wa{background:#25D366}
@@ -866,7 +838,7 @@ export default function Landing({ onPortal }) {
           {C.instagram_url && <a href={C.instagram_url} target="_blank" rel="noopener noreferrer" className="nav-soc" title="Instagram"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="rgba(255,255,255,0.75)" stroke="none"/></svg></a>}
           {C.tiktok_url && <a href={C.tiktok_url} target="_blank" rel="noopener noreferrer" className="nav-soc" title="TikTok"><svg width="13" height="13" viewBox="0 0 24 24" fill="rgba(255,255,255,0.75)"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.69a8.27 8.27 0 0 0 4.83 1.55V6.79a4.85 4.85 0 0 1-1.07-.1z"/></svg></a>}
           {C.youtube_url && <a href={C.youtube_url} target="_blank" rel="noopener noreferrer" className="nav-soc" title="YouTube"><svg width="15" height="15" viewBox="0 0 24 24" fill="rgba(255,255,255,0.75)"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="rgba(6,14,36,0.9)"/></svg></a>}
-          <button className="nav-cta" onClick={onPortal}>Acceso Portal</button>
+          <button className="nav-cta" onClick={onPortal}>Acceso a Integrantes</button>
         </div>
       </nav>
 
@@ -880,7 +852,7 @@ export default function Landing({ onPortal }) {
             <h1 className="hero-h1">{C.hero_titulo}<br/><span className="it">{C.hero_titulo2}</span></h1>
           </div>
           <div className="hero-right">
-            <HeroCountdown evento={{ nombre: C.evento_nombre, fecha: C.evento_fecha, hora: C.evento_hora, lugar: C.evento_lugar }} />
+            <BanderaChile />
             <p className="hero-sub">{C.hero_sub}</p>
             <div className="hero-btns">
               <button className="btn-w" onClick={() => go("nosotros")}>Conócenos</button>
