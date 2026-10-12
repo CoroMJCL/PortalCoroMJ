@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, Component } from "react";
 import { EscuelaCanto } from "./EscuelaCanto";
 import Landing from "./Landing";
+import CursoGuitarra from "./CursoGuitarra";
 
 // ══════════════════════════════════════════
 //  SUPABASE CONFIG
@@ -851,6 +852,7 @@ const NAV = [
   { id: "dashboard", icon: "⊞", label: "Inicio" },
   { id: "perfil", icon: "◎", label: "Mi Perfil" },
   { id: "reglamento", icon: "📜", label: "Reglamento" },
+  { id: "curso_guitarra", icon: "🎸", label: "Curso de Guitarra" },
   { id: "admin", icon: "⚙", label: "Administración" },
   { id: "solicitudes", icon: "🔔", label: "Solicitudes" },
   { id: "finanzas", icon: "💼", label: "Finanzas" },
@@ -4109,6 +4111,7 @@ function AppInner() {
                 <Noticias noticias={avisos} onReload={loadData} />
               )}
               {section === "reglamento" && <Reglamento />}
+              {section === "curso_guitarra" && <CursoGuitarra />}
               {section === "qanda" && (
                 <QandA preguntas={preguntas} user={user} onReload={loadData} />
               )}
@@ -14538,6 +14541,7 @@ const HERRAMIENTAS_CORO = [
   { id: "cantos_pdf", icon: "📄", titulo: "Cantos PDF", desc: "Letras y partituras para estudiar" },
   { id: "audios", icon: "🎧", titulo: "Audios", desc: "Pistas de práctica por cuerda" },
   { id: "cancioneros", icon: "📚", titulo: "Cancioneros", desc: "Descarga los cancioneros del coro" },
+  { id: "curso_guitarra", icon: "🎸", titulo: "Curso de Guitarra", desc: "Acordes con audio, ritmos y ensayos guiados" },
 ];
 
 function PautaExpandida({ pautas, setSection, onCerrar }) {
