@@ -262,6 +262,24 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
   );
 }
 
+// Próxima misa regular: segundo y último sábado de cada mes, 20:00 hrs
+function proximaMisaRegular() {
+  const hoy = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Santiago" }));
+  hoy.setHours(0, 0, 0, 0);
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const cand = [];
+  for (let k = 0; k < 3; k++) {
+    const y = hoy.getFullYear(), mo = hoy.getMonth() + k;
+    const sabs = [];
+    for (let d = new Date(y, mo, 1); d.getMonth() === ((mo % 12) + 12) % 12; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+      if (d.getDay() === 6) sabs.push(new Date(d));
+    }
+    cand.push(sabs[1], sabs[sabs.length - 1]);
+  }
+  const prox = cand.filter(Boolean).filter((d) => d >= hoy).sort((a, b) => a - b)[0];
+  return prox ? { fecha: fmt(prox), hora: "20:00", lugar: "Capilla Sagrada Familia · Maipú" } : null;
+}
+
 // ── Próxima misa (portada) ──
 function ProximaMisa({ C }) {
   const [m, setM] = useState(null);
@@ -274,7 +292,7 @@ function ProximaMisa({ C }) {
     }).then(r => r.json()).then(rows => { if (Array.isArray(rows) && rows[0]) setM(rows[0]); }).catch(() => {});
   }, [modo]);
   if (modo === "oculto") return null;
-  const src = modo === "manual" ? { fecha: C.evento_fecha, hora: C.evento_hora, lugar: C.evento_lugar } : m;
+  const src = modo === "manual" ? { fecha: C.evento_fecha, hora: C.evento_hora, lugar: C.evento_lugar } : (m || proximaMisaRegular());
   if (!src || !src.fecha) return null;
   const d = new Date(src.fecha + "T12:00:00");
   const dia = d.toLocaleDateString("es-CL", { weekday: "short" }).replace(".", "").slice(0, 3).toUpperCase();

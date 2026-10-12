@@ -1238,6 +1238,7 @@ function MobileMenu({
         {NAV.filter((item) => {
           if (NAV_OCULTOS.has(item.id)) return false;
           const isVisita = esVisita(user);
+          if (!isVisita && item.id === "material_ensayo") return false;
           if (isVisita) {
             return [
               "dashboard",
@@ -3423,6 +3424,7 @@ function AppInner() {
           {NAV.filter((item) => {
           if (NAV_OCULTOS.has(item.id)) return false;
             const isVisita = esVisita(user);
+            if (!isVisita && item.id === "material_ensayo") return false;
             if (isVisita) {
               return [
                 "dashboard",
@@ -4284,14 +4286,14 @@ function AppInner() {
                   </div>
                 </div>
               )}
-              {section === "cantos_pdf" && esVisita(user) && (
+              {section === "cantos_pdf" && (
                 <MaterialEnsayo
                   docs={materialEnsayo}
                   user={user}
                   catFiltroInicial="PDF"
                 />
               )}
-              {section === "audios" && esVisita(user) && (
+              {section === "audios" && (
                 <MaterialEnsayo
                   docs={materialEnsayo}
                   user={user}
@@ -14230,8 +14232,19 @@ function BannerWidget({ isAdmin }) {
   const [editing, setEditing] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
   const [cargado, setCargado] = useState(false);
+  const [activo, setActivo] = useState(false);
+
+  async function alternarActivo(v) {
+    setActivo(v);
+    try {
+      await setConfig("banner_destacado_activo", v ? "1" : "0");
+    } catch (e) {}
+  }
 
   useEffect(() => {
+    getConfig("banner_destacado_activo")
+      .then((v) => setActivo(v === "1"))
+      .catch(() => {});
     getConfig("banner_destacado_url")
       .then((v) => setUrl(v || ""))
       .catch(() => {});
@@ -14295,6 +14308,39 @@ function BannerWidget({ isAdmin }) {
   }
 
   if (!cargado) return null;
+  // El banner está oculto hasta que el administrador lo active
+  if (!activo) {
+    if (!isAdmin) return null;
+    return (
+      <div
+        style={{
+          marginBottom: 12,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          fontSize: 12,
+          color: "#64748b",
+        }}
+      >
+        <span>🖼️ Banner destacado oculto para los integrantes.</span>
+        <button
+          onClick={() => alternarActivo(true)}
+          style={{
+            background: "#0a5ac8",
+            color: "white",
+            border: "none",
+            borderRadius: 8,
+            padding: "5px 12px",
+            fontSize: 11.5,
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          Activar banner
+        </button>
+      </div>
+    );
+  }
   // Sin banner y sin ser admin → no mostrar nada
   if (!url && !isAdmin) return null;
   // Sin banner pero admin → invitación a crear
@@ -14510,9 +14556,56 @@ function BannerWidget({ isAdmin }) {
             ✏️ Editar banner
           </button>
         ))}
+      {isAdmin && !editing && (
+        <button
+          onClick={() => alternarActivo(false)}
+          style={{
+            marginTop: 6,
+            marginLeft: 12,
+            fontSize: 11.5,
+            fontWeight: 700,
+            color: "#b45309",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          🙈 Ocultar banner
+        </button>
+      )}
     </div>
   );
 }
+
+// Herramientas del coro (mismas del perfil invitado, pensadas para integrantes)
+const HERRAMIENTAS_CORO = [
+  { id: "pauta_misa", icon: "🎼", titulo: "Pauta de Misa", desc: "Canciones y orden de la próxima misa" },
+  { id: "material_ensayo", icon: "🎤", titulo: "Sala de Ensayo", desc: "Material por voz, canto y momento" },
+  { id: "cantos_pdf", icon: "📄", titulo: "Cantos PDF", desc: "Letras y partituras para estudiar" },
+  { id: "audios", icon: "🎧", titulo: "Audios", desc: "Pistas de práctica por cuerda" },
+  { id: "cancioneros", icon: "📚", titulo: "Cancioneros", desc: "Descarga los cancioneros del coro" },
+];
+
+function HerramientasCoro({ setSection }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "#1e3a5f", margin: "0 2px 8px" }}>
+        Herramientas del coro
+      </div>
+      <style>{`.hc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.hc-t{display:flex;flex-direction:column;gap:6px;text-align:left;border:1px solid #dbe4f0;background:linear-gradient(180deg,#fff,#f5f8fd);border-radius:16px;padding:14px;cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s}.hc-t:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(30,58,95,.12)}.hc-i{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#1e3a5f,#2f5d9a);display:flex;align-items:center;justify-content:center;font-size:19px}`}</style>
+      <div className="hc-grid">
+        {HERRAMIENTAS_CORO.map((h) => (
+          <button key={h.id} className="hc-t" onClick={() => setSection(h.id)}>
+            <span className="hc-i">{h.icon}</span>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: "#0f2744" }}>{h.titulo}</span>
+            <span style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.35 }}>{h.desc}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 
 function ComunicadosWidget({ isAdmin }) {
   const [html, setHtml] = useState("");
@@ -15615,13 +15708,13 @@ function Dashboard({
       {isVisita ? null : (
         <>
           {/* ── Inicio: hero + cuota a lo ancho, luego 2 columnas ── */}
-          <style>{`.dash-2col{display:grid;grid-template-columns:1.45fr 1fr 1fr;gap:10px;align-items:start}.dash-col{display:flex;flex-direction:column;gap:10px;min-width:0}@media(max-width:1180px){.dash-2col{grid-template-columns:1.6fr 1fr}.dash-right{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:start}}@media(max-width:860px){.dash-2col{grid-template-columns:1fr}.dash-right{display:flex}}`}</style>
+          <style>{`.dash-2col{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:14px;align-items:start}.dash-col{display:flex;flex-direction:column;gap:10px;min-width:0}.dash-side{gap:8px}.dash-side .dash-col{gap:8px}@media(max-width:900px){.dash-2col{grid-template-columns:1fr}}`}</style>
           {/* ── Stats con foto de usuario ── */}
           <div
             className="grid-stats"
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(4,1fr)",
+              gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))",
               gap: 12,
               marginBottom: 16,
             }}
@@ -15870,145 +15963,6 @@ function Dashboard({
                 )}
               </div>
             </Card>
-            {/* Documentos */}
-            <Card
-              onClick={abrirDescargas}
-              hover
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 13,
-                padding: 15,
-                position: "relative",
-                border: hayDocNuevo ? `1px solid ${C.gold}55` : undefined,
-                background: hayDocNuevo
-                  ? "linear-gradient(180deg,#fffefb,#fffaf0)"
-                  : undefined,
-              }}
-            >
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 13,
-                  background: hayDocNuevo
-                    ? "linear-gradient(135deg,#fef3c7,#fde9b0)"
-                    : "rgba(10,90,200,0.08)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  position: "relative",
-                }}
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M6 2.6h7L19 8v12.4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3.6a1 1 0 0 1 1-1Z"
-                    fill={hayDocNuevo ? "#b45309" : "#0a5ac8"}
-                    fillOpacity="0.14"
-                    stroke={hayDocNuevo ? "#b45309" : "#0a5ac8"}
-                    strokeWidth="1.4"
-                  />
-                  <path
-                    d="M13 2.6V8h6"
-                    stroke={hayDocNuevo ? "#b45309" : "#0a5ac8"}
-                    strokeWidth="1.4"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M8.4 13h7.2M8.4 16.4h5"
-                    stroke={hayDocNuevo ? "#b45309" : "#0a5ac8"}
-                    strokeWidth="1.4"
-                    strokeLinecap="round"
-                  />
-                </svg>
-                {hayDocNuevo && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: -3,
-                      right: -3,
-                      width: 10,
-                      height: 10,
-                      borderRadius: "50%",
-                      background: C.gold,
-                      border: "2px solid white",
-                      animation: "pulseGold 1.8s infinite",
-                    }}
-                  />
-                )}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 7,
-                    marginBottom: 3,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 10.5,
-                      fontWeight: 700,
-                      color: hayDocNuevo ? "#b45309" : C.gray,
-                      letterSpacing: "0.04em",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Descargas Misas
-                  </span>
-                  {hayDocNuevo && (
-                    <span
-                      style={{
-                        fontSize: 9,
-                        fontWeight: 800,
-                        color: "#b45309",
-                        background: C.gold + "26",
-                        borderRadius: 20,
-                        padding: "1.5px 7px",
-                        letterSpacing: "0.05em",
-                        textTransform: "uppercase",
-                        flexShrink: 0,
-                      }}
-                    >
-                      Nuevo
-                    </span>
-                  )}
-                </div>
-                {hayDocNuevo ? (
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: "#1c1c1e",
-                      lineHeight: 1.35,
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {docNuevo.nombre}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>
-                    {docs.length} {docs.length === 1 ? "archivo" : "archivos"}
-                  </div>
-                )}
-              </div>
-              <span
-                style={{
-                  fontSize: 17,
-                  color: hayDocNuevo ? C.gold : "#c7c7cc",
-                  flexShrink: 0,
-                  fontWeight: 300,
-                }}
-              >
-                ›
-              </span>
-              <style>{`@keyframes pulseGold { 0% { box-shadow: 0 0 0 0 ${C.gold}77; } 70% { box-shadow: 0 0 0 6px ${C.gold}00; } 100% { box-shadow: 0 0 0 0 ${C.gold}00; } }`}</style>
-            </Card>
           </div>
           <BannerWidget isAdmin={isAdmin} />
           {esCuerdaAdmin(user) && pendientes && pendientes.length > 0 && (
@@ -16068,6 +16022,7 @@ function Dashboard({
           <CumpleanosCompacto members={members} setSection={setSection} />
           <div className="dash-2col">
             <div className="dash-col">
+              <HerramientasCoro setSection={setSection} />
               <ComunicadosWidget isAdmin={isAdmin} />
               {/* ── Avisos del Coro ── */}
               {avisos && avisos.length > 0 && (
@@ -16480,6 +16435,7 @@ function Dashboard({
                 </div>
               )}
             </div>
+            <div className="dash-col dash-side">
             <div className="dash-col">
               <GaleriaWidget
                 fotos={fotos}
@@ -16550,6 +16506,7 @@ function Dashboard({
                 </div>
               )}
               <ValoresWidget />
+            </div>
             </div>
           </div>
 
