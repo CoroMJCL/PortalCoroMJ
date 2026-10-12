@@ -4939,66 +4939,6 @@ function AuthScreen({
                   {loading ? "Verificando..." : "Ingresar al Portal"}
                 </button>
 
-                {/* Separador invitado */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    margin: "16px 0 0",
-                  }}
-                >
-                  <div
-                    style={{
-                      flex: 1,
-                      height: 1,
-                      background: "rgba(60,60,67,0.13)",
-                    }}
-                  />
-                  <span
-                    style={{
-                      fontSize: 11,
-                      color: "#8a8a90",
-                      fontWeight: 600,
-                      letterSpacing: "0.04em",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    o
-                  </span>
-                  <div
-                    style={{
-                      flex: 1,
-                      height: 1,
-                      background: "rgba(60,60,67,0.13)",
-                    }}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setView("guest_code");
-                    setError("");
-                    setSuccess("");
-                    setGuestCode("");
-                  }}
-                  style={{
-                    width: "100%",
-                    marginTop: 12,
-                    padding: "12px",
-                    background: "rgba(30,58,95,0.06)",
-                    border: "1.5px solid rgba(30,58,95,0.20)",
-                    borderRadius: 10,
-                    color: "#1e3a5f",
-                    fontSize: 14,
-                    fontFamily: "var(--font-display)",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    letterSpacing: "-0.016em",
-                  }}
-                >
-                  👤 Entrar como Invitado
-                </button>
               </form>
             )}
 
@@ -8455,7 +8395,15 @@ function AgendaInvitado({ isAdmin }) {
             justifyContent: "center",
             padding: 16,
           }}
-          onClick={() => !saving && setEditing(null)}
+          onMouseDown={(e) => {
+            e.currentTarget.dataset.dn = e.target === e.currentTarget ? "1" : "";
+          }}
+          onClick={(e) =>
+            !saving &&
+            e.target === e.currentTarget &&
+            e.currentTarget.dataset.dn === "1" &&
+            setEditing(null)
+          }
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -14592,18 +14540,126 @@ const HERRAMIENTAS_CORO = [
   { id: "cancioneros", icon: "📚", titulo: "Cancioneros", desc: "Descarga los cancioneros del coro" },
 ];
 
-function HerramientasCoro({ setSection }) {
+function PautaExpandida({ pautas, setSection, onCerrar }) {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const pub = (pautas || []).filter((p) => p.publicada && p.fecha);
+  const prox = pub
+    .filter((p) => new Date(p.fecha + "T00:00:00") >= hoy)
+    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha))[0];
+  const pauta =
+    prox || pub.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
+  if (!pauta)
+    return (
+      <div style={{ marginTop: 10, padding: 14, borderRadius: 14, background: "#f5f8fd", border: "1px solid #dbe4f0", fontSize: 13, color: "#64748b" }}>
+        Aún no hay pautas publicadas.
+      </div>
+    );
+  let canciones = [];
+  try {
+    canciones =
+      typeof pauta.canciones === "string"
+        ? JSON.parse(pauta.canciones || "[]")
+        : pauta.canciones || [];
+  } catch {}
+  const fecha = new Date(pauta.fecha + "T00:00:00").toLocaleDateString("es-CL", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  const th = { textAlign: "left", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b", padding: "6px 8px", borderBottom: "1px solid #e2e8f0" };
+  const td = { padding: "7px 8px", fontSize: 12.5, color: "#1e293b", borderBottom: "1px solid #eef2f7", verticalAlign: "top" };
+  return (
+    <div style={{ marginTop: 10, background: "#fff", border: "1px solid #dbe4f0", borderRadius: 16, overflow: "hidden", boxShadow: "0 6px 20px rgba(30,58,95,0.08)" }}>
+      <div style={{ background: "linear-gradient(135deg,#1e3a5f,#2f5d9a)", color: "#fff", padding: "12px 16px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <div style={{ fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.75 }}>Pauta de Misa</div>
+          <div style={{ fontSize: 15, fontWeight: 800 }}>{pauta.titulo || "Misa"}</div>
+          <div style={{ fontSize: 12, opacity: 0.9, textTransform: "capitalize" }}>
+            {fecha}
+            {pauta.hora ? ` · ${pauta.hora}` : ""}
+            {pauta.lugar ? ` · ${pauta.lugar}` : ""}
+          </div>
+        </div>
+        <button onClick={() => setSection("pauta_misa")} style={{ background: "rgba(255,255,255,0.16)", border: "none", color: "#fff", borderRadius: 9, padding: "6px 11px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+          Abrir completa ↗
+        </button>
+        <button onClick={onCerrar} style={{ background: "rgba(255,255,255,0.16)", border: "none", color: "#fff", borderRadius: 9, padding: "6px 11px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+          Cerrar ✕
+        </button>
+      </div>
+      <div style={{ padding: "6px 12px 12px", overflowX: "auto" }}>
+        {canciones.length === 0 ? (
+          <div style={{ padding: 12, fontSize: 12.5, color: "#64748b" }}>Esta pauta aún no tiene canciones.</div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 420 }}>
+            <thead>
+              <tr>
+                <th style={th}>Momento</th>
+                <th style={th}>Canción</th>
+                <th style={th}>Intérprete</th>
+                <th style={th}>Letra</th>
+              </tr>
+            </thead>
+            <tbody>
+              {canciones.map((c, i) => (
+                <tr key={i}>
+                  <td style={{ ...td, color: "#2f5d9a", fontWeight: 700, fontSize: 11 }}>{c.orden || i + 1}</td>
+                  <td style={{ ...td, fontWeight: 600 }}>{c.cancion || "—"}</td>
+                  <td style={{ ...td, color: "#64748b" }}>{c.salmista || "—"}</td>
+                  <td style={td}>
+                    {c.url_letra && /^https?:/i.test(c.url_letra) ? (
+                      <a href={c.url_letra} target="_blank" rel="noreferrer" style={{ color: "#0a5ac8", fontWeight: 700, fontSize: 12 }}>
+                        Ver PDF
+                      </a>
+                    ) : (
+                      <span style={{ color: "#cbd5e1" }}>—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {pauta.notas && (
+          <div style={{ marginTop: 8, fontSize: 12, color: "#475569", whiteSpace: "pre-wrap" }}>{pauta.notas}</div>
+        )}
+        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {pauta.guion_url && /^https?:/i.test(pauta.guion_url) && (
+            <a href={pauta.guion_url} target="_blank" rel="noreferrer" style={{ background: "#eef4fb", color: "#1e3a5f", border: "1px solid #dbe4f0", borderRadius: 9, padding: "7px 12px", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>
+              📖 Ver guion de la misa
+            </a>
+          )}
+          <PautaWhatsappBoton pauta={pauta} canciones={canciones} compacto />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HerramientasCoro({ setSection, pautas }) {
+  const [pautaAbierta, setPautaAbierta] = useState(false);
   return (
     <div>
-      <style>{`.hc-grid{display:flex;flex-wrap:wrap;gap:8px}.hc-t{flex:1 1 130px;display:flex;align-items:center;gap:9px;text-align:left;border:1px solid #dbe4f0;background:linear-gradient(180deg,#fff,#f5f8fd);border-radius:12px;padding:8px 11px;cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s}.hc-t:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(30,58,95,.12)}.hc-i{width:30px;height:30px;flex-shrink:0;border-radius:9px;background:linear-gradient(135deg,#1e3a5f,#2f5d9a);display:flex;align-items:center;justify-content:center;font-size:15px}`}</style>
+      <style>{`.hc-grid{display:flex;flex-wrap:wrap;gap:8px}.hc-t{flex:1 1 130px;display:flex;align-items:center;gap:9px;text-align:left;border:1px solid #dbe4f0;background:linear-gradient(180deg,#fff,#f5f8fd);border-radius:12px;padding:8px 11px;cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s}.hc-t:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(30,58,95,.12)}.hc-t.on{border-color:#2f5d9a;background:linear-gradient(180deg,#eef4fb,#e3edf9)}.hc-i{width:30px;height:30px;flex-shrink:0;border-radius:9px;background:linear-gradient(135deg,#1e3a5f,#2f5d9a);display:flex;align-items:center;justify-content:center;font-size:15px}`}</style>
       <div className="hc-grid">
         {HERRAMIENTAS_CORO.map((h) => (
-          <button key={h.id} className="hc-t" onClick={() => setSection(h.id)} title={h.desc}>
+          <button
+            key={h.id}
+            className={"hc-t" + (h.id === "pauta_misa" && pautaAbierta ? " on" : "")}
+            onClick={() =>
+              h.id === "pauta_misa" ? setPautaAbierta((v) => !v) : setSection(h.id)
+            }
+            title={h.desc}
+          >
             <span className="hc-i">{h.icon}</span>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0f2744", lineHeight: 1.2 }}>{h.titulo}</span>
           </button>
         ))}
       </div>
+      {pautaAbierta && (
+        <PautaExpandida pautas={pautas} setSection={setSection} onCerrar={() => setPautaAbierta(false)} />
+      )}
     </div>
   );
 }
@@ -15128,6 +15184,14 @@ function InformacionesWidget({ isAdmin }) {
   const [saving, setSaving] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const ref = useRef(null);
+  const textoRef = useRef(null);
+  const [expandido, setExpandido] = useState(false);
+  const [desborda, setDesborda] = useState(false);
+  const ALTO_MIN = 64;
+  useEffect(() => {
+    if (textoRef.current)
+      setDesborda(textoRef.current.scrollHeight > ALTO_MIN + 6);
+  }, [html, editing]);
   useEffect(() => {
     getConfig("informaciones_html")
       .then((v) => setHtml(v || ""))
@@ -15224,9 +15288,9 @@ function InformacionesWidget({ isAdmin }) {
         borderRadius: 18,
         border: "1px solid #ecdfb0",
         borderLeft: `4px solid ${ORO}`,
-        padding: "16px 18px",
-        boxShadow: "0 6px 18px rgba(184,134,11,0.10)",
-        marginBottom: 14,
+        padding: "10px 14px",
+        boxShadow: "0 3px 10px rgba(184,134,11,0.08)",
+        marginBottom: 10,
       }}
     >
       <div
@@ -15234,16 +15298,16 @@ function InformacionesWidget({ isAdmin }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: 12,
+          marginBottom: 6,
           gap: 10,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div
             style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
+              width: 28,
+              height: 28,
+              borderRadius: 9,
               background: "rgba(184,134,11,0.12)",
               display: "flex",
               alignItems: "center",
@@ -15268,16 +15332,13 @@ function InformacionesWidget({ isAdmin }) {
           <div>
             <div
               style={{
-                fontSize: 14.5,
+                fontSize: 13.5,
                 fontWeight: 800,
                 color: "#1c1c1e",
                 letterSpacing: "-0.01em",
               }}
             >
               Informaciones
-            </div>
-            <div style={{ fontSize: 11, color: "#a9832d", fontWeight: 600 }}>
-              Avisos e indicaciones del coro
             </div>
           </div>
         </div>
@@ -15572,10 +15633,45 @@ function InformacionesWidget({ isAdmin }) {
           </div>
         </div>
       ) : html ? (
-        <div
-          style={{ fontSize: 13.5, lineHeight: 1.6, color: "#2a2a30" }}
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
+        <div>
+          <div
+            ref={textoRef}
+            style={{
+              fontSize: 12.5,
+              lineHeight: 1.5,
+              color: "#2a2a30",
+              maxHeight: expandido ? "none" : ALTO_MIN,
+              overflow: "hidden",
+              position: "relative",
+              WebkitMaskImage:
+                !expandido && desborda
+                  ? "linear-gradient(180deg,#000 55%,transparent)"
+                  : "none",
+              maskImage:
+                !expandido && desborda
+                  ? "linear-gradient(180deg,#000 55%,transparent)"
+                  : "none",
+            }}
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+          {(desborda || expandido) && (
+            <button
+              onClick={() => setExpandido((v) => !v)}
+              style={{
+                marginTop: 4,
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                fontSize: 11.5,
+                fontWeight: 700,
+                color: ORO,
+              }}
+            >
+              {expandido ? "Ver menos ▴" : "Ver más ▾"}
+            </button>
+          )}
+        </div>
       ) : (
         <div
           style={{
@@ -15709,16 +15805,16 @@ function Dashboard({
       {isVisita ? null : (
         <>
           {/* ── Inicio: hero + cuota a lo ancho, luego 2 columnas ── */}
-          <style>{`.dash-2col{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(300px,0.9fr);gap:12px;align-items:start}.dash-col{display:flex;flex-direction:column;gap:10px;min-width:0}.dash-side{gap:8px}.dash-side .dash-col{gap:8px}@media(max-width:900px){.dash-2col{grid-template-columns:1fr}}`}</style>
+          <style>{`.dash-2col{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(300px,0.9fr);gap:12px;align-items:start}.dash-col{display:flex;flex-direction:column;gap:10px;min-width:0}.dash-side{gap:8px}.dash-side .dash-col{gap:8px}@media(max-width:900px){.dash-2col,.grid-stats{grid-template-columns:1fr !important}}`}</style>
           {/* ── Stats con foto de usuario ── */}
           <div
             className="grid-stats"
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
-              gap: 10,
-              marginBottom: 8,
-              alignItems: "center",
+              gridTemplateColumns: "minmax(0,1.9fr) minmax(300px,0.9fr)",
+              gap: 12,
+              marginBottom: 12,
+              alignItems: "stretch",
             }}
           >
             {/* Foto + saludo usuario */}
@@ -15938,9 +16034,8 @@ function Dashboard({
           )}
           <div className="dash-2col">
             <div className="dash-col">
-              <HerramientasCoro setSection={setSection} />
+              <HerramientasCoro setSection={setSection} pautas={pautas} />
               <InformacionesWidget isAdmin={isAdmin} />
-              <ComunicadosWidget isAdmin={isAdmin} />
               {/* ── Avisos del Coro ── */}
               {avisos && avisos.length > 0 && (
                 <div style={{ marginBottom: 14 }}>
@@ -46463,11 +46558,13 @@ function CumpleanosCompacto({ members, setSection }) {
           ? "linear-gradient(90deg,#0f2d5c 0%,#1d6fc7 100%)"
           : C.white,
         border: `1px solid ${esHoy ? "#1d6fc760" : C.border}`,
-        borderRadius: 14,
-        marginBottom: 10,
+        borderRadius: 16,
         boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
         overflow: "hidden",
-        maxWidth: 380,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignSelf: "stretch",
       }}
     >
       <div
@@ -46475,8 +46572,8 @@ function CumpleanosCompacto({ members, setSection }) {
           display: "flex",
           alignItems: "center",
           gap: 9,
-          padding: "6px 10px",
-          minHeight: 44,
+          padding: "8px 14px",
+          minHeight: 56,
         }}
       >
         <span style={{ fontSize: 18, flexShrink: 0 }}>{esHoy ? "🎉" : "🎂"}</span>
