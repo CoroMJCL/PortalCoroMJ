@@ -56,8 +56,14 @@ async function dbGet() {
     return obj;
   } catch { return DEFAULT; }
 }
+let _adminToken = null; // sesión del administrador (para poder escribir con permisos)
 async function dbSet(key, value) {
-  await fetch(`${SUPABASE_URL}/rest/v1/landing_content`, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ key, value }) });
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/landing_content?on_conflict=key`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_adminToken || SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ key, value })
+  });
+  if (!r.ok) throw new Error((await r.text()) || `Error ${r.status}`);
 }
 async function uploadImg(file, name) {
   const ext = file.name.split(".").pop();
@@ -134,6 +140,7 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
       });
       const d = await r.json();
       if (d.access_token) {
+        _adminToken = d.access_token;
         if (rememberMe) localStorage.setItem("admin_email", email);
         else localStorage.removeItem("admin_email");
         setAuth(true);
@@ -300,17 +307,19 @@ function ProximaMisa({ C }) {
   const hora = (src.hora || "").slice(0, 5);
   return (
     <div className="pm">
-      <div className="pm-k">Próxima misa</div>
-      <div className="pm-row">
-        <span>{dia}</span><i /><span>{String(d.getDate()).padStart(2, "0")}</span><i /><span>{mes}</span>
-        {hora && <><i /><span className="pm-h">{hora}<small>HRS</small></span></>}
+      <div className="pm-date">
+        <span className="pm-day">{String(d.getDate()).padStart(2, "0")}</span>
+        <span className="pm-mon">{dia} · {mes}</span>
       </div>
-      {src.lugar && <div className="pm-l">{src.lugar}</div>}
+      <div className="pm-info">
+        <div className="pm-k"><b />Próxima misa</div>
+        {hora && <div className="pm-h">{hora}<small>HRS</small></div>}
+        {src.lugar && <div className="pm-l">{src.lugar}</div>}
+      </div>
     </div>
   );
 }
 
-// ── METRÓNOMO ──────────────────────────────
 function ToolMetronome() {
   const [bpm, setBpm] = useState(80);
   const [running, setRunning] = useState(false);
@@ -599,7 +608,13 @@ export default function Landing({ onPortal }) {
   async function saveF(key, valueOverride) {
     setSaving(s => ({ ...s, [key]: true }));
     const val = valueOverride !== undefined ? valueOverride : (editing[key] ?? C[key]);
-    await dbSet(key, val);
+    try {
+      await dbSet(key, val);
+    } catch (e) {
+      setSaving(s => ({ ...s, [key]: false }));
+      alert("No se pudo guardar: " + (e.message || e));
+      return;
+    }
     setC(c => ({ ...c, [key]: val }));
     setEditing(e => { const n = { ...e }; delete n[key]; return n; });
     setSaving(s => ({ ...s, [key]: false }));
@@ -652,13 +667,16 @@ export default function Landing({ onPortal }) {
         .hero-kicker::before{content:'';width:28px;height:1px;background:rgba(255,255,255,0.4)}
         .hero-h1{font-size:clamp(70px,9.5vw,124px);font-weight:900;line-height:0.88;color:#fff;letter-spacing:-0.03em}
         .hero-h1 .it{font-family:'Fraunces',serif;font-style:italic;font-weight:400;display:block;line-height:0.92;font-size:clamp(66px,9vw,118px)}
-        .pm{margin-top:34px;color:#fff}
-        .pm-k{font-size:11px;font-weight:700;letter-spacing:0.32em;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-bottom:10px}
-        .pm-row{display:flex;align-items:center;gap:clamp(12px,1.8vw,22px);font-family:'Outfit','Plus Jakarta Sans',sans-serif;font-weight:200;font-size:clamp(34px,4.6vw,60px);line-height:1;letter-spacing:0.06em;font-variant-numeric:tabular-nums}
-        .pm-row i{display:block;width:1px;height:1.05em;background:rgba(255,255,255,0.75)}
-        .pm-h{display:flex;align-items:baseline;gap:6px}
-        .pm-h small{font-family:inherit;font-weight:400;font-size:0.28em;letter-spacing:0.28em;opacity:0.7}
-        .pm-l{margin-top:16px;font-family:'Outfit','Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:400;letter-spacing:0.22em;text-transform:uppercase;color:rgba(255,255,255,0.85)}
+        .pm{display:flex;align-items:stretch;gap:18px;padding:14px 20px 14px 16px;border-radius:18px;background:rgba(10,18,40,0.38);border:1px solid rgba(255,255,255,0.22);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 30px rgba(0,0,0,0.25);color:#fff;font-family:'Outfit','Plus Jakarta Sans',sans-serif}
+        .pm-date{display:flex;flex-direction:column;align-items:center;justify-content:center;padding-right:18px;border-right:1px solid rgba(255,255,255,0.25)}
+        .pm-day{font-size:44px;font-weight:300;line-height:0.95;letter-spacing:-0.02em}
+        .pm-mon{margin-top:6px;font-size:10px;font-weight:500;letter-spacing:0.22em;color:rgba(255,255,255,0.75)}
+        .pm-info{display:flex;flex-direction:column;justify-content:center;gap:3px;text-align:left}
+        .pm-k{display:flex;align-items:center;gap:7px;font-size:9.5px;font-weight:500;letter-spacing:0.26em;text-transform:uppercase;color:rgba(255,255,255,0.7)}
+        .pm-k b{width:6px;height:6px;border-radius:50%;background:#f5b942;box-shadow:0 0 0 3px rgba(245,185,66,0.25)}
+        .pm-h{display:flex;align-items:baseline;gap:6px;font-size:26px;font-weight:400;line-height:1.1;letter-spacing:0.02em;font-variant-numeric:tabular-nums}
+        .pm-h small{font-size:10px;font-weight:500;letter-spacing:0.22em;opacity:0.65}
+        .pm-l{font-size:11.5px;font-weight:400;letter-spacing:0.04em;color:rgba(255,255,255,0.85)}
         .hero-right{display:flex;flex-direction:column;align-items:flex-end;gap:16px;max-width:320px}
         .hero-sub{font-size:13.5px;font-weight:300;color:rgba(255,255,255,0.55);line-height:1.75;text-align:right}
         .hero-btns{display:flex;gap:10px}
@@ -885,9 +903,9 @@ export default function Landing({ onPortal }) {
           <div>
             <div style={{fontSize:"clamp(11px,1.2vw,14px)",fontWeight:700,letterSpacing:"0.45em",textTransform:"uppercase",color:"rgba(255,255,255,0.85)",marginBottom:12,display:"block"}}>CORO</div>
             <h1 className="hero-h1">{C.hero_titulo}<br/><span className="it">{C.hero_titulo2}</span></h1>
-            <ProximaMisa C={C} />
           </div>
           <div className="hero-right">
+            <ProximaMisa C={C} />
             <p className="hero-sub">{C.hero_sub}</p>
             <div className="hero-btns">
               <button className="btn-w" onClick={() => go("nosotros")}>Conócenos</button>

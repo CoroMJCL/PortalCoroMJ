@@ -4223,17 +4223,8 @@ function AppInner() {
                   isAdmin={esCuerdaAdmin(user)}
                 />
               )}
-              {section === "material_ensayo" && esVisita(user) && (
+              {section === "material_ensayo" && (
                 <MaterialEnsayo docs={materialEnsayo} user={user} />
-              )}
-              {section === "material_ensayo" && !esVisita(user) && (
-                <SalaEnsayoMiembro
-                  docs={materialCoro}
-                  user={user}
-                  isAdmin={esCuerdaAdmin(user)}
-                  podcasts={podcasts}
-                  onReload={loadData}
-                />
               )}
               {section === "vista_invitado" && esCuerdaAdmin(user) && (
                 <div>
@@ -4467,13 +4458,20 @@ function AuthScreen({
       .catch(() => {});
   }, []);
 
-  function doGuestEnter() {
+  async function doGuestEnter() {
     setError("");
+    const norm = (s) => String(s || "").replace(/\s+/g, "").toLowerCase();
     if (!guestCode.trim()) {
       setError("Ingresa el código de acceso.");
       return;
     }
-    if (guestCode.trim() !== codigoValido) {
+    // Se vuelve a leer el código vigente al momento de entrar
+    let vigente = codigoValido;
+    try {
+      const v = await getConfig("codigo_invitado");
+      if (v && String(v).trim()) vigente = String(v).trim();
+    } catch {}
+    if (norm(guestCode) !== norm(vigente)) {
       setError(
         "Código incorrecto. Pídele el código al administrador del coro."
       );
@@ -5738,27 +5736,32 @@ function normalizarUrlFoto(url) {
 
 // ── Helpers para tabla config en Supabase ────────────────────────────
 async function getConfig(key) {
-  try {
-    const token = _authToken || SUPABASE_SERVICE_KEY;
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/config?select=value&key=eq.${encodeURIComponent(
-        key
-      )}&limit=1`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    // Si el array está vacío, la clave no existe aún — retornar null sin error
-    if (!Array.isArray(data) || data.length === 0) return null;
-    return data[0]?.value ?? null;
-  } catch {
-    return null;
+  const url = `${SUPABASE_URL}/rest/v1/config?select=value&key=eq.${encodeURIComponent(
+    key
+  )}&limit=1`;
+  const intentos = [_authToken, SUPABASE_KEY, SUPABASE_SERVICE_KEY].filter(
+    (v, i, arr) => v && arr.indexOf(v) === i
+  );
+  for (const token of intentos) {
+    try {
+      const res = await fetch(url, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      // Si el array está vacío, la clave no existe aún
+      if (!Array.isArray(data) || data.length === 0) return null;
+      return data[0]?.value ?? null;
+    } catch {
+      /* probar con la siguiente llave */
+    }
   }
+  return null;
 }
 
 async function setConfig(key, value) {
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/config`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/config`, {
       method: "POST",
       headers: {
         apikey: SUPABASE_KEY,
@@ -5768,7 +5771,10 @@ async function setConfig(key, value) {
       },
       body: JSON.stringify({ key, value }),
     });
-  } catch {}
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 // Widget de Shorts de YouTube en fila vertical deslizable — admin pega los enlaces
@@ -7702,7 +7708,7 @@ function GaleriaWidget({ fotos, setSection, isAdmin }) {
             borderRadius: 14,
             overflow: "hidden",
             background: "#000",
-            aspectRatio: "16/9",
+            aspectRatio: "21/9",
             cursor: "pointer",
           }}
           onClick={() => setLightbox(true)}
@@ -14580,7 +14586,7 @@ function BannerWidget({ isAdmin }) {
 // Herramientas del coro (mismas del perfil invitado, pensadas para integrantes)
 const HERRAMIENTAS_CORO = [
   { id: "pauta_misa", icon: "🎼", titulo: "Pauta de Misa", desc: "Canciones y orden de la próxima misa" },
-  { id: "material_ensayo", icon: "🎤", titulo: "Sala de Ensayo", desc: "Material por voz, canto y momento" },
+  { id: "material_ensayo", icon: "🎤", titulo: "Material de ensayo", desc: "Cantos, letras y audios por voz" },
   { id: "cantos_pdf", icon: "📄", titulo: "Cantos PDF", desc: "Letras y partituras para estudiar" },
   { id: "audios", icon: "🎧", titulo: "Audios", desc: "Pistas de práctica por cuerda" },
   { id: "cancioneros", icon: "📚", titulo: "Cancioneros", desc: "Descarga los cancioneros del coro" },
@@ -14589,23 +14595,18 @@ const HERRAMIENTAS_CORO = [
 function HerramientasCoro({ setSection }) {
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "#1e3a5f", margin: "0 2px 8px" }}>
-        Herramientas del coro
-      </div>
-      <style>{`.hc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.hc-t{display:flex;flex-direction:column;gap:6px;text-align:left;border:1px solid #dbe4f0;background:linear-gradient(180deg,#fff,#f5f8fd);border-radius:16px;padding:14px;cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s}.hc-t:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(30,58,95,.12)}.hc-i{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#1e3a5f,#2f5d9a);display:flex;align-items:center;justify-content:center;font-size:19px}`}</style>
+      <style>{`.hc-grid{display:flex;flex-wrap:wrap;gap:8px}.hc-t{flex:1 1 130px;display:flex;align-items:center;gap:9px;text-align:left;border:1px solid #dbe4f0;background:linear-gradient(180deg,#fff,#f5f8fd);border-radius:12px;padding:8px 11px;cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s}.hc-t:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(30,58,95,.12)}.hc-i{width:30px;height:30px;flex-shrink:0;border-radius:9px;background:linear-gradient(135deg,#1e3a5f,#2f5d9a);display:flex;align-items:center;justify-content:center;font-size:15px}`}</style>
       <div className="hc-grid">
         {HERRAMIENTAS_CORO.map((h) => (
-          <button key={h.id} className="hc-t" onClick={() => setSection(h.id)}>
+          <button key={h.id} className="hc-t" onClick={() => setSection(h.id)} title={h.desc}>
             <span className="hc-i">{h.icon}</span>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: "#0f2744" }}>{h.titulo}</span>
-            <span style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.35 }}>{h.desc}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0f2744", lineHeight: 1.2 }}>{h.titulo}</span>
           </button>
         ))}
       </div>
     </div>
   );
 }
-
 
 function ComunicadosWidget({ isAdmin }) {
   const [html, setHtml] = useState("");
@@ -14616,7 +14617,7 @@ function ComunicadosWidget({ isAdmin }) {
   const textoRef = useRef(null);
   const [expandido, setExpandido] = useState(false);
   const [desborda, setDesborda] = useState(false);
-  const ALTO_RESUMEN = 132;
+  const ALTO_RESUMEN = 92;
   useEffect(() => {
     getConfig("comunicados_html")
       .then((v) => setHtml(v || ""))
@@ -15708,15 +15709,16 @@ function Dashboard({
       {isVisita ? null : (
         <>
           {/* ── Inicio: hero + cuota a lo ancho, luego 2 columnas ── */}
-          <style>{`.dash-2col{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:14px;align-items:start}.dash-col{display:flex;flex-direction:column;gap:10px;min-width:0}.dash-side{gap:8px}.dash-side .dash-col{gap:8px}@media(max-width:900px){.dash-2col{grid-template-columns:1fr}}`}</style>
+          <style>{`.dash-2col{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(300px,0.9fr);gap:12px;align-items:start}.dash-col{display:flex;flex-direction:column;gap:10px;min-width:0}.dash-side{gap:8px}.dash-side .dash-col{gap:8px}@media(max-width:900px){.dash-2col{grid-template-columns:1fr}}`}</style>
           {/* ── Stats con foto de usuario ── */}
           <div
             className="grid-stats"
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))",
-              gap: 12,
-              marginBottom: 16,
+              gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
+              gap: 10,
+              marginBottom: 8,
+              alignItems: "center",
             }}
           >
             {/* Foto + saludo usuario */}
@@ -15877,92 +15879,7 @@ function Dashboard({
                 )}
               </div>
             </Card>
-            {/* Próximo evento con fecha */}
-            <Card
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: 14,
-                gridColumn: "span 2",
-              }}
-            >
-              <div
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 14,
-                  background: C.primary + "15",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 9,
-                  fontWeight: 700,
-                  color: C.primary,
-                  flexShrink: 0,
-                  border: `1px solid ${C.primary}20`,
-                }}
-              >
-                {eventoDestacado ? (
-                  <>
-                    <div
-                      style={{
-                        fontSize: 20,
-                        fontWeight: 800,
-                        lineHeight: 1,
-                        color: C.primary,
-                      }}
-                    >
-                      {new Date(eventoDestacado.fecha + "T00:00:00").getDate()}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 8,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      {new Date(
-                        eventoDestacado.fecha + "T00:00:00"
-                      ).toLocaleDateString("es-CL", { month: "short" })}
-                    </div>
-                  </>
-                ) : (
-                  <span style={{ fontSize: 20 }}>🎼</span>
-                )}
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 11, color: C.gray, marginBottom: 2 }}>
-                  Próximo evento
-                </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: C.dark,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {eventoDestacado?.titulo || "Sin eventos próximos"}
-                </div>
-                {eventoDestacado && (
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: C.primary,
-                      marginTop: 2,
-                      textTransform: "capitalize",
-                    }}
-                  >
-                    {fmtEventoFecha(eventoDestacado.fecha)}
-                    {eventoDestacado.hora ? " · " + eventoDestacado.hora : ""}
-                  </div>
-                )}
-              </div>
-            </Card>
+            <CumpleanosCompacto members={members} setSection={setSection} />
           </div>
           <BannerWidget isAdmin={isAdmin} />
           {esCuerdaAdmin(user) && pendientes && pendientes.length > 0 && (
@@ -16019,10 +15936,10 @@ function Dashboard({
               </span>
             </div>
           )}
-          <CumpleanosCompacto members={members} setSection={setSection} />
           <div className="dash-2col">
             <div className="dash-col">
               <HerramientasCoro setSection={setSection} />
+              <InformacionesWidget isAdmin={isAdmin} />
               <ComunicadosWidget isAdmin={isAdmin} />
               {/* ── Avisos del Coro ── */}
               {avisos && avisos.length > 0 && (
@@ -16083,14 +16000,14 @@ function Dashboard({
                       style={{
                         display: "grid",
                         gridTemplateColumns:
-                          "repeat(auto-fill, minmax(230px, 1fr))",
-                        gap: 12,
-                        marginBottom: 10,
+                          "repeat(auto-fill, minmax(150px, 1fr))",
+                        gap: 8,
+                        marginBottom: 8,
                       }}
                     >
                       {avisos
                         .filter((a) => a.imagen_url)
-                        .slice(0, 6)
+                        .slice(0, 4)
                         .map((n) => (
                           <div
                             key={n.id}
@@ -16436,14 +16353,7 @@ function Dashboard({
               )}
             </div>
             <div className="dash-col dash-side">
-            <div className="dash-col">
-              <GaleriaWidget
-                fotos={fotos}
-                setSection={setSection}
-                isAdmin={isAdmin}
-              />
-              <VocalizacionWidget isAdmin={isAdmin} />
-            </div>
+              <AgendaInvitado isAdmin={isAdmin} />
             <div className="dash-col dash-right">
               <PautasCompacto
                 pautas={pautas}
@@ -16506,6 +16416,12 @@ function Dashboard({
                 </div>
               )}
               <ValoresWidget />
+              <GaleriaWidget
+                fotos={fotos}
+                setSection={setSection}
+                isAdmin={isAdmin}
+              />
+              <VocalizacionWidget isAdmin={isAdmin} />
             </div>
             </div>
           </div>
@@ -34249,7 +34165,8 @@ function AdminCodigoInvitado() {
     setGuardando(true);
     setOk(false);
     try {
-      await setConfig("codigo_invitado", nuevo);
+      const guardado = await setConfig("codigo_invitado", nuevo);
+      if (guardado === false) throw new Error("no se pudo guardar en la base de datos. Cierra sesión, vuelve a entrar e inténtalo de nuevo.");
       setOriginal(nuevo);
       setOk(true);
       setTimeout(() => setOk(false), 3000);
