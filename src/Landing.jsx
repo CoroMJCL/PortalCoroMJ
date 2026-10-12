@@ -244,40 +244,49 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
   );
 }
 
-// ── BANDERA DE CHILE (dibujada a trazo, sin fondo) ─────────────────
-// Solo líneas blancas y la estrella sólida, igual que el ícono del coro:
-// no lleva rellenos de color ni caja, así toma el fondo que ya existe.
-function BanderaChile({ width = 84 }) {
-  const trazo = "rgba(255,255,255,0.92)";
+// ── BANDERA DE CHILE (a trazo, sin asta ni fondo) ─────────────────
+// Línea fina con degradado blanco → oro. El pentagrama nace de las ondas de
+// la bandera, la estrella lleva una cruz grabada y una nota cierra la composición.
+// Sin rellenos de color ni caja: toma el fondo que ya existe.
+function BanderaChile({ width = 132 }) {
+  const top = "M6 14C26 6 44 22 66 14S104 6 126 14";
   return (
     <svg
       role="img"
-      aria-label="Bandera de Chile"
+      aria-label="Bandera de Chile con pentagrama, estrella y cruz"
       width={width}
-      height={(width * 56) / 84}
-      viewBox="0 0 96 64"
+      height={(width * 80) / 132}
+      viewBox="0 0 132 80"
       fill="none"
-      stroke={trazo}
-      strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={{ display: "block", filter: "drop-shadow(0 1px 6px rgba(0,0,0,0.35))" }}
+      style={{ display: "block", overflow: "visible", filter: "drop-shadow(0 2px 10px rgba(0,0,0,0.38))" }}
     >
-      {/* asta */}
-      <line x1="6" y1="5" x2="6" y2="62" strokeWidth="2.6" />
-      {/* contorno de la bandera, con una leve ondulación */}
-      <path d="M8 10 C26 5 44 15 62 10 C80 5 82 6 90 9 L90 45 C82 42 80 41 62 46 C44 51 26 41 8 46 Z" />
-      {/* cuadro del cantón */}
-      <path d="M8 28 C17 25.5 26 26.75 35 28" />
-      <line x1="35" y1="10" x2="35" y2="28" />
-      {/* división entre blanco y rojo */}
-      <path d="M35 28 C44 29.25 53 30.5 62 28 C80 23 82 24 90 27" />
-      {/* estrella sólida */}
-      <polygon
-        fill={trazo}
-        strokeWidth="0.6"
-        points="21.5,12.5 23.03,16.9 27.68,16.99 23.97,19.8 25.32,24.26 21.5,21.6 17.68,24.26 19.03,19.8 15.32,16.99 19.97,16.9"
-      />
+      <defs>
+        <linearGradient id="mjOro" gradientUnits="userSpaceOnUse" x1="6" y1="0" x2="126" y2="0">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset=".55" stopColor="#fff6e0" />
+          <stop offset="1" stopColor="#f1cf86" />
+        </linearGradient>
+        <mask id="mjCruz" maskUnits="userSpaceOnUse" x="0" y="0" width="132" height="80">
+          <rect width="132" height="80" fill="#fff" />
+          <path d="M25 21.25v7.6M21.7 24.05h6.6" stroke="#000" strokeWidth="1.5" />
+        </mask>
+      </defs>
+      <g stroke="url(#mjOro)">
+        <path d={top} strokeWidth="2" />
+        <path d={top} transform="translate(0 44)" strokeWidth="2" />
+        <path d="M6 14V58M126 14V58" strokeWidth="2" />
+        <path d={top} transform="translate(0 22)" strokeWidth="1.5" />
+        <path d={top} transform="translate(0 29)" strokeWidth="1.2" opacity=".85" />
+        <path d={top} transform="translate(0 36)" strokeWidth="1.2" opacity=".7" />
+        <path d="M44 15.62V37.62" strokeWidth="1.5" />
+        <path d="M99.6 39.50V19.50C99.6 19.50 105 21.50 105.5 28.50" strokeWidth="1.6" />
+      </g>
+      <g fill="url(#mjOro)" stroke="none">
+        <polygon points="25.00,13.35 27.45,20.38 34.89,20.53 28.96,25.03 31.11,32.16 25.00,27.91 18.89,32.16 21.04,25.03 15.11,20.53 22.55,20.38" mask="url(#mjCruz)" />
+        <ellipse cx="96" cy="40.50" rx="4.3" ry="3.1" transform="rotate(-22 96 40.50)" />
+      </g>
     </svg>
   );
 }
@@ -624,6 +633,8 @@ export default function Landing({ onPortal }) {
         .hero-kicker::before{content:'';width:28px;height:1px;background:rgba(255,255,255,0.4)}
         .hero-h1{font-size:clamp(70px,9.5vw,124px);font-weight:900;line-height:0.88;color:#fff;letter-spacing:-0.03em}
         .hero-h1 .it{font-family:'Fraunces',serif;font-style:italic;font-weight:400;display:block;line-height:0.92;font-size:clamp(66px,9vw,118px)}
+        .hero-flag{position:absolute;z-index:3;top:108px;left:clamp(20px,4.2vw,64px);width:clamp(112px,12.5vw,176px);pointer-events:none}
+        .hero-flag svg{width:100%;height:auto}
         .hero-right{display:flex;flex-direction:column;align-items:flex-end;gap:16px;max-width:320px}
         .hero-sub{font-size:13.5px;font-weight:300;color:rgba(255,255,255,0.55);line-height:1.75;text-align:right}
         .hero-btns{display:flex;gap:10px}
@@ -846,13 +857,13 @@ export default function Landing({ onPortal }) {
       <section id="inicio" className="hero">
         <div className="hero-bg" style={{ backgroundImage: `url('${C.hero_img}')` }}/>
         <div className="hero-ov"/>
+        <div className="hero-flag"><BanderaChile /></div>
         <div className="hero-c">
           <div>
             <div style={{fontSize:"clamp(11px,1.2vw,14px)",fontWeight:700,letterSpacing:"0.45em",textTransform:"uppercase",color:"rgba(255,255,255,0.85)",marginBottom:12,display:"block"}}>CORO</div>
             <h1 className="hero-h1">{C.hero_titulo}<br/><span className="it">{C.hero_titulo2}</span></h1>
           </div>
           <div className="hero-right">
-            <BanderaChile />
             <p className="hero-sub">{C.hero_sub}</p>
             <div className="hero-btns">
               <button className="btn-w" onClick={() => go("nosotros")}>Conócenos</button>

@@ -850,6 +850,7 @@ const G = `
 const NAV = [
   { id: "dashboard", icon: "⊞", label: "Inicio" },
   { id: "perfil", icon: "◎", label: "Mi Perfil" },
+  { id: "reglamento", icon: "📜", label: "Reglamento" },
   { id: "admin", icon: "⚙", label: "Administración" },
   { id: "solicitudes", icon: "🔔", label: "Solicitudes" },
   { id: "finanzas", icon: "💼", label: "Finanzas" },
@@ -4105,6 +4106,7 @@ function AppInner() {
               {section === "noticias" && (
                 <Noticias noticias={avisos} onReload={loadData} />
               )}
+              {section === "reglamento" && <Reglamento />}
               {section === "qanda" && (
                 <QandA preguntas={preguntas} user={user} onReload={loadData} />
               )}
@@ -14518,6 +14520,10 @@ function ComunicadosWidget({ isAdmin }) {
   const [saving, setSaving] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const ref = useRef(null);
+  const textoRef = useRef(null);
+  const [expandido, setExpandido] = useState(false);
+  const [desborda, setDesborda] = useState(false);
+  const ALTO_RESUMEN = 132;
   useEffect(() => {
     getConfig("comunicados_html")
       .then((v) => setHtml(v || ""))
@@ -14526,6 +14532,11 @@ function ComunicadosWidget({ isAdmin }) {
   useEffect(() => {
     if (editing && ref.current) ref.current.innerHTML = html || "";
   }, [editing]);
+  // Detecta si el comunicado es más alto que el resumen para mostrar "Ver más"
+  useEffect(() => {
+    if (textoRef.current)
+      setDesborda(textoRef.current.scrollHeight > ALTO_RESUMEN + 8);
+  }, [html, editing]);
   function cmd(c, v) {
     document.execCommand(c, false, v != null ? v : null);
     if (ref.current) ref.current.focus();
@@ -14952,10 +14963,53 @@ function ComunicadosWidget({ isAdmin }) {
           </div>
         </div>
       ) : html ? (
-        <div
-          style={{ fontSize: 13.5, lineHeight: 1.6, color: "#2a2a30" }}
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
+        <div>
+          <div style={{ position: "relative" }}>
+            <div
+              ref={textoRef}
+              style={{
+                fontSize: 13.5,
+                lineHeight: 1.6,
+                color: "#2a2a30",
+                maxHeight: expandido ? "none" : ALTO_RESUMEN,
+                overflow: "hidden",
+              }}
+              dangerouslySetInnerHTML={{ __html: html }}
+            />
+            {desborda && !expandido && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: 56,
+                  background:
+                    "linear-gradient(180deg, rgba(255,255,255,0) 0%, #ffffff 92%)",
+                  pointerEvents: "none",
+                }}
+              />
+            )}
+          </div>
+          {desborda && (
+            <button
+              onClick={() => setExpandido((v) => !v)}
+              style={{
+                marginTop: 8,
+                background: "rgba(10,90,200,0.08)",
+                border: "none",
+                borderRadius: 980,
+                padding: "6px 14px",
+                fontSize: 12,
+                fontWeight: 700,
+                color: AZUL,
+                cursor: "pointer",
+              }}
+            >
+              {expandido ? "Ver menos ▴" : "Ver más ▾"}
+            </button>
+          )}
+        </div>
       ) : (
         <div
           style={{
@@ -16208,14 +16262,7 @@ function Dashboard({
               </span>
             </div>
           )}
-          {verFinanzas(user) && (
-            <CuotaRecordatorioWidget
-              members={members}
-              user={user}
-              setSection={setSection}
-              onReload={onReload}
-            />
-          )}
+          <CumpleanosCompacto members={members} setSection={setSection} />
           <div className="dash-2col">
             <div className="dash-col">
               <div style={{ marginBottom: 16 }}>
@@ -16631,7 +16678,6 @@ function Dashboard({
                   </div>
                 </div>
               )}
-              <VideoDestacadoWidget isAdmin={isAdmin} />
               <GaleriaWidget
                 fotos={fotos}
                 setSection={setSection}
@@ -16696,14 +16742,6 @@ function Dashboard({
                 </div>
               )}
               <ValoresWidget />
-              <ShortsWidget isAdmin={isAdmin} />
-              {/* ── Cumpleañeros de hoy (solo ese día) ── */}
-              {cumple.length > 0 && <CumpleanosHoyWidget cumple={cumple} />}
-              {/* ── Valores del coro ── */}
-              <ProximosCumpleanosWidget
-                members={members}
-                setSection={setSection}
-              />
             </div>
           </div>
 
@@ -30170,6 +30208,156 @@ const normBusquedaLetra = (t) =>
     .toLowerCase()
     .trim();
 
+// ── Pauta Whatsapp: reúne los PDF de la pauta en el orden de la misa ──────
+function driveFileId(url) {
+  const t = String(url || "");
+  const m = t.match(/\/d\/([a-zA-Z0-9_-]{10,})/) || t.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+  return m ? m[1] : null;
+}
+
+// Lista ordenada de PDFs de la pauta: primero el guion, luego cada canción por orden.
+function pdfsDePauta(pauta, canciones) {
+  const items = [];
+  if (pauta?.guion_url && /^https?:/i.test(pauta.guion_url))
+    items.push({ etiqueta: "Guion de la misa", url: pauta.guion_url });
+  (canciones || []).forEach((c, i) => {
+    if (c.url_letra && /^https?:/i.test(c.url_letra)) {
+      const nombre = [c.orden, c.cancion].filter(Boolean).join(" – ");
+      items.push({ etiqueta: nombre || `Canción ${i + 1}`, url: c.url_letra });
+    }
+  });
+  return items;
+}
+
+function mensajePautaWhatsapp(pauta, items) {
+  const fecha = new Date(pauta.fecha + "T00:00:00").toLocaleDateString("es-CL", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  const lineas = items.map((it, i) => `${i + 1}. ${it.etiqueta}\n${it.url}`);
+  return (
+    `🎼 *Pauta de Misa* – ${pauta.titulo || ""}\n` +
+    `📅 ${fecha}${pauta.hora ? ` · ${pauta.hora} hrs` : ""}${pauta.lugar ? `\n📍 ${pauta.lugar}` : ""}\n\n` +
+    `📄 *PDF en el orden de la misa:*\n\n${lineas.join("\n\n")}`
+  );
+}
+
+function PautaWhatsappBoton({ pauta, canciones }) {
+  // estado: idle → preparando → listo (archivos para compartir) | enlaces (plan B)
+  const [estado, setEstado] = useState("idle");
+  const [progreso, setProgreso] = useState("");
+  const archivosRef = useRef([]);
+  const items = pdfsDePauta(pauta, canciones);
+  if (items.length === 0) return null;
+
+  const puedeCompartirArchivos = () => {
+    try {
+      if (!navigator.share || !navigator.canShare) return false;
+      const prueba = new File(["x"], "a.pdf", { type: "application/pdf" });
+      return navigator.canShare({ files: [prueba] });
+    } catch (e) {
+      return false;
+    }
+  };
+
+  function abrirConEnlaces() {
+    const texto = mensajePautaWhatsapp(pauta, items);
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
+  }
+
+  async function prepararArchivos() {
+    setEstado("preparando");
+    const archivos = [];
+    try {
+      for (let i = 0; i < items.length; i++) {
+        setProgreso(`${i + 1}/${items.length}`);
+        const id = driveFileId(items[i].url);
+        const src = id
+          ? `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${GDRIVE_API_KEY}`
+          : items[i].url;
+        const res = await fetch(src);
+        if (!res.ok) throw new Error("No se pudo descargar " + items[i].etiqueta);
+        const blob = await res.blob();
+        const limpio = items[i].etiqueta.replace(/[\\/:*?"<>|]/g, "").slice(0, 70);
+        // El número al inicio del nombre mantiene el orden aunque WhatsApp ordene por nombre.
+        archivos.push(
+          new File([blob], `${String(i + 1).padStart(2, "0")} - ${limpio}.pdf`, {
+            type: "application/pdf",
+          })
+        );
+      }
+      archivosRef.current = archivos;
+      setEstado("listo");
+    } catch (e) {
+      setEstado("enlaces");
+    }
+  }
+
+  async function compartir() {
+    try {
+      await navigator.share({
+        files: archivosRef.current,
+        title: `Pauta de Misa – ${pauta.titulo || ""}`,
+        text: `🎼 Pauta de Misa – ${pauta.titulo || ""} (PDF en orden)`,
+      });
+    } catch (e) {
+      if (e && e.name === "AbortError") return; // la persona canceló
+      setEstado("enlaces");
+    }
+  }
+
+  function onClick() {
+    if (estado === "listo") return compartir();
+    if (estado === "enlaces") return abrirConEnlaces();
+    if (estado === "preparando") return;
+    // idle
+    if (puedeCompartirArchivos()) return prepararArchivos();
+    abrirConEnlaces();
+  }
+
+  const etiqueta =
+    estado === "preparando"
+      ? `⏳ Preparando PDF ${progreso}…`
+      : estado === "listo"
+      ? `📤 Enviar ${items.length} PDF por WhatsApp`
+      : estado === "enlaces"
+      ? "💬 Enviar enlaces por WhatsApp"
+      : "💬 Pauta Whatsapp";
+
+  return (
+    <span style={{ display: "inline-flex", flexDirection: "column", marginTop: 10, marginLeft: 8, verticalAlign: "top" }}>
+      <button
+        onClick={onClick}
+        disabled={estado === "preparando"}
+        title="Envía por WhatsApp los PDF de la pauta, en el orden de la misa"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          fontSize: 13,
+          fontWeight: 600,
+          color: "white",
+          background: "#25d366",
+          borderRadius: 10,
+          padding: "9px 16px",
+          border: "none",
+          cursor: estado === "preparando" ? "wait" : "pointer",
+          opacity: estado === "preparando" ? 0.85 : 1,
+        }}
+      >
+        {etiqueta}
+      </button>
+      {estado === "enlaces" && (
+        <span style={{ fontSize: 11, color: C.gray, marginTop: 4, maxWidth: 260 }}>
+          No se pudieron adjuntar los archivos; se enviarán los enlaces en el orden de la pauta.
+        </span>
+      )}
+    </span>
+  );
+}
+
+
 function DirectorioLetrasModal({ initialQuery = "", onSelect, onClose }) {
   const [items, setItems] = useState(_letrasDriveCache || []);
   const [loading, setLoading] = useState(!_letrasDriveCache);
@@ -30462,6 +30650,25 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const [showColLetra, setShowColLetra] = useState(true);
   const [showColAudio, setShowColAudio] = useState(false);
   const [letraFila, setLetraFila] = useState(null); // índice de la fila que elige letra del directorio
+  // Títulos del directorio de letras (Drive) para la lista desplegable de canciones
+  const [dirLetras, setDirLetras] = useState(_letrasDriveCache || []);
+  useEffect(() => {
+    let vivo = true;
+    if (_letrasDriveCache) {
+      setDirLetras(_letrasDriveCache);
+      return;
+    }
+    listarTodosDrive()
+      .then((lista) => {
+        if (!vivo) return;
+        if (lista.length) _letrasDriveCache = lista;
+        setDirLetras(lista);
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   function toggleColLetra() {
     setShowColLetra((v) => !v);
@@ -30797,6 +31004,11 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     const pautaEdit = mode === "edit" ? selected : null;
     return (
       <div style={{ maxWidth: 1100 }}>
+        <datalist id="pauta-dir-canciones">
+          {dirLetras.map((x) => (
+            <option key={x.id} value={x.nombre} />
+          ))}
+        </datalist>
         {letraFila !== null && (
           <DirectorioLetrasModal
             initialQuery={canciones[letraFila]?.cancion || ""}
@@ -31419,12 +31631,21 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     </td>
                     <td style={tdEditStyle}>
                       <input
+                        list="pauta-dir-canciones"
                         value={c.cancion}
-                        onChange={(e) =>
-                          updateFila(i, "cancion", e.target.value)
-                        }
-                        placeholder="Nombre de la canción"
-                        style={{ ...inpTd, minWidth: 180 }}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          updateFila(i, "cancion", v);
+                          // Si el título coincide con uno del directorio, se carga su letra (PDF).
+                          const hit = dirLetras.find(
+                            (x) => normBusquedaLetra(x.nombre) === normBusquedaLetra(v)
+                          );
+                          if (hit) updateFila(i, "url_letra", hit.url);
+                        }}
+                        placeholder="Elige del directorio o escribe el título"
+                        title="Despliega la lista con los títulos del directorio, o escribe uno distinto"
+                        autoComplete="off"
+                        style={{ ...inpTd, minWidth: 200 }}
                       />
                     </td>
                     <td style={tdEditStyle}>
@@ -31970,6 +32191,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     📖 Ver guion de la misa
                   </button>
                 )}
+                <PautaWhatsappBoton pauta={selected} canciones={cancionesData} />
               </div>
               {selected.id &&
                 (() => {
@@ -35081,29 +35303,29 @@ const VALORES = [
     icon: "✝️",
     label: "Fe",
     color: "#1d6fc7",
-    bg: "#e8f7f2",
-    desc: "Cantamos porque creemos. Nuestra voz es oración, nuestro servicio es adoración.",
+    bg: "#e8f1fc",
+    desc: "Cantamos porque creemos. Nuestra voz es oración y nuestro servicio, adoración.",
+  },
+  {
+    icon: "🌎",
+    label: "Misión",
+    color: "#2563a8",
+    bg: "#e3effb",
+    desc: "Cantamos en cualquier comunidad y lugar donde se nos invite: llevamos la liturgia a donde se necesite.",
+  },
+  {
+    icon: "🕊️",
+    label: "Independencia",
+    color: "#BA7517",
+    bg: "#faeeda",
+    desc: "Somos un coro católico independiente: no pertenecemos a una sola parroquia, servimos a toda la Iglesia.",
   },
   {
     icon: "🤝",
-    label: "Respeto",
-    color: "#2563a8",
-    bg: "#e3effb",
-    desc: "Valoramos a cada persona, su tiempo, su voz y su lugar en el coro.",
-  },
-  {
-    icon: "🤜",
     label: "Compromiso",
-    color: "#BA7517",
-    bg: "#faeeda",
-    desc: "Cumplimos con nuestra palabra: en los ensayos, en las misas y en el grupo.",
-  },
-  {
-    icon: "💙",
-    label: "Comunidad",
     color: "#1d6fc7",
     bg: "#e8f1fc",
-    desc: "Somos más que un coro, somos una familia que camina junta en la fe.",
+    desc: "Participación activa y palabra cumplida: en los ensayos, en las misas y en el grupo.",
   },
 ];
 
@@ -46279,6 +46501,480 @@ export function InfoGastos({ user, members }) {
     </div>
   );
 }
+// ══════════════════════════════════════════
+//  REGLAMENTO DEL CORO (sección escrita, sin PDF)
+// ══════════════════════════════════════════
+const REGLAMENTO_ARTICULOS = [
+  {
+    num: "I",
+    titulo: "Quiénes somos y a quién servimos",
+    texto:
+      "Somos un coro católico independiente. No pertenecemos a una sola parroquia: cantamos en cualquier comunidad y lugar donde se nos invite, para servir a la liturgia y a la Iglesia.",
+    puntos: [
+      "Nuestro servicio es oración cantada, no una presentación.",
+      "Cada misa a la que somos invitados representa al coro completo.",
+      "Por eso el compromiso de cada integrante importa tanto como la calidad de la voz.",
+    ],
+  },
+  {
+    num: "II",
+    titulo: "Compromiso base: dos misas al mes",
+    texto:
+      "Cada integrante debe cumplir con la participación en dos misas al mes. Es el mínimo que permite que el coro llegue completo, preparado y a tiempo a cada celebración.",
+    puntos: [
+      "Dos misas al mes es el mínimo esperado de todos, sin importar la cuerda o la antigüedad.",
+      "La asistencia queda registrada en el portal.",
+      "Si por algún motivo no es posible cumplirlo en un mes, se conversa con el Encargado de Coro (ver artículo IV).",
+    ],
+  },
+  {
+    num: "III",
+    titulo: "Participación activa",
+    texto:
+      "Ser parte del coro es más que asistir. Esperamos una participación activa: presencia, preparación y disposición de servicio, tanto en las misas como en el trabajo previo.",
+    puntos: [
+      "Asistir a los ensayos y llegar a la hora acordada.",
+      "Preparar el repertorio antes de cada misa, con la pauta y las letras del portal.",
+      "Responder a las convocatorias y mantener un trato respetuoso con todo el grupo.",
+      "Colaborar con lo que el coro necesite, dentro de sus posibilidades.",
+    ],
+  },
+  {
+    num: "IV",
+    titulo: "Avisos y comunicación",
+    texto:
+      "Todo aviso, por el motivo que sea (ausencias, atrasos, cambios de disponibilidad o imprevistos), debe ser conversado directamente con el Encargado de Coro.",
+    puntos: [
+      "Avisa con la mayor anticipación posible, para que la misa pueda organizarse.",
+      "Cuéntale al Encargado de Coro el motivo y, si corresponde, cuánto tiempo durará la situación.",
+      "Así se pueden tomar decisiones justas y coordinadas para todo el grupo.",
+    ],
+    destacado: true,
+  },
+  {
+    num: "V",
+    titulo: "Evaluación de asistencia a fin de año",
+    texto:
+      "Al terminar el año se evaluará la asistencia de cada integrante, con el fin de revisar si es factible que continúe participando en el coro.",
+    puntos: [
+      "La base de la evaluación es el cumplimiento de las dos misas mensuales y la participación activa.",
+      "Se revisa la asistencia de cada integrante durante el año.",
+      "Con esa revisión se determina si es factible continuar participando en el coro.",
+    ],
+  },
+];
+
+function Reglamento() {
+  const NAVY = "#0f2d5c";
+  const NAVY2 = "#1e3a5f";
+  const ORO = "#b8893a";
+  const ORO_CLARO = "#e9d3a1";
+  const lo_esencial = [
+    {
+      grande: "2",
+      titulo: "misas al mes",
+      texto: "Cada integrante cumple con dos misas mensuales.",
+    },
+    {
+      grande: "Activa",
+      titulo: "participación",
+      texto: "Presencia, preparación y servicio, siempre.",
+    },
+    {
+      grande: "Fin de año",
+      titulo: "evaluación",
+      texto: "Se revisa la asistencia de cada integrante.",
+    },
+  ];
+  return (
+    <div className="rg-wrap" style={{ maxWidth: 920, margin: "0 auto" }}>
+      <style>{`
+        .rg-wrap *{box-sizing:border-box}
+        .rg-esencial{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0 26px}
+        .rg-art{display:grid;grid-template-columns:64px 1fr;gap:0 18px;padding:22px 24px;background:#fff;border:1px solid rgba(60,60,67,0.12);border-radius:20px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,0.03),0 8px 24px rgba(15,45,92,0.05)}
+        .rg-art.dest{border-color:${ORO}66;background:linear-gradient(180deg,#fffdf7,#fff);box-shadow:0 1px 2px rgba(0,0,0,0.03),0 10px 30px ${ORO}22}
+        .rg-num{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:Georgia,'Times New Roman',serif;font-size:17px;font-weight:700;color:${NAVY2};border:1.5px solid ${ORO};background:#fff}
+        .rg-art.dest .rg-num{background:${NAVY};color:#fff;border-color:${NAVY}}
+        .rg-li{position:relative;padding-left:20px;margin:0 0 7px;font-size:13.5px;line-height:1.6;color:#3a3a40}
+        .rg-dot{position:absolute;left:3px;top:.62em;width:7px;height:7px;border-radius:50%;background:${ORO}}
+        @media(max-width:720px){
+          .rg-esencial{grid-template-columns:1fr}
+          .rg-art{grid-template-columns:1fr;padding:18px}
+          .rg-num{margin-bottom:10px}
+        }
+      `}</style>
+
+      {/* Portada */}
+      <div
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          borderRadius: 24,
+          padding: "30px 30px 28px",
+          background: `linear-gradient(135deg, ${NAVY} 0%, ${NAVY2} 100%)`,
+          color: "white",
+          boxShadow: "0 18px 50px rgba(15,45,92,0.28)",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            background: `linear-gradient(90deg, ${ORO_CLARO}, ${ORO}, ${ORO_CLARO})`,
+          }}
+        />
+        <svg
+          width="210"
+          height="210"
+          viewBox="0 0 100 100"
+          fill="none"
+          stroke={ORO_CLARO}
+          strokeWidth="0.8"
+          style={{ position: "absolute", right: -34, top: -26, opacity: 0.22 }}
+          aria-hidden="true"
+        >
+          <path d="M50 8v84M26 34h48" strokeWidth="1.6" strokeLinecap="round" />
+          {[0, 1, 2, 3].map((i) => (
+            <path key={i} d={`M8 ${58 + i * 7}C28 ${52 + i * 7} 40 ${66 + i * 7} 60 ${60 + i * 7}S86 ${54 + i * 7} 96 ${58 + i * 7}`} />
+          ))}
+        </svg>
+        <div style={{ position: "relative", maxWidth: 620 }}>
+          <div style={{ fontSize: 12.5, color: ORO_CLARO, fontWeight: 600, marginBottom: 8 }}>
+            Coro Misioneros de Jesús
+          </div>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: "clamp(26px,4.6vw,36px)",
+              lineHeight: 1.08,
+              fontWeight: 800,
+              letterSpacing: "-0.025em",
+              fontFamily: "Georgia, 'Times New Roman', serif",
+            }}
+          >
+            Reglamento del coro
+          </h1>
+          <p
+            style={{
+              margin: "12px 0 0",
+              fontSize: 14.5,
+              lineHeight: 1.65,
+              color: "rgba(255,255,255,0.86)",
+            }}
+          >
+            Cantamos para servir. Estas son las reglas que nos permiten hacerlo bien y en
+            conjunto: qué se espera de cada integrante, cómo se avisa y cómo se evalúa el año.
+          </p>
+        </div>
+      </div>
+
+      {/* Lo esencial */}
+      <div className="rg-esencial">
+        {lo_esencial.map((e) => (
+          <div
+            key={e.titulo}
+            style={{
+              background: "#fff",
+              border: "1px solid rgba(60,60,67,0.12)",
+              borderTop: `3px solid ${ORO}`,
+              borderRadius: 16,
+              padding: "16px 18px",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.03), 0 8px 24px rgba(15,45,92,0.05)",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: e.grande.length > 2 ? 21 : 34,
+                lineHeight: 1.1,
+                fontWeight: 700,
+                color: NAVY2,
+              }}
+            >
+              {e.grande}
+            </div>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: "#1c1c1e", margin: "4px 0 6px" }}>
+              {e.titulo}
+            </div>
+            <div style={{ fontSize: 12.5, lineHeight: 1.55, color: "#5a5a62" }}>{e.texto}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Artículos */}
+      {REGLAMENTO_ARTICULOS.map((a) => (
+        <article key={a.num} className={`rg-art${a.destacado ? " dest" : ""}`}>
+          <div className="rg-num">{a.num}</div>
+          <div>
+            <h2
+              style={{
+                margin: "0 0 8px",
+                fontSize: 17,
+                lineHeight: 1.25,
+                fontWeight: 800,
+                letterSpacing: "-0.015em",
+                color: "#1c1c1e",
+              }}
+            >
+              {a.titulo}
+            </h2>
+            <p style={{ margin: "0 0 12px", fontSize: 14, lineHeight: 1.7, color: "#2a2a30" }}>
+              {a.texto}
+            </p>
+            <div style={{ fontSize: 12, fontWeight: 700, color: ORO, marginBottom: 8 }}>
+              En la práctica
+            </div>
+            {a.puntos.map((t) => (
+              <p key={t} className="rg-li">
+                <span className="rg-dot" />
+                {t}
+              </p>
+            ))}
+            {a.destacado && (
+              <div
+                style={{
+                  marginTop: 14,
+                  padding: "12px 14px",
+                  borderRadius: 12,
+                  background: NAVY,
+                  color: "white",
+                  fontSize: 13.5,
+                  lineHeight: 1.55,
+                  fontWeight: 600,
+                }}
+              >
+                Recuerda: todos los avisos, por el motivo que sea, se conversan con el Encargado de Coro.
+              </div>
+            )}
+          </div>
+        </article>
+      ))}
+
+      <p
+        style={{
+          textAlign: "center",
+          margin: "22px 12px 6px",
+          fontSize: 12.5,
+          lineHeight: 1.6,
+          color: "#6b6b73",
+        }}
+      >
+        Este reglamento aplica a todos los integrantes del coro. Cualquier duda se resuelve
+        conversando con el Encargado de Coro.
+      </p>
+    </div>
+  );
+}
+
+// ── Cumpleaños compacto: el más próximo en una franja horizontal + "Ver más" ──
+function CumpleanosCompacto({ members, setSection }) {
+  const [abierto, setAbierto] = useState(false);
+  const MESES = [
+    "enero","febrero","marzo","abril","mayo","junio",
+    "julio","agosto","septiembre","octubre","noviembre","diciembre",
+  ];
+  const hoy = new Date();
+  const base = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  function parse(str) {
+    if (!str) return null;
+    const parts = String(str).split("/");
+    if (parts.length < 2) return null;
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    if (!day || !month || month < 1 || month > 12) return null;
+    return { day, month };
+  }
+  function dias(p) {
+    let next = new Date(hoy.getFullYear(), p.month - 1, p.day);
+    if (next < base) next = new Date(hoy.getFullYear() + 1, p.month - 1, p.day);
+    return Math.round((next - base) / 86400000);
+  }
+  const lista = (members || [])
+    .map((m) => {
+      const p = parse(m.cumpleanos);
+      return p ? { ...m, _p: p, _d: dias(p) } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a._d - b._d);
+  if (lista.length === 0) return null;
+
+  const primero = lista[0];
+  const mismos = lista.filter((x) => x._d === primero._d);
+  const resto = lista.slice(mismos.length);
+  const nombreCorto = (m) =>
+    (m.nombre || "").split(" ").slice(0, 2).join(" ") || "Integrante";
+  const cuando = (d) =>
+    d === 0 ? "hoy" : d === 1 ? "mañana" : `en ${d} días`;
+  const fechaTxt = (p) => `${p.day} de ${MESES[p.month - 1]}`;
+  const avatar = (m, size) => {
+    const col = CUERDAS[m.cuerda] || C.gray;
+    return (
+      <div
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          flexShrink: 0,
+          background: col + "22",
+          border: `2px solid ${col}40`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: size * 0.36,
+          fontWeight: 700,
+          color: col,
+          overflow: "hidden",
+        }}
+      >
+        {m.foto_url ? (
+          <img
+            src={m.foto_url}
+            alt=""
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : (
+          (m.nombre || "?").charAt(0).toUpperCase()
+        )}
+      </div>
+    );
+  };
+  const esHoy = primero._d === 0;
+
+  return (
+    <div
+      style={{
+        background: esHoy
+          ? "linear-gradient(90deg,#0f2d5c 0%,#1d6fc7 100%)"
+          : C.white,
+        border: `1px solid ${esHoy ? "#1d6fc760" : C.border}`,
+        borderRadius: 16,
+        marginBottom: 14,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "9px 14px",
+          minHeight: 52,
+        }}
+      >
+        <span style={{ fontSize: 18, flexShrink: 0 }}>{esHoy ? "🎉" : "🎂"}</span>
+        {avatar(primero, 32)}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div
+            style={{
+              fontSize: 12.5,
+              fontWeight: 700,
+              color: esHoy ? "white" : C.dark,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {mismos.map(nombreCorto).join(" y ")}
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              color: esHoy ? "rgba(255,255,255,0.8)" : C.gray,
+            }}
+          >
+            {esHoy
+              ? "¡Cumple años hoy!"
+              : `Cumple el ${fechaTxt(primero._p)} · ${cuando(primero._d)}`}
+          </div>
+        </div>
+        {resto.length > 0 && (
+          <button
+            onClick={() => setAbierto((v) => !v)}
+            style={{
+              flexShrink: 0,
+              background: esHoy ? "rgba(255,255,255,0.18)" : C.primary + "12",
+              color: esHoy ? "white" : C.primary,
+              border: "none",
+              borderRadius: 980,
+              padding: "6px 13px",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {abierto ? "Ver menos ▴" : "Ver más ▾"}
+          </button>
+        )}
+      </div>
+      {abierto && (
+        <div
+          style={{
+            borderTop: `1px solid ${C.border}`,
+            background: C.white,
+            maxHeight: 280,
+            overflowY: "auto",
+            padding: "6px 10px",
+          }}
+        >
+          {resto.map((m) => (
+            <div
+              key={m.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "7px 6px",
+                borderBottom: `1px solid ${C.border}`,
+              }}
+            >
+              {avatar(m, 28)}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: C.dark,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {nombreCorto(m)}
+                </div>
+              </div>
+              <div style={{ fontSize: 11.5, color: C.gray, whiteSpace: "nowrap" }}>
+                {fechaTxt(m._p)} · {cuando(m._d)}
+              </div>
+            </div>
+          ))}
+          {setSection && (
+            <button
+              onClick={() => setSection("cumpleanos")}
+              style={{
+                width: "100%",
+                background: "none",
+                border: "none",
+                padding: "8px 0 4px",
+                fontSize: 12,
+                fontWeight: 600,
+                color: C.primary,
+                cursor: "pointer",
+              }}
+            >
+              Abrir calendario de cumpleaños →
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CumpleanosHoyWidget({ cumple }) {
   return (
     <div
