@@ -840,22 +840,23 @@ export default function CursoGuitarra() {
   };
 
   const css = `
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 .cg{max-width:1100px;font-family:inherit;color:#1e293b}
 .cg *{box-sizing:border-box}
 .cg-hero{position:relative;overflow:hidden;border-radius:22px;padding:18px 22px;color:#fff;background:radial-gradient(120% 140% at 85% 0%,#2a4d7a 0%,#0f2744 55%,#08162b 100%);box-shadow:0 14px 40px rgba(15,39,68,.28)}
 .cg-hero:after{content:"";position:absolute;right:-40px;top:-40px;width:220px;height:220px;border-radius:50%;border:1px solid rgba(201,162,39,.35);box-shadow:0 0 0 24px rgba(201,162,39,.06),0 0 0 54px rgba(201,162,39,.04)}
 .cg-kick{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:${ORO};font-weight:700}
-.cg-title{font-family:Georgia,'Times New Roman',serif;font-size:clamp(20px,2.6vw,26px);line-height:1.1;margin:0 0 6px;font-weight:700}
+.cg-title{letter-spacing:-.02em;font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;font-size:clamp(20px,2.6vw,26px);line-height:1.1;margin:0 0 6px;font-weight:700}
 .cg-sub{max-width:620px;font-size:13.5px;line-height:1.6;color:rgba(255,255,255,.82)}
 .cg-stats{display:flex;gap:20px;flex-wrap:wrap;margin-top:12px}
 .cg-stats div{font-size:11px;color:rgba(255,255,255,.7);letter-spacing:.06em;text-transform:uppercase}
-.cg-stats b{display:block;font-size:18px;color:#fff;letter-spacing:0;font-family:Georgia,serif}
+.cg-stats b{display:block;font-size:18px;color:#fff;letter-spacing:0;font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif}
 .cg-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:16px 0 12px}
 .cg-levels{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px}
 .cg-level{text-align:left;border:1.5px solid #e2e8f0;background:#fff;border-radius:18px;padding:14px 16px;cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s}
 .cg-level:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(15,39,68,.12)}
 .cg-level.on{box-shadow:0 10px 26px rgba(15,39,68,.14)}
-.cg-level h3{margin:0;font-size:16px;font-family:Georgia,serif}
+.cg-level h3{margin:0;font-size:16px;font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif}
 .cg-level p{margin:4px 0 8px;font-size:12px;color:#64748b;line-height:1.4}
 .cg-prog-bar{height:6px;background:#eef2f7;border-radius:6px;overflow:hidden}
 .cg-prog-bar i{display:block;height:100%;border-radius:6px}
@@ -868,9 +869,9 @@ export default function CursoGuitarra() {
 .cg-mod b{display:block;font-size:13px;color:#0f2744;line-height:1.25}
 .cg-mod div span{display:block;font-size:11.5px;color:#64748b;line-height:1.35;margin-top:2px}
 .cg-card{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:22px 24px;box-shadow:0 6px 20px rgba(15,39,68,.05)}
-.cg-card h2{font-family:Georgia,serif;font-size:clamp(20px,2.6vw,26px);margin:2px 0 4px;color:#0f2744}
+.cg-card h2{font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;font-size:clamp(20px,2.6vw,26px);margin:2px 0 4px;color:#0f2744}
 .cg-p{font-size:14px;line-height:1.7;color:#334155;margin:12px 0}
-.cg-h{font-family:Georgia,serif;font-size:16px;color:#0f2744;margin:20px 0 4px}
+.cg-h{font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;font-size:16px;color:#0f2744;margin:20px 0 4px}
 .cg-ul{margin:8px 0 12px;padding-left:20px;font-size:13.5px;line-height:1.7;color:#334155}
 .cg-ul li{margin:4px 0}
 .cg-note{display:flex;gap:10px;border-radius:14px;padding:12px 14px;margin:14px 0;font-size:13px;line-height:1.6}
@@ -880,15 +881,15 @@ export default function CursoGuitarra() {
 .cg-panel-t{font-size:13px;font-weight:800;color:#0f2744;margin-bottom:10px}
 .cg-chords{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin:14px 0}
 .cg-chord{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:12px;display:flex;flex-direction:column;align-items:center;text-align:center}
-.cg-chord-name{font-family:Georgia,serif;font-size:20px;font-weight:700;color:#0f2744}
+.cg-chord-name{font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;font-size:20px;font-weight:700;color:#0f2744}
 .cg-chord-name small{display:block;font-family:inherit;font-size:10.5px;font-weight:600;color:#94a3b8;letter-spacing:.08em}
 .cg-chord-tip{font-size:11.5px;line-height:1.5;color:#64748b;margin-top:8px}
 .cg-chord-str{display:flex;gap:7px;margin-top:8px;font-size:10.5px;color:#94a3b8;font-weight:700;font-variant-numeric:tabular-nums}
 .cg-string{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:62px;border:1px solid #d6dee9;background:#fff;border-radius:14px;padding:8px 10px;cursor:pointer;font-family:inherit}
 .cg-string:hover{background:#eef4fb;border-color:#2f6fb5}
-.cg-string b{font-size:10px;color:#94a3b8}.cg-string span{font-size:17px;font-weight:800;color:#0f2744;font-family:Georgia,serif}.cg-string small{font-size:10px;color:#64748b}
+.cg-string b{font-size:10px;color:#94a3b8}.cg-string span{font-size:17px;font-weight:800;color:#0f2744;font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif}.cg-string small{font-size:10px;color:#64748b}
 .cg-prog{display:flex;gap:8px;flex-wrap:wrap}
-.cg-prog-c{min-width:64px;text-align:center;padding:11px 16px;border-radius:12px;border:1.5px solid #cbd5e1;background:#fff;font-family:Georgia,serif;font-size:19px;font-weight:700;color:#0f2744;transition:background .12s,color .12s}
+.cg-prog-c{min-width:64px;text-align:center;padding:11px 16px;border-radius:12px;border:1.5px solid #cbd5e1;background:#fff;font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;font-size:19px;font-weight:700;color:#0f2744;transition:background .12s,color .12s}
 .cg-prog-c.on{color:#fff}
 .cg-pat{display:grid;gap:5px}
 .cg-pat-s{display:flex;flex-direction:column;align-items:center;gap:2px;border:1.5px solid #cbd5e1;border-radius:10px;padding:6px 0;background:#fff;color:#0f2744;transition:background .1s}
@@ -896,7 +897,7 @@ export default function CursoGuitarra() {
 .cg-trans{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
 .cg-trans small{display:block;font-size:10.5px;color:#64748b;letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px}
 .cg-trans-r{display:flex;gap:6px;flex-wrap:wrap}
-.cg-trans-r span{padding:8px 14px;border-radius:10px;background:#fff;border:1px solid #d6dee9;font-family:Georgia,serif;font-size:18px;font-weight:700;color:#0f2744}
+.cg-trans-r span{padding:8px 14px;border-radius:10px;background:#fff;border:1px solid #d6dee9;font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;font-size:18px;font-weight:700;color:#0f2744}
 .cg-trans-r.on span{background:#0f2744;color:#fff;border-color:#0f2744}
 .cg-ensayo{border:2px solid;border-radius:18px;padding:16px 18px;margin:18px 0;background:linear-gradient(180deg,#fbfcfe,#f3f6fb)}
 .cg-ensayo-k{font-size:10.5px;font-weight:800;letter-spacing:.18em}

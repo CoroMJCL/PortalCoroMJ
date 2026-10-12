@@ -549,10 +549,10 @@ const C = {
 };
 
 const G = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
   :root {
-    --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', 'Helvetica Neue', Arial, sans-serif;
-    --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Helvetica Neue', sans-serif;
+    --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+    --font-display: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
     --font-rounded: -apple-system, BlinkMacSystemFont, 'SF Pro Rounded', 'Inter', sans-serif;
     --radius-sm: 10px;
     --radius-md: 13px;
@@ -873,7 +873,6 @@ const NAV = [
   { id: "qanda", icon: "?", label: "Preguntas" },
   { id: "material_ensayo", icon: "📥", label: "Ensayos Coro" },
   { id: "cancioneros", icon: "📄", label: "Descargas" },
-  { id: "vista_invitado", icon: "👁", label: "Vista Invitado" },
   { id: "cantos_pdf", icon: "📄", label: "Cantos PDF" },
   { id: "audios", icon: "🎧", label: "Audios" },
 ];
@@ -12264,7 +12263,7 @@ function CantoHub({ nombre, rows }) {
         <div style={{ minWidth: 0 }}>
           <div
             style={{
-              fontFamily: "var(--font-display), Georgia, serif",
+              fontFamily: "var(--font-display), system-ui, sans-serif",
               fontSize: 23,
               fontWeight: 700,
               color: "#1c1c1e",
@@ -12771,7 +12770,7 @@ function CantoDrive({ nombre, rows }) {
       >
         <div
           style={{
-            fontFamily: "var(--font-display), Georgia, serif",
+            fontFamily: "var(--font-display), system-ui, sans-serif",
             fontSize: 19,
             fontWeight: 700,
             color: "#1c1c1e",
@@ -14541,7 +14540,6 @@ const HERRAMIENTAS_CORO = [
   { id: "cantos_pdf", icon: "📄", titulo: "Cantos PDF", desc: "Letras y partituras para estudiar" },
   { id: "audios", icon: "🎧", titulo: "Audios", desc: "Pistas de práctica por cuerda" },
   { id: "cancioneros", icon: "📚", titulo: "Cancioneros", desc: "Descarga los cancioneros del coro" },
-  { id: "curso_guitarra", icon: "🎸", titulo: "Curso de Guitarra", desc: "Acordes con audio, ritmos y ensayos guiados" },
 ];
 
 function PautaExpandida({ pautas, setSection, onCerrar }) {
@@ -14645,7 +14643,7 @@ function HerramientasCoro({ setSection, pautas }) {
   const [pautaAbierta, setPautaAbierta] = useState(false);
   return (
     <div>
-      <style>{`.hc-grid{display:flex;flex-wrap:wrap;gap:8px}.hc-t{flex:1 1 130px;display:flex;align-items:center;gap:9px;text-align:left;border:1px solid #dbe4f0;background:linear-gradient(180deg,#fff,#f5f8fd);border-radius:12px;padding:8px 11px;cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s}.hc-t:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(30,58,95,.12)}.hc-t.on{border-color:#2f5d9a;background:linear-gradient(180deg,#eef4fb,#e3edf9)}.hc-i{width:30px;height:30px;flex-shrink:0;border-radius:9px;background:linear-gradient(135deg,#1e3a5f,#2f5d9a);display:flex;align-items:center;justify-content:center;font-size:15px}`}</style>
+      <style>{`.hc-grid{display:flex;flex-wrap:wrap;gap:8px}.hc-t{flex:1 1 130px;display:flex;align-items:center;gap:10px;text-align:left;border:1px solid #e3e9f2;background:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 2px 8px rgba(15,39,68,.04);cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s}.hc-t:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(30,58,95,.12)}.hc-t.on{border-color:#2f5d9a;background:linear-gradient(180deg,#eef4fb,#e3edf9)}.hc-i{width:32px;height:32px;flex-shrink:0;border-radius:10px;background:#eaf0f8;display:flex;align-items:center;justify-content:center;font-size:16px}`}</style>
       <div className="hc-grid">
         {HERRAMIENTAS_CORO.map((h) => (
           <button
@@ -15810,176 +15808,84 @@ function Dashboard({
         <>
           {/* ── Inicio: hero + cuota a lo ancho, luego 2 columnas ── */}
           <style>{`.dash-2col{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(300px,0.9fr);gap:12px;align-items:start}.dash-col{display:flex;flex-direction:column;gap:10px;min-width:0}.dash-side{gap:8px}.dash-side .dash-col{gap:8px}@media(max-width:900px){.dash-2col,.grid-stats{grid-template-columns:1fr !important}}`}</style>
-          {/* ── Stats con foto de usuario ── */}
-          <div
-            className="grid-stats"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0,1.9fr) minmax(300px,0.9fr)",
-              gap: 12,
-              marginBottom: 12,
-              alignItems: "stretch",
-            }}
-          >
-            {/* Foto + saludo usuario */}
-            <Card
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: 14,
-                background: `linear-gradient(135deg,${C.primaryLight},#fff)`,
-              }}
-            >
-              {/* Foto con anillo de asistencia */}
-              <div style={{ position: "relative", flexShrink: 0 }}>
-                <svg
-                  width="56"
-                  height="56"
-                  style={{
-                    position: "absolute",
-                    top: -4,
-                    left: -4,
-                    transform: "rotate(-90deg)",
-                  }}
-                >
-                  <circle
-                    cx="28"
-                    cy="28"
-                    r="24"
-                    fill="none"
-                    stroke="#e5e7eb"
-                    strokeWidth="3"
-                  />
+          {/* ── Banda superior: bienvenida · cumpleaños · santoral ── */}
+          <style>{`.dash-band{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.1fr) minmax(0,1fr);margin-bottom:14px;border-radius:22px;background:linear-gradient(180deg,#ffffff,#f7f9fd);border:1px solid #e3e9f2;box-shadow:0 8px 28px rgba(15,39,68,.07);position:relative}.dash-pane{padding:16px 20px;display:flex;align-items:center;gap:14px;min-width:0;border-right:1px solid #edf1f7}.dash-pane:last-child{border-right:none}@media(max-width:900px){.dash-band{grid-template-columns:1fr}.dash-pane{border-right:none;border-bottom:1px solid #edf1f7}.dash-pane:last-child{border-bottom:none}}`}</style>
+          <div className="dash-band">
+            <div className="dash-pane">
+              <div style={{ position: "relative", flexShrink: 0, width: 64, height: 64 }}>
+                <svg width="64" height="64" style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
+                  <circle cx="32" cy="32" r="29" fill="none" stroke="#e5eaf2" strokeWidth="3" />
                   {pctAsistencia !== null && (
                     <circle
-                      cx="28"
-                      cy="28"
-                      r="24"
+                      cx="32"
+                      cy="32"
+                      r="29"
                       fill="none"
-                      stroke={
-                        pctAsistencia >= 75
-                          ? C.primary
-                          : pctAsistencia >= 50
-                          ? "#f59e0b"
-                          : "#ef4444"
-                      }
+                      stroke={pctAsistencia >= 75 ? "#1e3a5f" : pctAsistencia >= 50 ? "#f59e0b" : "#ef4444"}
                       strokeWidth="3"
-                      strokeDasharray={`${(pctAsistencia / 100) * 150.8} 150.8`}
+                      strokeDasharray={`${(pctAsistencia / 100) * 182.2} 182.2`}
                       strokeLinecap="round"
                     />
                   )}
                 </svg>
                 <div
                   style={{
-                    width: 48,
-                    height: 48,
+                    position: "absolute",
+                    inset: 7,
                     borderRadius: "50%",
                     background: cc,
-                    border: `3px solid ${cc}40`,
                     overflow: "hidden",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     color: "white",
-                    fontSize: 16,
+                    fontSize: 18,
                     fontWeight: 700,
                   }}
                 >
                   {user?.foto_url ? (
-                    <img
-                      src={user.foto_url}
-                      alt=""
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        display: "block",
-                      }}
-                    />
+                    <img src={user.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                   ) : (
                     ini(user?.nombre || "U")
                   )}
                 </div>
-                {pctAsistencia !== null && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: -4,
-                      right: -4,
-                      background:
-                        pctAsistencia >= 75
-                          ? C.primary
-                          : pctAsistencia >= 50
-                          ? "#f59e0b"
-                          : "#ef4444",
-                      color: "white",
-                      borderRadius: 10,
-                      fontSize: 9,
-                      fontWeight: 800,
-                      padding: "2px 4px",
-                      lineHeight: 1,
-                      border: "1.5px solid white",
-                    }}
-                  >
-                    {pctAsistencia}%
-                  </div>
-                )}
               </div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: C.gray, marginBottom: 1 }}>
+                <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.26em", textTransform: "uppercase", color: "#8a94a6" }}>
                   Bienvenido/a
                 </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: C.dark,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
+                <div style={{ fontFamily: "'Plus Jakarta Sans','Inter',system-ui,sans-serif", letterSpacing: "-0.02em", fontSize: 24, fontWeight: 800, color: "#0f2744", lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {user?.nombre?.split(" ")[0]}
                 </div>
-                <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>
-                  {!esVisita(user) ? rolFullLabel(user) : ""}
-                </div>
-                {pctAsistencia !== null ? (
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color:
-                        pctAsistencia >= 75
-                          ? C.primary
-                          : pctAsistencia >= 50
-                          ? "#f59e0b"
-                          : "#ef4444",
-                      fontWeight: 600,
-                      marginTop: 2,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                    }}
-                  >
-                    ✅ Asistencia: {pctAsistencia}%
-                    {tieneEstrella && (
-                      <span
-                        title="¡Sin ausencias este año!"
-                        style={{ fontSize: 14, lineHeight: 1 }}
-                      >
-                        ⭐
-                      </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 5 }}>
+                  {!esVisita(user) && (
+                    <span style={{ fontSize: 10.5, fontWeight: 600, color: "#1e3a5f", background: "#eaf0f8", borderRadius: 980, padding: "2px 9px" }}>
+                      {rolFullLabel(user)}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#475569" }}>
+                    {pctAsistencia !== null ? `Asistencia ${pctAsistencia}%` : "Sin registros aún"}
+                    {pctAsistencia !== null && tieneEstrella && (
+                      <span title="¡Sin ausencias este año!" style={{ marginLeft: 5 }}>⭐</span>
                     )}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>
-                    Sin registros aún
-                  </div>
-                )}
+                  </span>
+                </div>
               </div>
-            </Card>
+            </div>
             <CumpleanosCompacto members={members} setSection={setSection} />
+            <div className="dash-pane" style={{ background: "linear-gradient(135deg,#fdf6e3,#fffdf6)", borderRadius: "0 22px 22px 0" }}>
+              <div style={{ width: 38, height: 38, borderRadius: 12, flexShrink: 0, background: "linear-gradient(135deg,#e0bd52,#b8901f)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
+                ✨
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "#a9780a", marginBottom: 2 }}>
+                  Santoral de hoy
+                </div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#3d3206", lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  {santoral || "—"}
+                </div>
+              </div>
+            </div>
           </div>
           <BannerWidget isAdmin={isAdmin} />
           {esCuerdaAdmin(user) && pendientes && pendientes.length > 0 && (
@@ -16039,7 +15945,6 @@ function Dashboard({
           <div className="dash-2col">
             <div className="dash-col">
               <HerramientasCoro setSection={setSection} pautas={pautas} />
-              <InformacionesWidget isAdmin={isAdmin} />
               {/* ── Avisos del Coro ── */}
               {avisos && avisos.length > 0 && (
                 <div style={{ marginBottom: 14 }}>
@@ -16452,6 +16357,12 @@ function Dashboard({
               )}
             </div>
             <div className="dash-col dash-side">
+              <InformacionesWidget isAdmin={isAdmin} />
+              <GaleriaWidget
+                fotos={fotos}
+                setSection={setSection}
+                isAdmin={isAdmin}
+              />
               <AgendaInvitado isAdmin={isAdmin} />
             <div className="dash-col dash-right">
               <PautasCompacto
@@ -16459,67 +16370,7 @@ function Dashboard({
                 isAdmin={isAdmin}
                 setSection={setSection}
               />
-              {/* ── Santoral (franja completa) ── */}
-              {santoral && (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    background: "linear-gradient(180deg,#fffdf6,#fdf4df)",
-                    border: `1px solid ${C.gold}40`,
-                    borderRadius: 16,
-                    padding: "12px 16px",
-                    marginBottom: 14,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 11,
-                      flexShrink: 0,
-                      background: `linear-gradient(135deg,${C.gold},#caa017)`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 17,
-                    }}
-                  >
-                    ✨
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 9.5,
-                        fontWeight: 800,
-                        color: "#a9780a",
-                        letterSpacing: "0.06em",
-                        textTransform: "uppercase",
-                        marginBottom: 1,
-                      }}
-                    >
-                      Santoral de hoy
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 14.5,
-                        fontWeight: 700,
-                        color: "#5b4708",
-                        lineHeight: 1.25,
-                      }}
-                    >
-                      {santoral}
-                    </div>
-                  </div>
-                </div>
-              )}
               <ValoresWidget />
-              <GaleriaWidget
-                fotos={fotos}
-                setSection={setSection}
-                isAdmin={isAdmin}
-              />
               <VocalizacionWidget isAdmin={isAdmin} />
             </div>
             </div>
@@ -22073,7 +21924,7 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
     w.document.write(`
       <html><head><title>${cancion?.nombre || "Canto"}</title>
       <style>
-        body{font-family:Georgia,serif;padding:40px;color:#1a1a1a;}
+        body{font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;padding:40px;color:#1a1a1a;}
         h1{font-size:22px;margin-bottom:2px;}
         .sub{color:#666;font-size:13px;margin-bottom:24px;}
         .tono{background:#f0f0f0;padding:8px 14px;border-radius:8px;display:inline-block;margin-bottom:20px;font-size:14px;}
@@ -46155,7 +46006,7 @@ function Reglamento() {
         .rg-esencial{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0 26px}
         .rg-art{display:grid;grid-template-columns:64px 1fr;gap:0 18px;padding:22px 24px;background:#fff;border:1px solid rgba(60,60,67,0.12);border-radius:20px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,0.03),0 8px 24px rgba(15,45,92,0.05)}
         .rg-art.dest{border-color:${ORO}66;background:linear-gradient(180deg,#fffdf7,#fff);box-shadow:0 1px 2px rgba(0,0,0,0.03),0 10px 30px ${ORO}22}
-        .rg-num{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:Georgia,'Times New Roman',serif;font-size:17px;font-weight:700;color:${NAVY2};border:1.5px solid ${ORO};background:#fff}
+        .rg-num{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;font-size:17px;font-weight:700;color:${NAVY2};border:1.5px solid ${ORO};background:#fff}
         .rg-art.dest .rg-num{background:${NAVY};color:#fff;border-color:${NAVY}}
         .rg-li{position:relative;padding-left:20px;margin:0 0 7px;font-size:13.5px;line-height:1.6;color:#3a3a40}
         .rg-dot{position:absolute;left:3px;top:.62em;width:7px;height:7px;border-radius:50%;background:${ORO}}
@@ -46214,7 +46065,7 @@ function Reglamento() {
               lineHeight: 1.08,
               fontWeight: 800,
               letterSpacing: "-0.025em",
-              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontFamily: "'Plus Jakarta Sans','Inter',system-ui,sans-serif",
             }}
           >
             Reglamento del coro
@@ -46249,7 +46100,7 @@ function Reglamento() {
           >
             <div
               style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontFamily: "'Plus Jakarta Sans','Inter',system-ui,sans-serif",
                 fontSize: e.grande.length > 2 ? 21 : 34,
                 lineHeight: 1.1,
                 fontWeight: 700,
@@ -46558,17 +46409,15 @@ function CumpleanosCompacto({ members, setSection }) {
   return (
     <div
       style={{
-        background: esHoy
-          ? "linear-gradient(90deg,#0f2d5c 0%,#1d6fc7 100%)"
-          : C.white,
-        border: `1px solid ${esHoy ? "#1d6fc760" : C.border}`,
-        borderRadius: 16,
-        boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
-        overflow: "hidden",
+        background: esHoy ? "linear-gradient(135deg,#eaf2fd,#f7fbff)" : "transparent",
+        borderRight: "1px solid #edf1f7",
+        borderRadius: 0,
+        position: "relative",
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
         alignSelf: "stretch",
+        minWidth: 0,
       }}
     >
       <div
@@ -46576,18 +46425,17 @@ function CumpleanosCompacto({ members, setSection }) {
           display: "flex",
           alignItems: "center",
           gap: 9,
-          padding: "8px 14px",
-          minHeight: 56,
+          padding: "16px 20px",
+          minHeight: 64,
         }}
       >
-        <span style={{ fontSize: 18, flexShrink: 0 }}>{esHoy ? "🎉" : "🎂"}</span>
-        {avatar(primero, 32)}
+        {avatar(primero, 40)}
         <div style={{ minWidth: 0, flex: 1 }}>
           <div
             style={{
-              fontSize: 12.5,
+              fontSize: 14,
               fontWeight: 700,
-              color: esHoy ? "white" : C.dark,
+              color: "#0f2744",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -46598,7 +46446,7 @@ function CumpleanosCompacto({ members, setSection }) {
           <div
             style={{
               fontSize: 11,
-              color: esHoy ? "rgba(255,255,255,0.8)" : C.gray,
+              color: "#64748b",
             }}
           >
             {esHoy
@@ -46611,8 +46459,8 @@ function CumpleanosCompacto({ members, setSection }) {
             onClick={() => setAbierto((v) => !v)}
             style={{
               flexShrink: 0,
-              background: esHoy ? "rgba(255,255,255,0.18)" : C.primary + "12",
-              color: esHoy ? "white" : C.primary,
+              background: "#eaf0f8",
+              color: "#1e3a5f",
               border: "none",
               borderRadius: 980,
               padding: "6px 13px",
@@ -46629,7 +46477,14 @@ function CumpleanosCompacto({ members, setSection }) {
       {abierto && (
         <div
           style={{
-            borderTop: `1px solid ${C.border}`,
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: "calc(100% + 6px)",
+            zIndex: 30,
+            border: `1px solid ${C.border}`,
+            borderRadius: 14,
+            boxShadow: "0 16px 40px rgba(15,39,68,0.25)",
             background: C.white,
             maxHeight: 280,
             overflowY: "auto",
