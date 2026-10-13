@@ -14657,15 +14657,16 @@ function BotonAudioPauta({ url, size = 26, bg = "#1e3a5f", fs = 10 }) {
   );
 }
 
-function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar }) {
+function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, pautaId }) {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   const pub = (pautas || []).filter((p) => p.publicada && p.fecha);
   const prox = pub
     .filter((p) => new Date(p.fecha + "T00:00:00") >= hoy)
     .sort((a, b) => new Date(a.fecha) - new Date(b.fecha))[0];
+  const elegida = pautaId ? pub.find((p) => p.id === pautaId) : null;
   const pauta =
-    prox || pub.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
+    elegida || prox || pub.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
   if (!pauta || (soloProxima && !prox))
     return (
       <div style={{ marginTop: 10, padding: 14, borderRadius: 14, background: "#f5f8fd", border: "1px solid #dbe4f0", fontSize: 13, color: "#64748b" }}>
@@ -14760,17 +14761,21 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar }
   );
 }
 
-// Próxima pauta publicada: visible hasta las 00:00 del día siguiente a la misa
-function proximaPauta(pautas) {
+// Pautas publicadas vigentes (de hoy en adelante), en orden cronológico.
+function proximasPautas(pautas) {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   return (pautas || [])
     .filter((p) => p.publicada && p.fecha && new Date(p.fecha + "T00:00:00") >= hoy)
-    .sort((x, y) => new Date(x.fecha) - new Date(y.fecha))[0];
+    .sort((x, y) => new Date(x.fecha + "T00:00:00") - new Date(y.fecha + "T00:00:00"));
+}
+function proximaPauta(pautas) {
+  return proximasPautas(pautas)[0];
 }
 
-function AvisoPautaNueva({ pautas, setSection }) {
-  const prox = proximaPauta(pautas);
+// Aviso con TODAS las pautas nuevas que el integrante aún no ha visto, de la más cercana a la más lejana.
+function AvisoPautaNueva({ pautas, onVer }) {
+  const nuevas = proximasPautas(pautas);
   const leerVistas = () => {
     try {
       return JSON.parse(localStorage.getItem("pautas_vistas") || "[]");
@@ -14779,35 +14784,51 @@ function AvisoPautaNueva({ pautas, setSection }) {
     }
   };
   const [vistas, setVistas] = useState(leerVistas);
-  if (!prox || vistas.includes(prox.id)) return null;
-  const marcar = () => {
-    const n = [...vistas, prox.id].slice(-50);
+  const sinVer = nuevas.filter((p) => !vistas.includes(p.id));
+  if (sinVer.length === 0) return null;
+  const marcar = (ids) => {
+    const n = [...vistas, ...ids].slice(-100);
     try {
       localStorage.setItem("pautas_vistas", JSON.stringify(n));
     } catch {}
     setVistas(n);
   };
-  const fecha = new Date(prox.fecha + "T00:00:00").toLocaleDateString("es-CL", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+  const fmt = (p) =>
+    new Date(p.fecha + "T00:00:00").toLocaleDateString("es-CL", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", marginBottom: 10, borderRadius: 14, background: "linear-gradient(135deg,#fff8e1,#fff1c7)", border: "1px solid #f1d88a", boxShadow: "0 2px 10px rgba(201,162,39,.15)" }}>
-      <span style={{ fontSize: 22 }}>🔔</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 800, color: "#7a5a00" }}>¡Hay una nueva pauta publicada!</div>
-        <div style={{ fontSize: 12, color: "#8a6d1f", textTransform: "capitalize", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {prox.titulo || "Misa"} · {fecha}
-          {prox.hora ? ` · ${prox.hora}` : ""}
+    <div style={{ padding: "10px 14px", marginBottom: 10, borderRadius: 14, background: "linear-gradient(135deg,#fff8e1,#fff1c7)", border: "1px solid #f1d88a", boxShadow: "0 2px 10px rgba(201,162,39,.15)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+        <span style={{ fontSize: 20 }}>🔔</span>
+        <div style={{ flex: 1, fontSize: 13, fontWeight: 800, color: "#7a5a00" }}>
+          {sinVer.length === 1 ? "¡Hay una nueva pauta publicada!" : `¡Hay ${sinVer.length} pautas nuevas publicadas!`}
         </div>
+        {sinVer.length > 1 && (
+          <button onClick={() => marcar(sinVer.map((p) => p.id))} style={{ background: "none", border: "none", color: "#8a6d1f", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+            Marcar todas como vistas
+          </button>
+        )}
       </div>
-      <button onClick={() => { marcar(); setSection("pauta_misa"); }} style={{ background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 9, padding: "7px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-        Ver pauta
-      </button>
-      <button onClick={marcar} title="Descartar" style={{ background: "none", border: "none", color: "#8a6d1f", fontSize: 16, cursor: "pointer", padding: 4 }}>
-        ✕
-      </button>
+      {sinVer.map((p) => (
+        <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: "1px solid rgba(201,162,39,.25)" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: "#5c4300", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.titulo || "Misa"}</div>
+            <div style={{ fontSize: 11.5, color: "#8a6d1f", textTransform: "capitalize" }}>
+              {fmt(p)}
+              {p.hora ? ` · ${p.hora}` : ""}
+            </div>
+          </div>
+          <button onClick={() => { marcar([p.id]); onVer(p.id); }} style={{ background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 9, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+            Ver pauta
+          </button>
+          <button onClick={() => marcar([p.id])} title="Descartar" style={{ background: "none", border: "none", color: "#8a6d1f", fontSize: 15, cursor: "pointer", padding: 4 }}>
+            ✕
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
@@ -14815,13 +14836,25 @@ function AvisoPautaNueva({ pautas, setSection }) {
 function HerramientasCoro({ setSection, pautas, isAdmin }) {
   const [pautaAbierta, setPautaAbierta] = useState(false);
   const [proxCerrada, setProxCerrada] = useState(false);
-  const prox = proximaPauta(pautas);
+  const [selId, setSelId] = useState(null);
+  const lista = proximasPautas(pautas);
+  const prox = lista[0];
   // Con una próxima misa vigente la pauta va abierta por defecto; sin ella se abre solo al tocar el botón.
   const visible = prox ? !proxCerrada : pautaAbierta;
   const alternar = () => (prox ? setProxCerrada((v) => !v) : setPautaAbierta((v) => !v));
+  const verPauta = (id) => {
+    setSelId(id);
+    setProxCerrada(false);
+    setTimeout(() => {
+      const el = document.getElementById("pauta-inicio-panel");
+      if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  };
+  const chipFecha = (p) =>
+    new Date(p.fecha + "T00:00:00").toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "short" });
   return (
     <div>
-      <AvisoPautaNueva pautas={pautas} setSection={setSection} />
+      <AvisoPautaNueva pautas={pautas} onVer={verPauta} />
       <style>{`.hc-grid{display:flex;flex-wrap:wrap;gap:8px}.hc-t{flex:1 1 130px;display:flex;align-items:center;gap:10px;text-align:left;border:1px solid #e3e9f2;background:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 2px 8px rgba(15,39,68,.04);cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s}.hc-t:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(30,58,95,.12)}.hc-t.on{border-color:#2f5d9a;background:linear-gradient(180deg,#eef4fb,#e3edf9)}.hc-i{width:32px;height:32px;flex-shrink:0;border-radius:10px;background:#eaf0f8;display:flex;align-items:center;justify-content:center;font-size:16px}`}</style>
       <div className="hc-grid">
         {HERRAMIENTAS_CORO.map((h) => (
@@ -14836,14 +14869,29 @@ function HerramientasCoro({ setSection, pautas, isAdmin }) {
           </button>
         ))}
       </div>
+      {visible && prox && lista.length > 1 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+          {lista.map((p) => {
+            const on = (selId || prox.id) === p.id;
+            return (
+              <button key={p.id} onClick={() => setSelId(p.id)} style={{ border: "1px solid " + (on ? "#1e3a5f" : "#dbe4f0"), background: on ? "#1e3a5f" : "#fff", color: on ? "#fff" : "#1e3a5f", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", textTransform: "capitalize" }}>
+                {chipFecha(p)}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {visible && (
+        <div id="pauta-inicio-panel">
         <PautaExpandida
+          pautaId={selId}
           pautas={pautas}
           setSection={setSection}
           soloProxima={!!prox}
           respaldar={isAdmin}
           onCerrar={() => (prox ? setProxCerrada(true) : setPautaAbierta(false))}
         />
+        </div>
       )}
     </div>
   );
@@ -18201,7 +18249,27 @@ function Agenda({ eventos, onReload }) {
 // ══════════════════════════════════════════
 //  DOCUMENTOS
 // ══════════════════════════════════════════
-function Documentos({ docs, onReload }) {
+function Documentos({ docs: docsProp, onReload }) {
+  // Lista propia: se vuelve a leer al abrir la sección y cada vez que se respalda un consolidado.
+  const [docs, setDocsLocal] = useState(docsProp || []);
+  useEffect(() => {
+    setDocsLocal(docsProp || []);
+  }, [docsProp]);
+  useEffect(() => {
+    let vivo = true;
+    const refrescar = async () => {
+      try {
+        const lista = await supabase("documentos", { order: "&order=created_at.desc" });
+        if (vivo && Array.isArray(lista)) setDocsLocal(lista);
+      } catch (e) {}
+    };
+    refrescar();
+    window.addEventListener("docs-actualizados", refrescar);
+    return () => {
+      vivo = false;
+      window.removeEventListener("docs-actualizados", refrescar);
+    };
+  }, []);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     nombre: "",
@@ -29932,6 +30000,9 @@ function PautaWhatsappBoton({ pauta, canciones, compacto = false, respaldar = fa
             });
             if (!rw.ok) throw new Error("registro");
             setRespaldo("ok");
+            try {
+              window.dispatchEvent(new Event("docs-actualizados"));
+            } catch (e) {}
           }
         } catch (er) {
           setRespaldo("error");
