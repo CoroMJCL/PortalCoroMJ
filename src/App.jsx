@@ -14542,7 +14542,7 @@ const HERRAMIENTAS_CORO = [
   { id: "cancioneros", icon: "📚", titulo: "Cancioneros", desc: "Descarga los cancioneros del coro" },
 ];
 
-function PautaExpandida({ pautas, setSection, onCerrar }) {
+function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar }) {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   const pub = (pautas || []).filter((p) => p.publicada && p.fecha);
@@ -14551,7 +14551,7 @@ function PautaExpandida({ pautas, setSection, onCerrar }) {
     .sort((a, b) => new Date(a.fecha) - new Date(b.fecha))[0];
   const pauta =
     prox || pub.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
-  if (!pauta)
+  if (!pauta || (soloProxima && !prox))
     return (
       <div style={{ marginTop: 10, padding: 14, borderRadius: 14, background: "#f5f8fd", border: "1px solid #dbe4f0", fontSize: 13, color: "#64748b" }}>
         Aún no hay pautas publicadas.
@@ -14599,8 +14599,8 @@ function PautaExpandida({ pautas, setSection, onCerrar }) {
               <tr>
                 <th style={th}>Momento</th>
                 <th style={th}>Canción</th>
-                <th style={th}>Intérprete</th>
                 <th style={th}>Letra</th>
+                <th style={th}>Audio</th>
               </tr>
             </thead>
             <tbody>
@@ -14608,11 +14608,19 @@ function PautaExpandida({ pautas, setSection, onCerrar }) {
                 <tr key={i}>
                   <td style={{ ...td, color: "#2f5d9a", fontWeight: 700, fontSize: 11 }}>{c.orden || i + 1}</td>
                   <td style={{ ...td, fontWeight: 600 }}>{c.cancion || "—"}</td>
-                  <td style={{ ...td, color: "#64748b" }}>{c.salmista || "—"}</td>
                   <td style={td}>
                     {c.url_letra && /^https?:/i.test(c.url_letra) ? (
                       <a href={c.url_letra} target="_blank" rel="noreferrer" style={{ color: "#0a5ac8", fontWeight: 700, fontSize: 12 }}>
                         Ver PDF
+                      </a>
+                    ) : (
+                      <span style={{ color: "#cbd5e1" }}>—</span>
+                    )}
+                  </td>
+                  <td style={td}>
+                    {c.url_audio && /^https?:/i.test(c.url_audio) ? (
+                      <a href={c.url_audio} target="_blank" rel="noreferrer" title="Escuchar audio de referencia" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: "50%", background: "#1e3a5f", color: "#fff", fontSize: 10, textDecoration: "none" }}>
+                        ▶
                       </a>
                     ) : (
                       <span style={{ color: "#cbd5e1" }}>—</span>
@@ -14632,26 +14640,82 @@ function PautaExpandida({ pautas, setSection, onCerrar }) {
               📖 Ver guion de la misa
             </a>
           )}
-          <PautaWhatsappBoton pauta={pauta} canciones={canciones} compacto />
+          <PautaWhatsappBoton pauta={pauta} canciones={canciones} compacto respaldar={respaldar} />
         </div>
       </div>
     </div>
   );
 }
 
-function HerramientasCoro({ setSection, pautas }) {
+// Próxima pauta publicada: visible hasta las 00:00 del día siguiente a la misa
+function proximaPauta(pautas) {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  return (pautas || [])
+    .filter((p) => p.publicada && p.fecha && new Date(p.fecha + "T00:00:00") >= hoy)
+    .sort((x, y) => new Date(x.fecha) - new Date(y.fecha))[0];
+}
+
+function AvisoPautaNueva({ pautas, setSection }) {
+  const prox = proximaPauta(pautas);
+  const leerVistas = () => {
+    try {
+      return JSON.parse(localStorage.getItem("pautas_vistas") || "[]");
+    } catch {
+      return [];
+    }
+  };
+  const [vistas, setVistas] = useState(leerVistas);
+  if (!prox || vistas.includes(prox.id)) return null;
+  const marcar = () => {
+    const n = [...vistas, prox.id].slice(-50);
+    try {
+      localStorage.setItem("pautas_vistas", JSON.stringify(n));
+    } catch {}
+    setVistas(n);
+  };
+  const fecha = new Date(prox.fecha + "T00:00:00").toLocaleDateString("es-CL", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", marginBottom: 10, borderRadius: 14, background: "linear-gradient(135deg,#fff8e1,#fff1c7)", border: "1px solid #f1d88a", boxShadow: "0 2px 10px rgba(201,162,39,.15)" }}>
+      <span style={{ fontSize: 22 }}>🔔</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: "#7a5a00" }}>¡Hay una nueva pauta publicada!</div>
+        <div style={{ fontSize: 12, color: "#8a6d1f", textTransform: "capitalize", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {prox.titulo || "Misa"} · {fecha}
+          {prox.hora ? ` · ${prox.hora}` : ""}
+        </div>
+      </div>
+      <button onClick={() => { marcar(); setSection("pauta_misa"); }} style={{ background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 9, padding: "7px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+        Ver pauta
+      </button>
+      <button onClick={marcar} title="Descartar" style={{ background: "none", border: "none", color: "#8a6d1f", fontSize: 16, cursor: "pointer", padding: 4 }}>
+        ✕
+      </button>
+    </div>
+  );
+}
+
+function HerramientasCoro({ setSection, pautas, isAdmin }) {
   const [pautaAbierta, setPautaAbierta] = useState(false);
+  const [proxCerrada, setProxCerrada] = useState(false);
+  const prox = proximaPauta(pautas);
+  // Con una próxima misa vigente la pauta va abierta por defecto; sin ella se abre solo al tocar el botón.
+  const visible = prox ? !proxCerrada : pautaAbierta;
+  const alternar = () => (prox ? setProxCerrada((v) => !v) : setPautaAbierta((v) => !v));
   return (
     <div>
+      <AvisoPautaNueva pautas={pautas} setSection={setSection} />
       <style>{`.hc-grid{display:flex;flex-wrap:wrap;gap:8px}.hc-t{flex:1 1 130px;display:flex;align-items:center;gap:10px;text-align:left;border:1px solid #e3e9f2;background:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 2px 8px rgba(15,39,68,.04);cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s}.hc-t:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(30,58,95,.12)}.hc-t.on{border-color:#2f5d9a;background:linear-gradient(180deg,#eef4fb,#e3edf9)}.hc-i{width:32px;height:32px;flex-shrink:0;border-radius:10px;background:#eaf0f8;display:flex;align-items:center;justify-content:center;font-size:16px}`}</style>
       <div className="hc-grid">
         {HERRAMIENTAS_CORO.map((h) => (
           <button
             key={h.id}
-            className={"hc-t" + (h.id === "pauta_misa" && pautaAbierta ? " on" : "")}
-            onClick={() =>
-              h.id === "pauta_misa" ? setPautaAbierta((v) => !v) : setSection(h.id)
-            }
+            className={"hc-t" + (h.id === "pauta_misa" && visible ? " on" : "")}
+            onClick={() => (h.id === "pauta_misa" ? alternar() : setSection(h.id))}
             title={h.desc}
           >
             <span className="hc-i">{h.icon}</span>
@@ -14659,8 +14723,14 @@ function HerramientasCoro({ setSection, pautas }) {
           </button>
         ))}
       </div>
-      {pautaAbierta && (
-        <PautaExpandida pautas={pautas} setSection={setSection} onCerrar={() => setPautaAbierta(false)} />
+      {visible && (
+        <PautaExpandida
+          pautas={pautas}
+          setSection={setSection}
+          soloProxima={!!prox}
+          respaldar={isAdmin}
+          onCerrar={() => (prox ? setProxCerrada(true) : setPautaAbierta(false))}
+        />
       )}
     </div>
   );
@@ -15944,7 +16014,7 @@ function Dashboard({
           )}
           <div className="dash-2col">
             <div className="dash-col">
-              <HerramientasCoro setSection={setSection} pautas={pautas} />
+              <HerramientasCoro setSection={setSection} pautas={pautas} isAdmin={isAdmin} />
               {/* ── Avisos del Coro ── */}
               {avisos && avisos.length > 0 && (
                 <div style={{ marginBottom: 14 }}>
@@ -29620,88 +29690,108 @@ function mensajePautaWhatsapp(pauta, items) {
   );
 }
 
-function PautaWhatsappBoton({ pauta, canciones, compacto = false }) {
-  // estado: idle → preparando → listo (archivos para compartir) | enlaces (plan B)
-  const [estado, setEstado] = useState("idle");
+function PautaWhatsappBoton({ pauta, canciones, compacto = false, respaldar = false }) {
+  // Une las letras (PDF) de la pauta, en el orden litúrgico, en un solo archivo descargable.
+  const [estado, setEstado] = useState("idle"); // idle | preparando | error
   const [progreso, setProgreso] = useState("");
-  const archivosRef = useRef([]);
-  const items = pdfsDePauta(pauta, canciones);
+  const [omitidos, setOmitidos] = useState([]);
+  const [respaldo, setRespaldo] = useState("");
+  const items = pdfsDePauta(pauta, canciones).filter((it) => it.etiqueta !== "Guion de la misa");
   const sinPdf = items.length === 0;
 
-  const puedeCompartirArchivos = () => {
-    try {
-      if (!navigator.share || !navigator.canShare) return false;
-      const prueba = new File(["x"], "a.pdf", { type: "application/pdf" });
-      return navigator.canShare({ files: [prueba] });
-    } catch (e) {
-      return false;
-    }
-  };
-
-  function abrirConEnlaces() {
-    const texto = mensajePautaWhatsapp(pauta, items);
-    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
+  function nombreArchivo() {
+    const m = String(pauta?.fecha || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return `Cantos_Misa_${m ? m[3] + m[2] + m[1] : "sin_fecha"}.pdf`;
   }
 
-  async function prepararArchivos() {
+  async function descargarUnido() {
+    if (sinPdf || estado === "preparando") return;
     setEstado("preparando");
-    const archivos = [];
+    setOmitidos([]);
+    setRespaldo("");
+    const fallos = [];
     try {
+      const { PDFDocument } = await import("pdf-lib");
+      const salida = await PDFDocument.create();
       for (let i = 0; i < items.length; i++) {
         setProgreso(`${i + 1}/${items.length}`);
-        const id = driveFileId(items[i].url);
-        const src = id
-          ? `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${GDRIVE_API_KEY}`
-          : items[i].url;
-        const res = await fetch(src);
-        if (!res.ok) throw new Error("No se pudo descargar " + items[i].etiqueta);
-        const blob = await res.blob();
-        const limpio = items[i].etiqueta.replace(/[\\/:*?"<>|]/g, "").slice(0, 70);
-        // El número al inicio del nombre mantiene el orden aunque WhatsApp ordene por nombre.
-        archivos.push(
-          new File([blob], `${String(i + 1).padStart(2, "0")} - ${limpio}.pdf`, {
-            type: "application/pdf",
-          })
-        );
+        try {
+          const id = driveFileId(items[i].url);
+          const src = id
+            ? `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${GDRIVE_API_KEY}`
+            : items[i].url;
+          const res = await fetch(src);
+          if (!res.ok) throw new Error("descarga");
+          const bytes = await res.arrayBuffer();
+          const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+          const paginas = await salida.copyPages(doc, doc.getPageIndices());
+          paginas.forEach((pg) => salida.addPage(pg));
+        } catch (er) {
+          fallos.push(items[i].etiqueta);
+        }
       }
-      archivosRef.current = archivos;
-      setEstado("listo");
+      if (salida.getPageCount() === 0) throw new Error("vacío");
+      const bytes = await salida.save();
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nombreArchivo();
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setOmitidos(fallos);
+      setEstado("idle");
+      // Respaldo en "Descargas Misas" (solo admin): se sube el PDF y se registra/actualiza el documento.
+      if (respaldar) {
+        try {
+          const nombre = nombreArchivo();
+          const path = `descargas_misas/${nombre}`;
+          const up = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
+            method: "POST",
+            headers: {
+              apikey: SUPABASE_SERVICE_KEY,
+              Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+              "Content-Type": "application/pdf",
+              "x-upsert": "true",
+            },
+            body: blob,
+          });
+          if (!up.ok) throw new Error("subida");
+          const urlPub = `${SUPABASE_URL}/storage/v1/object/public/publico/${path}?v=${Date.now()}`;
+          const size = (blob.size / 1048576).toFixed(1) + " MB";
+          const nombreDoc = nombre.replace(/\.pdf$/i, "");
+          const existentes = await supabase("documentos", {
+            filters: `&nombre=eq.${encodeURIComponent(nombreDoc)}`,
+          });
+          if (existentes && existentes.length) {
+            await supabase("documentos", {
+              method: "PATCH",
+              filters: `&id=eq.${existentes[0].id}`,
+              body: { url: urlPub, size },
+            });
+          } else {
+            await supabase("documentos", {
+              method: "POST",
+              body: { nombre: nombreDoc, url: urlPub, categoria: "Repertorio", size },
+            });
+          }
+          setRespaldo("ok");
+        } catch (er) {
+          setRespaldo("error");
+        }
+      }
     } catch (e) {
-      setEstado("enlaces");
+      setOmitidos(fallos);
+      setEstado("error");
     }
-  }
-
-  async function compartir() {
-    try {
-      await navigator.share({
-        files: archivosRef.current,
-        title: `Pauta de Misa – ${pauta.titulo || ""}`,
-        text: `🎼 Pauta de Misa – ${pauta.titulo || ""} (PDF en orden)`,
-      });
-    } catch (e) {
-      if (e && e.name === "AbortError") return; // la persona canceló
-      setEstado("enlaces");
-    }
-  }
-
-  function onClick() {
-    if (sinPdf) return;
-    if (estado === "listo") return compartir();
-    if (estado === "enlaces") return abrirConEnlaces();
-    if (estado === "preparando") return;
-    // idle
-    if (puedeCompartirArchivos()) return prepararArchivos();
-    abrirConEnlaces();
   }
 
   const etiqueta =
     estado === "preparando"
-      ? `⏳ Preparando PDF ${progreso}…`
-      : estado === "listo"
-      ? `📤 Enviar ${items.length} PDF por WhatsApp`
-      : estado === "enlaces"
-      ? "💬 Enviar enlaces por WhatsApp"
-      : `💬 Pauta Whatsapp${sinPdf ? "" : ` (${items.length} PDF)`}`;
+      ? `⏳ Uniendo PDF ${progreso}…`
+      : `📥 Descargar cantos (PDF único)`;
 
   return (
     <span
@@ -29714,12 +29804,12 @@ function PautaWhatsappBoton({ pauta, canciones, compacto = false }) {
       }}
     >
       <button
-        onClick={onClick}
+        onClick={descargarUnido}
         disabled={estado === "preparando" || sinPdf}
         title={
           sinPdf
-            ? "Agrega las letras (PDF) a las canciones para poder enviarlas"
-            : "Envía por WhatsApp los PDF de la pauta, en el orden de la misa"
+            ? "Agrega las letras (PDF) a las canciones para poder descargarlas"
+            : `Descarga todas las letras en un solo PDF, en el orden de la misa (${nombreArchivo()})`
         }
         style={{
           display: "inline-flex",
@@ -29728,7 +29818,7 @@ function PautaWhatsappBoton({ pauta, canciones, compacto = false }) {
           fontSize: 13,
           fontWeight: 600,
           color: "white",
-          background: "#25d366",
+          background: "#1e3a5f",
           borderRadius: 10,
           padding: "9px 16px",
           border: "none",
@@ -29743,9 +29833,24 @@ function PautaWhatsappBoton({ pauta, canciones, compacto = false }) {
           Aún no hay letras (PDF) en la pauta.
         </span>
       )}
-      {estado === "enlaces" && (
-        <span style={{ fontSize: 11, color: C.gray, marginTop: 4, maxWidth: 260 }}>
-          No se pudieron adjuntar los archivos; se enviarán los enlaces en el orden de la pauta.
+      {estado === "error" && (
+        <span style={{ fontSize: 11, color: "#b91c1c", marginTop: 4, maxWidth: 280 }}>
+          No se pudo unir los PDF. Revisa tu conexión e intenta de nuevo.
+        </span>
+      )}
+      {respaldo === "ok" && (
+        <span style={{ fontSize: 11, color: "#166534", marginTop: 4, maxWidth: 300 }}>
+          ✓ Respaldado en Descargas Misas.
+        </span>
+      )}
+      {respaldo === "error" && (
+        <span style={{ fontSize: 11, color: "#b45309", marginTop: 4, maxWidth: 300 }}>
+          Se descargó, pero no se pudo respaldar en Descargas Misas.
+        </span>
+      )}
+      {estado === "idle" && omitidos.length > 0 && (
+        <span style={{ fontSize: 11, color: "#b45309", marginTop: 4, maxWidth: 300 }}>
+          Se descargó, pero no se pudo incluir: {omitidos.join(", ")}.
         </span>
       )}
     </span>
@@ -31235,6 +31340,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
           </Btn>
           <PautaWhatsappBoton
             compacto
+            respaldar={isAdmin}
             pauta={{
               titulo: form.titulo,
               fecha: form.fecha || selected?.fecha,
@@ -31599,7 +31705,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     📖 Ver guion de la misa
                   </button>
                 )}
-                <PautaWhatsappBoton pauta={selected} canciones={cancionesData} />
+                <PautaWhatsappBoton pauta={selected} canciones={cancionesData} respaldar={isAdmin} />
               </div>
               {selected.id &&
                 (() => {
@@ -31675,9 +31781,8 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     "Orden Litúrgico",
                     "Canción",
                     "Autor",
-                    "Intérprete",
                     ...(showColLetra ? ["Letra (PDF)"] : []),
-                    ...(showColAudio ? ["Audio Referencial"] : []),
+                    "Audio Referencial",
                   ].map((h, i) => (
                     <th
                       key={i}
@@ -31718,26 +31823,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     >
                       📄
                     </button>
-                    <button
-                      onClick={toggleColAudio}
-                      title={
-                        showColAudio
-                          ? "Ocultar Audio Ref."
-                          : "Mostrar Audio Ref."
-                      }
-                      style={{
-                        background: showColAudio ? "#0a5ac8" : "#eef0f3",
-                        border: "none",
-                        borderRadius: 6,
-                        padding: "3px 8px",
-                        color: showColAudio ? "white" : "#6b7280",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        cursor: "pointer",
-                      }}
-                    >
-                      ▶
-                    </button>
+                    
                   </th>
                 </tr>
               </thead>
@@ -31823,18 +31909,6 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       >
                         {c.autor || <span style={{ color: "#cbd5e1" }}>—</span>}
                       </td>
-                      <td
-                        style={{
-                          ...tdStyle,
-                          verticalAlign: "middle",
-                          color: "#64748b",
-                          fontSize: 12,
-                        }}
-                      >
-                        {c.salmista || (
-                          <span style={{ color: "#cbd5e1" }}>—</span>
-                        )}
-                      </td>
                       {showColLetra && (
                         <td style={{ ...tdStyle, verticalAlign: "middle" }}>
                           {c.pendiente ? (
@@ -31884,7 +31958,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                           )}
                         </td>
                       )}
-                      {showColAudio && (
+                      {true && (
                         <td style={{ ...tdStyle, verticalAlign: "middle" }}>
                           {c.url_audio && c.url_audio.includes("http") ? (
                             <a
