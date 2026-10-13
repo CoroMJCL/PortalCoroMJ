@@ -549,10 +549,10 @@ const C = {
 };
 
 const G = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
   :root {
-    --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
-    --font-display: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Helvetica Neue', sans-serif;
     --font-rounded: -apple-system, BlinkMacSystemFont, 'SF Pro Rounded', 'Inter', sans-serif;
     --radius-sm: 10px;
     --radius-md: 13px;
@@ -873,6 +873,7 @@ const NAV = [
   { id: "qanda", icon: "?", label: "Preguntas" },
   { id: "material_ensayo", icon: "📥", label: "Ensayos Coro" },
   { id: "cancioneros", icon: "📄", label: "Descargas" },
+  { id: "vista_invitado", icon: "👁", label: "Vista Invitado" },
   { id: "cantos_pdf", icon: "📄", label: "Cantos PDF" },
   { id: "audios", icon: "🎧", label: "Audios" },
 ];
@@ -12263,7 +12264,7 @@ function CantoHub({ nombre, rows }) {
         <div style={{ minWidth: 0 }}>
           <div
             style={{
-              fontFamily: "var(--font-display), system-ui, sans-serif",
+              fontFamily: "var(--font-display), Georgia, serif",
               fontSize: 23,
               fontWeight: 700,
               color: "#1c1c1e",
@@ -12770,7 +12771,7 @@ function CantoDrive({ nombre, rows }) {
       >
         <div
           style={{
-            fontFamily: "var(--font-display), system-ui, sans-serif",
+            fontFamily: "var(--font-display), Georgia, serif",
             fontSize: 19,
             fontWeight: 700,
             color: "#1c1c1e",
@@ -14540,9 +14541,10 @@ const HERRAMIENTAS_CORO = [
   { id: "cantos_pdf", icon: "📄", titulo: "Cantos PDF", desc: "Letras y partituras para estudiar" },
   { id: "audios", icon: "🎧", titulo: "Audios", desc: "Pistas de práctica por cuerda" },
   { id: "cancioneros", icon: "📚", titulo: "Cancioneros", desc: "Descarga los cancioneros del coro" },
+  { id: "curso_guitarra", icon: "🎸", titulo: "Curso de Guitarra", desc: "Acordes con audio, ritmos y ensayos guiados" },
 ];
 
-function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar }) {
+function PautaExpandida({ pautas, setSection, onCerrar }) {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   const pub = (pautas || []).filter((p) => p.publicada && p.fecha);
@@ -14551,7 +14553,7 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar }
     .sort((a, b) => new Date(a.fecha) - new Date(b.fecha))[0];
   const pauta =
     prox || pub.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
-  if (!pauta || (soloProxima && !prox))
+  if (!pauta)
     return (
       <div style={{ marginTop: 10, padding: 14, borderRadius: 14, background: "#f5f8fd", border: "1px solid #dbe4f0", fontSize: 13, color: "#64748b" }}>
         Aún no hay pautas publicadas.
@@ -14599,8 +14601,8 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar }
               <tr>
                 <th style={th}>Momento</th>
                 <th style={th}>Canción</th>
+                <th style={th}>Intérprete</th>
                 <th style={th}>Letra</th>
-                <th style={th}>Audio</th>
               </tr>
             </thead>
             <tbody>
@@ -14608,19 +14610,11 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar }
                 <tr key={i}>
                   <td style={{ ...td, color: "#2f5d9a", fontWeight: 700, fontSize: 11 }}>{c.orden || i + 1}</td>
                   <td style={{ ...td, fontWeight: 600 }}>{c.cancion || "—"}</td>
+                  <td style={{ ...td, color: "#64748b" }}>{c.salmista || "—"}</td>
                   <td style={td}>
                     {c.url_letra && /^https?:/i.test(c.url_letra) ? (
                       <a href={c.url_letra} target="_blank" rel="noreferrer" style={{ color: "#0a5ac8", fontWeight: 700, fontSize: 12 }}>
                         Ver PDF
-                      </a>
-                    ) : (
-                      <span style={{ color: "#cbd5e1" }}>—</span>
-                    )}
-                  </td>
-                  <td style={td}>
-                    {c.url_audio && /^https?:/i.test(c.url_audio) ? (
-                      <a href={c.url_audio} target="_blank" rel="noreferrer" title="Escuchar audio de referencia" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: "50%", background: "#1e3a5f", color: "#fff", fontSize: 10, textDecoration: "none" }}>
-                        ▶
                       </a>
                     ) : (
                       <span style={{ color: "#cbd5e1" }}>—</span>
@@ -14640,82 +14634,26 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar }
               📖 Ver guion de la misa
             </a>
           )}
-          <PautaWhatsappBoton pauta={pauta} canciones={canciones} compacto respaldar={respaldar} />
+          <PautaWhatsappBoton pauta={pauta} canciones={canciones} compacto />
         </div>
       </div>
     </div>
   );
 }
 
-// Próxima pauta publicada: visible hasta las 00:00 del día siguiente a la misa
-function proximaPauta(pautas) {
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  return (pautas || [])
-    .filter((p) => p.publicada && p.fecha && new Date(p.fecha + "T00:00:00") >= hoy)
-    .sort((x, y) => new Date(x.fecha) - new Date(y.fecha))[0];
-}
-
-function AvisoPautaNueva({ pautas, setSection }) {
-  const prox = proximaPauta(pautas);
-  const leerVistas = () => {
-    try {
-      return JSON.parse(localStorage.getItem("pautas_vistas") || "[]");
-    } catch {
-      return [];
-    }
-  };
-  const [vistas, setVistas] = useState(leerVistas);
-  if (!prox || vistas.includes(prox.id)) return null;
-  const marcar = () => {
-    const n = [...vistas, prox.id].slice(-50);
-    try {
-      localStorage.setItem("pautas_vistas", JSON.stringify(n));
-    } catch {}
-    setVistas(n);
-  };
-  const fecha = new Date(prox.fecha + "T00:00:00").toLocaleDateString("es-CL", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", marginBottom: 10, borderRadius: 14, background: "linear-gradient(135deg,#fff8e1,#fff1c7)", border: "1px solid #f1d88a", boxShadow: "0 2px 10px rgba(201,162,39,.15)" }}>
-      <span style={{ fontSize: 22 }}>🔔</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 800, color: "#7a5a00" }}>¡Hay una nueva pauta publicada!</div>
-        <div style={{ fontSize: 12, color: "#8a6d1f", textTransform: "capitalize", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {prox.titulo || "Misa"} · {fecha}
-          {prox.hora ? ` · ${prox.hora}` : ""}
-        </div>
-      </div>
-      <button onClick={() => { marcar(); setSection("pauta_misa"); }} style={{ background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 9, padding: "7px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-        Ver pauta
-      </button>
-      <button onClick={marcar} title="Descartar" style={{ background: "none", border: "none", color: "#8a6d1f", fontSize: 16, cursor: "pointer", padding: 4 }}>
-        ✕
-      </button>
-    </div>
-  );
-}
-
-function HerramientasCoro({ setSection, pautas, isAdmin }) {
+function HerramientasCoro({ setSection, pautas }) {
   const [pautaAbierta, setPautaAbierta] = useState(false);
-  const [proxCerrada, setProxCerrada] = useState(false);
-  const prox = proximaPauta(pautas);
-  // Con una próxima misa vigente la pauta va abierta por defecto; sin ella se abre solo al tocar el botón.
-  const visible = prox ? !proxCerrada : pautaAbierta;
-  const alternar = () => (prox ? setProxCerrada((v) => !v) : setPautaAbierta((v) => !v));
   return (
     <div>
-      <AvisoPautaNueva pautas={pautas} setSection={setSection} />
-      <style>{`.hc-grid{display:flex;flex-wrap:wrap;gap:8px}.hc-t{flex:1 1 130px;display:flex;align-items:center;gap:10px;text-align:left;border:1px solid #e3e9f2;background:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 2px 8px rgba(15,39,68,.04);cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s}.hc-t:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(30,58,95,.12)}.hc-t.on{border-color:#2f5d9a;background:linear-gradient(180deg,#eef4fb,#e3edf9)}.hc-i{width:32px;height:32px;flex-shrink:0;border-radius:10px;background:#eaf0f8;display:flex;align-items:center;justify-content:center;font-size:16px}`}</style>
+      <style>{`.hc-grid{display:flex;flex-wrap:wrap;gap:8px}.hc-t{flex:1 1 130px;display:flex;align-items:center;gap:9px;text-align:left;border:1px solid #dbe4f0;background:linear-gradient(180deg,#fff,#f5f8fd);border-radius:12px;padding:8px 11px;cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s}.hc-t:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(30,58,95,.12)}.hc-t.on{border-color:#2f5d9a;background:linear-gradient(180deg,#eef4fb,#e3edf9)}.hc-i{width:30px;height:30px;flex-shrink:0;border-radius:9px;background:linear-gradient(135deg,#1e3a5f,#2f5d9a);display:flex;align-items:center;justify-content:center;font-size:15px}`}</style>
       <div className="hc-grid">
         {HERRAMIENTAS_CORO.map((h) => (
           <button
             key={h.id}
-            className={"hc-t" + (h.id === "pauta_misa" && visible ? " on" : "")}
-            onClick={() => (h.id === "pauta_misa" ? alternar() : setSection(h.id))}
+            className={"hc-t" + (h.id === "pauta_misa" && pautaAbierta ? " on" : "")}
+            onClick={() =>
+              h.id === "pauta_misa" ? setPautaAbierta((v) => !v) : setSection(h.id)
+            }
             title={h.desc}
           >
             <span className="hc-i">{h.icon}</span>
@@ -14723,14 +14661,8 @@ function HerramientasCoro({ setSection, pautas, isAdmin }) {
           </button>
         ))}
       </div>
-      {visible && (
-        <PautaExpandida
-          pautas={pautas}
-          setSection={setSection}
-          soloProxima={!!prox}
-          respaldar={isAdmin}
-          onCerrar={() => (prox ? setProxCerrada(true) : setPautaAbierta(false))}
-        />
+      {pautaAbierta && (
+        <PautaExpandida pautas={pautas} setSection={setSection} onCerrar={() => setPautaAbierta(false)} />
       )}
     </div>
   );
@@ -15878,84 +15810,176 @@ function Dashboard({
         <>
           {/* ── Inicio: hero + cuota a lo ancho, luego 2 columnas ── */}
           <style>{`.dash-2col{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(300px,0.9fr);gap:12px;align-items:start}.dash-col{display:flex;flex-direction:column;gap:10px;min-width:0}.dash-side{gap:8px}.dash-side .dash-col{gap:8px}@media(max-width:900px){.dash-2col,.grid-stats{grid-template-columns:1fr !important}}`}</style>
-          {/* ── Banda superior: bienvenida · cumpleaños · santoral ── */}
-          <style>{`.dash-band{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.1fr) minmax(0,1fr);margin-bottom:14px;border-radius:22px;background:linear-gradient(180deg,#ffffff,#f7f9fd);border:1px solid #e3e9f2;box-shadow:0 8px 28px rgba(15,39,68,.07);position:relative}.dash-pane{padding:16px 20px;display:flex;align-items:center;gap:14px;min-width:0;border-right:1px solid #edf1f7}.dash-pane:last-child{border-right:none}@media(max-width:900px){.dash-band{grid-template-columns:1fr}.dash-pane{border-right:none;border-bottom:1px solid #edf1f7}.dash-pane:last-child{border-bottom:none}}`}</style>
-          <div className="dash-band">
-            <div className="dash-pane">
-              <div style={{ position: "relative", flexShrink: 0, width: 64, height: 64 }}>
-                <svg width="64" height="64" style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
-                  <circle cx="32" cy="32" r="29" fill="none" stroke="#e5eaf2" strokeWidth="3" />
+          {/* ── Stats con foto de usuario ── */}
+          <div
+            className="grid-stats"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0,1.9fr) minmax(300px,0.9fr)",
+              gap: 12,
+              marginBottom: 12,
+              alignItems: "stretch",
+            }}
+          >
+            {/* Foto + saludo usuario */}
+            <Card
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: 14,
+                background: `linear-gradient(135deg,${C.primaryLight},#fff)`,
+              }}
+            >
+              {/* Foto con anillo de asistencia */}
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                <svg
+                  width="56"
+                  height="56"
+                  style={{
+                    position: "absolute",
+                    top: -4,
+                    left: -4,
+                    transform: "rotate(-90deg)",
+                  }}
+                >
+                  <circle
+                    cx="28"
+                    cy="28"
+                    r="24"
+                    fill="none"
+                    stroke="#e5e7eb"
+                    strokeWidth="3"
+                  />
                   {pctAsistencia !== null && (
                     <circle
-                      cx="32"
-                      cy="32"
-                      r="29"
+                      cx="28"
+                      cy="28"
+                      r="24"
                       fill="none"
-                      stroke={pctAsistencia >= 75 ? "#1e3a5f" : pctAsistencia >= 50 ? "#f59e0b" : "#ef4444"}
+                      stroke={
+                        pctAsistencia >= 75
+                          ? C.primary
+                          : pctAsistencia >= 50
+                          ? "#f59e0b"
+                          : "#ef4444"
+                      }
                       strokeWidth="3"
-                      strokeDasharray={`${(pctAsistencia / 100) * 182.2} 182.2`}
+                      strokeDasharray={`${(pctAsistencia / 100) * 150.8} 150.8`}
                       strokeLinecap="round"
                     />
                   )}
                 </svg>
                 <div
                   style={{
-                    position: "absolute",
-                    inset: 7,
+                    width: 48,
+                    height: 48,
                     borderRadius: "50%",
                     background: cc,
+                    border: `3px solid ${cc}40`,
                     overflow: "hidden",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     color: "white",
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: 700,
                   }}
                 >
                   {user?.foto_url ? (
-                    <img src={user.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    <img
+                      src={user.foto_url}
+                      alt=""
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        display: "block",
+                      }}
+                    />
                   ) : (
                     ini(user?.nombre || "U")
                   )}
                 </div>
+                {pctAsistencia !== null && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: -4,
+                      right: -4,
+                      background:
+                        pctAsistencia >= 75
+                          ? C.primary
+                          : pctAsistencia >= 50
+                          ? "#f59e0b"
+                          : "#ef4444",
+                      color: "white",
+                      borderRadius: 10,
+                      fontSize: 9,
+                      fontWeight: 800,
+                      padding: "2px 4px",
+                      lineHeight: 1,
+                      border: "1.5px solid white",
+                    }}
+                  >
+                    {pctAsistencia}%
+                  </div>
+                )}
               </div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.26em", textTransform: "uppercase", color: "#8a94a6" }}>
+                <div style={{ fontSize: 12, color: C.gray, marginBottom: 1 }}>
                   Bienvenido/a
                 </div>
-                <div style={{ fontFamily: "'Plus Jakarta Sans','Inter',system-ui,sans-serif", letterSpacing: "-0.02em", fontSize: 24, fontWeight: 800, color: "#0f2744", lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: C.dark,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {user?.nombre?.split(" ")[0]}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 5 }}>
-                  {!esVisita(user) && (
-                    <span style={{ fontSize: 10.5, fontWeight: 600, color: "#1e3a5f", background: "#eaf0f8", borderRadius: 980, padding: "2px 9px" }}>
-                      {rolFullLabel(user)}
-                    </span>
-                  )}
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "#475569" }}>
-                    {pctAsistencia !== null ? `Asistencia ${pctAsistencia}%` : "Sin registros aún"}
-                    {pctAsistencia !== null && tieneEstrella && (
-                      <span title="¡Sin ausencias este año!" style={{ marginLeft: 5 }}>⭐</span>
+                <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>
+                  {!esVisita(user) ? rolFullLabel(user) : ""}
+                </div>
+                {pctAsistencia !== null ? (
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color:
+                        pctAsistencia >= 75
+                          ? C.primary
+                          : pctAsistencia >= 50
+                          ? "#f59e0b"
+                          : "#ef4444",
+                      fontWeight: 600,
+                      marginTop: 2,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    ✅ Asistencia: {pctAsistencia}%
+                    {tieneEstrella && (
+                      <span
+                        title="¡Sin ausencias este año!"
+                        style={{ fontSize: 14, lineHeight: 1 }}
+                      >
+                        ⭐
+                      </span>
                     )}
-                  </span>
-                </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 11, color: C.gray, marginTop: 2 }}>
+                    Sin registros aún
+                  </div>
+                )}
               </div>
-            </div>
+            </Card>
             <CumpleanosCompacto members={members} setSection={setSection} />
-            <div className="dash-pane" style={{ background: "linear-gradient(135deg,#fdf6e3,#fffdf6)", borderRadius: "0 22px 22px 0" }}>
-              <div style={{ width: 38, height: 38, borderRadius: 12, flexShrink: 0, background: "linear-gradient(135deg,#e0bd52,#b8901f)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
-                ✨
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "#a9780a", marginBottom: 2 }}>
-                  Santoral de hoy
-                </div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#3d3206", lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                  {santoral || "—"}
-                </div>
-              </div>
-            </div>
           </div>
           <BannerWidget isAdmin={isAdmin} />
           {esCuerdaAdmin(user) && pendientes && pendientes.length > 0 && (
@@ -16014,7 +16038,8 @@ function Dashboard({
           )}
           <div className="dash-2col">
             <div className="dash-col">
-              <HerramientasCoro setSection={setSection} pautas={pautas} isAdmin={isAdmin} />
+              <HerramientasCoro setSection={setSection} pautas={pautas} />
+              <InformacionesWidget isAdmin={isAdmin} />
               {/* ── Avisos del Coro ── */}
               {avisos && avisos.length > 0 && (
                 <div style={{ marginBottom: 14 }}>
@@ -16427,12 +16452,6 @@ function Dashboard({
               )}
             </div>
             <div className="dash-col dash-side">
-              <InformacionesWidget isAdmin={isAdmin} />
-              <GaleriaWidget
-                fotos={fotos}
-                setSection={setSection}
-                isAdmin={isAdmin}
-              />
               <AgendaInvitado isAdmin={isAdmin} />
             <div className="dash-col dash-right">
               <PautasCompacto
@@ -16440,7 +16459,67 @@ function Dashboard({
                 isAdmin={isAdmin}
                 setSection={setSection}
               />
+              {/* ── Santoral (franja completa) ── */}
+              {santoral && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    background: "linear-gradient(180deg,#fffdf6,#fdf4df)",
+                    border: `1px solid ${C.gold}40`,
+                    borderRadius: 16,
+                    padding: "12px 16px",
+                    marginBottom: 14,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 11,
+                      flexShrink: 0,
+                      background: `linear-gradient(135deg,${C.gold},#caa017)`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 17,
+                    }}
+                  >
+                    ✨
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 9.5,
+                        fontWeight: 800,
+                        color: "#a9780a",
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        marginBottom: 1,
+                      }}
+                    >
+                      Santoral de hoy
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 14.5,
+                        fontWeight: 700,
+                        color: "#5b4708",
+                        lineHeight: 1.25,
+                      }}
+                    >
+                      {santoral}
+                    </div>
+                  </div>
+                </div>
+              )}
               <ValoresWidget />
+              <GaleriaWidget
+                fotos={fotos}
+                setSection={setSection}
+                isAdmin={isAdmin}
+              />
               <VocalizacionWidget isAdmin={isAdmin} />
             </div>
             </div>
@@ -21994,7 +22073,7 @@ function CancioneroVisor({ cancion, isAdmin, onVolver, onReload, canciones }) {
     w.document.write(`
       <html><head><title>${cancion?.nombre || "Canto"}</title>
       <style>
-        body{font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;padding:40px;color:#1a1a1a;}
+        body{font-family:Georgia,serif;padding:40px;color:#1a1a1a;}
         h1{font-size:22px;margin-bottom:2px;}
         .sub{color:#666;font-size:13px;margin-bottom:24px;}
         .tono{background:#f0f0f0;padding:8px 14px;border-radius:8px;display:inline-block;margin-bottom:20px;font-size:14px;}
@@ -29690,108 +29769,88 @@ function mensajePautaWhatsapp(pauta, items) {
   );
 }
 
-function PautaWhatsappBoton({ pauta, canciones, compacto = false, respaldar = false }) {
-  // Une las letras (PDF) de la pauta, en el orden litúrgico, en un solo archivo descargable.
-  const [estado, setEstado] = useState("idle"); // idle | preparando | error
+function PautaWhatsappBoton({ pauta, canciones, compacto = false }) {
+  // estado: idle → preparando → listo (archivos para compartir) | enlaces (plan B)
+  const [estado, setEstado] = useState("idle");
   const [progreso, setProgreso] = useState("");
-  const [omitidos, setOmitidos] = useState([]);
-  const [respaldo, setRespaldo] = useState("");
-  const items = pdfsDePauta(pauta, canciones).filter((it) => it.etiqueta !== "Guion de la misa");
+  const archivosRef = useRef([]);
+  const items = pdfsDePauta(pauta, canciones);
   const sinPdf = items.length === 0;
 
-  function nombreArchivo() {
-    const m = String(pauta?.fecha || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
-    return `Cantos_Misa_${m ? m[3] + m[2] + m[1] : "sin_fecha"}.pdf`;
+  const puedeCompartirArchivos = () => {
+    try {
+      if (!navigator.share || !navigator.canShare) return false;
+      const prueba = new File(["x"], "a.pdf", { type: "application/pdf" });
+      return navigator.canShare({ files: [prueba] });
+    } catch (e) {
+      return false;
+    }
+  };
+
+  function abrirConEnlaces() {
+    const texto = mensajePautaWhatsapp(pauta, items);
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
   }
 
-  async function descargarUnido() {
-    if (sinPdf || estado === "preparando") return;
+  async function prepararArchivos() {
     setEstado("preparando");
-    setOmitidos([]);
-    setRespaldo("");
-    const fallos = [];
+    const archivos = [];
     try {
-      const { PDFDocument } = await import("pdf-lib");
-      const salida = await PDFDocument.create();
       for (let i = 0; i < items.length; i++) {
         setProgreso(`${i + 1}/${items.length}`);
-        try {
-          const id = driveFileId(items[i].url);
-          const src = id
-            ? `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${GDRIVE_API_KEY}`
-            : items[i].url;
-          const res = await fetch(src);
-          if (!res.ok) throw new Error("descarga");
-          const bytes = await res.arrayBuffer();
-          const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
-          const paginas = await salida.copyPages(doc, doc.getPageIndices());
-          paginas.forEach((pg) => salida.addPage(pg));
-        } catch (er) {
-          fallos.push(items[i].etiqueta);
-        }
+        const id = driveFileId(items[i].url);
+        const src = id
+          ? `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${GDRIVE_API_KEY}`
+          : items[i].url;
+        const res = await fetch(src);
+        if (!res.ok) throw new Error("No se pudo descargar " + items[i].etiqueta);
+        const blob = await res.blob();
+        const limpio = items[i].etiqueta.replace(/[\\/:*?"<>|]/g, "").slice(0, 70);
+        // El número al inicio del nombre mantiene el orden aunque WhatsApp ordene por nombre.
+        archivos.push(
+          new File([blob], `${String(i + 1).padStart(2, "0")} - ${limpio}.pdf`, {
+            type: "application/pdf",
+          })
+        );
       }
-      if (salida.getPageCount() === 0) throw new Error("vacío");
-      const bytes = await salida.save();
-      const blob = new Blob([bytes], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = nombreArchivo();
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-      setOmitidos(fallos);
-      setEstado("idle");
-      // Respaldo en "Descargas Misas" (solo admin): se sube el PDF y se registra/actualiza el documento.
-      if (respaldar) {
-        try {
-          const nombre = nombreArchivo();
-          const path = `descargas_misas/${nombre}`;
-          const up = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
-            method: "POST",
-            headers: {
-              apikey: SUPABASE_SERVICE_KEY,
-              Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-              "Content-Type": "application/pdf",
-              "x-upsert": "true",
-            },
-            body: blob,
-          });
-          if (!up.ok) throw new Error("subida");
-          const urlPub = `${SUPABASE_URL}/storage/v1/object/public/publico/${path}?v=${Date.now()}`;
-          const size = (blob.size / 1048576).toFixed(1) + " MB";
-          const nombreDoc = nombre.replace(/\.pdf$/i, "");
-          const existentes = await supabase("documentos", {
-            filters: `&nombre=eq.${encodeURIComponent(nombreDoc)}`,
-          });
-          if (existentes && existentes.length) {
-            await supabase("documentos", {
-              method: "PATCH",
-              filters: `&id=eq.${existentes[0].id}`,
-              body: { url: urlPub, size },
-            });
-          } else {
-            await supabase("documentos", {
-              method: "POST",
-              body: { nombre: nombreDoc, url: urlPub, categoria: "Repertorio", size },
-            });
-          }
-          setRespaldo("ok");
-        } catch (er) {
-          setRespaldo("error");
-        }
-      }
+      archivosRef.current = archivos;
+      setEstado("listo");
     } catch (e) {
-      setOmitidos(fallos);
-      setEstado("error");
+      setEstado("enlaces");
     }
+  }
+
+  async function compartir() {
+    try {
+      await navigator.share({
+        files: archivosRef.current,
+        title: `Pauta de Misa – ${pauta.titulo || ""}`,
+        text: `🎼 Pauta de Misa – ${pauta.titulo || ""} (PDF en orden)`,
+      });
+    } catch (e) {
+      if (e && e.name === "AbortError") return; // la persona canceló
+      setEstado("enlaces");
+    }
+  }
+
+  function onClick() {
+    if (sinPdf) return;
+    if (estado === "listo") return compartir();
+    if (estado === "enlaces") return abrirConEnlaces();
+    if (estado === "preparando") return;
+    // idle
+    if (puedeCompartirArchivos()) return prepararArchivos();
+    abrirConEnlaces();
   }
 
   const etiqueta =
     estado === "preparando"
-      ? `⏳ Uniendo PDF ${progreso}…`
-      : `📥 Descargar cantos (PDF único)`;
+      ? `⏳ Preparando PDF ${progreso}…`
+      : estado === "listo"
+      ? `📤 Enviar ${items.length} PDF por WhatsApp`
+      : estado === "enlaces"
+      ? "💬 Enviar enlaces por WhatsApp"
+      : `💬 Pauta Whatsapp${sinPdf ? "" : ` (${items.length} PDF)`}`;
 
   return (
     <span
@@ -29804,12 +29863,12 @@ function PautaWhatsappBoton({ pauta, canciones, compacto = false, respaldar = fa
       }}
     >
       <button
-        onClick={descargarUnido}
+        onClick={onClick}
         disabled={estado === "preparando" || sinPdf}
         title={
           sinPdf
-            ? "Agrega las letras (PDF) a las canciones para poder descargarlas"
-            : `Descarga todas las letras en un solo PDF, en el orden de la misa (${nombreArchivo()})`
+            ? "Agrega las letras (PDF) a las canciones para poder enviarlas"
+            : "Envía por WhatsApp los PDF de la pauta, en el orden de la misa"
         }
         style={{
           display: "inline-flex",
@@ -29818,7 +29877,7 @@ function PautaWhatsappBoton({ pauta, canciones, compacto = false, respaldar = fa
           fontSize: 13,
           fontWeight: 600,
           color: "white",
-          background: "#1e3a5f",
+          background: "#25d366",
           borderRadius: 10,
           padding: "9px 16px",
           border: "none",
@@ -29833,24 +29892,9 @@ function PautaWhatsappBoton({ pauta, canciones, compacto = false, respaldar = fa
           Aún no hay letras (PDF) en la pauta.
         </span>
       )}
-      {estado === "error" && (
-        <span style={{ fontSize: 11, color: "#b91c1c", marginTop: 4, maxWidth: 280 }}>
-          No se pudo unir los PDF. Revisa tu conexión e intenta de nuevo.
-        </span>
-      )}
-      {respaldo === "ok" && (
-        <span style={{ fontSize: 11, color: "#166534", marginTop: 4, maxWidth: 300 }}>
-          ✓ Respaldado en Descargas Misas.
-        </span>
-      )}
-      {respaldo === "error" && (
-        <span style={{ fontSize: 11, color: "#b45309", marginTop: 4, maxWidth: 300 }}>
-          Se descargó, pero no se pudo respaldar en Descargas Misas.
-        </span>
-      )}
-      {estado === "idle" && omitidos.length > 0 && (
-        <span style={{ fontSize: 11, color: "#b45309", marginTop: 4, maxWidth: 300 }}>
-          Se descargó, pero no se pudo incluir: {omitidos.join(", ")}.
+      {estado === "enlaces" && (
+        <span style={{ fontSize: 11, color: C.gray, marginTop: 4, maxWidth: 260 }}>
+          No se pudieron adjuntar los archivos; se enviarán los enlaces en el orden de la pauta.
         </span>
       )}
     </span>
@@ -29872,14 +29916,17 @@ function DirectorioLetrasModal({ initialQuery = "", onSelect, onClose }) {
       if (base && lista.some((x) => normBusquedaLetra(x.nombre).includes(base)))
         setQ(initialQuery.trim());
     };
-    // Se muestra el caché mientras se pide la lista actualizada (así aparecen las letras recién agregadas).
-    if (_letrasDriveCache) prefiltrar(_letrasDriveCache);
+    if (_letrasDriveCache) {
+      prefiltrar(_letrasDriveCache);
+      return () => {
+        vivo = false;
+      };
+    }
     listarTodosDrive()
       .then((lista) => {
         if (!vivo) return;
         if (lista.length) _letrasDriveCache = lista;
-        else if (!_letrasDriveCache) setError("No se encontraron letras en el directorio.");
-        if (!lista.length && _letrasDriveCache) lista = _letrasDriveCache;
+        else setError("No se encontraron letras en el directorio.");
         setItems(lista);
         setLoading(false);
         prefiltrar(lista);
@@ -29887,7 +29934,7 @@ function DirectorioLetrasModal({ initialQuery = "", onSelect, onClose }) {
       .catch(() => {
         if (!vivo) return;
         setLoading(false);
-        if (!_letrasDriveCache) setError("No se pudo cargar el directorio de letras.");
+        setError("No se pudo cargar el directorio de letras.");
       });
     return () => {
       vivo = false;
@@ -30071,7 +30118,6 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     ? (pautas || []).filter((p) => p.publicada && p.visible_visita)
     : pautas;
   const [selected, setSelected] = useState(null); // pauta activa
-  const [aniosAbiertos, setAniosAbiertos] = useState({});
   const [mode, setMode] = useState(null); // null=lista | "new" | "edit" | "view"
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
@@ -30158,21 +30204,23 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const [letraFila, setLetraFila] = useState(null); // índice de la fila que elige letra del directorio
   // Títulos del directorio de letras (Drive) para la lista desplegable de canciones
   const [dirLetras, setDirLetras] = useState(_letrasDriveCache || []);
-  // Se vuelve a leer Drive cada vez que se abre el formulario, para ver las canciones recién agregadas.
   useEffect(() => {
     let vivo = true;
-    if (_letrasDriveCache) setDirLetras(_letrasDriveCache);
+    if (_letrasDriveCache) {
+      setDirLetras(_letrasDriveCache);
+      return;
+    }
     listarTodosDrive()
       .then((lista) => {
-        if (!vivo || !lista.length) return;
-        _letrasDriveCache = lista;
+        if (!vivo) return;
+        if (lista.length) _letrasDriveCache = lista;
         setDirLetras(lista);
       })
       .catch(() => {});
     return () => {
       vivo = false;
     };
-  }, [mode]);
+  }, []);
 
   function toggleColLetra() {
     setShowColLetra((v) => !v);
@@ -31340,7 +31388,6 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
           </Btn>
           <PautaWhatsappBoton
             compacto
-            respaldar={isAdmin}
             pauta={{
               titulo: form.titulo,
               fecha: form.fecha || selected?.fecha,
@@ -31705,7 +31752,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     📖 Ver guion de la misa
                   </button>
                 )}
-                <PautaWhatsappBoton pauta={selected} canciones={cancionesData} respaldar={isAdmin} />
+                <PautaWhatsappBoton pauta={selected} canciones={cancionesData} />
               </div>
               {selected.id &&
                 (() => {
@@ -31781,8 +31828,9 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     "Orden Litúrgico",
                     "Canción",
                     "Autor",
+                    "Intérprete",
                     ...(showColLetra ? ["Letra (PDF)"] : []),
-                    "Audio Referencial",
+                    ...(showColAudio ? ["Audio Referencial"] : []),
                   ].map((h, i) => (
                     <th
                       key={i}
@@ -31823,7 +31871,26 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     >
                       📄
                     </button>
-                    
+                    <button
+                      onClick={toggleColAudio}
+                      title={
+                        showColAudio
+                          ? "Ocultar Audio Ref."
+                          : "Mostrar Audio Ref."
+                      }
+                      style={{
+                        background: showColAudio ? "#0a5ac8" : "#eef0f3",
+                        border: "none",
+                        borderRadius: 6,
+                        padding: "3px 8px",
+                        color: showColAudio ? "white" : "#6b7280",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ▶
+                    </button>
                   </th>
                 </tr>
               </thead>
@@ -31909,6 +31976,18 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       >
                         {c.autor || <span style={{ color: "#cbd5e1" }}>—</span>}
                       </td>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          verticalAlign: "middle",
+                          color: "#64748b",
+                          fontSize: 12,
+                        }}
+                      >
+                        {c.salmista || (
+                          <span style={{ color: "#cbd5e1" }}>—</span>
+                        )}
+                      </td>
                       {showColLetra && (
                         <td style={{ ...tdStyle, verticalAlign: "middle" }}>
                           {c.pendiente ? (
@@ -31958,7 +32037,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                           )}
                         </td>
                       )}
-                      {true && (
+                      {showColAudio && (
                         <td style={{ ...tdStyle, verticalAlign: "middle" }}>
                           {c.url_audio && c.url_audio.includes("http") ? (
                             <a
@@ -32142,68 +32221,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
           >
             ✅ Pautas Publicadas
           </div>
-          {Object.entries(
-            publicadas.reduce((acc, p) => {
-              const y = String(p.fecha || "").slice(0, 4) || "Sin fecha";
-              (acc[y] = acc[y] || []).push(p);
-              return acc;
-            }, {})
-          )
-            .sort((x, y) => y[0].localeCompare(x[0]))
-            .map(([anio, lista]) => {
-              const abierto = !!aniosAbiertos[anio];
-              return (
-                <div key={anio} style={{ marginBottom: 12 }}>
-                  <button
-                    onClick={() =>
-                      setAniosAbiertos((s) => ({ ...s, [anio]: !s[anio] }))
-                    }
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 14,
-                      padding: "16px 18px",
-                      background: "linear-gradient(135deg,#1e3a5f,#0f2744)",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: 16,
-                      cursor: "pointer",
-                      textAlign: "left",
-                      fontFamily: "inherit",
-                      boxShadow: "0 4px 14px rgba(15,39,68,.18)",
-                    }}
-                  >
-                    <span style={{ fontSize: 26 }}>{abierto ? "📂" : "📁"}</span>
-                    <span style={{ flex: 1 }}>
-                      <span
-                        style={{
-                          display: "block",
-                          fontSize: 17,
-                          fontWeight: 800,
-                          letterSpacing: "-0.01em",
-                        }}
-                      >
-                        Pautas {anio}
-                      </span>
-                      <span style={{ fontSize: 12, opacity: 0.75 }}>
-                        {lista.length} {lista.length === 1 ? "pauta" : "pautas"}
-                        {" · "}última:{" "}
-                        {new Date(
-                          lista[0].fecha + "T00:00:00"
-                        ).toLocaleDateString("es-CL", {
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </span>
-                    </span>
-                    <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.85 }}>
-                      {abierto ? "Ocultar ▴" : "Ver todas ▾"}
-                    </span>
-                  </button>
-                  <div style={{ marginTop: abierto ? 10 : 0 }}>
-                    {abierto &&
-                      lista.map((p) => {
+          {publicadas.map((p) => {
             const fechaFmt = new Date(p.fecha + "T00:00:00").toLocaleDateString(
               "es-CL",
               {
@@ -32381,11 +32399,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                 <span style={{ fontSize: 12, color: C.gray }}>Ver pauta →</span>
               </Card>
             );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+          })}
         </div>
       )}
 
@@ -46141,7 +46155,7 @@ function Reglamento() {
         .rg-esencial{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0 26px}
         .rg-art{display:grid;grid-template-columns:64px 1fr;gap:0 18px;padding:22px 24px;background:#fff;border:1px solid rgba(60,60,67,0.12);border-radius:20px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,0.03),0 8px 24px rgba(15,45,92,0.05)}
         .rg-art.dest{border-color:${ORO}66;background:linear-gradient(180deg,#fffdf7,#fff);box-shadow:0 1px 2px rgba(0,0,0,0.03),0 10px 30px ${ORO}22}
-        .rg-num{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;font-size:17px;font-weight:700;color:${NAVY2};border:1.5px solid ${ORO};background:#fff}
+        .rg-num{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:Georgia,'Times New Roman',serif;font-size:17px;font-weight:700;color:${NAVY2};border:1.5px solid ${ORO};background:#fff}
         .rg-art.dest .rg-num{background:${NAVY};color:#fff;border-color:${NAVY}}
         .rg-li{position:relative;padding-left:20px;margin:0 0 7px;font-size:13.5px;line-height:1.6;color:#3a3a40}
         .rg-dot{position:absolute;left:3px;top:.62em;width:7px;height:7px;border-radius:50%;background:${ORO}}
@@ -46200,7 +46214,7 @@ function Reglamento() {
               lineHeight: 1.08,
               fontWeight: 800,
               letterSpacing: "-0.025em",
-              fontFamily: "'Plus Jakarta Sans','Inter',system-ui,sans-serif",
+              fontFamily: "Georgia, 'Times New Roman', serif",
             }}
           >
             Reglamento del coro
@@ -46235,7 +46249,7 @@ function Reglamento() {
           >
             <div
               style={{
-                fontFamily: "'Plus Jakarta Sans','Inter',system-ui,sans-serif",
+                fontFamily: "Georgia, 'Times New Roman', serif",
                 fontSize: e.grande.length > 2 ? 21 : 34,
                 lineHeight: 1.1,
                 fontWeight: 700,
@@ -46544,15 +46558,17 @@ function CumpleanosCompacto({ members, setSection }) {
   return (
     <div
       style={{
-        background: esHoy ? "linear-gradient(135deg,#eaf2fd,#f7fbff)" : "transparent",
-        borderRight: "1px solid #edf1f7",
-        borderRadius: 0,
-        position: "relative",
+        background: esHoy
+          ? "linear-gradient(90deg,#0f2d5c 0%,#1d6fc7 100%)"
+          : C.white,
+        border: `1px solid ${esHoy ? "#1d6fc760" : C.border}`,
+        borderRadius: 16,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+        overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
         alignSelf: "stretch",
-        minWidth: 0,
       }}
     >
       <div
@@ -46560,17 +46576,18 @@ function CumpleanosCompacto({ members, setSection }) {
           display: "flex",
           alignItems: "center",
           gap: 9,
-          padding: "16px 20px",
-          minHeight: 64,
+          padding: "8px 14px",
+          minHeight: 56,
         }}
       >
-        {avatar(primero, 40)}
+        <span style={{ fontSize: 18, flexShrink: 0 }}>{esHoy ? "🎉" : "🎂"}</span>
+        {avatar(primero, 32)}
         <div style={{ minWidth: 0, flex: 1 }}>
           <div
             style={{
-              fontSize: 14,
+              fontSize: 12.5,
               fontWeight: 700,
-              color: "#0f2744",
+              color: esHoy ? "white" : C.dark,
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -46581,7 +46598,7 @@ function CumpleanosCompacto({ members, setSection }) {
           <div
             style={{
               fontSize: 11,
-              color: "#64748b",
+              color: esHoy ? "rgba(255,255,255,0.8)" : C.gray,
             }}
           >
             {esHoy
@@ -46594,8 +46611,8 @@ function CumpleanosCompacto({ members, setSection }) {
             onClick={() => setAbierto((v) => !v)}
             style={{
               flexShrink: 0,
-              background: "#eaf0f8",
-              color: "#1e3a5f",
+              background: esHoy ? "rgba(255,255,255,0.18)" : C.primary + "12",
+              color: esHoy ? "white" : C.primary,
               border: "none",
               borderRadius: 980,
               padding: "6px 13px",
@@ -46612,14 +46629,7 @@ function CumpleanosCompacto({ members, setSection }) {
       {abierto && (
         <div
           style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: "calc(100% + 6px)",
-            zIndex: 30,
-            border: `1px solid ${C.border}`,
-            borderRadius: 14,
-            boxShadow: "0 16px 40px rgba(15,39,68,0.25)",
+            borderTop: `1px solid ${C.border}`,
             background: C.white,
             maxHeight: 280,
             overflowY: "auto",
