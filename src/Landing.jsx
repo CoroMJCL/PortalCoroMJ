@@ -33,6 +33,7 @@ const DEFAULT = {
   contacto_ensayo:"Sábados · Capilla Sagrada Familia de Maipú",
   whatsapp:"56912345678",
   pm_modo:"auto", evento_nombre:"", evento_fecha:"", evento_hora:"", evento_lugar:"",
+  ig_mostrar:"si", ig_seguidores:"", ig_vistas:"", ig_nota:"",
   instagram_url:"",
   tiktok_url:"",
   youtube_url:"",
@@ -207,6 +208,23 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
             <AdminField {...fp} label="Hora (modo manual)" k="evento_hora" type="time" />
             <AdminField {...fp} label="Lugar (modo manual)" k="evento_lugar" />
 
+            {/* INSTAGRAM */}
+            <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>📸 Instagram (portada)</div>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: "#888", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 5 }}>Mostrar en la portada</div>
+              <select value={editing.ig_mostrar ?? C.ig_mostrar ?? "si"} onChange={e => setEditing(p => ({ ...p, ig_mostrar: e.target.value }))}
+                style={{ width: "100%", border: "1px solid #e0e6f0", borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fff", marginBottom: 4 }}>
+                <option value="si">Sí, mostrar</option>
+                <option value="no">No mostrar</option>
+              </select>
+              <button onClick={() => saveF("ig_mostrar")} disabled={saving.ig_mostrar} style={{ background: "#08122d", color: "#fff", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                {saving.ig_mostrar ? "..." : "Guardar"}
+              </button>
+            </div>
+            <AdminField {...fp} label="Seguidores (ej: 12500)" k="ig_seguidores" />
+            <AdminField {...fp} label="Visualizaciones totales (ej: 250000)" k="ig_vistas" />
+            <AdminField {...fp} label="Nota pequeña (ej: Datos a octubre 2026)" k="ig_nota" />
+
             {/* NOSOTROS */}
             <div style={{ fontWeight: 700, fontSize: 12, color: "#08122d", margin: "20px 0 14px", textTransform: "uppercase", letterSpacing: "0.1em" }}>👥 Nosotros</div>
             <AdminImgField {...ifp} label="Imagen nosotros" k="about_img" name="landing_about" />
@@ -288,6 +306,54 @@ function proximaMisaRegular() {
 }
 
 // ── Próxima misa (portada) ──
+// Estadísticas de Instagram (se editan a mano desde el panel de administración)
+function useContador(texto) {
+  const limpio = String(texto || "").replace(/[.\s,]/g, "");
+  const meta = /^\d+$/.test(limpio) ? parseInt(limpio, 10) : null;
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    if (meta === null) return;
+    let raf, t0;
+    const dur = 1600;
+    const paso = (t) => {
+      if (!t0) t0 = t;
+      const k = Math.min(1, (t - t0) / dur);
+      setVal(Math.round(meta * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) raf = requestAnimationFrame(paso);
+    };
+    raf = requestAnimationFrame(paso);
+    return () => cancelAnimationFrame(raf);
+  }, [meta]);
+  return meta === null ? String(texto || "") : val.toLocaleString("es-CL");
+}
+function IgStat({ valor, etiqueta }) {
+  const v = useContador(valor);
+  return (
+    <div className="ig-i">
+      <div className="ig-n">{v}</div>
+      <div className="ig-l">{etiqueta}</div>
+    </div>
+  );
+}
+function IgStats({ C }) {
+  if (C.ig_mostrar === "no") return null;
+  if (!C.ig_seguidores && !C.ig_vistas) return null;
+  return (
+    <div className="ig">
+      <div className="ig-k">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>
+        <span>Nuestra comunidad</span>
+      </div>
+      <div className="ig-row">
+        {C.ig_seguidores && <IgStat valor={C.ig_seguidores} etiqueta="Seguidores en Instagram" />}
+        {C.ig_seguidores && C.ig_vistas && <div className="ig-sep" />}
+        {C.ig_vistas && <IgStat valor={C.ig_vistas} etiqueta="Visualizaciones" />}
+      </div>
+      {C.ig_nota && <div className="ig-nota">{C.ig_nota}</div>}
+    </div>
+  );
+}
+
 function ProximaMisa({ C }) {
   const [m, setM] = useState(null);
   const modo = C.pm_modo || "auto";
@@ -677,6 +743,14 @@ export default function Landing({ onPortal }) {
         .pm-h{display:flex;align-items:baseline;gap:6px;font-size:26px;font-weight:400;line-height:1.1;letter-spacing:0.02em;font-variant-numeric:tabular-nums}
         .pm-h small{font-size:10px;font-weight:500;letter-spacing:0.22em;opacity:0.65}
         .pm-l{white-space:nowrap;font-size:11.5px;font-weight:400;letter-spacing:0.04em;color:rgba(255,255,255,0.85)}
+        .ig{position:absolute;z-index:3;top:112px;left:60px;display:flex;flex-direction:column;gap:10px;padding:16px 22px;border-radius:20px;background:rgba(10,18,40,0.36);border:1px solid rgba(255,255,255,0.22);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:#fff;font-family:'Outfit','Plus Jakarta Sans',sans-serif}
+        .ig-k{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:500;letter-spacing:0.26em;text-transform:uppercase;color:rgba(255,255,255,0.75)}
+        .ig-row{display:flex;align-items:center;gap:22px}
+        .ig-sep{width:1px;align-self:stretch;background:rgba(255,255,255,0.25)}
+        .ig-n{font-size:38px;font-weight:300;line-height:1;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+        .ig-l{margin-top:6px;font-size:10.5px;font-weight:400;letter-spacing:0.08em;color:rgba(255,255,255,0.75);white-space:nowrap}
+        .ig-nota{font-size:10px;color:rgba(255,255,255,0.5);letter-spacing:0.04em}
+        @media(max-width:900px){.ig{top:92px;left:20px;right:20px;padding:12px 16px}.ig-n{font-size:28px}.ig-row{gap:16px}}
         .hero-right{display:flex;flex-direction:column;align-items:flex-end;gap:16px;max-width:420px}
         .hero-sub{font-size:13.5px;font-weight:300;color:rgba(255,255,255,0.55);line-height:1.75;text-align:right}
         .hero-btns{display:flex;gap:10px}
@@ -899,6 +973,7 @@ export default function Landing({ onPortal }) {
       <section id="inicio" className="hero">
         <div className="hero-bg" style={{ backgroundImage: `url('${C.hero_img}')` }}/>
         <div className="hero-ov"/>
+        <IgStats C={C} />
         <div className="hero-c">
           <div>
             <div style={{fontSize:"clamp(11px,1.2vw,14px)",fontWeight:700,letterSpacing:"0.45em",textTransform:"uppercase",color:"rgba(255,255,255,0.85)",marginBottom:12,display:"block"}}>CORO</div>

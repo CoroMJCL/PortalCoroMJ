@@ -14538,7 +14538,6 @@ function BannerWidget({ isAdmin }) {
 const HERRAMIENTAS_CORO = [
   { id: "pauta_misa", icon: "🎼", titulo: "Pauta de Misa", desc: "Canciones y orden de la próxima misa" },
   { id: "material_ensayo", icon: "🎤", titulo: "Material de ensayo", desc: "Cantos, letras y audios por voz" },
-  { id: "cantos_pdf", icon: "📄", titulo: "Cantos PDF", desc: "Letras y partituras para estudiar" },
   { id: "audios", icon: "🎧", titulo: "Audios", desc: "Pistas de práctica por cuerda" },
   { id: "cancioneros", icon: "📚", titulo: "Cancioneros", desc: "Descarga los cancioneros del coro" },
 ];
@@ -29974,10 +29973,12 @@ function PautaWhatsappBoton({ pauta, canciones, compacto = false, respaldar = fa
             "Content-Type": "application/json",
           };
           const base = `${SUPABASE_URL}/rest/v1/documentos`;
-          // Se respalda una sola vez por pauta: si ya existe en Descargas Misas, no se vuelve a guardar.
-          const rq = await fetch(`${base}?select=id&nombre=eq.${encodeURIComponent(nombreDoc)}`, { headers: H });
+          // Se respalda una sola vez por pauta; si la pauta cambió (otro tamaño de PDF), se reemplaza el respaldo.
+          const rq = await fetch(`${base}?select=id,size&nombre=eq.${encodeURIComponent(nombreDoc)}`, { headers: H });
           const existentes = rq.ok ? await rq.json() : [];
-          if (existentes.length) {
+          const size = (blob.size / 1048576).toFixed(2) + " MB";
+          const igual = existentes.length && existentes[0].size === size;
+          if (igual) {
             setRespaldo("ya");
           } else {
             const up = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
@@ -29991,15 +29992,20 @@ function PautaWhatsappBoton({ pauta, canciones, compacto = false, respaldar = fa
               body: blob,
             });
             if (!up.ok) throw new Error("subida");
-            const urlPub = `${SUPABASE_URL}/storage/v1/object/public/publico/${path}`;
-            const size = (blob.size / 1048576).toFixed(1) + " MB";
-            const rw = await fetch(base, {
-              method: "POST",
-              headers: H,
-              body: JSON.stringify({ nombre: nombreDoc, url: urlPub, categoria: "Repertorio", size }),
-            });
+            const urlPub = `${SUPABASE_URL}/storage/v1/object/public/publico/${path}?v=${Date.now()}`;
+            const rw = existentes.length
+              ? await fetch(`${base}?id=eq.${existentes[0].id}`, {
+                  method: "PATCH",
+                  headers: H,
+                  body: JSON.stringify({ url: urlPub, size }),
+                })
+              : await fetch(base, {
+                  method: "POST",
+                  headers: H,
+                  body: JSON.stringify({ nombre: nombreDoc, url: urlPub, categoria: "Repertorio", size }),
+                });
             if (!rw.ok) throw new Error("registro");
-            setRespaldo("ok");
+            setRespaldo(existentes.length ? "actualizado" : "ok");
             try {
               window.dispatchEvent(new Event("docs-actualizados"));
             } catch (e) {}
@@ -30071,9 +30077,14 @@ function PautaWhatsappBoton({ pauta, canciones, compacto = false, respaldar = fa
           ✓ Respaldado en Descargas Misas.
         </span>
       )}
+      {respaldo === "actualizado" && (
+        <span style={{ fontSize: 11, color: "#166534", marginTop: 4, maxWidth: 300 }}>
+          ✓ Respaldo actualizado en Descargas Misas (la pauta cambió).
+        </span>
+      )}
       {respaldo === "ya" && (
         <span style={{ fontSize: 11, color: C.gray, marginTop: 4, maxWidth: 300 }}>
-          Esta pauta ya estaba respaldada en Descargas Misas.
+          Esta pauta ya estaba respaldada en Descargas Misas, sin cambios.
         </span>
       )}
       {respaldo === "error" && (
