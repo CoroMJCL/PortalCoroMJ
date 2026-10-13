@@ -14552,8 +14552,15 @@ function urlAudioReproducible(url) {
     ? `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${GDRIVE_API_KEY}`
     : url;
 }
+function youtubeId(url) {
+  const m = String(url || "").match(
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/))([A-Za-z0-9_-]{11})/
+  );
+  return m ? m[1] : null;
+}
 function BotonAudioPauta({ url, size = 26, bg = "#1e3a5f", fs = 10 }) {
   const [estado, setEstado] = useState("idle"); // idle | cargando | sonando
+  const [visor, setVisor] = useState(false); // reproductor de Drive incrustado (plan B)
   const stopRef = useRef(null);
   useEffect(
     () => () => {
@@ -14566,6 +14573,19 @@ function BotonAudioPauta({ url, size = 26, bg = "#1e3a5f", fs = 10 }) {
     []
   );
   function alternar() {
+    if (visor) {
+      setVisor(false);
+      return;
+    }
+    // YouTube: se reproduce en el mini reproductor de la misma página
+    if (youtubeId(url)) {
+      if (_audioPauta) {
+        _audioPauta.pause();
+        if (_audioPautaStop) _audioPautaStop();
+      }
+      setVisor(true);
+      return;
+    }
     if (estado !== "idle") {
       if (_audioPauta) _audioPauta.pause();
       _audioPauta = null;
@@ -14589,12 +14609,30 @@ function BotonAudioPauta({ url, size = 26, bg = "#1e3a5f", fs = 10 }) {
       parar();
       _audioPauta = null;
       _audioPautaStop = null;
-      alert("No se pudo reproducir este audio aquí. Se abrirá en otra pestaña.");
-      window.open(url, "_blank", "noopener");
+      // Plan B: reproductor de Drive incrustado en esta misma página (sin abrir otra ventana)
+      if (driveFileId(url)) setVisor(true);
+      else {
+        alert("No se pudo reproducir este audio aquí. Se abrirá en otra pestaña.");
+        window.open(url, "_blank", "noopener");
+      }
     });
     audio.play().catch(() => {});
   }
   return (
+    <>
+    {visor && (
+      <div style={{ position: "fixed", right: 16, bottom: 16, zIndex: 3000, width: 340, maxWidth: "calc(100vw - 32px)", background: "#fff", borderRadius: 14, boxShadow: "0 12px 40px rgba(15,39,68,.3)", border: "1px solid #dbe4f0", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: "#1e3a5f", color: "#fff", fontSize: 12, fontWeight: 700 }}>
+          <span>🎧 Audio de referencia</span>
+          <button onClick={() => setVisor(false)} style={{ background: "none", border: "none", color: "#fff", fontSize: 15, cursor: "pointer" }}>✕</button>
+        </div>
+        {youtubeId(url) ? (
+          <iframe title="Audio" src={`https://www.youtube.com/embed/${youtubeId(url)}?autoplay=1&rel=0`} allow="autoplay; encrypted-media" allowFullScreen style={{ width: "100%", height: 190, border: 0, display: "block" }} />
+        ) : (
+          <iframe title="Audio" src={`https://drive.google.com/file/d/${driveFileId(url)}/preview`} allow="autoplay" style={{ width: "100%", height: 150, border: 0, display: "block" }} />
+        )}
+      </div>
+    )}
     <button
       onClick={alternar}
       title={estado === "idle" ? "Escuchar audio de referencia" : "Pausar"}
@@ -14615,6 +14653,7 @@ function BotonAudioPauta({ url, size = 26, bg = "#1e3a5f", fs = 10 }) {
     >
       {estado === "cargando" ? "…" : estado === "sonando" ? "⏸" : "▶"}
     </button>
+    </>
   );
 }
 
@@ -18171,6 +18210,20 @@ function Documentos({ docs, onReload }) {
     size: "",
   });
   const [saving, setSaving] = useState(false);
+  const [aniosAbiertos, setAniosAbiertos] = useState({});
+  // Año de cada documento: se toma del nombre (2026, 17102026, 07/06/2026...) o, si no, de su fecha de creación.
+  const anioDoc = (d) => {
+    const m = String(d.nombre || "").match(/20\d{2}(?!\d)/g);
+    if (m) return m[m.length - 1];
+    return d.created_at ? String(d.created_at).slice(0, 4) : "Otros";
+  };
+  const gruposDocs = Object.entries(
+    (docs || []).reduce((acc, d) => {
+      const y = anioDoc(d);
+      (acc[y] = acc[y] || []).push(d);
+      return acc;
+    }, {})
+  ).sort((x, y) => y[0].localeCompare(x[0]));
 
   async function submit() {
     if (!form.nombre || !form.url) return;
@@ -18291,7 +18344,23 @@ function Documentos({ docs, onReload }) {
           </div>
         </Card>
       )}
-      {docs.map((d) => (
+      {gruposDocs.map(([anio, lista]) => {
+        const abierto = !!aniosAbiertos[anio];
+        return (
+          <div key={anio} style={{ marginBottom: 12 }}>
+            <button
+              onClick={() => setAniosAbiertos((s) => ({ ...s, [anio]: !s[anio] }))}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", background: "linear-gradient(135deg,#1e3a5f,#0f2744)", color: "#fff", border: "none", borderRadius: 16, cursor: "pointer", textAlign: "left", fontFamily: "inherit", boxShadow: "0 4px 14px rgba(15,39,68,.18)" }}
+            >
+              <span style={{ fontSize: 26 }}>{abierto ? "📂" : "📁"}</span>
+              <span style={{ flex: 1 }}>
+                <span style={{ display: "block", fontSize: 17, fontWeight: 800, letterSpacing: "-0.01em" }}>Descargas {anio}</span>
+                <span style={{ fontSize: 12, opacity: 0.75 }}>{lista.length} {lista.length === 1 ? "archivo" : "archivos"}</span>
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.85 }}>{abierto ? "Ocultar ▴" : "Ver todas ▾"}</span>
+            </button>
+            <div style={{ marginTop: abierto ? 10 : 0 }}>
+              {abierto && lista.map((d) => (
         <Card
           key={d.id}
           hover
@@ -18345,7 +18414,11 @@ function Documentos({ docs, onReload }) {
             </Btn>
           </a>
         </Card>
-      ))}
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -32895,11 +32968,101 @@ function Asistencia({ asistencia, members, eventos, user, onReload }) {
       ? "#f59e0b40"
       : "#ef444440";
 
+  // Reinicio: el admin elige la fecha; se respalda y se borra todo lo anterior a ella.
+  const [reiniciando, setReiniciando] = useState(false);
+  const [panelReinicio, setPanelReinicio] = useState(false);
+  const [fechaCorte, setFechaCorte] = useState("");
+  async function reiniciarAsistencia() {
+    const CORTE = fechaCorte;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(CORTE)) {
+      alert("Elige primero la fecha desde la que quieres que cuente la asistencia.");
+      return;
+    }
+    const corteTxt = new Date(CORTE + "T00:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" });
+    const token = _authToken || SUPABASE_KEY;
+    const H = {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+    setReiniciando(true);
+    try {
+      const rg = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?select=*`, { headers: H });
+      if (!rg.ok) throw new Error("No se pudo leer la asistencia");
+      const todos = await rg.json();
+      const fechaDe = {};
+      (eventos || []).forEach((e) => (fechaDe[e.id] = e.fecha));
+      const viejos = todos.filter((r) => {
+        const f = fechaDe[r.evento_id];
+        if (f) return String(f).slice(0, 10) < CORTE;
+        return String(r.created_at || "").slice(0, 10) < CORTE;
+      });
+      if (viejos.length === 0) {
+        alert(`No hay registros anteriores al ${corteTxt}. No se borró nada.`);
+        setReiniciando(false);
+        return;
+      }
+      const ok = window.confirm(
+        `Se reiniciará la asistencia: se respaldarán y borrarán ${viejos.length} registros anteriores al ${corteTxt}.\n` +
+          `Los registros desde esa fecha en adelante (${todos.length - viejos.length}) se mantienen.\n\n¿Continuar?`
+      );
+      if (!ok) {
+        setReiniciando(false);
+        return;
+      }
+      // 1) Respaldo (si falla, no se borra nada)
+      const rb = await fetch(`${SUPABASE_URL}/rest/v1/asistencia_historial`, {
+        method: "POST",
+        headers: { ...H, Prefer: "return=minimal" },
+        body: JSON.stringify({ ano: Number(CORTE.slice(0, 4)), datos: viejos }),
+      });
+      if (!rb.ok) throw new Error("No se pudo respaldar: " + (await rb.text()));
+      // 2) Borrado por lotes de los registros antiguos
+      const ids = viejos.map((r) => r.id);
+      for (let i = 0; i < ids.length; i += 100) {
+        const lote = ids.slice(i, i + 100).join(",");
+        const rd = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?id=in.(${lote})`, {
+          method: "DELETE",
+          headers: H,
+        });
+        if (!rd.ok) throw new Error("No se pudo borrar: " + (await rd.text()));
+      }
+      alert(`Listo: ${viejos.length} registros respaldados y borrados. La asistencia cuenta desde el ${corteTxt}.`);
+      if (onReload) onReload();
+    } catch (e) {
+      alert("No se reinició la asistencia: " + (e && e.message ? e.message : e));
+    }
+    setReiniciando(false);
+  }
+
   return (
     <div style={{ maxWidth: 1000 }}>
       <SectionTitle
         title="Asistencia del Coro"
         subtitle="Registro de asistencia a eventos y ensayos"
+        action={
+          isAdmin && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+              {panelReinicio && (
+                <>
+                  <label style={{ fontSize: 12, color: C.gray }}>Contar desde:</label>
+                  <input
+                    type="date"
+                    value={fechaCorte}
+                    onChange={(e) => setFechaCorte(e.target.value)}
+                    style={{ padding: "7px 10px", borderRadius: 9, border: `1px solid ${C.border}`, fontSize: 13 }}
+                  />
+                  <Btn onClick={reiniciarAsistencia} disabled={reiniciando || !fechaCorte}>
+                    {reiniciando ? "Reiniciando…" : "Reiniciar"}
+                  </Btn>
+                </>
+              )}
+              <Btn variant="ghost" onClick={() => setPanelReinicio((v) => !v)}>
+                {panelReinicio ? "Cancelar" : "🔄 Reiniciar asistencia"}
+              </Btn>
+            </div>
+          )
+        }
       />
 
       {/* ── WIDGET PERSONAL ── */}
