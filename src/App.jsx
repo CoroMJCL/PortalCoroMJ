@@ -29767,17 +29767,14 @@ function DirectorioLetrasModal({ initialQuery = "", onSelect, onClose }) {
       if (base && lista.some((x) => normBusquedaLetra(x.nombre).includes(base)))
         setQ(initialQuery.trim());
     };
-    if (_letrasDriveCache) {
-      prefiltrar(_letrasDriveCache);
-      return () => {
-        vivo = false;
-      };
-    }
+    // Se muestra el caché mientras se pide la lista actualizada (así aparecen las letras recién agregadas).
+    if (_letrasDriveCache) prefiltrar(_letrasDriveCache);
     listarTodosDrive()
       .then((lista) => {
         if (!vivo) return;
         if (lista.length) _letrasDriveCache = lista;
-        else setError("No se encontraron letras en el directorio.");
+        else if (!_letrasDriveCache) setError("No se encontraron letras en el directorio.");
+        if (!lista.length && _letrasDriveCache) lista = _letrasDriveCache;
         setItems(lista);
         setLoading(false);
         prefiltrar(lista);
@@ -29785,7 +29782,7 @@ function DirectorioLetrasModal({ initialQuery = "", onSelect, onClose }) {
       .catch(() => {
         if (!vivo) return;
         setLoading(false);
-        setError("No se pudo cargar el directorio de letras.");
+        if (!_letrasDriveCache) setError("No se pudo cargar el directorio de letras.");
       });
     return () => {
       vivo = false;
@@ -29969,6 +29966,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     ? (pautas || []).filter((p) => p.publicada && p.visible_visita)
     : pautas;
   const [selected, setSelected] = useState(null); // pauta activa
+  const [aniosAbiertos, setAniosAbiertos] = useState({});
   const [mode, setMode] = useState(null); // null=lista | "new" | "edit" | "view"
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
@@ -30055,23 +30053,21 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const [letraFila, setLetraFila] = useState(null); // índice de la fila que elige letra del directorio
   // Títulos del directorio de letras (Drive) para la lista desplegable de canciones
   const [dirLetras, setDirLetras] = useState(_letrasDriveCache || []);
+  // Se vuelve a leer Drive cada vez que se abre el formulario, para ver las canciones recién agregadas.
   useEffect(() => {
     let vivo = true;
-    if (_letrasDriveCache) {
-      setDirLetras(_letrasDriveCache);
-      return;
-    }
+    if (_letrasDriveCache) setDirLetras(_letrasDriveCache);
     listarTodosDrive()
       .then((lista) => {
-        if (!vivo) return;
-        if (lista.length) _letrasDriveCache = lista;
+        if (!vivo || !lista.length) return;
+        _letrasDriveCache = lista;
         setDirLetras(lista);
       })
       .catch(() => {});
     return () => {
       vivo = false;
     };
-  }, []);
+  }, [mode]);
 
   function toggleColLetra() {
     setShowColLetra((v) => !v);
@@ -32072,7 +32068,68 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
           >
             ✅ Pautas Publicadas
           </div>
-          {publicadas.map((p) => {
+          {Object.entries(
+            publicadas.reduce((acc, p) => {
+              const y = String(p.fecha || "").slice(0, 4) || "Sin fecha";
+              (acc[y] = acc[y] || []).push(p);
+              return acc;
+            }, {})
+          )
+            .sort((x, y) => y[0].localeCompare(x[0]))
+            .map(([anio, lista]) => {
+              const abierto = !!aniosAbiertos[anio];
+              return (
+                <div key={anio} style={{ marginBottom: 12 }}>
+                  <button
+                    onClick={() =>
+                      setAniosAbiertos((s) => ({ ...s, [anio]: !s[anio] }))
+                    }
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 14,
+                      padding: "16px 18px",
+                      background: "linear-gradient(135deg,#1e3a5f,#0f2744)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 16,
+                      cursor: "pointer",
+                      textAlign: "left",
+                      fontFamily: "inherit",
+                      boxShadow: "0 4px 14px rgba(15,39,68,.18)",
+                    }}
+                  >
+                    <span style={{ fontSize: 26 }}>{abierto ? "📂" : "📁"}</span>
+                    <span style={{ flex: 1 }}>
+                      <span
+                        style={{
+                          display: "block",
+                          fontSize: 17,
+                          fontWeight: 800,
+                          letterSpacing: "-0.01em",
+                        }}
+                      >
+                        Pautas {anio}
+                      </span>
+                      <span style={{ fontSize: 12, opacity: 0.75 }}>
+                        {lista.length} {lista.length === 1 ? "pauta" : "pautas"}
+                        {" · "}última:{" "}
+                        {new Date(
+                          lista[0].fecha + "T00:00:00"
+                        ).toLocaleDateString("es-CL", {
+                          day: "numeric",
+                          month: "short",
+                        })}
+                      </span>
+                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.85 }}>
+                      {abierto ? "Ocultar ▴" : "Ver todas ▾"}
+                    </span>
+                  </button>
+                  <div style={{ marginTop: abierto ? 10 : 0 }}>
+                    {abierto &&
+                      lista.map((p) => {
             const fechaFmt = new Date(p.fecha + "T00:00:00").toLocaleDateString(
               "es-CL",
               {
@@ -32250,7 +32307,11 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                 <span style={{ fontSize: 12, color: C.gray }}>Ver pauta →</span>
               </Card>
             );
-          })}
+                    })}
+                  </div>
+                </div>
+              );
+            })}
         </div>
       )}
 
