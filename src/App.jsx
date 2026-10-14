@@ -855,6 +855,7 @@ const NAV = [
   { id: "reglamento", icon: "📜", label: "Reglamento" },
   { id: "curso_guitarra", icon: "🎸", label: "Curso de Guitarra" },
   { id: "admin", icon: "⚙", label: "Administración" },
+  { id: "subir_material", icon: "⬆", label: "Subir Material" },
   { id: "solicitudes", icon: "🔔", label: "Solicitudes" },
   { id: "finanzas", icon: "💼", label: "Finanzas" },
   { id: "info_gastos", icon: "📊", label: "Info. Gastos" },
@@ -1254,6 +1255,7 @@ function MobileMenu({
           if (item.id === "vista_invitado" && !esCuerdaAdmin(user))
             return false;
           if (item.id === "solicitudes" && !esCuerdaAdmin(user)) return false;
+          if (item.id === "subir_material" && !esCuerdaAdmin(user)) return false;
           if (item.id === "cancionero") return false;
           if (item.id === "musica") return false;
           if (item.id === "cantos_pdf" || item.id === "audios") return false;
@@ -3442,6 +3444,7 @@ function AppInner() {
             if (item.id === "vista_invitado" && !esCuerdaAdmin(user))
               return false;
             if (item.id === "solicitudes" && !esCuerdaAdmin(user)) return false;
+          if (item.id === "subir_material" && !esCuerdaAdmin(user)) return false;
             // Canto Digital ahora vive dentro de la Sala de Ensayo
             if (item.id === "cancionero") return false;
             if (item.id === "musica") return false;
@@ -4228,6 +4231,9 @@ function AppInner() {
               )}
               {section === "material_ensayo" && (
                 <MaterialEnsayo docs={materialEnsayo} user={user} />
+              )}
+              {section === "subir_material" && esCuerdaAdmin(user) && (
+                <SubirMaterial materialEnsayo={materialEnsayo} onReload={loadData} />
               )}
               {section === "vista_invitado" && esCuerdaAdmin(user) && (
                 <div>
@@ -10648,17 +10654,19 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   // tracks: [{ voz|null, doc }]
   // Motor Web Audio: cada pista se descarga y decodifica completa; al reproducir todas arrancan
   // en el mismo instante del reloj de audio (sincronía exacta) y cada una tiene su propia ganancia (M / S / volumen).
-  const lista = tracks.filter(
+  const sinYoutube = tracks.filter(
     (t) => !/(youtube\.com|youtu\.be)/i.test(urlDoc(t.doc))
   );
-  const hayStems = lista.some((t) => t.voz);
+  const hayStems = sinYoutube.some((t) => t.voz);
+  // Si existen las voces por separado, la mezcla completa sobra (y así no se descarga de más)
+  const lista = hayStems ? sinYoutube.filter((t) => t.voz) : sinYoutube;
   const inicial = () =>
     lista.map((t) => ({
       id: t.doc.id,
       label: t.voz ? ETIQUETA_VOZ_MULTI[t.voz.id] || t.voz.id : "Mezcla",
       vozId: t.voz ? t.voz.id : null,
       vol: 85,
-      on: !(!t.voz && hayStems), // la mezcla completa queda apagada si existen las voces por separado
+      on: true,
       estado: "cargando",
     }));
   const [pistas, setPistas] = useState(inicial);
@@ -10806,6 +10814,7 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   };
 
   const reproducir = async () => {
+    if (pistasRef.current.some((x) => x.estado === "cargando")) return;
     if (!nodos.current.some((n) => n && n.buffer)) return;
     if (primera.current) {
       primera.current = false;
@@ -10853,140 +10862,129 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   const sinMiVoz = () =>
     setPistas((p) => p.map((x) => ({ ...x, on: !!x.vozId && x.vozId !== miCuerda })));
   const alternar = (i) => setPistas((p) => p.map((x, j) => (j === i ? { ...x, on: !x.on } : x)));
-  const soloEsta = (i) =>
-    setPistas((p) => {
-      const yaSola = p.every((x, j) => (j === i ? x.on : !x.on));
-      return p.map((x, j) => ({ ...x, on: yaSola ? inicial()[j].on : j === i }));
-    });
+
+  // Barra espaciadora: reproducir / pausar
+  const toggleRef = useRef(null);
+  toggleRef.current = () => (reloj.current.sonando ? pausar() : reproducir());
+  useEffect(() => {
+    const h = (e) => {
+      if (e.code !== "Space") return;
+      const t = e.target && e.target.tagName;
+      if (/^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(t || "")) return;
+      e.preventDefault();
+      toggleRef.current();
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
 
   const todasFallan = pistas.length > 0 && pistas.every((p) => p.estado === "error");
   if (lista.length === 0 || todasFallan) return fallback;
 
-  const NAVY = "#14283f";
-  const ORO = "#e2b659";
-  const tieneMiVoz = !!miCuerda && pistas.some((p) => p.vozId === miCuerda);
+  const INK = "#12161d";
+  const ACC = "#c9a96a";
+  const cargando = pistas.some((x) => x.estado === "cargando");
+  const nListas = pistas.filter((x) => x.estado === "ok").length;
   const pct = dur ? Math.min(100, (pos / dur) * 100) : 0;
-  const listos = pistas.some((x) => x.estado === "ok");
-  const activas = pistas.filter((x) => x.on && x.vol > 0 && x.estado !== "error");
+  const tieneMiVoz = !!miCuerda && pistas.some((p) => p.vozId === miCuerda);
   const mismas = (arr) => pistas.length === arr.length && pistas.every((x, j) => x.on === arr[j]);
-  const estadoTodas = mismas(inicial().map((x) => x.on));
-  const estadoMia = tieneMiVoz && mismas(pistas.map((x) => !!miCuerda && x.vozId === miCuerda));
-  const estadoSin = tieneMiVoz && mismas(pistas.map((x) => !!x.vozId && x.vozId !== miCuerda));
-  let resumen = "Ninguna pista activa";
-  if (activas.length) {
-    const nombres = activas.map((x) => x.label);
-    resumen = estadoTodas ? "Todas las voces" : estadoMia ? "Solo tu voz" : estadoSin ? "Todo menos tu voz" : nombres.length > 3 ? `${nombres.length} pistas activas` : nombres.join(" + ");
-  }
-  const R = 38;
-  const CIRC = 2 * Math.PI * R;
-  const chip = (activo) => ({
+  const modoTodas = mismas(pistas.map(() => true));
+  const modoMia = tieneMiVoz && mismas(pistas.map((x) => x.vozId === miCuerda));
+  const modoSin = tieneMiVoz && mismas(pistas.map((x) => x.vozId !== miCuerda));
+  const modo = (activo) => ({
     flex: 1,
-    padding: "10px 6px",
-    borderRadius: 12,
+    padding: "9px 6px",
+    borderRadius: 9,
     border: "none",
     cursor: "pointer",
     fontFamily: "inherit",
     fontSize: 12.5,
-    fontWeight: 700,
-    background: activo ? NAVY : "transparent",
-    color: activo ? "#fff" : "#5b6675",
-    boxShadow: activo ? "0 4px 12px rgba(20,40,63,.28)" : "none",
-    transition: "all .18s",
+    fontWeight: 600,
+    letterSpacing: "0.01em",
+    background: activo ? "rgba(255,255,255,0.13)" : "transparent",
+    color: activo ? "#fff" : "#8b94a3",
+    boxShadow: activo ? "inset 0 0 0 1px rgba(255,255,255,0.14)" : "none",
+    transition: "all .15s",
   });
 
   return (
     <div className="me-grid">
       <style>{`
-        .me-grid{display:grid;grid-template-columns:minmax(310px,410px) minmax(0,1fr);gap:26px;align-items:start;margin-bottom:12px}
-        @media(max-width:900px){.me-grid{grid-template-columns:1fr;gap:18px}}
-        .mp-range{-webkit-appearance:none;appearance:none;height:6px;border-radius:6px;outline:none;cursor:pointer}
-        .mp-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--c,#14283f);box-shadow:0 2px 6px rgba(0,0,0,.25)}
-        .mp-range::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#fff;border:3px solid var(--c,#14283f);box-shadow:0 2px 6px rgba(0,0,0,.25)}
-        .mp-voz{transition:background .2s,border-color .2s,box-shadow .2s}
-        .mp-play:hover{transform:scale(1.05)}
-        @keyframes mp-eq{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
-        .mp-eq{display:inline-flex;align-items:flex-end;gap:2px;height:12px}
-        .mp-eq i{width:3px;height:100%;border-radius:2px;background:currentColor;transform-origin:bottom;animation:mp-eq .9s ease-in-out infinite}
-        .mp-eq i:nth-child(2){animation-delay:.18s}.mp-eq i:nth-child(3){animation-delay:.4s}
+        .me-grid{display:grid;grid-template-columns:minmax(300px,390px) minmax(0,1fr);gap:28px;align-items:start;margin-bottom:12px}
+        @media(max-width:900px){.me-grid{grid-template-columns:1fr;gap:20px}}
+        .mp-range{-webkit-appearance:none;appearance:none;height:3px;border-radius:3px;outline:none;cursor:pointer;background:rgba(255,255,255,.14)}
+        .mp-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;background:#fff;border:none;box-shadow:0 1px 5px rgba(0,0,0,.5)}
+        .mp-range::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;border:none;box-shadow:0 1px 5px rgba(0,0,0,.5)}
+        .mp-range:disabled{cursor:default;opacity:.4}
+        .mp-play{transition:transform .15s,background .15s}.mp-play:hover{transform:scale(1.05)}
+        .mp-sw{position:relative;width:38px;height:22px;border-radius:12px;border:none;padding:0;cursor:pointer;transition:background .2s;flex-shrink:0}
+        .mp-sw i{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+        .mp-sw[aria-checked=true] i{transform:translateX(16px)}
+        .mp-fila{transition:opacity .2s}
       `}</style>
-      <div style={{ position: "sticky", top: 12, background: "#fff", borderRadius: 26, overflow: "hidden", border: "1px solid rgba(20,40,63,.08)", boxShadow: "0 30px 60px -30px rgba(20,40,63,.45)", fontFamily: "var(--font-sans)" }}>
+      <div style={{ position: "sticky", top: 12, background: `linear-gradient(180deg,#171c25 0%,${INK} 100%)`, color: "#eceff4", borderRadius: 20, padding: "22px 22px 18px", boxShadow: "0 24px 50px -28px rgba(10,14,22,.75), inset 0 1px 0 rgba(255,255,255,.06)", fontFamily: "var(--font-sans)" }}>
         {/* Transporte */}
-        <div style={{ background: "linear-gradient(160deg,#1c3a5e 0%,#14283f 70%)", color: "#fff", padding: "20px 22px 20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <button className="mp-play" onClick={playing ? pausar : reproducir} aria-label={playing ? "Pausar" : "Reproducir"} style={{ position: "relative", width: 88, height: 88, borderRadius: "50%", border: "none", background: "transparent", cursor: "pointer", padding: 0, flexShrink: 0, opacity: listos ? 1 : 0.5, transition: "transform .15s" }}>
-              <svg width="88" height="88" viewBox="0 0 88 88" style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
-                <circle cx="44" cy="44" r={R} fill="none" stroke="rgba(255,255,255,.16)" strokeWidth="4" />
-                <circle cx="44" cy="44" r={R} fill="none" stroke={ORO} strokeWidth="4" strokeLinecap="round" strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - pct / 100)} />
-              </svg>
-              <span style={{ position: "absolute", inset: 10, borderRadius: "50%", background: ORO, color: NAVY, display: "flex", alignItems: "center", justifyContent: "center", fontSize: playing ? 20 : 24, paddingLeft: playing ? 0 : 3, boxShadow: "0 8px 20px rgba(0,0,0,.3)" }}>{playing ? "❚❚" : "▶"}</span>
-            </button>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: 10.5, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.6, fontWeight: 700 }}>Ensayo por voces</div>
-              <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.03em", fontVariantNumeric: "tabular-nums", lineHeight: 1.15 }}>
-                {fmtTiempoMulti(pos)}
-                <span style={{ fontSize: 14, fontWeight: 500, opacity: 0.6 }}> / {fmtTiempoMulti(dur)}</span>
-              </div>
-              <button onClick={() => irA(0)} style={{ marginTop: 4, background: "none", border: "none", color: "rgba(255,255,255,.75)", fontSize: 12, cursor: "pointer", fontFamily: "inherit", padding: 0, textDecoration: "underline", textUnderlineOffset: 3 }}>⏮ Volver al inicio</button>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <button className="mp-play" onClick={playing ? pausar : reproducir} disabled={cargando || nListas === 0} aria-label={playing ? "Pausar" : "Reproducir"}
+            style={{ width: 54, height: 54, borderRadius: "50%", border: "none", background: "#fff", color: INK, cursor: cargando ? "default" : "pointer", opacity: cargando || nListas === 0 ? 0.45 : 1, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {playing ? (
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor"><rect x="3" y="2" width="4" height="14" rx="1" /><rect x="11" y="2" width="4" height="14" rx="1" /></svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor"><path d="M5 2.5v13l11-6.5z" /></svg>
+            )}
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+              <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 40, fontWeight: 600, lineHeight: 1, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em" }}>{fmtTiempoMulti(pos)}</span>
+              <span style={{ fontSize: 13, color: "#8b94a3", fontVariantNumeric: "tabular-nums" }}>/ {fmtTiempoMulti(dur)}</span>
+            </div>
+            <div style={{ fontSize: 12, color: "#8b94a3", marginTop: 4 }}>
+              {cargando ? `Cargando pistas ${nListas} de ${pistas.length}…` : (
+                <button onClick={() => irA(0)} style={{ background: "none", border: "none", color: "#8b94a3", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12 }}>Volver al inicio</button>
+              )}
             </div>
           </div>
-          <input className="mp-range" type="range" min={0} max={dur || 1} step={0.1} value={Math.min(pos, dur || 1)} onChange={(e) => irA(parseFloat(e.target.value))} aria-label="Posición"
-            style={{ "--c": ORO, width: "100%", marginTop: 18, background: `linear-gradient(90deg,${ORO} ${pct}%,rgba(255,255,255,.2) ${pct}%)` }} />
-          <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 8, fontSize: 13, background: "rgba(255,255,255,.08)", borderRadius: 12, padding: "9px 12px" }}>
-            {playing && activas.length > 0 ? <span className="mp-eq" style={{ color: ORO }}><i /><i /><i /></span> : <span style={{ opacity: 0.6 }}>🎧</span>}
-            <span style={{ opacity: 0.65 }}>Escuchando:</span>
-            <b style={{ color: activas.length ? "#fff" : "#f0a39b" }}>{resumen}</b>
-          </div>
         </div>
+        <input className="mp-range" type="range" min={0} max={dur || 1} step={0.1} value={Math.min(pos, dur || 1)} onChange={(e) => irA(parseFloat(e.target.value))} aria-label="Posición" disabled={cargando}
+          style={{ width: "100%", marginTop: 18, background: `linear-gradient(90deg,${ACC} ${pct}%,rgba(255,255,255,.14) ${pct}%)` }} />
 
-        {/* Modos rápidos */}
-        <div style={{ padding: "16px 18px 6px" }}>
-          <div style={{ display: "flex", gap: 4, padding: 4, borderRadius: 16, background: "#eef1f5" }}>
-            <button onClick={restablecer} style={chip(estadoTodas)}>Todas</button>
-            {tieneMiVoz && <button onClick={soloMiVoz} style={chip(estadoMia)}>★ Mi voz sola</button>}
-            {tieneMiVoz && <button onClick={sinMiVoz} style={chip(estadoSin)}>Sin mi voz</button>}
+        {/* Modos */}
+        {tieneMiVoz && (
+          <div style={{ display: "flex", gap: 3, padding: 3, borderRadius: 12, background: "rgba(255,255,255,0.06)", marginTop: 20 }}>
+            <button onClick={restablecer} style={modo(modoTodas)}>Todas</button>
+            <button onClick={soloMiVoz} style={modo(modoMia)}>Mi voz</button>
+            <button onClick={sinMiVoz} style={modo(modoSin)}>Sin mi voz</button>
           </div>
-        </div>
+        )}
 
         {/* Voces */}
-        <div style={{ padding: "10px 18px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ marginTop: tieneMiVoz ? 8 : 20 }}>
           {pistas.map((p, i) => {
-            const v = lista[i] && lista[i].voz;
-            const col = v ? v.color : "#6b7280";
             const err = p.estado === "error";
-            const suena = p.on && !err;
+            const on = p.on && !err;
+            const mia = p.vozId && p.vozId === miCuerda;
             return (
-              <div key={p.id} className="mp-voz" style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 18, border: "1.5px solid " + (suena ? col : "#e5e9ef"), background: suena ? col + "14" : "#f7f8fa", opacity: err ? 0.45 : 1 }}>
-                <button onClick={() => alternar(i)} disabled={err} aria-label={(p.on ? "Silenciar " : "Activar ") + p.label} aria-pressed={p.on}
-                  style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0, cursor: err ? "default" : "pointer", border: "2px solid " + (suena ? col : "#c9d0da"), background: suena ? col : "#fff", color: suena ? "#fff" : "#9aa3b0", fontSize: 19, display: "flex", alignItems: "center", justifyContent: "center", transition: "all .18s", boxShadow: suena ? `0 6px 14px ${col}55` : "none" }}>
-                  {suena ? "🔊" : "🔇"}
-                </button>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 14.5, fontWeight: 800, color: suena ? "#14283f" : "#8a93a1" }}>{p.label}</span>
-                    {p.vozId && p.vozId === miCuerda && <span style={{ fontSize: 10.5, fontWeight: 800, background: ORO, color: NAVY, borderRadius: 6, padding: "1px 6px" }}>TU VOZ</span>}
-                    <span style={{ marginLeft: "auto", fontSize: 10.5, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: err ? "#b42318" : p.estado === "cargando" ? "#8a93a1" : suena ? col : "#9aa3b0" }}>
-                      {err ? "No disponible" : p.estado === "cargando" ? "Cargando…" : suena ? (playing ? "Sonando" : "Activa") : "Silenciada"}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 7 }}>
-                    <input className="mp-range" type="range" min={0} max={100} value={p.vol} disabled={err} onChange={(e) => setP(i, { vol: parseInt(e.target.value, 10) })} aria-label={"Volumen " + p.label}
-                      style={{ "--c": col, flex: 1, minWidth: 50, opacity: suena ? 1 : 0.45, background: `linear-gradient(90deg,${col} ${p.vol}%,#d9dee6 ${p.vol}%)` }} />
-                    <span style={{ width: 30, textAlign: "right", fontSize: 11.5, color: "#7a8494", fontVariantNumeric: "tabular-nums" }}>{p.vol}</span>
-                    <button onClick={() => soloEsta(i)} disabled={err} title="Escuchar solo esta pista" style={{ fontSize: 11, fontWeight: 800, padding: "4px 9px", borderRadius: 8, border: "1px solid #cfd6df", background: "#fff", color: "#3d4757", cursor: err ? "default" : "pointer", fontFamily: "inherit" }}>Solo</button>
-                  </div>
+              <div key={p.id} className="mp-fila" style={{ padding: "13px 0", borderBottom: i < pistas.length - 1 ? "1px solid rgba(255,255,255,.07)" : "none", opacity: err ? 0.35 : on ? 1 : 0.45 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <button className="mp-sw" role="switch" aria-checked={on} aria-label={p.label} disabled={err} onClick={() => alternar(i)} style={{ background: on ? ACC : "rgba(255,255,255,.2)" }}><i /></button>
+                  <button onClick={() => !err && alternar(i)} style={{ flex: 1, textAlign: "left", background: "none", border: "none", color: "inherit", cursor: err ? "default" : "pointer", fontFamily: "inherit", padding: 0, fontSize: 15, fontWeight: 600, letterSpacing: "-0.005em" }}>
+                    {p.label}
+                    {mia && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: ACC, letterSpacing: "0.04em" }}>TU VOZ</span>}
+                  </button>
+                  <span style={{ fontSize: 12, color: "#8b94a3", fontVariantNumeric: "tabular-nums", minWidth: 52, textAlign: "right" }}>{err ? "No disponible" : cargando && p.estado === "cargando" ? "…" : on ? p.vol + "%" : "Silenciada"}</span>
                 </div>
+                <input className="mp-range" type="range" min={0} max={100} value={p.vol} disabled={err || !on} onChange={(e) => setP(i, { vol: parseInt(e.target.value, 10) })} aria-label={"Volumen " + p.label}
+                  style={{ width: "100%", marginTop: 11, background: `linear-gradient(90deg,rgba(255,255,255,.75) ${p.vol}%,rgba(255,255,255,.14) ${p.vol}%)` }} />
               </div>
             );
           })}
-          <div style={{ fontSize: 12, color: "#7a8494", lineHeight: 1.5, marginTop: 4 }}>
-            Toca el círculo de cada voz para <b>activarla o silenciarla</b>. <b>Solo</b> deja únicamente esa pista.
-          </div>
         </div>
       </div>
       {visor}
     </div>
   );
 }
+
 
 // Visor de PDF propio: páginas con flechas, zoom y pantalla completa (pdf.js). Si algo falla, usa el visor de Drive.
 function VisorPDF({ url, nombre }) {
@@ -11092,29 +11090,29 @@ function VisorPDF({ url, nombre }) {
       else if (el.requestFullscreen) el.requestFullscreen();
     } catch (e) {}
   };
-  const bt = (off) => ({ width: 44, height: 44, borderRadius: 12, border: "1px solid #e6dfcf", background: "#fff", color: "#3b3b3b", fontSize: 20, cursor: off ? "default" : "pointer", opacity: off ? 0.35 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 });
+  const bt = (off) => ({ width: 38, height: 38, borderRadius: 10, border: "none", background: "#f1f2f5", color: "#2a2f3a", fontSize: 18, cursor: off ? "default" : "pointer", opacity: off ? 0.35 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 });
   if (error) {
     return (
-      <div style={{ background: "#ece4d2", borderRadius: 20, overflow: "hidden", border: "1px solid #e6dfcf" }}>
+      <div style={{ background: "#e9ebef", borderRadius: 16, overflow: "hidden", border: "1px solid #e6e8ec" }}>
         <iframe title={nombre || "Documento"} src={drivePreviewUrl(url) || url} style={{ width: "100%", height: "min(78vh, 760px)", minHeight: 480, border: 0, display: "block" }} allow="autoplay" />
       </div>
     );
   }
   return (
-    <div ref={caja} style={{ background: "#fff", border: "1px solid #e6dfcf", borderRadius: 20, overflow: "hidden", display: "flex", flexDirection: "column", height: completa ? "100vh" : "auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px", flexWrap: "wrap" }}>
+    <div ref={caja} style={{ background: "#fff", border: "1px solid #e6e8ec", borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 18px 40px -30px rgba(18,22,29,.35)", height: completa ? "100vh" : "auto" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 12px", flexWrap: "wrap", borderBottom: "1px solid #eef0f3" }}>
         <button onClick={() => ir(pagina - 1)} disabled={pagina <= 1} style={bt(pagina <= 1)} aria-label="Página anterior">‹</button>
-        <span style={{ fontSize: 14, fontWeight: 600, minWidth: 96, textAlign: "center", whiteSpace: "nowrap" }}>{pdf ? `Página ${pagina} de ${total}` : "Cargando…"}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#2a2f3a", minWidth: 96, textAlign: "center", whiteSpace: "nowrap" }}>{pdf ? `Página ${pagina} de ${total}` : "Cargando…"}</span>
         <button onClick={() => ir(pagina + 1)} disabled={pagina >= total} style={bt(pagina >= total)} aria-label="Página siguiente">›</button>
-        <span style={{ width: 1, height: 28, background: "#e6dfcf", margin: "0 6px" }} />
+        <span style={{ width: 1, height: 22, background: "#e6e8ec", margin: "0 6px" }} />
         <button onClick={() => setZoom((z) => Math.max(50, z - 25))} style={bt(false)} aria-label="Alejar">−</button>
-        <span style={{ width: 48, textAlign: "center", fontSize: 14, fontWeight: 600 }}>{zoom}%</span>
+        <span style={{ width: 46, textAlign: "center", fontSize: 13, fontWeight: 600, color: "#2a2f3a" }}>{zoom}%</span>
         <button onClick={() => setZoom((z) => Math.min(300, z + 25))} style={bt(false)} aria-label="Acercar">+</button>
         <button onClick={pantallaCompleta} style={{ ...bt(false), marginLeft: "auto" }} aria-label="Pantalla completa" title="Pantalla completa">⛶</button>
       </div>
-      <div ref={marco} style={{ background: "#ece4d2", overflow: "auto", padding: 12, flex: 1, maxHeight: completa ? "none" : "min(78vh, 760px)", minHeight: completa ? 0 : 420, textAlign: "center" }}>
+      <div ref={marco} style={{ background: "#e9ebef", overflow: "auto", padding: 12, flex: 1, maxHeight: completa ? "none" : "min(78vh, 760px)", minHeight: completa ? 0 : 420, textAlign: "center" }}>
         {!pdf && <div style={{ padding: 60, color: "#8a8a90", fontSize: 13 }}>Cargando documento…</div>}
-        <canvas ref={lienzo} style={{ display: pdf ? "inline-block" : "none", boxShadow: "0 6px 24px rgba(0,0,0,.18)", background: "#fff" }} />
+        <canvas ref={lienzo} style={{ display: pdf ? "inline-block" : "none", boxShadow: "0 6px 24px rgba(18,22,29,.18)", background: "#fff" }} />
       </div>
     </div>
   );
@@ -11137,21 +11135,21 @@ function VisorMaterialEnsayo({ partituras, letras, cantoNombre, accent }) {
   }, [tab]);
   return (
     <div style={{ minWidth: 0 }}>
-      <div style={{ display: "inline-flex", gap: 4, padding: 4, borderRadius: 16, background: "#e9edf3", marginBottom: 14 }}>
+      <div style={{ display: "flex", gap: 26, borderBottom: "1px solid #e6e8ec", marginBottom: 14 }}>
         {tabs.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{ border: "none", cursor: "pointer", fontFamily: "inherit", padding: "10px 24px", borderRadius: 12, fontSize: 14, fontWeight: 800, background: tab === t.id ? "#14283f" : "transparent", color: tab === t.id ? "#fff" : "#5b6675", boxShadow: tab === t.id ? "0 4px 12px rgba(20,40,63,.28)" : "none", transition: "all .18s" }}>
+          <button key={t.id} onClick={() => setTab(t.id)} style={{ border: "none", background: "none", cursor: "pointer", fontFamily: "inherit", padding: "8px 0 11px", marginBottom: -1, fontSize: 14, fontWeight: 600, letterSpacing: "0.01em", color: tab === t.id ? "#12161d" : "#8b94a3", borderBottom: "2px solid " + (tab === t.id ? "#12161d" : "transparent"), transition: "all .15s" }}>
             {t.label}
           </button>
         ))}
       </div>
       {actual.docs.length === 0 ? (
-        <div style={{ background: "#fff", border: "1px solid #e6dfcf", borderRadius: 18, padding: "36px 20px", textAlign: "center", color: "#8a8a90", fontSize: 13 }}>
+        <div style={{ background: "#fff", border: "1px solid #e6e8ec", borderRadius: 16, padding: "36px 20px", textAlign: "center", color: "#8a8a90", fontSize: 13 }}>
           Aún no hay {tab === "partitura" ? "partitura" : "letra"} para este canto.
         </div>
       ) : (
         <div>
           {actual.docs.length > 1 && (
-            <select value={sel ? sel.id : ""} onChange={(e) => setSelId(e.target.value)} style={{ width: "100%", height: 44, padding: "0 12px", borderRadius: 12, border: "1px solid #e6dfcf", fontSize: 13.5, fontFamily: "inherit", background: "#fff", marginBottom: 10 }}>
+            <select value={sel ? sel.id : ""} onChange={(e) => setSelId(e.target.value)} style={{ width: "100%", height: 40, padding: "0 12px", borderRadius: 10, border: "1px solid #e6e8ec", fontSize: 13, fontFamily: "inherit", background: "#fff", marginBottom: 10 }}>
               {actual.docs.map((d) => (
                 <option key={d.id} value={d.id}>{d.nombre}</option>
               ))}
@@ -11166,7 +11164,10 @@ function VisorMaterialEnsayo({ partituras, letras, cantoNombre, accent }) {
 
 function MaterialEnsayo({ docs, user, catFiltroInicial }) {
   const norm = _normME;
+  // La cuerda sale del perfil del integrante; solo se pregunta si el perfil no tiene una de las 5 voces
+  const cuerdaPerfil = (VOCES_ENSAYO.find((v) => _normME(v.id) === _normME(user && user.cuerda)) || {}).id || "";
   const [miCuerda, setMiCuerda] = useState(() => {
+    if (cuerdaPerfil) return cuerdaPerfil;
     try {
       return localStorage.getItem("me_mi_cuerda") || "";
     } catch {
@@ -11357,448 +11358,56 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
         .me-row { transition: background 0.14s ease; }
       `}</style>
 
-      {/* ── Hero ── */}
-      <div
-        className="me-fade"
-        style={{
-          position: "relative",
-          overflow: "hidden",
-          background:
-            "radial-gradient(120% 90% at 100% 0%, rgba(220,183,101,0.20) 0%, transparent 55%), linear-gradient(160deg,#12493d 0%,#0e3a31 55%,#09271f 100%)",
-          borderRadius: 26,
-          padding: "24px 26px",
-          marginBottom: 14,
-          boxShadow:
-            "0 28px 56px -26px rgba(6,30,25,0.65), inset 0 1px 0 rgba(255,255,255,0.08)",
-          border: "1px solid rgba(255,255,255,0.08)",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: -60,
-            right: -40,
-            width: 180,
-            height: 180,
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle, rgba(220,183,101,0.18) 0%, transparent 70%)",
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 14,
-            position: "relative",
-          }}
-        >
-          <div
-            style={{
-              width: 50,
-              height: 50,
-              borderRadius: 15,
-              flexShrink: 0,
-              background: "linear-gradient(145deg,#f8e6ae,#d6ab52)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 26,
-              boxShadow: "0 8px 22px rgba(220,183,101,0.35), inset 0 1px 0 rgba(255,255,255,0.6)",
-            }}
-          >
-            🎼
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 10.5,
-                fontWeight: 700,
-                color: "#dcb765",
-                letterSpacing: "0.22em",
-                textTransform: "uppercase",
-                marginBottom: 2,
-              }}
-            >
-              Sala de Ensayo
-            </div>
-            <div
-              style={{
-                fontSize: 26,
-                fontWeight: 800,
-                color: "#f6f0e1",
-                letterSpacing: "-0.03em",
-                lineHeight: 1.1,
-              }}
-            >
-              Hola, {nombre1}
-            </div>
-            <div
-              style={{
-                fontSize: 13,
-                color: "rgba(246,240,225,0.65)",
-                marginTop: 3,
-                lineHeight: 1.4,
-              }}
-            >
-              Repertorio de la misa · elige tu voz y estudia tu pista
-            </div>
-          </div>
-        </div>
-
-        {/* Mi cuerda */}
-        <div style={{ marginTop: 14, position: "relative" }}>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              color: "rgba(246,240,225,0.55)",
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              marginBottom: 7,
-            }}
-          >
-            Mi cuerda
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {VOCES_ENSAYO.map((v) => {
-              const on = miCuerda === v.id;
-              return (
-                <button
-                  key={v.id}
-                  onClick={() => setMiCuerda(on ? "" : v.id)}
-                  style={{
-                    fontSize: 12,
-                    padding: "6px 12px",
-                    borderRadius: 20,
-                    cursor: "pointer",
-                    border: `1px solid ${
-                      on ? "#dcb765" : "rgba(255,255,255,0.2)"
-                    }`,
-                    background: on ? "linear-gradient(145deg,#f8e6ae,#d6ab52)" : "rgba(255,255,255,0.05)",
-                    color: on ? "#10352d" : "rgba(246,240,225,0.85)",
-                    fontWeight: on ? 800 : 600,
-                    fontFamily: "inherit",
-                    transition: "all .15s",
-                  }}
-                >
-                  {v.emoji} {v.id}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
       {!cantoActivo ? (
-        <div className="me-fade">
-          <details
-            style={{
-              marginBottom: 14,
-              background: "#f5f9ff",
-              border: "1px solid #cfe0fb",
-              borderRadius: 14,
-            }}
-          >
-            <summary
-              style={{
-                cursor: "pointer",
-                padding: "11px 16px",
-                fontSize: 13,
-                fontWeight: 700,
-                color: "#0a5ac8",
-                listStyle: "none",
-              }}
-            >
-              ❓ ¿Cómo se usa esta sala?
-            </summary>
-            <div
-              style={{
-                padding: "2px 16px 14px",
-                fontSize: 12.5,
-                color: "#3a3a40",
-                lineHeight: 1.65,
-              }}
-            >
-              <div style={{ marginBottom: 6 }}>
-                <strong>1. Elige tu cuerda</strong> arriba (Soprano, Contralto,
-                Tenor, Bajo o Instrumentos). El reproductor cargará tu voz sola.
-              </div>
-              <div style={{ marginBottom: 6 }}>
-                <strong>2. Toca un canto</strong> de la lista para abrirlo.
-              </div>
-              <div style={{ marginBottom: 6 }}>
-                <strong>3. Escucha tu pista:</strong> ▶ para reproducir. Baja la{" "}
-                <strong>velocidad</strong> (0.75x / 0.9x) para aprender un
-                pasaje difícil, y fija un tramo con <strong>A</strong> y{" "}
-                <strong>B</strong> para repetirlo en bucle.
-              </div>
-              <div style={{ marginBottom: 6 }}>
-                <strong>4. Cambia de voz</strong> cuando quieras: toca otra
-                cuerda y sonará esa pista.
-              </div>
-              <div style={{ marginBottom: 6 }}>
-                <strong>5. Lee la partitura y la letra</strong> en pantalla
-                mientras escuchas tu pista.
-              </div>
-              <div>
-                <strong>6. Marca tu avance</strong> en cada canto: Pendiente →
-                En práctica → Aprendido.
+        <div className="me-fade" style={{ fontFamily: "var(--font-sans)" }}>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 18 }}>
+            <div>
+              <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "#8b94a3", fontWeight: 700 }}>Sala de ensayo</div>
+              <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 38, fontWeight: 600, color: "#12161d", lineHeight: 1.05, marginTop: 4, letterSpacing: "-0.01em" }}>Repertorio de la misa</div>
+              <div style={{ fontSize: 13, color: "#6b7280", marginTop: 6 }}>
+                {cantos.length} {cantos.length === 1 ? "canto" : "cantos"}
+                {cuerdaPerfil ? <> · Tu cuerda: <b style={{ color: "#12161d" }}>{cuerdaPerfil}</b></> : null}
               </div>
             </div>
-          </details>
-          {/* Buscador */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              background: "white",
-              borderRadius: 11,
-              padding: "8px 13px",
-              border: "1px solid rgba(60,60,67,0.12)",
-              marginBottom: 14,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle
-                cx="6"
-                cy="6"
-                r="4.5"
-                stroke="#8e8e93"
-                strokeWidth="1.3"
-              />
-              <path
-                d="M9.5 9.5l3 3"
-                stroke="#8e8e93"
-                strokeWidth="1.3"
-                strokeLinecap="round"
-              />
-            </svg>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar canto…"
-              style={{
-                border: "none",
-                outline: "none",
-                fontSize: 13,
-                flex: 1,
-                color: "#1c1c1e",
-                background: "none",
-              }}
-            />
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid #e6e8ec", borderRadius: 12, padding: "9px 14px", minWidth: 230 }}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#8b94a3" strokeWidth="1.3" /><path d="M9.5 9.5l3 3" stroke="#8b94a3" strokeWidth="1.3" strokeLinecap="round" /></svg>
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar canto" style={{ border: "none", outline: "none", fontSize: 13.5, flex: 1, color: "#12161d", background: "none", fontFamily: "inherit" }} />
+            </div>
           </div>
+
+          {!cuerdaPerfil && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+              <span style={{ fontSize: 12, color: "#6b7280", marginRight: 4 }}>Mi cuerda</span>
+              {VOCES_ENSAYO.map((v) => {
+                const on = miCuerda === v.id;
+                return (
+                  <button key={v.id} onClick={() => setMiCuerda(on ? "" : v.id)} style={{ fontSize: 12.5, fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", fontFamily: "inherit", border: "1px solid " + (on ? "#12161d" : "#dfe2e7"), background: on ? "#12161d" : "#fff", color: on ? "#fff" : "#4b5563", transition: "all .15s" }}>{v.id}</button>
+                );
+              })}
+            </div>
+          )}
 
           {cantos.length === 0 ? (
-            <div
-              style={{
-                textAlign: "center",
-                padding: "44px 20px",
-                background: "white",
-                borderRadius: 18,
-                border: "1px solid rgba(60,60,67,0.08)",
-              }}
-            >
-              <div style={{ fontSize: 40, marginBottom: 10, opacity: 0.35 }}>
-                🎼
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1c1e" }}>
-                Aún no hay cantos en el repertorio
-              </div>
-              <div style={{ fontSize: 12.5, color: "#8a8a90", marginTop: 4 }}>
-                El encargado publicará los cantos de la misa pronto.
-              </div>
+            <div style={{ textAlign: "center", padding: "56px 20px", background: "#fff", borderRadius: 16, border: "1px solid #e6e8ec", color: "#6b7280", fontSize: 14 }}>
+              Aún no hay cantos en el repertorio.
             </div>
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))",
-                gap: 12,
-              }}
-            >
+            <div style={{ background: "#fff", border: "1px solid #e6e8ec", borderRadius: 16, overflow: "hidden", boxShadow: "0 18px 40px -32px rgba(18,22,29,.4)" }}>
               {cantos.map((c, i) => {
-                const est = progreso[c.nombre];
-                const estO = ESTADOS.find((e) => e.id === est);
-                const tieneLetra = c.files.some(
-                  (f) => tipoDocEnsayo(f) === "letra"
-                );
-                const tienePart = c.files.some(
-                  (f) => tipoDocEnsayo(f) === "partitura"
-                );
-                const tieneVideo = c.files.some(
-                  (f) => tipoDocEnsayo(f) === "video"
-                );
+                const nVoces = VOCES_ENSAYO.filter((v) => tieneVozAudio(c, v.id)).length;
+                const tienePart = c.files.some((f) => tipoDocEnsayo(f) === "partitura");
+                const tieneLetra = c.files.some((f) => tipoDocEnsayo(f) === "letra");
+                const meta = [tienePart && "Partitura", tieneLetra && "Letra", nVoces > 0 && `${nVoces} ${nVoces === 1 ? "voz" : "voces"}`].filter(Boolean).join("  ·  ");
                 return (
-                  <button
-                    key={c.key}
-                    className="me-tile"
-                    onClick={() => abrirCanto(c)}
-                    style={{
-                      textAlign: "left",
-                      cursor: "pointer",
-                      background: "white",
-                      border: "1px solid rgba(16,53,45,0.08)",
-                      borderRadius: 20,
-                      padding: "16px 17px",
-                      fontFamily: "inherit",
-                      boxShadow: "0 1px 2px rgba(16,53,45,0.04), 0 14px 30px -18px rgba(16,53,45,0.35)",
-                      animationDelay: `${i * 0.03}s`,
-                      position: "relative",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        marginBottom: 6,
-                      }}
-                    >
-                      {c.momento ? (
-                        <span
-                          style={{
-                            fontSize: 9.5,
-                            fontWeight: 800,
-                            color: "#0e3a31",
-                            background: "rgba(220,183,101,0.28)",
-                            borderRadius: 6,
-                            padding: "2px 8px",
-                            letterSpacing: "0.05em",
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          {c.momento}
-                        </span>
-                      ) : (
-                        <span />
-                      )}
-                      {estO && (
-                        <span
-                          style={{
-                            fontSize: 9.5,
-                            fontWeight: 700,
-                            color: estO.color,
-                            background: estO.bg,
-                            borderRadius: 6,
-                            padding: "2px 8px",
-                          }}
-                        >
-                          {estO.label}
-                        </span>
-                      )}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 16,
-                        fontWeight: 800,
-                        color: "#1c1c1e",
-                        letterSpacing: "-0.02em",
-                        lineHeight: 1.2,
-                        marginBottom: 10,
-                      }}
-                    >
-                      {c.nombre}
-                    </div>
-                    {/* Voces con pista (claro, en palabras) */}
-                    {(() => {
-                      const conAudio = VOCES_ENSAYO.filter((v) =>
-                        tieneVozAudio(c, v.id)
-                      );
-                      return conAudio.length > 0 ? (
-                        <div
-                          style={{
-                            fontSize: 11.5,
-                            color: "#5a5a60",
-                            marginBottom: 10,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                            flexWrap: "wrap",
-                            lineHeight: 1.4,
-                          }}
-                        >
-                          <span style={{ fontSize: 13 }}>🎧</span>
-                          <span>
-                            <strong style={{ color: "#1c1c1e" }}>Voces:</strong>{" "}
-                            {conAudio.map((v) => v.id).join(" · ")}
-                          </span>
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            fontSize: 11.5,
-                            color: "#a0a0a6",
-                            marginBottom: 10,
-                          }}
-                        >
-                          🎧 Sin pistas de audio aún
-                        </div>
-                      );
-                    })()}
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      {tieneLetra && (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: "#3c3c43",
-                            background: "rgba(60,60,67,0.06)",
-                            borderRadius: 7,
-                            padding: "3px 8px",
-                          }}
-                        >
-                          📝 Letra
-                        </span>
-                      )}
-                      {tienePart && (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: "#3c3c43",
-                            background: "rgba(60,60,67,0.06)",
-                            borderRadius: 7,
-                            padding: "3px 8px",
-                          }}
-                        >
-                          🎼 Partitura
-                        </span>
-                      )}
-                      {tieneVideo && (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: "#3c3c43",
-                            background: "rgba(60,60,67,0.06)",
-                            borderRadius: 7,
-                            padding: "3px 8px",
-                          }}
-                        >
-                          🎬 Video
-                        </span>
-                      )}
-                      <span
-                        style={{
-                          marginLeft: "auto",
-                          fontSize: 12,
-                          color: "#0e3a31",
-                          fontWeight: 800,
-                        }}
-                      >
-                        Estudiar ›
-                      </span>
-                    </div>
+                  <button key={c.key} className="me-row" onClick={() => abrirCanto(c)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 18, textAlign: "left", cursor: "pointer", background: "#fff", border: "none", borderTop: i ? "1px solid #eef0f3" : "none", padding: "17px 22px", fontFamily: "inherit" }}
+                    onMouseOver={(e) => (e.currentTarget.style.background = "#f8f9fb")} onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}>
+                    <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, color: "#b3b9c4", width: 30, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{String(i + 1).padStart(2, "0")}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      {c.momento && <span style={{ display: "block", fontSize: 10.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#9a7b3e", fontWeight: 700, marginBottom: 3 }}>{c.momento}</span>}
+                      <span style={{ display: "block", fontSize: 16.5, fontWeight: 600, color: "#12161d", letterSpacing: "-0.01em" }}>{c.nombre}</span>
+                      {meta && <span style={{ display: "block", fontSize: 12.5, color: "#8b94a3", marginTop: 3 }}>{meta}</span>}
+                    </span>
+                    <span style={{ color: "#b3b9c4", fontSize: 22, lineHeight: 1 }}>›</span>
                   </button>
                 );
               })}
@@ -11807,216 +11416,32 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
         </div>
       ) : (
         /* ── Detalle de un canto ── */
-        <div className="me-fade">
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 12,
-              flexWrap: "wrap",
-            }}
-          >
-            <button
-              onClick={() => {
-                setCantoSel(null);
-                setTrackId(null);
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                background: "white",
-                border: "1px solid rgba(60,60,67,0.12)",
-                borderRadius: 11,
-                padding: "8px 13px",
-                cursor: "pointer",
-                fontSize: 12.5,
-                color: C.primary,
-                fontWeight: 600,
-              }}
-            >
-              ‹ Repertorio
-            </button>
-            <select
-              value={cantoActivo.key}
-              onChange={(e) => {
-                const c = cantos.find((x) => x.key === e.target.value);
-                if (c) abrirCanto(c);
-              }}
-              style={{
-                flex: 1,
-                minWidth: 160,
-                padding: "8px 12px",
-                borderRadius: 11,
-                border: "1px solid rgba(60,60,67,0.12)",
-                fontSize: 12.5,
-                color: "#1c1c1e",
-                background: "white",
-                outline: "none",
-                fontFamily: "inherit",
-                fontWeight: 600,
-              }}
-            >
-              {cantos.map((c) => (
-                <option key={c.key} value={c.key}>
-                  {c.momento ? `${c.momento} · ` : ""}
-                  {c.nombre}
-                </option>
-              ))}
+        <div className="me-fade" style={{ fontFamily: "var(--font-sans)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+            <button onClick={() => { setCantoSel(null); setTrackId(null); }} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 13.5, fontWeight: 600, color: "#4b5563", padding: 0 }}>‹ Repertorio</button>
+            <select value={cantoActivo.key} onChange={(e) => { const c = cantos.find((x) => x.key === e.target.value); if (c) abrirCanto(c); }} aria-label="Cambiar de canto"
+              style={{ maxWidth: 280, padding: "8px 12px", borderRadius: 10, border: "1px solid #e6e8ec", fontSize: 13, color: "#12161d", background: "#fff", outline: "none", fontFamily: "inherit", fontWeight: 500 }}>
+              {cantos.map((c) => (<option key={c.key} value={c.key}>{c.momento ? `${c.momento} · ` : ""}{c.nombre}</option>))}
             </select>
           </div>
-
-          <div
-            style={{
-              background: "white",
-              borderRadius: 16,
-              border: "1px solid rgba(60,60,67,0.1)",
-              padding: "16px 16px 14px",
-              marginBottom: 12,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "space-between",
-                gap: 10,
-                flexWrap: "wrap",
-              }}
-            >
-              <div style={{ minWidth: 0 }}>
-                {cantoActivo.momento && (
-                  <div
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 800,
-                      color: C.primary,
-                      letterSpacing: "0.08em",
-                      textTransform: "uppercase",
-                      marginBottom: 3,
-                    }}
-                  >
-                    {cantoActivo.momento}
-                  </div>
-                )}
-                <div
-                  style={{
-                    fontSize: 20,
-                    fontWeight: 800,
-                    color: "#1c1c1e",
-                    letterSpacing: "-0.025em",
-                    lineHeight: 1.15,
-                  }}
-                >
-                  {cantoActivo.nombre}
+          <div style={{ marginBottom: 20 }}>
+            {cantoActivo.momento && <div style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "#9a7b3e", fontWeight: 700 }}>{cantoActivo.momento}</div>}
+            <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 38, fontWeight: 600, color: "#12161d", lineHeight: 1.08, letterSpacing: "-0.01em", marginTop: 4 }}>{cantoActivo.nombre}</div>
+            {(() => {
+              const f = cantoActivo.files || [];
+              const autor = f.map((r) => r.autor).find(Boolean);
+              const yt = f.map((r) => r.youtube).find(Boolean);
+              const sp = f.map((r) => r.spotify).find(Boolean);
+              if (!autor && !yt && !sp) return null;
+              const lk = { color: "#12161d", fontWeight: 600, fontSize: 13, textDecoration: "underline", textUnderlineOffset: 3 };
+              return (
+                <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginTop: 8, fontSize: 13, color: "#6b7280" }}>
+                  {autor && <span>{autor}</span>}
+                  {yt && <a href={yt} target="_blank" rel="noopener noreferrer" style={lk}>YouTube</a>}
+                  {sp && <a href={sp} target="_blank" rel="noopener noreferrer" style={lk}>Spotify</a>}
                 </div>
-                {(() => {
-                  const fa = (cantoActivo.files || [])
-                    .map((r) => r.autor)
-                    .find(Boolean);
-                  return fa ? (
-                    <div
-                      style={{ fontSize: 12.5, color: "#6a6a70", marginTop: 4 }}
-                    >
-                      <strong style={{ color: "#3a3a40" }}>Autor:</strong> {fa}
-                    </div>
-                  ) : null;
-                })()}
-              </div>
-              {(() => {
-                const fy = (cantoActivo.files || [])
-                  .map((r) => r.youtube)
-                  .find(Boolean);
-                const fs = (cantoActivo.files || [])
-                  .map((r) => r.spotify)
-                  .find(Boolean);
-                if (!fy && !fs) return null;
-                return (
-                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                    {fy && (
-                      <a
-                        href={fy}
-                        target="_blank"
-                        rel="noopener"
-                        title="YouTube"
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: "50%",
-                          background: "#FF0000",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="white"
-                        >
-                          <path d="M23 7.5a3 3 0 0 0-2.1-2.1C19 4.9 12 4.9 12 4.9s-7 0-8.9.5A3 3 0 0 0 1 7.5 31 31 0 0 0 .5 12 31 31 0 0 0 1 16.5a3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.5 31 31 0 0 0-.5-4.5ZM9.8 15.3V8.7l5.7 3.3-5.7 3.3Z" />
-                        </svg>
-                      </a>
-                    )}
-                    {fs && (
-                      <a
-                        href={fs}
-                        target="_blank"
-                        rel="noopener"
-                        title="Spotify"
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: "50%",
-                          background: "#1DB954",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <svg
-                          width="17"
-                          height="17"
-                          viewBox="0 0 24 24"
-                          fill="white"
-                        >
-                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm4.59 14.42a.62.62 0 0 1-.86.21c-2.35-1.44-5.3-1.76-8.79-.96a.62.62 0 1 1-.28-1.21c3.81-.87 7.08-.5 9.71 1.11.3.18.39.57.22.85Zm1.23-2.73a.78.78 0 0 1-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.17a.78.78 0 1 1-.45-1.49c3.63-1.1 8.15-.56 11.23 1.33.37.22.49.71.26 1.07Zm.11-2.85C14.81 8.94 9.4 8.76 6.3 9.7a.93.93 0 1 1-.54-1.78c3.56-1.08 9.53-.87 13.29 1.36a.93.93 0 0 1-.96 1.6Z" />
-                        </svg>
-                      </a>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-            {/* Progreso */}
-            <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
-              {ESTADOS.map((e) => {
-                const on =
-                  (progreso[cantoActivo.nombre] || "pendiente") === e.id;
-                return (
-                  <button
-                    key={e.id}
-                    onClick={() => setEstado(cantoActivo.nombre, e.id)}
-                    style={{
-                      fontSize: 11,
-                      padding: "5px 11px",
-                      borderRadius: 20,
-                      cursor: "pointer",
-                      border: `1.5px solid ${
-                        on ? e.color : "rgba(60,60,67,0.16)"
-                      }`,
-                      background: on ? e.bg : "white",
-                      color: on ? e.color : "#8a8a90",
-                      fontWeight: on ? 700 : 500,
-                    }}
-                  >
-                    {e.label}
-                  </button>
-                );
-              })}
-            </div>
+              );
+            })()}
           </div>
 
           {/* Audios por voz + reproductor */}
@@ -12272,7 +11697,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                             <br />
                             El encargado puede subirla en PDF desde{" "}
                             <strong>
-                              Administración → Material Ensayo
+                              menú → Subir Material
                             </strong>{" "}
                             (categoría “Letras”). Una vez subida, aparece aquí
                             para proyectar y transponer los acordes.
@@ -12307,8 +11732,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
 
           {/* Letra / Partitura / Otro */}
           {[
-            { tipo: "letra", titulo: "Letra", icon: "📝" },
-            { tipo: "partitura", titulo: "Partitura", icon: "🎼" },
+            { tipo: "video", titulo: "Video", icon: "🎬" },
             { tipo: "otro", titulo: "Otro material", icon: "📄" },
           ].map((sec) => {
             const items = docsTipo(cantoActivo, sec.tipo);
@@ -13000,7 +12424,7 @@ function PartiturasEnsayo({ docs }) {
         🎼 Aún no hay cantos cargados.
         <br />
         El encargado los sube desde{" "}
-        <strong>Administración → Material Ensayo</strong> (partitura, pistas por
+        <strong>menú → Subir Material</strong> (partitura, pistas por
         voz y la ficha del canto).
       </div>
     );
@@ -24763,13 +24187,8 @@ const ADMIN_TABS = [
   { id: "integrantes", label: "Integrantes", icon: "👥" },
   { id: "asistencia", label: "Asistencia", icon: "✅" },
   { id: "documentos", label: "Descargas Misas", icon: "📄" },
-  {
-    id: "material_ensayo_admin",
-    label: "Material Ensayo (Invitado)",
-    icon: "📥",
-  },
   { id: "material_coro_admin", label: "Material Coro", icon: "🎵" },
-  { id: "descargas_admin", label: "Descargas (Invitado)", icon: "📄" },
+  { id: "descargas_admin", label: "Descargas libres", icon: "📄" },
   { id: "oraciones", label: "Oraciones", icon: "✦" },
   { id: "noticias", label: "Avisos", icon: "📢" },
   { id: "preguntas", label: "Preguntas", icon: "❓" },
@@ -24847,9 +24266,9 @@ const ADMIN_GRUPOS = [
     ],
   },
   {
-    grupo: "Invitados",
-    emoji: "👋",
-    ids: ["documentos", "material_ensayo_admin", "descargas_admin", "visitas"],
+    grupo: "Descargas y visitas",
+    emoji: "📄",
+    ids: ["documentos", "descargas_admin", "visitas"],
   },
   {
     grupo: "Sistema",
@@ -26691,6 +26110,450 @@ function AdminDocumentos({ docs, onReload }) {
           )}
         </Card>
       ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SUBIR MATERIAL (solo administrador) — carga rápida de un canto:
+//  eliges el canto y el momento con un toque, sueltas los archivos y se asignan solos.
+// ═══════════════════════════════════════════════════════════════
+const SM_MOMENTOS = ["Entrada", "Acto Penitencial", "Gloria", "Salmo", "Aleluya", "Ofertorio", "Santo", "Cordero", "Comunión", "Salida", "Otro"];
+const SM_SLOTS = [
+  { id: "Partitura", label: "Partitura", icon: "🎼", cat: "Partituras", cuerda: "Todas", tipo: "partitura", acepta: ".pdf,application/pdf", suf: "Partitura" },
+  { id: "Letra", label: "Letra", icon: "📝", cat: "Letras", cuerda: "Todas", tipo: "letra", acepta: ".pdf,application/pdf", suf: "Letra" },
+  { id: "Soprano", label: "Sopranos", icon: "🎙", cat: "Audio", cuerda: "Soprano", tipo: "audio", acepta: "audio/*", suf: "Soprano" },
+  { id: "Contralto", label: "Altos", icon: "🎙", cat: "Audio", cuerda: "Contralto", tipo: "audio", acepta: "audio/*", suf: "Contralto" },
+  { id: "Tenor", label: "Tenores", icon: "🎙", cat: "Audio", cuerda: "Tenor", tipo: "audio", acepta: "audio/*", suf: "Tenor" },
+  { id: "Bajo", label: "Bajos", icon: "🎙", cat: "Audio", cuerda: "Bajo", tipo: "audio", acepta: "audio/*", suf: "Bajo" },
+  { id: "Instrumentos", label: "Instrumentos", icon: "🎹", cat: "Audio", cuerda: "Instrumentos", tipo: "audio", acepta: "audio/*", suf: "Instrumentos" },
+  { id: "Mezcla", label: "Mezcla completa", icon: "🎚", cat: "Audio", cuerda: "Todas", tipo: "audio", acepta: "audio/*", suf: "General" },
+  { id: "Video", label: "Video", icon: "🎬", cat: "Video", cuerda: "Todas", tipo: "video", acepta: "video/*", suf: "Video" },
+];
+
+// Adivina a qué casilla va un archivo según su nombre y tipo
+function smDetectarSlot(nombre, mime) {
+  const n = _normME(nombre || "");
+  const ext = (nombre || "").toLowerCase().split(".").pop();
+  const esPdf = mime === "application/pdf" || ext === "pdf";
+  const esAudio = (mime || "").startsWith("audio/") || /^(mp3|m4a|wav|ogg|aac|flac|opus|mpeg|mpga)$/.test(ext);
+  const esVideo = (mime || "").startsWith("video/") || /^(mp4|mov|webm|m4v)$/.test(ext);
+  if (esPdf) return /letra|texto|acorde|lyrics/.test(n) ? "Letra" : "Partitura";
+  if (esVideo) return "Video";
+  if (esAudio) {
+    if (/soprano/.test(n)) return "Soprano";
+    if (/contralto|\balto|altos/.test(n)) return "Contralto";
+    if (/tenor/.test(n)) return "Tenor";
+    if (/bajo|bass|baritono/.test(n)) return "Bajo";
+    if (/instrument|piano|karaoke|playback|acompa/.test(n)) return "Instrumentos";
+    if (/mezcla|general|todas|completo|full|mix|coro/.test(n)) return "Mezcla";
+    return "";
+  }
+  return "";
+}
+
+function SubirMaterial({ materialEnsayo, onReload }) {
+  const TABLA = "material_ensayo";
+  const NAVY = "#14283f";
+  const [canto, setCanto] = useState(null); // nombre existente, "__nuevo__" o null
+  const [nuevoNombre, setNuevoNombre] = useState("");
+  const [momento, setMomento] = useState("");
+  const [slots, setSlots] = useState({}); // id → { file?, url?, size? }
+  const [sinAsignar, setSinAsignar] = useState([]); // archivos sin casilla
+  const [guardando, setGuardando] = useState("");
+  const [aviso, setAviso] = useState(null);
+  const [abierto, setAbierto] = useState(null);
+  const [arrastrando, setArrastrando] = useState(false);
+  const [filtro, setFiltro] = useState("");
+  const [vaciando, setVaciando] = useState(false);
+  const formRef = useRef(null);
+
+  const filas = materialEnsayo || [];
+  const grupos = {};
+  filas.forEach((d) => {
+    const k = cantoBaseEnsayo(d);
+    if (k) (grupos[k] = grupos[k] || []).push(d);
+  });
+  const nombresCantos = Object.keys(grupos).sort((a, b) => a.localeCompare(b));
+  const cantoFinal = canto === "__nuevo__" ? nuevoNombre.trim() : canto || "";
+
+  // Registro existente que corresponde a cada casilla del canto elegido
+  const existentePorSlot = (rows) => {
+    const m = {};
+    (rows || []).forEach((d) => {
+      const t = tipoDocEnsayo(d);
+      let id = null;
+      if (t === "partitura") id = "Partitura";
+      else if (t === "letra") id = "Letra";
+      else if (t === "video") id = "Video";
+      else if (t === "audio") {
+        const v = vozDocEnsayo(d);
+        id = v === "Todas" ? "Mezcla" : v;
+      }
+      if (id && !m[id]) m[id] = d;
+    });
+    return m;
+  };
+  const existentes = canto && canto !== "__nuevo__" ? existentePorSlot(grupos[canto]) : {};
+
+  function elegirCanto(nombre) {
+    setCanto(nombre);
+    setSlots({});
+    setSinAsignar([]);
+    setAviso(null);
+    if (nombre !== "__nuevo__") {
+      const r = (grupos[nombre] || []).find((d) => d.momento);
+      setMomento(r ? r.momento : "");
+    } else setMomento("");
+  }
+
+  function agregarArchivos(lista) {
+    const arr = Array.from(lista || []);
+    if (!arr.length) return;
+    const nuevos = { ...slots };
+    const huerfanos = [...sinAsignar];
+    arr.forEach((f) => {
+      const id = smDetectarSlot(f.name, mimeDeArchivo(f));
+      if (id) nuevos[id] = { file: f };
+      else huerfanos.push(f);
+    });
+    setSlots(nuevos);
+    setSinAsignar(huerfanos);
+    if (!canto) {
+      setCanto("__nuevo__");
+      if (!nuevoNombre) {
+        const base = cantoBaseEnsayo({ nombre: arr[0].name.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ") });
+        if (base && base !== "General") setNuevoNombre(base);
+      }
+    }
+  }
+  function asignar(i, id) {
+    if (!id) return;
+    const f = sinAsignar[i];
+    setSlots((s) => ({ ...s, [id]: { file: f } }));
+    setSinAsignar((l) => l.filter((_, j) => j !== i));
+  }
+  const setSlot = (id, v) => setSlots((s) => ({ ...s, [id]: v }));
+  const quitarSlot = (id) =>
+    setSlots((s) => {
+      const c = { ...s };
+      delete c[id];
+      return c;
+    });
+
+  const llenos = SM_SLOTS.filter((s) => slots[s.id] && (slots[s.id].file || (slots[s.id].url || "").trim()));
+
+  async function borrarStorage(url) {
+    const pref = `${SUPABASE_URL}/storage/v1/object/public/publico/`;
+    if (!url || !url.startsWith(pref)) return;
+    try {
+      await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${url.slice(pref.length)}`, {
+        method: "DELETE",
+        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+      });
+    } catch (e) {}
+  }
+  async function subirArchivo(file, idx) {
+    const mime = mimeDeArchivo(file);
+    if (!(mime.startsWith("audio/") || mime.startsWith("video/") || mime === "application/pdf"))
+      throw new Error(`"${file.name}": solo audio, video o PDF.`);
+    if (file.size > 45 * 1024 * 1024)
+      throw new Error(`"${file.name}" pesa más de 45 MB. Comprímelo (mp3) o pega un enlace de Drive.`);
+    let safe = file.name.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = `ensayo/${Date.now()}_${idx}_${safe}`;
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/publico/${path}`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": mime, "x-upsert": "true" },
+      body: file,
+    });
+    if (!res.ok) throw new Error(`No se pudo subir "${file.name}": ${await res.text()}`);
+    const mb = file.size / (1024 * 1024);
+    return { url: `${SUPABASE_URL}/storage/v1/object/public/publico/${path}`, size: mb < 1 ? Math.round(mb * 1024) + " KB" : mb.toFixed(1) + " MB" };
+  }
+
+  async function guardar() {
+    if (!cantoFinal) return setAviso({ t: "err", m: "Elige un canto o escribe el nombre del canto nuevo." });
+    if (!llenos.length) return setAviso({ t: "err", m: "Agrega al menos un archivo o enlace." });
+    setAviso(null);
+    const orden = momento ? SM_MOMENTOS.indexOf(momento) + 1 : null;
+    try {
+      let n = 0;
+      for (const s of llenos) {
+        n++;
+        setGuardando(`Guardando ${n} de ${llenos.length}: ${s.label}…`);
+        const v = slots[s.id];
+        let url = (v.url || "").trim();
+        let size = "";
+        if (v.file) {
+          const r = await subirArchivo(v.file, n);
+          url = r.url;
+          size = r.size;
+        }
+        const body = {
+          canto: cantoFinal,
+          nombre: `${cantoFinal} — ${s.suf}`,
+          momento: momento || "",
+          orden,
+          url,
+          categoria: s.cat,
+          cuerda_mat: s.cuerda,
+          size,
+          audiencia: "coro",
+        };
+        const ex = existentes[s.id];
+        if (ex) {
+          await updateRecord(TABLA, ex.id, body);
+          if (ex.url !== url) await borrarStorage(ex.url);
+        } else {
+          await supabase(TABLA, { method: "POST", body });
+        }
+      }
+      // Si cambió el momento, se actualiza en el resto de los archivos del canto
+      if (canto && canto !== "__nuevo__") {
+        for (const d of grupos[canto] || []) {
+          if ((d.momento || "") !== (momento || "") && !llenos.some((s) => existentes[s.id] && existentes[s.id].id === d.id))
+            await updateRecord(TABLA, d.id, { momento: momento || "", orden });
+        }
+      }
+      setGuardando("");
+      setAviso({ t: "ok", m: `✓ "${cantoFinal}" guardado (${llenos.length} archivo${llenos.length === 1 ? "" : "s"}).` });
+      setSlots({});
+      setSinAsignar([]);
+      if (canto === "__nuevo__") {
+        setCanto(cantoFinal);
+        setNuevoNombre("");
+      }
+      onReload();
+    } catch (e) {
+      setGuardando("");
+      setAviso({ t: "err", m: e.message || "Error al guardar" });
+    }
+  }
+
+  async function eliminarArchivo(d) {
+    if (!window.confirm(`¿Eliminar "${d.nombre}"?`)) return;
+    try {
+      await borrarStorage(d.url);
+      await deleteRecord(TABLA, d.id);
+      onReload();
+    } catch (e) {
+      alert("Error: " + e.message);
+    }
+  }
+  async function eliminarCanto(nombre) {
+    const rows = grupos[nombre] || [];
+    if (!window.confirm(`¿Eliminar el canto "${nombre}" con sus ${rows.length} archivo(s)?`)) return;
+    try {
+      for (const d of rows) {
+        await borrarStorage(d.url);
+        await deleteRecord(TABLA, d.id);
+      }
+      if (canto === nombre) elegirCanto(null);
+      onReload();
+    } catch (e) {
+      alert("Error: " + e.message);
+    }
+  }
+  async function vaciarTodo() {
+    const subidos = filas.filter((d) => (d.url || "").includes("/storage/v1/object/public/publico/")).length;
+    if (!window.confirm(`Esto borrará TODO el repertorio de ensayo:\n\n• ${nombresCantos.length} canto(s) / ${filas.length} archivo(s)\n• ${subidos} subido(s) a Supabase (se libera el espacio)\n\nLos enlaces de Drive no se tocan en Drive. ¿Continuar?`)) return;
+    setVaciando(true);
+    try {
+      for (const d of filas) {
+        await borrarStorage(d.url);
+        await deleteRecord(TABLA, d.id);
+      }
+      elegirCanto(null);
+      onReload();
+    } catch (e) {
+      alert("Error: " + e.message);
+    }
+    setVaciando(false);
+  }
+
+  const chip = (on, extra) => ({
+    padding: "9px 15px",
+    borderRadius: 999,
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+    fontFamily: "inherit",
+    border: "1.5px solid " + (on ? NAVY : "#d8dee7"),
+    background: on ? NAVY : "#fff",
+    color: on ? "#fff" : "#3d4757",
+    boxShadow: on ? "0 4px 12px rgba(20,40,63,.25)" : "none",
+    transition: "all .15s",
+    ...extra,
+  });
+  const paso = (n, t, sub) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "22px 0 10px" }}>
+      <span style={{ width: 26, height: 26, borderRadius: "50%", background: NAVY, color: "#fff", fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{n}</span>
+      <span style={{ fontSize: 15, fontWeight: 800, color: NAVY }}>{t}</span>
+      {sub && <span style={{ fontSize: 12, color: "#7a8494" }}>{sub}</span>}
+    </div>
+  );
+  const visibles = nombresCantos.filter((n) => !filtro || _normME(n).includes(_normME(filtro)));
+
+  return (
+    <div style={{ maxWidth: 980 }}>
+      <div style={{ background: "linear-gradient(160deg,#1c3a5e,#14283f)", color: "#fff", borderRadius: 22, padding: "20px 24px", marginBottom: 6 }}>
+        <div style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.6, fontWeight: 700 }}>Solo administrador</div>
+        <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em", marginTop: 2 }}>Subir material de ensayo</div>
+        <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>Elige el canto, el momento y suelta los archivos: partitura, letra y una pista por voz.</div>
+      </div>
+
+      <div ref={formRef} style={{ background: "#fff", border: "1px solid #e5e9ef", borderRadius: 22, padding: "4px 22px 22px", boxShadow: "0 18px 40px -26px rgba(20,40,63,.35)" }}>
+        {paso(1, "Canto", "toca uno existente o crea uno nuevo")}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <button onClick={() => elegirCanto("__nuevo__")} style={chip(canto === "__nuevo__", { borderStyle: "dashed", borderColor: canto === "__nuevo__" ? NAVY : "#9aa6b6" })}>＋ Canto nuevo</button>
+          {nombresCantos.map((n) => (
+            <button key={n} onClick={() => elegirCanto(n)} style={chip(canto === n)}>{n}</button>
+          ))}
+        </div>
+        {canto === "__nuevo__" && (
+          <input value={nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)} placeholder="Nombre del canto (ej: Reina de Chile)" autoFocus
+            style={{ marginTop: 12, width: "100%", boxSizing: "border-box", padding: "13px 16px", borderRadius: 14, border: "1.5px solid " + NAVY, fontSize: 15, fontFamily: "inherit", outline: "none" }} />
+        )}
+
+        {paso(2, "Momento de la misa", "opcional · define el orden")}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {SM_MOMENTOS.map((m) => (
+            <button key={m} onClick={() => setMomento(momento === m ? "" : m)} style={chip(momento === m, { padding: "8px 14px", fontSize: 12.5 })}>{m}</button>
+          ))}
+        </div>
+
+        {paso(3, "Archivos", "arrastra todos juntos o usa cada casilla")}
+        <div
+          onDragOver={(e) => { e.preventDefault(); setArrastrando(true); }}
+          onDragLeave={() => setArrastrando(false)}
+          onDrop={(e) => { e.preventDefault(); setArrastrando(false); agregarArchivos(e.dataTransfer.files); }}
+          style={{ border: "2px dashed " + (arrastrando ? NAVY : "#b9c3d1"), background: arrastrando ? "#eef3fa" : "#f6f8fb", borderRadius: 18, padding: "20px 16px", textAlign: "center", transition: "all .15s" }}
+        >
+          <div style={{ fontSize: 26 }}>📂</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: NAVY, marginTop: 4 }}>Suelta aquí los archivos del canto</div>
+          <div style={{ fontSize: 12, color: "#6b7686", marginTop: 3, lineHeight: 1.5 }}>Se asignan solos por el nombre (ej: “Tenor.mp3”, “Partitura.pdf”, “Letra.pdf”). Puedes corregirlos abajo.</div>
+          <label style={{ display: "inline-block", marginTop: 10, padding: "9px 16px", borderRadius: 12, background: NAVY, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+            Elegir archivos…
+            <input type="file" multiple accept="audio/*,video/*,.pdf,application/pdf" style={{ display: "none" }} onChange={(e) => { agregarArchivos(e.target.files); e.target.value = ""; }} />
+          </label>
+        </div>
+
+        {sinAsignar.length > 0 && (
+          <div style={{ marginTop: 12, background: "#fff7e6", border: "1px solid #f3d9a4", borderRadius: 14, padding: "10px 14px" }}>
+            <div style={{ fontSize: 12.5, fontWeight: 800, color: "#8a5a00", marginBottom: 6 }}>No supe dónde van estos archivos — elige la casilla:</div>
+            {sinAsignar.map((f, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", flexWrap: "wrap" }}>
+                <span style={{ flex: 1, minWidth: 120, fontSize: 13, color: "#3d4757", wordBreak: "break-all" }}>{f.name}</span>
+                <select value="" onChange={(e) => asignar(i, e.target.value)} style={{ padding: "7px 10px", borderRadius: 10, border: "1px solid #e0c58a", fontSize: 13, fontFamily: "inherit", background: "#fff" }}>
+                  <option value="">Asignar a…</option>
+                  {SM_SLOTS.map((s) => (<option key={s.id} value={s.id}>{s.label}</option>))}
+                </select>
+                <button onClick={() => setSinAsignar((l) => l.filter((_, j) => j !== i))} style={{ border: "none", background: "none", cursor: "pointer", color: "#b42318", fontSize: 16 }} aria-label="Quitar">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(270px,1fr))", gap: 10, marginTop: 14 }}>
+          {SM_SLOTS.map((s) => {
+            const v = slots[s.id];
+            const ex = existentes[s.id];
+            const lleno = v && (v.file || (v.url || "").trim());
+            return (
+              <div key={s.id} style={{ border: "1.5px solid " + (lleno ? "#2f9e6b" : ex ? "#cfd8e3" : "#e5e9ef"), background: lleno ? "#eefaf3" : "#fff", borderRadius: 16, padding: "11px 13px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>{s.icon}</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: NAVY }}>{s.label}</span>
+                  <span style={{ marginLeft: "auto", fontSize: 10.5, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: lleno ? "#1d7a4d" : ex ? "#5b6675" : "#9aa3b0" }}>
+                    {lleno ? (ex ? "Reemplazará" : "Listo") : ex ? "✓ Cargado" : "Vacío"}
+                  </span>
+                </div>
+                {v && v.file ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 12.5, color: "#1d4d38" }}>
+                    <span style={{ flex: 1, wordBreak: "break-all" }}>📎 {v.file.name}</span>
+                    <button onClick={() => quitarSlot(s.id)} style={{ border: "none", background: "none", cursor: "pointer", color: "#b42318", fontSize: 15 }} aria-label="Quitar">✕</button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                    <input value={(v && v.url) || ""} onChange={(e) => { const val = e.target.value; if (val) setSlot(s.id, { url: val }); else quitarSlot(s.id); }} placeholder="Pega un enlace…"
+                      style={{ flex: 1, minWidth: 0, padding: "8px 10px", borderRadius: 10, border: "1px solid #d8dee7", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                    <label title="Subir archivo" style={{ padding: "8px 11px", borderRadius: 10, background: "#eef1f5", color: NAVY, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center" }}>
+                      📎
+                      <input type="file" accept={s.acepta} style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) setSlot(s.id, { file: e.target.files[0] }); e.target.value = ""; }} />
+                    </label>
+                  </div>
+                )}
+                {ex && !lleno && (
+                  <a href={urlDoc(ex)} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 6, fontSize: 11.5, color: "#5b6675" }}>Ver el archivo actual ↗</a>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 20, flexWrap: "wrap" }}>
+          <button onClick={guardar} disabled={!!guardando} style={{ padding: "14px 28px", borderRadius: 14, border: "none", background: guardando ? "#8d98a8" : "linear-gradient(145deg,#f4d98a,#d6ab52)", color: NAVY, fontSize: 15, fontWeight: 800, cursor: guardando ? "default" : "pointer", fontFamily: "inherit", boxShadow: "0 8px 20px rgba(214,171,82,.35)" }}>
+            {guardando || `Guardar${llenos.length ? ` ${llenos.length} archivo${llenos.length === 1 ? "" : "s"}` : ""}`}
+          </button>
+          {cantoFinal && <span style={{ fontSize: 13, color: "#5b6675" }}>en <b>{cantoFinal}</b>{momento ? ` · ${momento}` : ""}</span>}
+        </div>
+        {aviso && (
+          <div style={{ marginTop: 12, padding: "11px 14px", borderRadius: 12, fontSize: 13.5, fontWeight: 600, background: aviso.t === "ok" ? "#eefaf3" : "#fdecea", color: aviso.t === "ok" ? "#1d7a4d" : "#b42318", border: "1px solid " + (aviso.t === "ok" ? "#bfe6d0" : "#f5c2bd") }}>{aviso.m}</div>
+        )}
+        <div style={{ fontSize: 11.5, color: "#7a8494", marginTop: 12, lineHeight: 1.5 }}>
+          Los archivos subidos aquí pesan máximo 45 MB cada uno (usa mp3). Para archivos más pesados, pega el enlace de Google Drive (compartido como “cualquiera con el enlace”).
+        </div>
+      </div>
+
+      {/* Cantos cargados */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "30px 0 12px", flexWrap: "wrap" }}>
+        <div style={{ fontSize: 17, fontWeight: 800, color: NAVY }}>Cantos cargados <span style={{ color: "#7a8494", fontWeight: 600, fontSize: 14 }}>({nombresCantos.length})</span></div>
+        {nombresCantos.length > 6 && (
+          <input value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder="Buscar…" style={{ marginLeft: "auto", padding: "8px 12px", borderRadius: 10, border: "1px solid #d8dee7", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+        )}
+      </div>
+      {nombresCantos.length === 0 && <div style={{ padding: 24, textAlign: "center", color: "#7a8494", background: "#f6f8fb", borderRadius: 16, fontSize: 13.5 }}>Aún no hay cantos cargados.</div>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {visibles.map((n) => {
+          const rows = grupos[n];
+          const ex = existentePorSlot(rows);
+          const mom = (rows.find((d) => d.momento) || {}).momento;
+          const open = abierto === n;
+          return (
+            <div key={n} style={{ background: "#fff", border: "1px solid #e5e9ef", borderRadius: 18, overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", flexWrap: "wrap" }}>
+                <button onClick={() => setAbierto(open ? null : n)} style={{ flex: 1, minWidth: 180, textAlign: "left", border: "none", background: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: NAVY }}>{n} {mom && <span style={{ fontSize: 11, fontWeight: 800, color: "#7a5b00", background: "#f7e9bf", borderRadius: 6, padding: "2px 8px", marginLeft: 6, textTransform: "uppercase" }}>{mom}</span>}</div>
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 6 }}>
+                    {SM_SLOTS.map((s) => (
+                      <span key={s.id} style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 8, background: ex[s.id] ? "#e3f6ec" : "#f1f3f6", color: ex[s.id] ? "#1d7a4d" : "#a2abb8" }}>{ex[s.id] ? "✓ " : ""}{s.label}</span>
+                    ))}
+                  </div>
+                </button>
+                <button onClick={() => { elegirCanto(n); if (formRef.current) formRef.current.scrollIntoView({ behavior: "smooth", block: "start" }); }} style={{ padding: "9px 14px", borderRadius: 12, border: "1px solid " + NAVY, background: "#fff", color: NAVY, fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>＋ Agregar / cambiar archivos</button>
+                <button onClick={() => eliminarCanto(n)} title="Eliminar canto" style={{ padding: "9px 11px", borderRadius: 12, border: "1px solid #f0c4c0", background: "#fff6f5", color: "#b42318", cursor: "pointer", fontSize: 14 }}>🗑</button>
+              </div>
+              {open && (
+                <div style={{ borderTop: "1px solid #eef1f5", padding: "8px 14px 12px", background: "#fafbfc" }}>
+                  {rows.map((d) => (
+                    <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid #eef1f5", fontSize: 13 }}>
+                      <span style={{ flex: 1, minWidth: 0, wordBreak: "break-word", color: "#2c3646" }}>{d.nombre}{d.size ? <span style={{ color: "#8a93a1" }}> · {d.size}</span> : null}</span>
+                      <a href={urlDoc(d)} target="_blank" rel="noreferrer" style={{ color: NAVY, fontWeight: 700, fontSize: 12.5 }}>Abrir ↗</a>
+                      <button onClick={() => eliminarArchivo(d)} style={{ border: "none", background: "none", cursor: "pointer", color: "#b42318", fontSize: 15 }} aria-label="Eliminar archivo">🗑</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {filas.length > 0 && (
+        <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px dashed #d8dee7" }}>
+          <button onClick={vaciarTodo} disabled={vaciando} style={{ fontSize: 12.5, fontWeight: 700, color: "#9b2c2c", background: "#fff4f4", border: "1px solid #f3c2c2", borderRadius: 10, padding: "9px 14px", cursor: "pointer", fontFamily: "inherit" }}>{vaciando ? "Vaciando…" : "🧹 Vaciar todo (nueva misa)"}</button>
+          <div style={{ fontSize: 11.5, color: "#7a8494", marginTop: 6 }}>Borra todos los cantos y libera el espacio de lo subido. Tus respaldos en Drive no se tocan.</div>
+        </div>
+      )}
     </div>
   );
 }
