@@ -1991,9 +1991,19 @@ function AppInner() {
           )
             .then((r) => (r.ok ? r.json() : []))
             .catch(() => []),
-          supabase("material_ensayo", {
-            order: "&order=created_at.desc",
-          }).catch(() => []),
+          (async () => {
+            // Supabase corta en 1000 filas por consulta: se pide por páginas
+            let todo = [];
+            for (let desde = 0; desde < 20000; desde += 1000) {
+              const pag = await supabase("material_ensayo", {
+                order: "&order=created_at.desc,id.desc",
+                filters: `&limit=1000&offset=${desde}`,
+              });
+              todo = todo.concat(pag || []);
+              if (!pag || pag.length < 1000) break;
+            }
+            return todo;
+          })().catch(() => []),
         ]);
       setMembers((m || []).filter((u) => u.cuerda && u.cuerda.trim() !== ""));
       setEventos(ev || []);
@@ -26248,6 +26258,8 @@ function ImportarDriveMasivo({ materialEnsayo, onReload }) {
   const [reemplazar, setReemplazar] = useState(false);
   const [limite, setLimite] = useState(25);
   const [resultado, setResultado] = useState("");
+  const [soloCompletos, setSoloCompletos] = useState(true);
+  const [exigirPartitura, setExigirPartitura] = useState(false);
 
   const existentes = {};
   (materialEnsayo || []).forEach((d) => {
@@ -26366,7 +26378,13 @@ function ImportarDriveMasivo({ materialEnsayo, onReload }) {
   const setG = (id, c) => setGrupos((l) => l.map((g) => (g.id === id ? { ...g, ...c } : g)));
   const nuevosArchivos = (g) =>
     Object.keys(g.slots).filter((s) => reemplazar || !g.existe[s]);
-  const seleccionados = grupos.filter((g) => g.incluir && nuevosArchivos(g).length > 0);
+  const VOCES4 = ["Soprano", "Contralto", "Tenor", "Bajo"];
+  const faltantes = (g) =>
+    [...VOCES4, ...(exigirPartitura ? ["Partitura"] : [])].filter((v) => !g.slots[v] && !g.existe[v]);
+  const esCompleto = (g) => faltantes(g).length === 0;
+  const visibles = grupos.filter((g) => !soloCompletos || esCompleto(g));
+  const completos = grupos.filter(esCompleto).length;
+  const seleccionados = visibles.filter((g) => g.incluir && nuevosArchivos(g).length > 0);
   const totalArchivos = seleccionados.reduce((a, g) => a + nuevosArchivos(g).length, 0);
 
   async function importar() {
@@ -26444,15 +26462,21 @@ function ImportarDriveMasivo({ materialEnsayo, onReload }) {
             <div style={{ marginTop: 16 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
                 <div style={{ fontSize: 14, color: "#2c3646" }}>
-                  Encontré <b>{grupos.length} cantos</b>. Se importarán <b>{totalArchivos} archivos</b> de {seleccionados.length} canto(s).
+                  Encontré <b>{grupos.length} cantos</b>, de los cuales <b style={{ color: "#1d7a4d" }}>{completos} están completos</b> (Sopranos, Altos, Tenores y Bajos{exigirPartitura ? " y partitura" : ""}). Se importarán <b>{totalArchivos} archivos</b> de {seleccionados.length} canto(s).
                 </div>
-                <label style={{ marginLeft: "auto", fontSize: 12.5, color: "#4b5563", display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                <label style={{ marginLeft: "auto", fontSize: 12.5, color: NAVY, fontWeight: 700, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <input type="checkbox" checked={soloCompletos} onChange={(e) => setSoloCompletos(e.target.checked)} /> Solo cantos con las 4 voces
+                </label>
+                <label style={{ fontSize: 12.5, color: "#4b5563", display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <input type="checkbox" checked={exigirPartitura} onChange={(e) => setExigirPartitura(e.target.checked)} /> Exigir también partitura
+                </label>
+                <label style={{ fontSize: 12.5, color: "#4b5563", display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
                   <input type="checkbox" checked={reemplazar} onChange={(e) => setReemplazar(e.target.checked)} /> Reemplazar archivos que ya existen
                 </label>
-                <button onClick={() => setGrupos((l) => l.map((g) => ({ ...g, incluir: !l.every((x) => x.incluir) })))} style={{ border: "none", background: "none", color: NAVY, fontWeight: 700, fontSize: 12.5, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>Marcar / desmarcar todos</button>
+                <button onClick={() => setGrupos((l) => { const v = l.filter((g) => !soloCompletos || esCompleto(g)); const todos = v.every((x) => x.incluir); return l.map((g) => (v.includes(g) ? { ...g, incluir: !todos } : g)); })} style={{ border: "none", background: "none", color: NAVY, fontWeight: 700, fontSize: 12.5, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>Marcar / desmarcar todos</button>
               </div>
               <div style={{ border: "1px solid #e5e9ef", borderRadius: 14, overflow: "hidden" }}>
-                {grupos.slice(0, limite).map((g, i) => {
+                {visibles.slice(0, limite).map((g, i) => {
                   const nuevos = nuevosArchivos(g);
                   return (
                     <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderTop: i ? "1px solid #eef1f5" : "none", flexWrap: "wrap", background: g.incluir && nuevos.length ? "#fff" : "#f7f8fa", opacity: g.incluir && nuevos.length ? 1 : 0.6 }}>
@@ -26473,15 +26497,16 @@ function ImportarDriveMasivo({ materialEnsayo, onReload }) {
                             </span>
                           );
                         })}
+                        {faltantes(g).length > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "#b42318" }}>· faltan: {faltantes(g).map((v) => SM_SLOTS.find((x) => x.id === v).label).join(", ")}</span>}
                         {g.dup.length > 0 && <span style={{ fontSize: 11, color: "#b45309" }}>· {g.dup.length} archivo(s) repetido(s) omitido(s)</span>}
                       </div>
                     </div>
                   );
                 })}
               </div>
-              {grupos.length > limite && (
+              {visibles.length > limite && (
                 <div style={{ textAlign: "center", marginTop: 10 }}>
-                  <button onClick={() => setLimite((l) => l + 25)} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid #cfd6df", background: "#fff", color: NAVY, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Ver más ({grupos.length - limite} restantes)</button>
+                  <button onClick={() => setLimite((l) => l + 25)} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid #cfd6df", background: "#fff", color: NAVY, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Ver más ({visibles.length - limite} restantes)</button>
                 </div>
               )}
               <div style={{ fontSize: 11.5, color: "#7a8494", marginTop: 8 }}>
