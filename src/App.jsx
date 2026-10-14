@@ -550,7 +550,7 @@ const C = {
 };
 
 const G = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
   :root {
     --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
     --font-display: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
@@ -10628,7 +10628,7 @@ function CancionerosInvitado({ user, isAdmin }) {
 // ═════════════════════════════════════════════
 const ETIQUETA_VOZ_MULTI = {
   Soprano: "Sopranos",
-  Contralto: "Contraltos",
+  Contralto: "Altos",
   Tenor: "Tenores",
   Bajo: "Bajos",
   Instrumentos: "Instrumentos",
@@ -10645,7 +10645,9 @@ const fmtTiempoMulti = (s) => {
 };
 
 function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
-  // tracks: [{ id, voz|null, doc }]
+  // tracks: [{ voz|null, doc }]
+  // Motor Web Audio: cada pista se descarga y decodifica completa; al reproducir todas arrancan
+  // en el mismo instante del reloj de audio (sincronía exacta) y cada una tiene su propia ganancia (M / S / volumen).
   const lista = tracks.filter(
     (t) => !/(youtube\.com|youtu\.be)/i.test(urlDoc(t.doc))
   );
@@ -10664,53 +10666,77 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   const [playing, setPlaying] = useState(false);
   const [pos, setPos] = useState(0);
   const [dur, setDur] = useState(0);
-  const [vel, setVel] = useState(1);
-  const els = useRef([]); // { a, gain, cors }
   const ctxRef = useRef(null);
+  const nodos = useRef([]); // por pista: { buffer, gain, src }
   const raf = useRef(null);
   const primera = useRef(true);
   const pistasRef = useRef(pistas);
   pistasRef.current = pistas;
+  const reloj = useRef({ inicio: 0, offset: 0, sonando: false });
+  const durRef = useRef(0);
 
-  // Crear los elementos de audio
-  useEffect(() => {
-    const arr = lista.map((t, i) => {
-      const a = new Audio();
-      a.preload = "auto";
-      const obj = { a, gain: null, cors: true, retried: false, ok: false };
-      a.crossOrigin = "anonymous";
-      const marcar = (estado) =>
-        setPistas((p) => p.map((x, j) => (j === i ? { ...x, estado } : x)));
-      a.addEventListener("loadedmetadata", () => {
-        obj.ok = true;
-        marcar("ok");
-        setDur((d) => Math.max(d, a.duration || 0));
-      });
-      a.addEventListener("error", () => {
-        if (!obj.retried) {
-          // Plan B: sin CORS (el volumen se maneja con el propio elemento)
-          obj.retried = true;
-          obj.cors = false;
-          a.removeAttribute("crossorigin");
-          a.crossOrigin = null;
-          a.src = srcMultipista(urlDoc(t.doc));
-          a.load();
-        } else {
-          obj.ok = false;
-          marcar("error");
-        }
-      });
-      a.src = srcMultipista(urlDoc(t.doc));
-      return obj;
+  const ctx = () => {
+    if (!ctxRef.current) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      try {
+        ctxRef.current = new AC({ sampleRate: 24000 });
+      } catch (e) {
+        ctxRef.current = new AC();
+      }
+    }
+    return ctxRef.current;
+  };
+
+  const decodificar = (c, buf) =>
+    new Promise((res, rej) => {
+      const r = c.decodeAudioData(buf, res, rej);
+      if (r && r.then) r.then(res, rej);
     });
-    els.current = arr;
+
+  // Descarga y decodifica todas las pistas
+  useEffect(() => {
+    let vivo = true;
+    const c = ctx();
+    nodos.current = lista.map(() => ({ buffer: null, gain: null, src: null }));
+    lista.forEach((t, i) => {
+      (async () => {
+        let ultimo = null;
+        for (let intento = 0; intento < 2 && vivo; intento++) {
+          try {
+            const r = await fetch(srcMultipista(urlDoc(t.doc)));
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            const dec = await decodificar(c, await r.arrayBuffer());
+            // Pasa a mono para ahorrar memoria en celulares
+            let buffer = dec;
+            if (dec.numberOfChannels > 1) {
+              buffer = c.createBuffer(1, dec.length, dec.sampleRate);
+              const out = buffer.getChannelData(0);
+              for (let ch = 0; ch < dec.numberOfChannels; ch++) {
+                const d = dec.getChannelData(ch);
+                for (let k = 0; k < d.length; k++) out[k] += d[k] / dec.numberOfChannels;
+              }
+            }
+            if (!vivo) return;
+            const gain = c.createGain();
+            gain.connect(c.destination);
+            nodos.current[i] = { buffer, gain, src: null };
+            durRef.current = Math.max(durRef.current, buffer.duration);
+            setDur(durRef.current);
+            setPistas((p) => p.map((x, j) => (j === i ? { ...x, estado: "ok" } : x)));
+            return;
+          } catch (e) {
+            ultimo = e;
+          }
+        }
+        if (vivo) setPistas((p) => p.map((x, j) => (j === i ? { ...x, estado: "error" } : x)));
+      })();
+    });
     return () => {
+      vivo = false;
       cancelAnimationFrame(raf.current);
-      arr.forEach((o) => {
+      nodos.current.forEach((n) => {
         try {
-          o.a.pause();
-          o.a.removeAttribute("src");
-          o.a.load();
+          if (n.src) n.src.stop();
         } catch (e) {}
       });
       try {
@@ -10724,107 +10750,102 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   const aplicarMezcla = () => {
     const ps = pistasRef.current;
     const hayS = ps.some((p) => p.solo);
-    els.current.forEach((o, i) => {
+    const c = ctxRef.current;
+    nodos.current.forEach((n, i) => {
       const p = ps[i];
-      if (!p || !o) return;
+      if (!p || !n || !n.gain) return;
       const suena = hayS ? p.solo : !p.mute;
       const g = suena ? p.vol / 100 : 0;
-      if (o.gain) {
-        o.gain.gain.value = g;
-        o.a.volume = 1;
-      } else {
-        o.a.volume = Math.min(1, g);
+      try {
+        n.gain.gain.setTargetAtTime(g, c.currentTime, 0.015);
+      } catch (e) {
+        n.gain.gain.value = g;
       }
     });
   };
   useEffect(aplicarMezcla, [pistas]);
 
-  const okEls = () => els.current.filter((o) => o && o.ok);
-  const maestro = () => okEls()[0];
+  const posActual = () => {
+    const r = reloj.current;
+    if (!r.sonando) return r.offset;
+    return Math.min(durRef.current, r.offset + (ctxRef.current.currentTime - r.inicio));
+  };
+
+  const pararFuentes = () => {
+    nodos.current.forEach((n) => {
+      if (n && n.src) {
+        try {
+          n.src.onended = null;
+          n.src.stop();
+        } catch (e) {}
+        n.src = null;
+      }
+    });
+  };
 
   const bucle = () => {
-    const m = maestro();
-    if (m) {
-      setPos(m.a.currentTime);
-      okEls().forEach((o) => {
-        if (o !== m && Math.abs(o.a.currentTime - m.a.currentTime) > 0.15)
-          o.a.currentTime = m.a.currentTime;
-      });
-      if (m.a.ended) {
-        detener(true);
-        return;
-      }
+    const t = posActual();
+    setPos(t);
+    if (reloj.current.sonando && durRef.current && t >= durRef.current - 0.02) {
+      detener();
+      return;
     }
     raf.current = requestAnimationFrame(bucle);
   };
 
-  const prepararAudioCtx = () => {
-    if (ctxRef.current) {
-      if (ctxRef.current.state === "suspended") ctxRef.current.resume();
-      return;
-    }
-    try {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      const ctx = new AC();
-      ctxRef.current = ctx;
-      els.current.forEach((o) => {
-        if (o.ok && o.cors) {
-          try {
-            const src = ctx.createMediaElementSource(o.a);
-            const g = ctx.createGain();
-            src.connect(g);
-            g.connect(ctx.destination);
-            o.gain = g;
-          } catch (e) {}
-        }
-      });
-    } catch (e) {}
+  const arrancar = (desde) => {
+    const c = ctxRef.current;
+    pararFuentes();
+    const t0 = c.currentTime + 0.06; // mismo instante para todas
+    nodos.current.forEach((n) => {
+      if (!n || !n.buffer) return;
+      const src = c.createBufferSource();
+      src.buffer = n.buffer;
+      src.connect(n.gain);
+      src.start(t0, Math.min(desde, Math.max(0, n.buffer.duration - 0.01)));
+      n.src = src;
+    });
+    reloj.current = { inicio: t0, offset: desde, sonando: true };
   };
 
   const reproducir = async () => {
-    const ok = okEls();
-    if (!ok.length) return;
+    if (!nodos.current.some((n) => n && n.buffer)) return;
     if (primera.current) {
       primera.current = false;
       if (onFirstPlay) onFirstPlay();
     }
-    prepararAudioCtx();
-    aplicarMezcla();
-    const t0 = ok[0].a.currentTime;
-    ok.forEach((o) => {
-      o.a.currentTime = t0;
-      o.a.playbackRate = vel;
-    });
+    const c = ctx();
     try {
-      await Promise.all(ok.map((o) => o.a.play()));
-      setPlaying(true);
-      cancelAnimationFrame(raf.current);
-      raf.current = requestAnimationFrame(bucle);
-    } catch (e) {
-      setPlaying(false);
-    }
+      if (c.state === "suspended") await c.resume();
+    } catch (e) {}
+    aplicarMezcla();
+    let desde = reloj.current.offset;
+    if (durRef.current && desde >= durRef.current - 0.05) desde = 0;
+    arrancar(desde);
+    setPlaying(true);
+    cancelAnimationFrame(raf.current);
+    raf.current = requestAnimationFrame(bucle);
   };
   const pausar = () => {
-    okEls().forEach((o) => o.a.pause());
+    const t = posActual();
+    pararFuentes();
+    reloj.current = { inicio: 0, offset: t, sonando: false };
     cancelAnimationFrame(raf.current);
+    setPos(t);
     setPlaying(false);
   };
-  const detener = (alFinal) => {
-    okEls().forEach((o) => {
-      o.a.pause();
-      o.a.currentTime = 0;
-    });
+  const detener = () => {
+    pararFuentes();
+    reloj.current = { inicio: 0, offset: 0, sonando: false };
     cancelAnimationFrame(raf.current);
     setPlaying(false);
     setPos(0);
   };
   const irA = (t) => {
-    okEls().forEach((o) => (o.a.currentTime = t));
+    t = Math.max(0, Math.min(durRef.current || 0, t));
+    if (reloj.current.sonando) arrancar(t);
+    else reloj.current = { inicio: 0, offset: t, sonando: false };
     setPos(t);
-  };
-  const cambiarVel = (v) => {
-    setVel(v);
-    okEls().forEach((o) => (o.a.playbackRate = v));
   };
   const setP = (i, cambio) =>
     setPistas((p) => p.map((x, j) => (j === i ? { ...x, ...cambio } : x)));
@@ -10840,21 +10861,21 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   const todasFallan = pistas.length > 0 && pistas.every((p) => p.estado === "error");
   if (lista.length === 0 || todasFallan) return fallback;
 
-  const ORO = "#dcb765";
-  const MARFIL = "#f6f0e1";
+  const ORO = "#d4a34a";
+  const CREMA = "#f3ecd9";
+  const SERIF = "'Cormorant Garamond', Georgia, serif";
   const btnMS = (on, color) => ({
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    border: "1px solid " + (on ? color : "rgba(255,255,255,0.18)"),
-    background: on ? color : "rgba(255,255,255,0.04)",
-    color: on ? "#10352d" : "rgba(246,240,225,0.85)",
-    fontWeight: 800,
-    fontSize: 12.5,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    border: "1px solid " + (on ? color : "rgba(243,236,217,0.4)"),
+    background: on ? color : "transparent",
+    color: on ? "#1c4a3f" : CREMA,
+    fontWeight: 700,
+    fontSize: 14,
     cursor: "pointer",
     fontFamily: "inherit",
     transition: "all .15s",
-    boxShadow: on ? `0 0 14px ${color}66` : "none",
   });
   const tieneMiVoz = !!miCuerda && pistas.some((p) => p.vozId === miCuerda);
   const hayS = pistas.some((p) => p.solo);
@@ -10863,86 +10884,70 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   return (
     <div className="me-grid">
       <style>{`
-        .me-grid{display:grid;grid-template-columns:minmax(310px,400px) minmax(0,1fr);gap:20px;align-items:start;margin-bottom:12px}
-        @media(max-width:900px){.me-grid{grid-template-columns:1fr}}
+        .me-grid{display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr);gap:40px;align-items:start;margin-bottom:12px;background:#f4efe3;border-radius:28px;padding:28px 28px 32px}
+        @media(max-width:900px){.me-grid{grid-template-columns:1fr;gap:24px;padding:16px;border-radius:20px}}
         .mp-range{-webkit-appearance:none;appearance:none;height:5px;border-radius:5px;outline:none;cursor:pointer}
-        .mp-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:17px;height:17px;border-radius:50%;background:#f6f0e1;border:3px solid #dcb765;box-shadow:0 2px 8px rgba(0,0,0,.4)}
-        .mp-range::-moz-range-thumb{width:11px;height:11px;border-radius:50%;background:#f6f0e1;border:3px solid #dcb765;box-shadow:0 2px 8px rgba(0,0,0,.4)}
-        .mp-big::-webkit-slider-thumb{width:19px;height:19px}
-        .mp-row{transition:background .2s,border-color .2s,opacity .2s}
-        .mp-row:hover{background:rgba(255,255,255,.08)!important}
-        @keyframes mp-eq{0%,100%{transform:scaleY(.25)}50%{transform:scaleY(1)}}
-        .mp-eq{display:inline-flex;align-items:flex-end;gap:2px;height:13px;margin-left:8px;vertical-align:middle}
-        .mp-eq i{width:2.5px;height:100%;background:#dcb765;border-radius:2px;transform-origin:bottom;animation:mp-eq .9s ease-in-out infinite}
-        .mp-eq i:nth-child(2){animation-delay:.2s}.mp-eq i:nth-child(3){animation-delay:.45s}
-        @keyframes mp-pulse{0%{box-shadow:0 0 0 0 rgba(220,183,101,.5)}100%{box-shadow:0 0 0 18px rgba(220,183,101,0)}}
-        .mp-play.on{animation:mp-pulse 1.6s ease-out infinite}
+        .mp-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:none;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+        .mp-range::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;border:none;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+        .mp-play:hover{transform:scale(1.04)}
       `}</style>
-      <div style={{ position: "sticky", top: 12, background: "radial-gradient(120% 70% at 100% 0%, rgba(220,183,101,.16) 0%, transparent 55%), linear-gradient(165deg,#12493d 0%,#0e3a31 55%,#09271f 100%)", color: MARFIL, borderRadius: 26, padding: "24px 22px 20px", border: "1px solid rgba(255,255,255,.08)", boxShadow: "0 30px 60px -22px rgba(6,30,25,.65), inset 0 1px 0 rgba(255,255,255,.08)", fontFamily: "var(--font-sans)", overflow: "hidden" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 10.5, letterSpacing: "0.22em", textTransform: "uppercase", color: ORO, fontWeight: 700 }}>
-            <span style={{ width: 18, height: 1, background: ORO, opacity: 0.7 }} /> Reproductor multipista
-          </span>
-          <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 999, background: "rgba(255,255,255,.08)", color: "rgba(246,240,225,.8)", fontWeight: 600 }}>{pistas.length} {pistas.length === 1 ? "pista" : "pistas"}</span>
+      <div style={{ position: "sticky", top: 12, background: "#245a4e", color: CREMA, borderRadius: 22, padding: "26px 26px 22px", boxShadow: "0 18px 40px -18px rgba(20,60,50,.55)", fontFamily: "var(--font-sans)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5 }}>
+          <span style={{ letterSpacing: "0.2em", textTransform: "uppercase", fontWeight: 700, opacity: 0.9 }}>Reproductor multipista</span>
+          <span style={{ opacity: 0.8 }}>{pistas.length} {pistas.length === 1 ? "pista" : "pistas"}</span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 22 }}>
-          <button className={"mp-play" + (playing ? " on" : "")} onClick={playing ? pausar : reproducir} aria-label={playing ? "Pausar" : "Reproducir"} style={{ width: 72, height: 72, borderRadius: "50%", border: "none", background: "linear-gradient(145deg,#f8e6ae,#d6ab52)", color: "#10352d", fontSize: playing ? 22 : 26, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 10px 26px rgba(220,183,101,.35), inset 0 1px 0 rgba(255,255,255,.6)", paddingLeft: playing ? 0 : 4, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 20 }}>
+          <button className="mp-play" onClick={playing ? pausar : reproducir} aria-label={playing ? "Pausar" : "Reproducir"} style={{ opacity: pistas.some((x) => x.estado === "ok") ? 1 : 0.5, width: 64, height: 64, borderRadius: "50%", border: "none", background: "#fff", color: "#245a4e", fontSize: playing ? 20 : 24, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", paddingLeft: playing ? 0 : 4, flexShrink: 0, transition: "transform .15s", boxShadow: "0 6px 16px rgba(0,0,0,.2)" }}>
             {playing ? "❚❚" : "▶"}
           </button>
-          <button onClick={() => irA(0)} aria-label="Volver al inicio" style={{ width: 42, height: 42, borderRadius: "50%", border: "1px solid rgba(255,255,255,.2)", background: "rgba(255,255,255,.05)", color: MARFIL, fontSize: 14, cursor: "pointer", flexShrink: 0 }}>⏮</button>
-          <div style={{ marginLeft: "auto", textAlign: "right", lineHeight: 1 }}>
-            <div style={{ fontSize: 34, fontWeight: 300, letterSpacing: "-0.03em", fontVariantNumeric: "tabular-nums" }}>{fmtTiempoMulti(pos)}</div>
-            <div style={{ fontSize: 12, opacity: 0.6, marginTop: 5, fontVariantNumeric: "tabular-nums" }}>de {fmtTiempoMulti(dur)}</div>
+          <button onClick={() => irA(0)} aria-label="Volver al inicio" style={{ width: 42, height: 42, borderRadius: "50%", border: "1px solid rgba(243,236,217,.45)", background: "transparent", color: CREMA, fontSize: 14, cursor: "pointer", flexShrink: 0 }}>⏮</button>
+          <div style={{ marginLeft: "auto", textAlign: "right", whiteSpace: "nowrap" }}>
+            <span style={{ fontFamily: SERIF, fontSize: 38, fontWeight: 600, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em" }}>{fmtTiempoMulti(pos)}</span>
+            <span style={{ fontSize: 13, opacity: 0.75, marginLeft: 6, fontVariantNumeric: "tabular-nums" }}>/ {fmtTiempoMulti(dur)}</span>
           </div>
         </div>
 
-        <input className="mp-range mp-big" type="range" min={0} max={dur || 1} step={0.1} value={Math.min(pos, dur || 1)} onChange={(e) => irA(parseFloat(e.target.value))}
-          style={{ width: "100%", marginTop: 22, background: `linear-gradient(90deg,${ORO} ${pct}%,rgba(255,255,255,.16) ${pct}%)` }} />
+        <input className="mp-range" type="range" min={0} max={dur || 1} step={0.1} value={Math.min(pos, dur || 1)} onChange={(e) => irA(parseFloat(e.target.value))}
+          style={{ width: "100%", marginTop: 22, background: `linear-gradient(90deg,${ORO} ${pct}%,rgba(243,236,217,.3) ${pct}%)` }} />
 
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", opacity: 0.6, marginRight: 4 }}>Velocidad</span>
-          {[0.75, 0.9, 1].map((v) => (
-            <button key={v} onClick={() => cambiarVel(v)} style={{ fontSize: 11.5, fontWeight: 700, padding: "4px 11px", borderRadius: 999, cursor: "pointer", border: "1px solid " + (vel === v ? ORO : "rgba(255,255,255,.18)"), background: vel === v ? ORO : "transparent", color: vel === v ? "#10352d" : "rgba(246,240,225,.85)", fontFamily: "inherit", transition: "all .15s" }}>{v}x</button>
-          ))}
+        <div style={{ height: 1, background: "rgba(243,236,217,.2)", margin: "22px 0 18px" }} />
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <span style={{ fontFamily: SERIF, fontSize: 28, fontWeight: 600 }}>Pistas</span>
+          <button onClick={restablecer} style={{ background: "none", border: "none", color: CREMA, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>Restablecer mezcla</button>
         </div>
 
-        <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, letterSpacing: "-0.01em" }}>Pistas</span>
-          <button onClick={restablecer} style={{ background: "none", border: "none", color: ORO, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.02em" }}>↺ Restablecer mezcla</button>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 12 }}>
+        <div style={{ marginTop: 6 }}>
           {pistas.map((p, i) => {
             const suena = hayS ? p.solo : !p.mute;
-            const col = lista[i] && lista[i].voz ? lista[i].voz.color : ORO;
             return (
-              <div key={p.id} className="mp-row" style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px 9px 14px", borderRadius: 15, background: "rgba(255,255,255,.05)", border: "1px solid " + (suena ? "rgba(255,255,255,.1)" : "rgba(255,255,255,.04)"), boxShadow: suena ? `inset 3px 0 0 ${col}` : "none", opacity: p.estado === "error" ? 0.4 : 1 }}>
-                <div style={{ width: 96, lineHeight: 1.15, opacity: suena ? 1 : 0.5, transition: "opacity .2s" }}>
-                  <span style={{ fontSize: 13.5, fontWeight: 700 }}>{p.label}</span>
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: i < pistas.length - 1 ? "1px solid rgba(243,236,217,.14)" : "none", opacity: p.estado === "error" ? 0.4 : 1 }}>
+                <div style={{ width: 104, lineHeight: 1.2, opacity: suena ? 1 : 0.55, transition: "opacity .2s" }}>
+                  <span style={{ fontSize: 15, fontWeight: 700 }}>{p.label}</span>
                   {p.vozId && p.vozId === miCuerda && <span title="Tu voz" style={{ color: ORO, marginLeft: 4 }}>★</span>}
-                  {playing && suena && p.estado === "ok" && (<span className="mp-eq"><i /><i /><i /></span>)}
-                  {p.estado === "cargando" && <div style={{ fontSize: 10, fontWeight: 500, opacity: 0.7 }}>cargando…</div>}
-                  {p.estado === "error" && <div style={{ fontSize: 10, fontWeight: 500 }}>no disponible</div>}
+                  {p.estado === "cargando" && <div style={{ fontSize: 10.5, fontWeight: 500, opacity: 0.7 }}>cargando…</div>}
+                  {p.estado === "error" && <div style={{ fontSize: 10.5, fontWeight: 500 }}>no disponible</div>}
                 </div>
                 <button onClick={() => setP(i, { mute: !p.mute })} title="Silenciar pista" style={btnMS(p.mute, "#f0b3aa")}>M</button>
                 <button onClick={() => setP(i, { solo: !p.solo })} title="Solo esta pista" style={btnMS(p.solo, ORO)}>S</button>
                 <input className="mp-range" type="range" min={0} max={100} value={p.vol} onChange={(e) => setP(i, { vol: parseInt(e.target.value, 10) })} aria-label={"Volumen " + p.label}
-                  style={{ flex: 1, minWidth: 56, background: `linear-gradient(90deg,${ORO} ${p.vol}%,rgba(255,255,255,.16) ${p.vol}%)` }} />
+                  style={{ flex: 1, minWidth: 56, background: `linear-gradient(90deg,${ORO} ${p.vol}%,rgba(243,236,217,.3) ${p.vol}%)` }} />
               </div>
             );
           })}
         </div>
 
-        {tieneMiVoz && (
-          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-            <button onClick={soloMiVoz} style={{ flex: 1, fontSize: 12, fontWeight: 700, padding: "10px 10px", borderRadius: 12, border: "none", background: "linear-gradient(145deg,#f8e6ae,#d6ab52)", color: "#10352d", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 6px 16px rgba(220,183,101,.25)" }}>★ Solo mi voz</button>
-            <button onClick={restablecer} style={{ flex: 1, fontSize: 12, fontWeight: 700, padding: "10px 10px", borderRadius: 12, border: "1px solid rgba(255,255,255,.22)", background: "rgba(255,255,255,.05)", color: MARFIL, cursor: "pointer", fontFamily: "inherit" }}>Todas las voces</button>
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, flexWrap: "wrap" }}>
+          {tieneMiVoz && (
+            <>
+              <button onClick={soloMiVoz} style={{ fontSize: 12, fontWeight: 700, padding: "5px 12px", borderRadius: 999, border: "none", background: ORO, color: "#1c4a3f", cursor: "pointer", fontFamily: "inherit" }}>★ Solo mi voz</button>
+            </>
+          )}
+        </div>
 
-        <div style={{ fontSize: 11, color: "rgba(246,240,225,.6)", marginTop: 16, lineHeight: 1.55 }}>
-          <b style={{ color: "rgba(246,240,225,.9)" }}>M</b> silencia la pista · <b style={{ color: "rgba(246,240,225,.9)" }}>S</b> deja sonando solo las pistas marcadas.
+        <div style={{ fontSize: 12.5, color: "rgba(243,236,217,.8)", marginTop: 16, lineHeight: 1.5 }}>
+          <b>M</b> silencia la pista. <b>S</b> deja sonando solo las pistas marcadas.
         </div>
       </div>
       {visor}
@@ -10950,9 +10955,141 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   );
 }
 
+// Visor de PDF propio: páginas con flechas, zoom y pantalla completa (pdf.js). Si algo falla, usa el visor de Drive.
+function VisorPDF({ url, nombre }) {
+  const [pdf, setPdf] = useState(null);
+  const [pagina, setPagina] = useState(1);
+  const [zoom, setZoom] = useState(100);
+  const [ancho, setAncho] = useState(0);
+  const [error, setError] = useState(false);
+  const [completa, setCompleta] = useState(false);
+  const caja = useRef(null);
+  const marco = useRef(null);
+  const lienzo = useRef(null);
+  useEffect(() => {
+    let vivo = true;
+    setPdf(null);
+    setError(false);
+    setPagina(1);
+    (async () => {
+      try {
+        const lib = await cargarPdfJs();
+        const id = driveIdEnsayo(url);
+        const src = id
+          ? `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${GDRIVE_API_KEY}`
+          : url;
+        const r = await fetch(src);
+        if (!r.ok) throw new Error("descarga " + r.status);
+        const buf = await r.arrayBuffer();
+        const doc = await lib.getDocument({ data: buf }).promise;
+        if (vivo) setPdf(doc);
+      } catch (e) {
+        if (vivo) setError(true);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [url]);
+  useEffect(() => {
+    const el = marco.current;
+    if (!el) return;
+    const medir = () => setAncho(el.clientWidth);
+    medir();
+    let ro = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(medir);
+      ro.observe(el);
+    }
+    window.addEventListener("resize", medir);
+    return () => {
+      if (ro) ro.disconnect();
+      window.removeEventListener("resize", medir);
+    };
+  }, [pdf, error]);
+  useEffect(() => {
+    const f = () => setCompleta(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", f);
+    return () => document.removeEventListener("fullscreenchange", f);
+  }, []);
+  useEffect(() => {
+    if (!pdf || !ancho || !lienzo.current) return;
+    let tarea = null;
+    let cancelado = false;
+    (async () => {
+      try {
+        const pg = await pdf.getPage(pagina);
+        const base = pg.getViewport({ scale: 1 });
+        const escala = ((ancho - 24) / base.width) * (zoom / 100);
+        const vp = pg.getViewport({ scale: escala });
+        const dpr = window.devicePixelRatio || 1;
+        const c = lienzo.current;
+        if (!c || cancelado) return;
+        c.width = Math.floor(vp.width * dpr);
+        c.height = Math.floor(vp.height * dpr);
+        c.style.width = Math.floor(vp.width) + "px";
+        c.style.height = Math.floor(vp.height) + "px";
+        tarea = pg.render({
+          canvasContext: c.getContext("2d"),
+          viewport: vp,
+          transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null,
+        });
+        await tarea.promise;
+      } catch (e) {}
+    })();
+    return () => {
+      cancelado = true;
+      if (tarea) {
+        try {
+          tarea.cancel();
+        } catch (e) {}
+      }
+    };
+  }, [pdf, pagina, zoom, ancho]);
+  useEffect(() => {
+    if (marco.current) marco.current.scrollTop = 0;
+  }, [pagina]);
+  const total = pdf ? pdf.numPages : 1;
+  const ir = (n) => setPagina(Math.max(1, Math.min(total, n)));
+  const pantallaCompleta = () => {
+    const el = caja.current;
+    if (!el) return;
+    try {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else if (el.requestFullscreen) el.requestFullscreen();
+    } catch (e) {}
+  };
+  const bt = (off) => ({ width: 44, height: 44, borderRadius: 12, border: "1px solid #e6dfcf", background: "#fff", color: "#3b3b3b", fontSize: 20, cursor: off ? "default" : "pointer", opacity: off ? 0.35 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 });
+  if (error) {
+    return (
+      <div style={{ background: "#ece4d2", borderRadius: 20, overflow: "hidden", border: "1px solid #e6dfcf" }}>
+        <iframe title={nombre || "Documento"} src={drivePreviewUrl(url) || url} style={{ width: "100%", height: "min(78vh, 760px)", minHeight: 480, border: 0, display: "block" }} allow="autoplay" />
+      </div>
+    );
+  }
+  return (
+    <div ref={caja} style={{ background: "#fff", border: "1px solid #e6dfcf", borderRadius: 20, overflow: "hidden", display: "flex", flexDirection: "column", height: completa ? "100vh" : "auto" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px", flexWrap: "wrap" }}>
+        <button onClick={() => ir(pagina - 1)} disabled={pagina <= 1} style={bt(pagina <= 1)} aria-label="Página anterior">‹</button>
+        <span style={{ fontSize: 14, fontWeight: 600, minWidth: 96, textAlign: "center", whiteSpace: "nowrap" }}>{pdf ? `Página ${pagina} de ${total}` : "Cargando…"}</span>
+        <button onClick={() => ir(pagina + 1)} disabled={pagina >= total} style={bt(pagina >= total)} aria-label="Página siguiente">›</button>
+        <span style={{ width: 1, height: 28, background: "#e6dfcf", margin: "0 6px" }} />
+        <button onClick={() => setZoom((z) => Math.max(50, z - 25))} style={bt(false)} aria-label="Alejar">−</button>
+        <span style={{ width: 48, textAlign: "center", fontSize: 14, fontWeight: 600 }}>{zoom}%</span>
+        <button onClick={() => setZoom((z) => Math.min(300, z + 25))} style={bt(false)} aria-label="Acercar">+</button>
+        <button onClick={pantallaCompleta} style={{ ...bt(false), marginLeft: "auto" }} aria-label="Pantalla completa" title="Pantalla completa">⛶</button>
+      </div>
+      <div ref={marco} style={{ background: "#ece4d2", overflow: "auto", padding: 12, flex: 1, maxHeight: completa ? "none" : "min(78vh, 760px)", minHeight: completa ? 0 : 420, textAlign: "center" }}>
+        {!pdf && <div style={{ padding: 60, color: "#8a8a90", fontSize: 13 }}>Cargando documento…</div>}
+        <canvas ref={lienzo} style={{ display: pdf ? "inline-block" : "none", boxShadow: "0 6px 24px rgba(0,0,0,.18)", background: "#fff" }} />
+      </div>
+    </div>
+  );
+}
+
 // Visor con pestañas: Partitura · Letra · Acordes
 function VisorMaterialEnsayo({ partituras, letras, cantoNombre, accent }) {
-  const ORO = "#b9863a";
+  const ORO = "#c9973f";
   const tabs = [
     { id: "partitura", label: "Partitura", docs: partituras },
     { id: "letra", label: "Letra", docs: letras },
@@ -10968,33 +11105,29 @@ function VisorMaterialEnsayo({ partituras, letras, cantoNombre, accent }) {
   }, [tab]);
   return (
     <div style={{ minWidth: 0 }}>
-      <div style={{ display: "inline-flex", gap: 4, padding: 4, borderRadius: 14, background: "rgba(60,60,67,0.07)", marginBottom: 14 }}>
+      <div style={{ display: "flex", gap: 30, borderBottom: "1px solid rgba(120,100,60,0.22)", marginBottom: 20 }}>
         {tabs.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{ border: "none", cursor: "pointer", fontFamily: "inherit", padding: "9px 20px", borderRadius: 11, fontSize: 13.5, fontWeight: 700, letterSpacing: "-0.005em", background: tab === t.id ? "#fff" : "transparent", color: tab === t.id ? "#0f2744" : "#7a7f8a", boxShadow: tab === t.id ? "0 2px 10px rgba(15,39,68,.12)" : "none", transition: "all .18s" }}>
+          <button key={t.id} onClick={() => setTab(t.id)} style={{ border: "none", background: "none", cursor: "pointer", fontFamily: "inherit", padding: "12px 2px", marginBottom: -1, fontSize: 16, fontWeight: 700, color: tab === t.id ? "#2b2418" : "#8a6a35", borderBottom: "3px solid " + (tab === t.id ? ORO : "transparent"), transition: "all .15s" }}>
             {t.label}
           </button>
         ))}
       </div>
       {actual.docs.length === 0 ? (
-        <div style={{ background: "#fff", border: "1px solid rgba(60,60,67,0.1)", borderRadius: 16, padding: "36px 20px", textAlign: "center", color: "#8a8a90", fontSize: 13 }}>
+        <div style={{ background: "#fff", border: "1px solid #e6dfcf", borderRadius: 18, padding: "36px 20px", textAlign: "center", color: "#8a8a90", fontSize: 13 }}>
           Aún no hay {tab === "partitura" ? "partitura" : tab === "letra" ? "letra" : "letra para sacar acordes"} para este canto.
         </div>
       ) : tab === "acordes" ? (
         <ProyectorLetraEnsayo docs={actual.docs} cantoNombre={cantoNombre} accent={accent} soloAcordes />
       ) : (
-        <div style={{ background: "#fff", border: "1px solid rgba(60,60,67,0.08)", borderRadius: 22, overflow: "hidden", boxShadow: "0 24px 50px -24px rgba(15,39,68,.3)" }}>
+        <div>
           {actual.docs.length > 1 && (
-            <div style={{ padding: "10px 12px", borderBottom: "1px solid rgba(60,60,67,0.08)" }}>
-              <select value={sel ? sel.id : ""} onChange={(e) => setSelId(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(60,60,67,0.18)", fontSize: 13, fontFamily: "inherit" }}>
-                {actual.docs.map((d) => (
-                  <option key={d.id} value={d.id}>{d.nombre}</option>
-                ))}
-              </select>
-            </div>
+            <select value={sel ? sel.id : ""} onChange={(e) => setSelId(e.target.value)} style={{ width: "100%", height: 44, padding: "0 12px", borderRadius: 12, border: "1px solid #e6dfcf", fontSize: 13.5, fontFamily: "inherit", background: "#fff", marginBottom: 10 }}>
+              {actual.docs.map((d) => (
+                <option key={d.id} value={d.id}>{d.nombre}</option>
+              ))}
+            </select>
           )}
-          <div style={{ background: "#ece4d2" }}>
-            <iframe key={sel.id} title={actual.label} src={drivePreviewUrl(urlDoc(sel)) || urlDoc(sel)} style={{ width: "100%", height: "min(78vh, 760px)", minHeight: 480, border: 0, display: "block" }} allow="autoplay" />
-          </div>
+          <VisorPDF key={sel.id} url={urlDoc(sel)} nombre={sel.nombre} />
         </div>
       )}
     </div>
@@ -11904,6 +12037,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
             const vozLabel = track.voz ? track.voz.id : "Mezcla (todas)";
             const vozEmoji = track.voz ? track.voz.emoji : "🎚";
             const esMiVoz = track.voz && track.voz.id === miCuerda;
+            const otras = aud.filter((a) => a.doc.id !== track.doc.id);
             const viejo = (
               <div
                 style={{
