@@ -11182,6 +11182,8 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
     }
   });
   const [search, setSearch] = useState("");
+  const [fMom, setFMom] = useState("");
+  const [lim, setLim] = useState(30);
   const [cantoSel, setCantoSel] = useState(null);
   const [trackId, setTrackId] = useState(null);
   const [proyAbierto, setProyAbierto] = useState(true);
@@ -11266,6 +11268,9 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
   });
   if (search)
     cantos = cantos.filter((c) => norm(c.nombre).includes(norm(search)));
+  const momentosPresentes = [...new Set(cantos.map((c) => c.momento).filter(Boolean))];
+  const cantosFiltrados = fMom ? cantos.filter((c) => c.momento === fMom) : cantos;
+  const cantosVis = cantosFiltrados.slice(0, lim);
 
   const esPista = (f) => {
     const t = tipoDocEnsayo(f);
@@ -11370,9 +11375,9 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 18 }}>
             <div>
               <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "#8b94a3", fontWeight: 700 }}>Sala de ensayo</div>
-              <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 38, fontWeight: 600, color: "#12161d", lineHeight: 1.05, marginTop: 4, letterSpacing: "-0.01em" }}>Repertorio de la misa</div>
+              <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 38, fontWeight: 600, color: "#12161d", lineHeight: 1.05, marginTop: 4, letterSpacing: "-0.01em" }}>Biblioteca de cantos</div>
               <div style={{ fontSize: 13, color: "#6b7280", marginTop: 6 }}>
-                {cantos.length} {cantos.length === 1 ? "canto" : "cantos"}
+                {cantosFiltrados.length} {cantosFiltrados.length === 1 ? "canto" : "cantos"}
                 {cuerdaPerfil ? <> · Tu cuerda: <b style={{ color: "#12161d" }}>{cuerdaPerfil}</b></> : null}
               </div>
             </div>
@@ -11382,6 +11387,16 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
             </div>
           </div>
 
+          {momentosPresentes.length > 1 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+              {["", ...momentosPresentes].map((m) => {
+                const on = fMom === m;
+                return (
+                  <button key={m || "todos"} onClick={() => { setFMom(m); setLim(30); }} style={{ fontSize: 12.5, fontWeight: 600, padding: "6px 14px", borderRadius: 999, cursor: "pointer", fontFamily: "inherit", border: "1px solid " + (on ? "#2a2825" : "#dfe2e7"), background: on ? "#2a2825" : "#fff", color: on ? "#fff" : "#4b5563", transition: "all .15s" }}>{m || "Todos"}</button>
+                );
+              })}
+            </div>
+          )}
           {!cuerdaPerfil && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
               <span style={{ fontSize: 12, color: "#6b7280", marginRight: 4 }}>Mi cuerda</span>
@@ -11400,7 +11415,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
             </div>
           ) : (
             <div style={{ background: "#fff", border: "1px solid #e6e8ec", borderRadius: 16, overflow: "hidden", boxShadow: "0 18px 40px -32px rgba(18,22,29,.4)" }}>
-              {cantos.map((c, i) => {
+              {cantosVis.map((c, i) => {
                 const nVoces = VOCES_ENSAYO.filter((v) => tieneVozAudio(c, v.id)).length;
                 const tienePart = c.files.some((f) => tipoDocEnsayo(f) === "partitura");
                 const tieneLetra = c.files.some((f) => tipoDocEnsayo(f) === "letra");
@@ -11420,12 +11435,17 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
               })}
             </div>
           )}
+          {cantosFiltrados.length > lim && (
+            <div style={{ textAlign: "center", marginTop: 16 }}>
+              <button onClick={() => setLim((l) => l + 30)} style={{ padding: "11px 22px", borderRadius: 12, border: "1px solid #dfe2e7", background: "#fff", color: "#2a2825", fontWeight: 700, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>Mostrar más ({cantosFiltrados.length - lim} restantes)</button>
+            </div>
+          )}
         </div>
       ) : (
         /* ── Detalle de un canto ── */
         <div className="me-fade" style={{ fontFamily: "var(--font-sans)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
-            <button onClick={() => { setCantoSel(null); setTrackId(null); }} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 13.5, fontWeight: 600, color: "#4b5563", padding: 0 }}>‹ Repertorio</button>
+            <button onClick={() => { setCantoSel(null); setTrackId(null); }} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 13.5, fontWeight: 600, color: "#4b5563", padding: 0 }}>‹ Biblioteca</button>
             <select value={cantoActivo.key} onChange={(e) => { const c = cantos.find((x) => x.key === e.target.value); if (c) abrirCanto(c); }} aria-label="Cambiar de canto"
               style={{ maxWidth: 280, padding: "8px 12px", borderRadius: 10, border: "1px solid #e6e8ec", fontSize: 13, color: "#12161d", background: "#fff", outline: "none", fontFamily: "inherit", fontWeight: 500 }}>
               {cantos.map((c) => (<option key={c.key} value={c.key}>{c.momento ? `${c.momento} · ` : ""}{c.nombre}</option>))}
@@ -26172,6 +26192,10 @@ function SubirMaterial({ materialEnsayo, onReload }) {
   const [abierto, setAbierto] = useState(null);
   const [arrastrando, setArrastrando] = useState(false);
   const [filtro, setFiltro] = useState("");
+  const [fMomento, setFMomento] = useState("");
+  const [limite, setLimite] = useState(12);
+  const [busca, setBusca] = useState("");
+  const [comboAbierto, setComboAbierto] = useState(false);
   const [vaciando, setVaciando] = useState(false);
   const formRef = useRef(null);
 
@@ -26205,6 +26229,8 @@ function SubirMaterial({ materialEnsayo, onReload }) {
 
   function elegirCanto(nombre) {
     setCanto(nombre);
+    setBusca("");
+    setComboAbierto(false);
     setSlots({});
     setSinAsignar([]);
     setAviso(null);
@@ -26399,7 +26425,10 @@ function SubirMaterial({ materialEnsayo, onReload }) {
       {sub && <span style={{ fontSize: 12, color: "#7a8494" }}>{sub}</span>}
     </div>
   );
-  const visibles = nombresCantos.filter((n) => !filtro || _normME(n).includes(_normME(filtro)));
+  const momentoDe = (n) => ((grupos[n] || []).find((d) => d.momento) || {}).momento || "";
+  const momentosUsados = SM_MOMENTOS.filter((m) => nombresCantos.some((n) => momentoDe(n) === m));
+  const filtrados = nombresCantos.filter((n) => (!filtro || _normME(n).includes(_normME(filtro))) && (!fMomento || momentoDe(n) === fMomento));
+  const visibles = filtrados.slice(0, limite);
 
   return (
     <div style={{ maxWidth: 980 }}>
@@ -26410,16 +26439,45 @@ function SubirMaterial({ materialEnsayo, onReload }) {
       </div>
 
       <div ref={formRef} style={{ background: "#fff", border: "1px solid #e5e9ef", borderRadius: 22, padding: "4px 22px 22px", boxShadow: "0 18px 40px -26px rgba(20,40,63,.35)" }}>
-        {paso(1, "Canto", "toca uno existente o crea uno nuevo")}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-          <button onClick={() => elegirCanto("__nuevo__")} style={chip(canto === "__nuevo__", { borderStyle: "dashed", borderColor: canto === "__nuevo__" ? NAVY : "#9aa6b6" })}>＋ Canto nuevo</button>
-          {nombresCantos.map((n) => (
-            <button key={n} onClick={() => elegirCanto(n)} style={chip(canto === n)}>{n}</button>
-          ))}
-        </div>
-        {canto === "__nuevo__" && (
-          <input value={nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)} placeholder="Nombre del canto (ej: Reina de Chile)" autoFocus
-            style={{ marginTop: 12, width: "100%", boxSizing: "border-box", padding: "13px 16px", borderRadius: 14, border: "1.5px solid " + NAVY, fontSize: 15, fontFamily: "inherit", outline: "none" }} />
+        {paso(1, "Canto", `busca entre los ${nombresCantos.length} existentes o crea uno nuevo`)}
+        {canto && canto !== "__nuevo__" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderRadius: 14, border: "1.5px solid " + NAVY, background: "#f4f6fa" }}>
+            <span style={{ fontSize: 16, fontWeight: 800, color: NAVY, flex: 1 }}>{canto}</span>
+            <span style={{ fontSize: 12, color: "#6b7686" }}>{(grupos[canto] || []).length} archivo(s) cargados</span>
+            <button onClick={() => elegirCanto(null)} style={{ border: "none", background: "none", cursor: "pointer", color: NAVY, fontWeight: 700, fontSize: 13, textDecoration: "underline", fontFamily: "inherit" }}>Cambiar</button>
+          </div>
+        ) : canto === "__nuevo__" ? (
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <input value={nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)} placeholder="Nombre del canto nuevo" autoFocus
+              style={{ flex: 1, boxSizing: "border-box", padding: "13px 16px", borderRadius: 14, border: "1.5px solid " + NAVY, fontSize: 15, fontFamily: "inherit", outline: "none" }} />
+            <button onClick={() => elegirCanto(null)} style={{ border: "none", background: "none", cursor: "pointer", color: NAVY, fontWeight: 700, fontSize: 13, textDecoration: "underline", fontFamily: "inherit" }}>Cancelar</button>
+          </div>
+        ) : (
+          <div style={{ position: "relative" }}>
+            <input value={busca} onChange={(e) => { setBusca(e.target.value); setComboAbierto(true); }} onFocus={() => setComboAbierto(true)} onBlur={() => setTimeout(() => setComboAbierto(false), 150)}
+              placeholder="Escribe para buscar un canto o crear uno nuevo…"
+              style={{ width: "100%", boxSizing: "border-box", padding: "13px 16px", borderRadius: 14, border: "1.5px solid #cfd6df", fontSize: 15, fontFamily: "inherit", outline: "none" }} />
+            {comboAbierto && (() => {
+              const q = _normME(busca);
+              const coin = nombresCantos.filter((n) => !q || _normME(n).includes(q));
+              const exacto = nombresCantos.some((n) => _normME(n) === q);
+              return (
+                <div style={{ position: "absolute", left: 0, right: 0, top: "calc(100% + 6px)", zIndex: 20, background: "#fff", border: "1px solid #dfe4ea", borderRadius: 14, boxShadow: "0 18px 40px -16px rgba(20,40,63,.35)", maxHeight: 320, overflowY: "auto" }}>
+                  {busca.trim() && !exacto && (
+                    <button onMouseDown={(e) => { e.preventDefault(); setNuevoNombre(busca.trim()); elegirCanto("__nuevo__"); setNuevoNombre(busca.trim()); }} style={{ width: "100%", textAlign: "left", padding: "12px 16px", border: "none", borderBottom: "1px solid #eef1f5", background: "#f4f8ff", cursor: "pointer", fontFamily: "inherit", fontSize: 14, color: NAVY, fontWeight: 800 }}>＋ Crear canto nuevo “{busca.trim()}”</button>
+                  )}
+                  {coin.slice(0, 8).map((n) => (
+                    <button key={n} onMouseDown={(e) => { e.preventDefault(); elegirCanto(n); }} style={{ width: "100%", textAlign: "left", padding: "11px 16px", border: "none", borderBottom: "1px solid #f1f3f6", background: "#fff", cursor: "pointer", fontFamily: "inherit", fontSize: 14, color: "#2c3646", display: "flex", justifyContent: "space-between", gap: 10 }}>
+                      <span>{n}</span>
+                      <span style={{ fontSize: 12, color: "#8a93a1" }}>{(grupos[n] || []).length} {(grupos[n] || []).length === 1 ? "archivo" : "archivos"}</span>
+                    </button>
+                  ))}
+                  {coin.length > 8 && <div style={{ padding: "9px 16px", fontSize: 12, color: "#8a93a1" }}>y {coin.length - 8} más… sigue escribiendo para afinar</div>}
+                  {!busca.trim() && coin.length === 0 && <div style={{ padding: "12px 16px", fontSize: 13, color: "#8a93a1" }}>Aún no hay cantos. Escribe el nombre del primero.</div>}
+                </div>
+              );
+            })()}
+          </div>
         )}
 
         {paso(2, "Momento de la misa", "opcional · define el orden")}
@@ -26514,11 +26572,17 @@ function SubirMaterial({ materialEnsayo, onReload }) {
 
       {/* Cantos cargados */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "30px 0 12px", flexWrap: "wrap" }}>
-        <div style={{ fontSize: 17, fontWeight: 800, color: NAVY }}>Cantos cargados <span style={{ color: "#7a8494", fontWeight: 600, fontSize: 14 }}>({nombresCantos.length})</span></div>
-        {nombresCantos.length > 6 && (
-          <input value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder="Buscar…" style={{ marginLeft: "auto", padding: "8px 12px", borderRadius: 10, border: "1px solid #d8dee7", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-        )}
+        <div style={{ fontSize: 17, fontWeight: 800, color: NAVY }}>Cantos cargados <span style={{ color: "#7a8494", fontWeight: 600, fontSize: 14 }}>({filtrados.length}{filtrados.length !== nombresCantos.length ? ` de ${nombresCantos.length}` : ""})</span></div>
+        <input value={filtro} onChange={(e) => { setFiltro(e.target.value); setLimite(12); }} placeholder="Buscar en cantos cargados…" style={{ marginLeft: "auto", padding: "9px 14px", borderRadius: 10, border: "1px solid #d8dee7", fontSize: 13, fontFamily: "inherit", outline: "none", minWidth: 220 }} />
       </div>
+      {momentosUsados.length > 1 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+          <button onClick={() => { setFMomento(""); setLimite(12); }} style={chip(!fMomento, { padding: "6px 13px", fontSize: 12 })}>Todos</button>
+          {momentosUsados.map((m) => (
+            <button key={m} onClick={() => { setFMomento(fMomento === m ? "" : m); setLimite(12); }} style={chip(fMomento === m, { padding: "6px 13px", fontSize: 12 })}>{m}</button>
+          ))}
+        </div>
+      )}
       {nombresCantos.length === 0 && <div style={{ padding: 24, textAlign: "center", color: "#7a8494", background: "#f6f8fb", borderRadius: 16, fontSize: 13.5 }}>Aún no hay cantos cargados.</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {visibles.map((n) => {
@@ -26555,6 +26619,12 @@ function SubirMaterial({ materialEnsayo, onReload }) {
           );
         })}
       </div>
+      {filtrados.length > limite && (
+        <div style={{ textAlign: "center", marginTop: 14 }}>
+          <button onClick={() => setLimite((l) => l + 20)} style={{ padding: "11px 22px", borderRadius: 12, border: "1px solid #cfd6df", background: "#fff", color: NAVY, fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>Mostrar {Math.min(20, filtrados.length - limite)} más ({filtrados.length - limite} restantes)</button>
+        </div>
+      )}
+      {filtrados.length === 0 && nombresCantos.length > 0 && <div style={{ padding: 20, textAlign: "center", color: "#7a8494", fontSize: 13.5 }}>Ningún canto coincide con la búsqueda.</div>}
       {filas.length > 0 && (
         <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px dashed #d8dee7" }}>
           <button onClick={vaciarTodo} disabled={vaciando} style={{ fontSize: 12.5, fontWeight: 700, color: "#9b2c2c", background: "#fff4f4", border: "1px solid #f3c2c2", borderRadius: 10, padding: "9px 14px", cursor: "pointer", fontFamily: "inherit" }}>{vaciando ? "Vaciando…" : "🧹 Vaciar todo (nueva misa)"}</button>
