@@ -10658,8 +10658,7 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
       label: t.voz ? ETIQUETA_VOZ_MULTI[t.voz.id] || t.voz.id : "Mezcla",
       vozId: t.voz ? t.voz.id : null,
       vol: 85,
-      mute: !t.voz && hayStems, // la mezcla completa queda en silencio si existen las voces por separado
-      solo: false,
+      on: !(!t.voz && hayStems), // la mezcla completa queda apagada si existen las voces por separado
       estado: "cargando",
     }));
   const [pistas, setPistas] = useState(inicial);
@@ -10749,13 +10748,11 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   // Ganancia efectiva de cada pista según volumen / M / S
   const aplicarMezcla = () => {
     const ps = pistasRef.current;
-    const hayS = ps.some((p) => p.solo);
     const c = ctxRef.current;
     nodos.current.forEach((n, i) => {
       const p = ps[i];
       if (!p || !n || !n.gain) return;
-      const suena = hayS ? p.solo : !p.mute;
-      const g = suena ? p.vol / 100 : 0;
+      const g = p.on ? p.vol / 100 : 0;
       try {
         n.gain.gain.setTargetAtTime(g, c.currentTime, 0.015);
       } catch (e) {
@@ -10849,105 +10846,141 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   };
   const setP = (i, cambio) =>
     setPistas((p) => p.map((x, j) => (j === i ? { ...x, ...cambio } : x)));
-  const restablecer = () =>
-    setPistas(() =>
-      inicial().map((x, i) => ({ ...x, estado: pistasRef.current[i]?.estado || "cargando" }))
-    );
+  const conEstado = (arr) => arr.map((x, i) => ({ ...x, estado: pistasRef.current[i]?.estado || "cargando" }));
+  const restablecer = () => setPistas(() => conEstado(inicial()));
   const soloMiVoz = () =>
-    setPistas((p) =>
-      p.map((x) => ({ ...x, solo: !!miCuerda && x.vozId === miCuerda, mute: false }))
-    );
+    setPistas((p) => p.map((x) => ({ ...x, on: !!miCuerda && x.vozId === miCuerda })));
+  const sinMiVoz = () =>
+    setPistas((p) => p.map((x) => ({ ...x, on: !!x.vozId && x.vozId !== miCuerda })));
+  const alternar = (i) => setPistas((p) => p.map((x, j) => (j === i ? { ...x, on: !x.on } : x)));
+  const soloEsta = (i) =>
+    setPistas((p) => {
+      const yaSola = p.every((x, j) => (j === i ? x.on : !x.on));
+      return p.map((x, j) => ({ ...x, on: yaSola ? inicial()[j].on : j === i }));
+    });
 
   const todasFallan = pistas.length > 0 && pistas.every((p) => p.estado === "error");
   if (lista.length === 0 || todasFallan) return fallback;
 
-  const ORO = "#d4a34a";
-  const CREMA = "#f3ecd9";
-  const SERIF = "'Cormorant Garamond', Georgia, serif";
-  const btnMS = (on, color) => ({
-    width: 44,
-    height: 44,
+  const NAVY = "#14283f";
+  const ORO = "#e2b659";
+  const tieneMiVoz = !!miCuerda && pistas.some((p) => p.vozId === miCuerda);
+  const pct = dur ? Math.min(100, (pos / dur) * 100) : 0;
+  const listos = pistas.some((x) => x.estado === "ok");
+  const activas = pistas.filter((x) => x.on && x.vol > 0 && x.estado !== "error");
+  const mismas = (arr) => pistas.length === arr.length && pistas.every((x, j) => x.on === arr[j]);
+  const estadoTodas = mismas(inicial().map((x) => x.on));
+  const estadoMia = tieneMiVoz && mismas(pistas.map((x) => !!miCuerda && x.vozId === miCuerda));
+  const estadoSin = tieneMiVoz && mismas(pistas.map((x) => !!x.vozId && x.vozId !== miCuerda));
+  let resumen = "Ninguna pista activa";
+  if (activas.length) {
+    const nombres = activas.map((x) => x.label);
+    resumen = estadoTodas ? "Todas las voces" : estadoMia ? "Solo tu voz" : estadoSin ? "Todo menos tu voz" : nombres.length > 3 ? `${nombres.length} pistas activas` : nombres.join(" + ");
+  }
+  const R = 38;
+  const CIRC = 2 * Math.PI * R;
+  const chip = (activo) => ({
+    flex: 1,
+    padding: "10px 6px",
     borderRadius: 12,
-    border: "1px solid " + (on ? color : "rgba(243,236,217,0.4)"),
-    background: on ? color : "transparent",
-    color: on ? "#1c4a3f" : CREMA,
-    fontWeight: 700,
-    fontSize: 14,
+    border: "none",
     cursor: "pointer",
     fontFamily: "inherit",
-    transition: "all .15s",
+    fontSize: 12.5,
+    fontWeight: 700,
+    background: activo ? NAVY : "transparent",
+    color: activo ? "#fff" : "#5b6675",
+    boxShadow: activo ? "0 4px 12px rgba(20,40,63,.28)" : "none",
+    transition: "all .18s",
   });
-  const tieneMiVoz = !!miCuerda && pistas.some((p) => p.vozId === miCuerda);
-  const hayS = pistas.some((p) => p.solo);
-  const pct = dur ? Math.min(100, (pos / dur) * 100) : 0;
 
   return (
     <div className="me-grid">
       <style>{`
-        .me-grid{display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr);gap:40px;align-items:start;margin-bottom:12px;background:#f4efe3;border-radius:28px;padding:28px 28px 32px}
-        @media(max-width:900px){.me-grid{grid-template-columns:1fr;gap:24px;padding:16px;border-radius:20px}}
-        .mp-range{-webkit-appearance:none;appearance:none;height:5px;border-radius:5px;outline:none;cursor:pointer}
-        .mp-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:none;box-shadow:0 2px 6px rgba(0,0,0,.35)}
-        .mp-range::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;border:none;box-shadow:0 2px 6px rgba(0,0,0,.35)}
-        .mp-play:hover{transform:scale(1.04)}
+        .me-grid{display:grid;grid-template-columns:minmax(310px,410px) minmax(0,1fr);gap:26px;align-items:start;margin-bottom:12px}
+        @media(max-width:900px){.me-grid{grid-template-columns:1fr;gap:18px}}
+        .mp-range{-webkit-appearance:none;appearance:none;height:6px;border-radius:6px;outline:none;cursor:pointer}
+        .mp-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--c,#14283f);box-shadow:0 2px 6px rgba(0,0,0,.25)}
+        .mp-range::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#fff;border:3px solid var(--c,#14283f);box-shadow:0 2px 6px rgba(0,0,0,.25)}
+        .mp-voz{transition:background .2s,border-color .2s,box-shadow .2s}
+        .mp-play:hover{transform:scale(1.05)}
+        @keyframes mp-eq{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+        .mp-eq{display:inline-flex;align-items:flex-end;gap:2px;height:12px}
+        .mp-eq i{width:3px;height:100%;border-radius:2px;background:currentColor;transform-origin:bottom;animation:mp-eq .9s ease-in-out infinite}
+        .mp-eq i:nth-child(2){animation-delay:.18s}.mp-eq i:nth-child(3){animation-delay:.4s}
       `}</style>
-      <div style={{ position: "sticky", top: 12, background: "#245a4e", color: CREMA, borderRadius: 22, padding: "26px 26px 22px", boxShadow: "0 18px 40px -18px rgba(20,60,50,.55)", fontFamily: "var(--font-sans)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5 }}>
-          <span style={{ letterSpacing: "0.2em", textTransform: "uppercase", fontWeight: 700, opacity: 0.9 }}>Reproductor multipista</span>
-          <span style={{ opacity: 0.8 }}>{pistas.length} {pistas.length === 1 ? "pista" : "pistas"}</span>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 20 }}>
-          <button className="mp-play" onClick={playing ? pausar : reproducir} aria-label={playing ? "Pausar" : "Reproducir"} style={{ opacity: pistas.some((x) => x.estado === "ok") ? 1 : 0.5, width: 64, height: 64, borderRadius: "50%", border: "none", background: "#fff", color: "#245a4e", fontSize: playing ? 20 : 24, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", paddingLeft: playing ? 0 : 4, flexShrink: 0, transition: "transform .15s", boxShadow: "0 6px 16px rgba(0,0,0,.2)" }}>
-            {playing ? "❚❚" : "▶"}
-          </button>
-          <button onClick={() => irA(0)} aria-label="Volver al inicio" style={{ width: 42, height: 42, borderRadius: "50%", border: "1px solid rgba(243,236,217,.45)", background: "transparent", color: CREMA, fontSize: 14, cursor: "pointer", flexShrink: 0 }}>⏮</button>
-          <div style={{ marginLeft: "auto", textAlign: "right", whiteSpace: "nowrap" }}>
-            <span style={{ fontFamily: SERIF, fontSize: 38, fontWeight: 600, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em" }}>{fmtTiempoMulti(pos)}</span>
-            <span style={{ fontSize: 13, opacity: 0.75, marginLeft: 6, fontVariantNumeric: "tabular-nums" }}>/ {fmtTiempoMulti(dur)}</span>
+      <div style={{ position: "sticky", top: 12, background: "#fff", borderRadius: 26, overflow: "hidden", border: "1px solid rgba(20,40,63,.08)", boxShadow: "0 30px 60px -30px rgba(20,40,63,.45)", fontFamily: "var(--font-sans)" }}>
+        {/* Transporte */}
+        <div style={{ background: "linear-gradient(160deg,#1c3a5e 0%,#14283f 70%)", color: "#fff", padding: "20px 22px 20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <button className="mp-play" onClick={playing ? pausar : reproducir} aria-label={playing ? "Pausar" : "Reproducir"} style={{ position: "relative", width: 88, height: 88, borderRadius: "50%", border: "none", background: "transparent", cursor: "pointer", padding: 0, flexShrink: 0, opacity: listos ? 1 : 0.5, transition: "transform .15s" }}>
+              <svg width="88" height="88" viewBox="0 0 88 88" style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
+                <circle cx="44" cy="44" r={R} fill="none" stroke="rgba(255,255,255,.16)" strokeWidth="4" />
+                <circle cx="44" cy="44" r={R} fill="none" stroke={ORO} strokeWidth="4" strokeLinecap="round" strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - pct / 100)} />
+              </svg>
+              <span style={{ position: "absolute", inset: 10, borderRadius: "50%", background: ORO, color: NAVY, display: "flex", alignItems: "center", justifyContent: "center", fontSize: playing ? 20 : 24, paddingLeft: playing ? 0 : 3, boxShadow: "0 8px 20px rgba(0,0,0,.3)" }}>{playing ? "❚❚" : "▶"}</span>
+            </button>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 10.5, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.6, fontWeight: 700 }}>Ensayo por voces</div>
+              <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.03em", fontVariantNumeric: "tabular-nums", lineHeight: 1.15 }}>
+                {fmtTiempoMulti(pos)}
+                <span style={{ fontSize: 14, fontWeight: 500, opacity: 0.6 }}> / {fmtTiempoMulti(dur)}</span>
+              </div>
+              <button onClick={() => irA(0)} style={{ marginTop: 4, background: "none", border: "none", color: "rgba(255,255,255,.75)", fontSize: 12, cursor: "pointer", fontFamily: "inherit", padding: 0, textDecoration: "underline", textUnderlineOffset: 3 }}>⏮ Volver al inicio</button>
+            </div>
+          </div>
+          <input className="mp-range" type="range" min={0} max={dur || 1} step={0.1} value={Math.min(pos, dur || 1)} onChange={(e) => irA(parseFloat(e.target.value))} aria-label="Posición"
+            style={{ "--c": ORO, width: "100%", marginTop: 18, background: `linear-gradient(90deg,${ORO} ${pct}%,rgba(255,255,255,.2) ${pct}%)` }} />
+          <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 8, fontSize: 13, background: "rgba(255,255,255,.08)", borderRadius: 12, padding: "9px 12px" }}>
+            {playing && activas.length > 0 ? <span className="mp-eq" style={{ color: ORO }}><i /><i /><i /></span> : <span style={{ opacity: 0.6 }}>🎧</span>}
+            <span style={{ opacity: 0.65 }}>Escuchando:</span>
+            <b style={{ color: activas.length ? "#fff" : "#f0a39b" }}>{resumen}</b>
           </div>
         </div>
 
-        <input className="mp-range" type="range" min={0} max={dur || 1} step={0.1} value={Math.min(pos, dur || 1)} onChange={(e) => irA(parseFloat(e.target.value))}
-          style={{ width: "100%", marginTop: 22, background: `linear-gradient(90deg,${ORO} ${pct}%,rgba(243,236,217,.3) ${pct}%)` }} />
-
-        <div style={{ height: 1, background: "rgba(243,236,217,.2)", margin: "22px 0 18px" }} />
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <span style={{ fontFamily: SERIF, fontSize: 28, fontWeight: 600 }}>Pistas</span>
-          <button onClick={restablecer} style={{ background: "none", border: "none", color: CREMA, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>Restablecer mezcla</button>
+        {/* Modos rápidos */}
+        <div style={{ padding: "16px 18px 6px" }}>
+          <div style={{ display: "flex", gap: 4, padding: 4, borderRadius: 16, background: "#eef1f5" }}>
+            <button onClick={restablecer} style={chip(estadoTodas)}>Todas</button>
+            {tieneMiVoz && <button onClick={soloMiVoz} style={chip(estadoMia)}>★ Mi voz sola</button>}
+            {tieneMiVoz && <button onClick={sinMiVoz} style={chip(estadoSin)}>Sin mi voz</button>}
+          </div>
         </div>
 
-        <div style={{ marginTop: 6 }}>
+        {/* Voces */}
+        <div style={{ padding: "10px 18px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
           {pistas.map((p, i) => {
-            const suena = hayS ? p.solo : !p.mute;
+            const v = lista[i] && lista[i].voz;
+            const col = v ? v.color : "#6b7280";
+            const err = p.estado === "error";
+            const suena = p.on && !err;
             return (
-              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: i < pistas.length - 1 ? "1px solid rgba(243,236,217,.14)" : "none", opacity: p.estado === "error" ? 0.4 : 1 }}>
-                <div style={{ width: 104, lineHeight: 1.2, opacity: suena ? 1 : 0.55, transition: "opacity .2s" }}>
-                  <span style={{ fontSize: 15, fontWeight: 700 }}>{p.label}</span>
-                  {p.vozId && p.vozId === miCuerda && <span title="Tu voz" style={{ color: ORO, marginLeft: 4 }}>★</span>}
-                  {p.estado === "cargando" && <div style={{ fontSize: 10.5, fontWeight: 500, opacity: 0.7 }}>cargando…</div>}
-                  {p.estado === "error" && <div style={{ fontSize: 10.5, fontWeight: 500 }}>no disponible</div>}
+              <div key={p.id} className="mp-voz" style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 18, border: "1.5px solid " + (suena ? col : "#e5e9ef"), background: suena ? col + "14" : "#f7f8fa", opacity: err ? 0.45 : 1 }}>
+                <button onClick={() => alternar(i)} disabled={err} aria-label={(p.on ? "Silenciar " : "Activar ") + p.label} aria-pressed={p.on}
+                  style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0, cursor: err ? "default" : "pointer", border: "2px solid " + (suena ? col : "#c9d0da"), background: suena ? col : "#fff", color: suena ? "#fff" : "#9aa3b0", fontSize: 19, display: "flex", alignItems: "center", justifyContent: "center", transition: "all .18s", boxShadow: suena ? `0 6px 14px ${col}55` : "none" }}>
+                  {suena ? "🔊" : "🔇"}
+                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 14.5, fontWeight: 800, color: suena ? "#14283f" : "#8a93a1" }}>{p.label}</span>
+                    {p.vozId && p.vozId === miCuerda && <span style={{ fontSize: 10.5, fontWeight: 800, background: ORO, color: NAVY, borderRadius: 6, padding: "1px 6px" }}>TU VOZ</span>}
+                    <span style={{ marginLeft: "auto", fontSize: 10.5, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: err ? "#b42318" : p.estado === "cargando" ? "#8a93a1" : suena ? col : "#9aa3b0" }}>
+                      {err ? "No disponible" : p.estado === "cargando" ? "Cargando…" : suena ? (playing ? "Sonando" : "Activa") : "Silenciada"}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 7 }}>
+                    <input className="mp-range" type="range" min={0} max={100} value={p.vol} disabled={err} onChange={(e) => setP(i, { vol: parseInt(e.target.value, 10) })} aria-label={"Volumen " + p.label}
+                      style={{ "--c": col, flex: 1, minWidth: 50, opacity: suena ? 1 : 0.45, background: `linear-gradient(90deg,${col} ${p.vol}%,#d9dee6 ${p.vol}%)` }} />
+                    <span style={{ width: 30, textAlign: "right", fontSize: 11.5, color: "#7a8494", fontVariantNumeric: "tabular-nums" }}>{p.vol}</span>
+                    <button onClick={() => soloEsta(i)} disabled={err} title="Escuchar solo esta pista" style={{ fontSize: 11, fontWeight: 800, padding: "4px 9px", borderRadius: 8, border: "1px solid #cfd6df", background: "#fff", color: "#3d4757", cursor: err ? "default" : "pointer", fontFamily: "inherit" }}>Solo</button>
+                  </div>
                 </div>
-                <button onClick={() => setP(i, { mute: !p.mute })} title="Silenciar pista" style={btnMS(p.mute, "#f0b3aa")}>M</button>
-                <button onClick={() => setP(i, { solo: !p.solo })} title="Solo esta pista" style={btnMS(p.solo, ORO)}>S</button>
-                <input className="mp-range" type="range" min={0} max={100} value={p.vol} onChange={(e) => setP(i, { vol: parseInt(e.target.value, 10) })} aria-label={"Volumen " + p.label}
-                  style={{ flex: 1, minWidth: 56, background: `linear-gradient(90deg,${ORO} ${p.vol}%,rgba(243,236,217,.3) ${p.vol}%)` }} />
               </div>
             );
           })}
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, flexWrap: "wrap" }}>
-          {tieneMiVoz && (
-            <>
-              <button onClick={soloMiVoz} style={{ fontSize: 12, fontWeight: 700, padding: "5px 12px", borderRadius: 999, border: "none", background: ORO, color: "#1c4a3f", cursor: "pointer", fontFamily: "inherit" }}>★ Solo mi voz</button>
-            </>
-          )}
-        </div>
-
-        <div style={{ fontSize: 12.5, color: "rgba(243,236,217,.8)", marginTop: 16, lineHeight: 1.5 }}>
-          <b>M</b> silencia la pista. <b>S</b> deja sonando solo las pistas marcadas.
+          <div style={{ fontSize: 12, color: "#7a8494", lineHeight: 1.5, marginTop: 4 }}>
+            Toca el círculo de cada voz para <b>activarla o silenciarla</b>. <b>Solo</b> deja únicamente esa pista.
+          </div>
         </div>
       </div>
       {visor}
@@ -11093,7 +11126,6 @@ function VisorMaterialEnsayo({ partituras, letras, cantoNombre, accent }) {
   const tabs = [
     { id: "partitura", label: "Partitura", docs: partituras },
     { id: "letra", label: "Letra", docs: letras },
-    { id: "acordes", label: "Acordes", docs: [...letras, ...partituras] },
   ];
   const primera = tabs.find((t) => t.docs.length > 0) || tabs[0];
   const [tab, setTab] = useState(primera.id);
@@ -11105,19 +11137,17 @@ function VisorMaterialEnsayo({ partituras, letras, cantoNombre, accent }) {
   }, [tab]);
   return (
     <div style={{ minWidth: 0 }}>
-      <div style={{ display: "flex", gap: 30, borderBottom: "1px solid rgba(120,100,60,0.22)", marginBottom: 20 }}>
+      <div style={{ display: "inline-flex", gap: 4, padding: 4, borderRadius: 16, background: "#e9edf3", marginBottom: 14 }}>
         {tabs.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{ border: "none", background: "none", cursor: "pointer", fontFamily: "inherit", padding: "12px 2px", marginBottom: -1, fontSize: 16, fontWeight: 700, color: tab === t.id ? "#2b2418" : "#8a6a35", borderBottom: "3px solid " + (tab === t.id ? ORO : "transparent"), transition: "all .15s" }}>
+          <button key={t.id} onClick={() => setTab(t.id)} style={{ border: "none", cursor: "pointer", fontFamily: "inherit", padding: "10px 24px", borderRadius: 12, fontSize: 14, fontWeight: 800, background: tab === t.id ? "#14283f" : "transparent", color: tab === t.id ? "#fff" : "#5b6675", boxShadow: tab === t.id ? "0 4px 12px rgba(20,40,63,.28)" : "none", transition: "all .18s" }}>
             {t.label}
           </button>
         ))}
       </div>
       {actual.docs.length === 0 ? (
         <div style={{ background: "#fff", border: "1px solid #e6dfcf", borderRadius: 18, padding: "36px 20px", textAlign: "center", color: "#8a8a90", fontSize: 13 }}>
-          Aún no hay {tab === "partitura" ? "partitura" : tab === "letra" ? "letra" : "letra para sacar acordes"} para este canto.
+          Aún no hay {tab === "partitura" ? "partitura" : "letra"} para este canto.
         </div>
-      ) : tab === "acordes" ? (
-        <ProyectorLetraEnsayo docs={actual.docs} cantoNombre={cantoNombre} accent={accent} soloAcordes />
       ) : (
         <div>
           {actual.docs.length > 1 && (
