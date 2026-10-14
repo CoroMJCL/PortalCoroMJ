@@ -11190,7 +11190,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
         @keyframes me-fade { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         .me-fade { animation: me-fade 0.32s cubic-bezier(0.22,1,0.36,1) both; }
         .me-tile { transition: all 0.18s cubic-bezier(0.22,1,0.36,1); }
-        .me-tile:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(30,58,95,0.12); }
+        .me-tile:hover { transform: translateY(-3px); border-color: rgba(220,183,101,0.7) !important; box-shadow: 0 22px 40px -18px rgba(16,53,45,0.45) !important; }
         .me-row { transition: background 0.14s ease; }
       `}</style>
 
@@ -11201,13 +11201,13 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
           position: "relative",
           overflow: "hidden",
           background:
-            "linear-gradient(150deg, rgba(30,58,95,0.06) 0%, rgba(255,255,255,0.97) 46%, #ffffff 100%)",
-          borderRadius: 22,
-          padding: "20px 22px",
+            "radial-gradient(120% 90% at 100% 0%, rgba(220,183,101,0.20) 0%, transparent 55%), linear-gradient(160deg,#12493d 0%,#0e3a31 55%,#09271f 100%)",
+          borderRadius: 26,
+          padding: "24px 26px",
           marginBottom: 14,
           boxShadow:
-            "0 1px 2px rgba(0,0,0,0.04), 0 10px 30px rgba(30,58,95,0.08)",
-          border: "1px solid rgba(255,255,255,0.8)",
+            "0 28px 56px -26px rgba(6,30,25,0.65), inset 0 1px 0 rgba(255,255,255,0.08)",
+          border: "1px solid rgba(255,255,255,0.08)",
         }}
       >
         <div
@@ -11219,7 +11219,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
             height: 180,
             borderRadius: "50%",
             background:
-              "radial-gradient(circle, rgba(30,58,95,0.10) 0%, transparent 70%)",
+              "radial-gradient(circle, rgba(220,183,101,0.18) 0%, transparent 70%)",
             pointerEvents: "none",
           }}
         />
@@ -11237,12 +11237,12 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
               height: 50,
               borderRadius: 15,
               flexShrink: 0,
-              background: `linear-gradient(145deg, ${C.primary}, ${C.primaryDark})`,
+              background: "linear-gradient(145deg,#f8e6ae,#d6ab52)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontSize: 26,
-              boxShadow: `0 6px 18px ${C.primary}50, inset 0 1px 0 rgba(255,255,255,0.3)`,
+              boxShadow: "0 8px 22px rgba(220,183,101,0.35), inset 0 1px 0 rgba(255,255,255,0.6)",
             }}
           >
             🎼
@@ -11250,10 +11250,10 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
           <div style={{ minWidth: 0 }}>
             <div
               style={{
-                fontSize: 9.5,
-                fontWeight: 800,
-                color: C.primary,
-                letterSpacing: "0.14em",
+                fontSize: 10.5,
+                fontWeight: 700,
+                color: "#dcb765",
+                letterSpacing: "0.22em",
                 textTransform: "uppercase",
                 marginBottom: 2,
               }}
@@ -11262,9 +11262,9 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
             </div>
             <div
               style={{
-                fontSize: 20,
+                fontSize: 26,
                 fontWeight: 800,
-                color: "#1c1c1e",
+                color: "#f6f0e1",
                 letterSpacing: "-0.03em",
                 lineHeight: 1.1,
               }}
@@ -11273,9 +11273,9 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
             </div>
             <div
               style={{
-                fontSize: 12.5,
-                color: "#8a8a90",
-                marginTop: 2,
+                fontSize: 13,
+                color: "rgba(246,240,225,0.65)",
+                marginTop: 3,
                 lineHeight: 1.4,
               }}
             >
@@ -11290,8 +11290,8 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
             style={{
               fontSize: 10,
               fontWeight: 700,
-              color: "#8a8a90",
-              letterSpacing: "0.06em",
+              color: "rgba(246,240,225,0.55)",
+              letterSpacing: "0.14em",
               textTransform: "uppercase",
               marginBottom: 7,
             }}
@@ -11310,12 +11310,14 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                     padding: "6px 12px",
                     borderRadius: 20,
                     cursor: "pointer",
-                    border: `1.5px solid ${
-                      on ? v.color : "rgba(60,60,67,0.18)"
+                    border: `1px solid ${
+                      on ? "#dcb765" : "rgba(255,255,255,0.2)"
                     }`,
-                    background: on ? v.light : "white",
-                    color: on ? v.dark : "#8a8a90",
-                    fontWeight: on ? 700 : 500,
+                    background: on ? "linear-gradient(145deg,#f8e6ae,#d6ab52)" : "rgba(255,255,255,0.05)",
+                    color: on ? "#10352d" : "rgba(246,240,225,0.85)",
+                    fontWeight: on ? 800 : 600,
+                    fontFamily: "inherit",
+                    transition: "all .15s",
                   }}
                 >
                   {v.emoji} {v.id}
@@ -11475,10 +11477,11 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                       textAlign: "left",
                       cursor: "pointer",
                       background: "white",
-                      border: "1px solid rgba(60,60,67,0.1)",
-                      borderRadius: 16,
-                      padding: "14px 15px",
-                      boxShadow: "0 2px 8px rgba(30,58,95,0.06)",
+                      border: "1px solid rgba(16,53,45,0.08)",
+                      borderRadius: 20,
+                      padding: "16px 17px",
+                      fontFamily: "inherit",
+                      boxShadow: "0 1px 2px rgba(16,53,45,0.04), 0 14px 30px -18px rgba(16,53,45,0.35)",
                       animationDelay: `${i * 0.03}s`,
                       position: "relative",
                     }}
@@ -11496,8 +11499,8 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                           style={{
                             fontSize: 9.5,
                             fontWeight: 800,
-                            color: C.primary,
-                            background: `${C.primary}12`,
+                            color: "#0e3a31",
+                            background: "rgba(220,183,101,0.28)",
                             borderRadius: 6,
                             padding: "2px 8px",
                             letterSpacing: "0.05em",
@@ -11526,7 +11529,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                     </div>
                     <div
                       style={{
-                        fontSize: 15,
+                        fontSize: 16,
                         fontWeight: 800,
                         color: "#1c1c1e",
                         letterSpacing: "-0.02em",
@@ -11626,7 +11629,7 @@ function MaterialEnsayo({ docs, user, catFiltroInicial }) {
                         style={{
                           marginLeft: "auto",
                           fontSize: 12,
-                          color: C.primary,
+                          color: "#0e3a31",
                           fontWeight: 800,
                         }}
                       >
@@ -14938,7 +14941,6 @@ function BannerWidget({ isAdmin }) {
 const HERRAMIENTAS_CORO = [
   { id: "pauta_misa", icon: "🎼", titulo: "Pauta de Misa", desc: "Canciones y orden de la próxima misa" },
   { id: "material_ensayo", icon: "🎤", titulo: "Material de ensayo", desc: "Cantos, letras y audios por voz" },
-  { id: "audios", icon: "🎧", titulo: "Audios", desc: "Pistas de práctica por cuerda" },
   { id: "cancioneros", icon: "📚", titulo: "Cancioneros", desc: "Descarga los cancioneros del coro" },
 ];
 
@@ -15262,6 +15264,7 @@ function PautaRevisiones({ pauta, members, compacto }) {
             </div>
           ))}
         </div>
+        {!compacto && (
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: "#b45309", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>⏳ Sin revisar ({faltan.length})</div>
           {faltan.length === 0 && <div style={{ fontSize: 12, color: "#94a3b8" }}>Todos la han revisado.</div>}
@@ -15271,8 +15274,12 @@ function PautaRevisiones({ pauta, members, compacto }) {
             </div>
           ))}
         </div>
+        )}
       </div>
-      <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 10 }}>🟢 = conectado en este momento. Cuenta desde que se activó este seguimiento.</div>
+      {compacto && (
+        <div style={{ fontSize: 12, color: "#b45309", fontWeight: 700, marginTop: 10 }}>⏳ Faltan por revisar: {faltan.length}</div>
+      )}
+      <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 10 }}>{compacto ? "Cuenta desde que se activó este seguimiento." : "🟢 = conectado en este momento. Cuenta desde que se activó este seguimiento."}</div>
     </div>
   );
 }
