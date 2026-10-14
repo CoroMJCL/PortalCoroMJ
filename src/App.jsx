@@ -10649,6 +10649,17 @@ const ETIQUETA_VOZ_MULTI = {
   Bajo: "Bajos",
   Instrumentos: "Instrumentos",
 };
+function fuentesMultipista(url) {
+  const id = /(?:drive|docs)\.google\.com/i.test(url || "") ? driveIdEnsayo(url) : null;
+  if (!id) return [url];
+  return [
+    `/api/drive-audio?id=${id}`, // puente propio (sin bloqueo CORS)
+    `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${GDRIVE_API_KEY}`,
+  ];
+}
+function srcReproducible(url) {
+  return fuentesMultipista(url)[0];
+}
 function srcMultipista(url) {
   const id = /(?:drive|docs)\.google\.com/i.test(url || "") ? driveIdEnsayo(url) : null;
   return id
@@ -10659,6 +10670,34 @@ const fmtTiempoMulti = (s) => {
   s = Math.max(0, Math.floor(s || 0));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
+
+// Respaldo limpio cuando el modo multipista no puede cargar: una tarjeta por voz con su propio reproductor
+function PistasSueltas({ lista, motivo, visor }) {
+  const INK = "#2a2825";
+  const ACC = "#a9864d";
+  const MUTED = "#8a847a";
+  return (
+    <div>
+      <div style={{ background: "#fbf8f2", border: "1px solid #e8e0d0", borderRadius: 20, padding: "18px 20px", marginBottom: 14 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: ACC }}>Pistas por voz</div>
+        <div style={{ fontSize: 12.5, color: MUTED, margin: "4px 0 14px", lineHeight: 1.5 }}>
+          Por ahora se escuchan una a una (no se pueden mezclar). {motivo ? `Motivo técnico: ${motivo}.` : ""}
+        </div>
+        <div style={{ display: "grid", gap: 8 }}>
+          {lista.map((t) => (
+            <div key={t.doc.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "#fff", border: "1px solid #eee7d8", borderRadius: 14, padding: "10px 14px", flexWrap: "wrap" }}>
+              <div style={{ minWidth: 112, fontWeight: 800, fontSize: 14, color: INK }}>
+                {t.voz ? ETIQUETA_VOZ_MULTI[t.voz.id] || t.voz.id : "Canción completa"}
+              </div>
+              <audio controls preload="none" src={srcReproducible(urlDoc(t.doc))} style={{ flex: 1, minWidth: 200, height: 36 }} />
+            </div>
+          ))}
+        </div>
+      </div>
+      {visor}
+    </div>
+  );
+}
 
 function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   // tracks: [{ voz|null, doc }]
@@ -10692,6 +10731,7 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   pistasRef.current = pistas;
   const reloj = useRef({ inicio: 0, offset: 0, sonando: false });
   const durRef = useRef(0);
+  const motivoRef = useRef("");
 
   const ctx = () => {
     if (!ctxRef.current) {
@@ -10719,9 +10759,10 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
     lista.forEach((t, i) => {
       (async () => {
         let ultimo = null;
-        for (let intento = 0; intento < 2 && vivo; intento++) {
+        const fuentes = fuentesMultipista(urlDoc(t.doc));
+        for (let intento = 0; intento < fuentes.length && vivo; intento++) {
           try {
-            const r = await fetch(srcMultipista(urlDoc(t.doc)));
+            const r = await fetch(fuentes[intento]);
             if (!r.ok) throw new Error("HTTP " + r.status);
             const dec = await decodificar(c, await r.arrayBuffer());
             // Pasa a mono para ahorrar memoria en celulares
@@ -10746,7 +10787,10 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
             ultimo = e;
           }
         }
-        if (vivo) setPistas((p) => p.map((x, j) => (j === i ? { ...x, estado: "error" } : x)));
+        if (vivo) {
+          motivoRef.current = motivoRef.current || (ultimo && ultimo.message) || "no se pudo descargar";
+          setPistas((p) => p.map((x, j) => (j === i ? { ...x, estado: "error" } : x)));
+        }
       })();
     });
     return () => {
@@ -10891,7 +10935,9 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   }, []);
 
   const todasFallan = pistas.length > 0 && pistas.every((p) => p.estado === "error");
-  if (lista.length === 0 || todasFallan) return fallback;
+  if (lista.length === 0) return fallback;
+  if (todasFallan)
+    return <PistasSueltas lista={lista} motivo={motivoRef.current} visor={visor} />;
 
   const INK = "#2a2825";
   const ACC = "#a9864d";
@@ -11022,12 +11068,19 @@ function VisorPDF({ url, nombre }) {
     (async () => {
       try {
         const lib = await cargarPdfJs();
-        const id = driveIdEnsayo(url);
-        const src = id
-          ? `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${GDRIVE_API_KEY}`
-          : url;
-        const r = await fetch(src);
-        if (!r.ok) throw new Error("descarga " + r.status);
+        const id = /(?:drive|docs)\.google\.com/i.test(url || "") ? driveIdEnsayo(url) : null;
+        const fuentes = id ? fuentesMultipista(url) : [url];
+        let r = null;
+        for (const f of fuentes) {
+          try {
+            const rr = await fetch(f);
+            if (rr.ok && !/text\/html/i.test(rr.headers.get("content-type") || "")) {
+              r = rr;
+              break;
+            }
+          } catch (e) {}
+        }
+        if (!r) throw new Error("descarga");
         const buf = await r.arrayBuffer();
         const doc = await lib.getDocument({ data: buf }).promise;
         if (vivo) setPdf(doc);
