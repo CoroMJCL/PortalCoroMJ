@@ -26179,6 +26179,333 @@ function smDetectarSlot(nombre, mime) {
   return "";
 }
 
+// ── Importación masiva desde una carpeta de Google Drive ──
+function smVozDeTexto(n) {
+  n = _normME(n || "");
+  if (/soprano/.test(n)) return "Soprano";
+  if (/contralto|\balto|altos/.test(n)) return "Contralto";
+  if (/tenor/.test(n)) return "Tenor";
+  if (/bajo|bass|baritono|barítono/.test(n)) return "Bajo";
+  if (/instrument|piano|karaoke|playback|acompa/.test(n)) return "Instrumentos";
+  if (/mezcla|general|todas|completo|full|mix\b/.test(n)) return "Mezcla";
+  return "";
+}
+const SM_MOMENTO_ALIAS = {
+  entrada: "Entrada",
+  "acto penitencial": "Acto Penitencial",
+  penitencial: "Acto Penitencial",
+  perdon: "Acto Penitencial",
+  kyrie: "Acto Penitencial",
+  "señor ten piedad": "Acto Penitencial",
+  gloria: "Gloria",
+  salmo: "Salmo",
+  "salmo responsorial": "Salmo",
+  aleluya: "Aleluya",
+  aclamacion: "Aleluya",
+  ofertorio: "Ofertorio",
+  santo: "Santo",
+  cordero: "Cordero",
+  "cordero de dios": "Cordero",
+  comunion: "Comunión",
+  "comunión": "Comunión",
+  salida: "Salida",
+  final: "Salida",
+  "canto final": "Salida",
+  despedida: "Salida",
+  otro: "Otro",
+  otros: "Otro",
+};
+const smLimpiaCarpeta = (s) => (s || "").replace(/^\s*\d+\s*[.\-)_]*\s*/, "").trim();
+const smEsCarpetaCategoria = (s) => /^(audios?|pistas?|voces|voz|partituras?|letras?|videos?|pdfs?|mp3|acordes?|sopranos?|contraltos?|altos?|tenores?|tenor|bajos?|bar[ií]tonos?|instrument\w*|mezcla|general|karaoke)$/i.test(smLimpiaCarpeta(s).trim());
+
+function smExistentePorSlot(rows) {
+  const m = {};
+  (rows || []).forEach((d) => {
+    const t = tipoDocEnsayo(d);
+    let id = null;
+    if (t === "partitura") id = "Partitura";
+    else if (t === "letra") id = "Letra";
+    else if (t === "video") id = "Video";
+    else if (t === "audio") {
+      const v = vozDocEnsayo(d);
+      id = v === "Todas" ? "Mezcla" : v;
+    }
+    if (id && !m[id]) m[id] = d;
+  });
+  return m;
+}
+
+function ImportarDriveMasivo({ materialEnsayo, onReload }) {
+  const NAVY = "#14283f";
+  const TABLA = "material_ensayo";
+  const [abierto, setAbierto] = useState(false);
+  const [url, setUrl] = useState("https://drive.google.com/drive/folders/1brG53fX6nDmERiPfyRr2FbyJv3qZYN-9");
+  const [estado, setEstado] = useState("idle"); // idle | leyendo | listo | importando | hecho
+  const [prog, setProg] = useState("");
+  const [grupos, setGrupos] = useState([]); // [{id, nombre, momento, incluir, slots:{slotId:{fileId,name}}, dup:[], existe:{}}]
+  const [sinClasificar, setSinClasificar] = useState([]);
+  const [error, setError] = useState("");
+  const [reemplazar, setReemplazar] = useState(false);
+  const [limite, setLimite] = useState(25);
+  const [resultado, setResultado] = useState("");
+
+  const existentes = {};
+  (materialEnsayo || []).forEach((d) => {
+    const k = _normME(cantoBaseEnsayo(d));
+    (existentes[k] = existentes[k] || []).push(d);
+  });
+
+  async function listar(folderId) {
+    let files = [];
+    let token = "";
+    do {
+      const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
+      const u = `https://www.googleapis.com/drive/v3/files?q=${q}&key=${GDRIVE_API_KEY}&fields=nextPageToken,files(id,name,mimeType,size,shortcutDetails(targetId,targetMimeType))&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${token ? `&pageToken=${token}` : ""}`;
+      const r = await fetch(u);
+      if (!r.ok) {
+        if (r.status === 404 || r.status === 403)
+          throw new Error(`No pude leer la carpeta (código ${r.status}). En Drive, comparte la carpeta como “Cualquiera con el enlace · Lector” y vuelve a intentar.`);
+        throw new Error(`Drive respondió ${r.status}`);
+      }
+      const d = await r.json();
+      files = files.concat(d.files || []);
+      token = d.nextPageToken || "";
+    } while (token);
+    return files;
+  }
+
+  async function analizar() {
+    setError("");
+    setResultado("");
+    const rootId = parseDriveFolderId(url);
+    if (!rootId) return setError("Pega el enlace de la carpeta de Drive.");
+    setEstado("leyendo");
+    setProg("Leyendo carpetas…");
+    try {
+      const archivos = [];
+      let n = 0;
+      const recorrer = async (id, ruta, prof) => {
+        if (prof > 6) return;
+        const hijos = await listar(id);
+        for (const c of hijos) {
+          let mime = c.mimeType;
+          let fid = c.id;
+          if (mime === "application/vnd.google-apps.shortcut" && c.shortcutDetails) {
+            mime = c.shortcutDetails.targetMimeType || mime;
+            fid = c.shortcutDetails.targetId || fid;
+          }
+          if (mime === "application/vnd.google-apps.folder") await recorrer(fid, [...ruta, c.name], prof + 1);
+          else {
+            archivos.push({ id: fid, name: c.name, mime, ruta });
+            n++;
+            if (n % 20 === 0) setProg(`Leyendo carpetas… ${n} archivos`);
+          }
+        }
+      };
+      await recorrer(rootId, [], 0);
+      setProg("Clasificando…");
+
+      const mapa = {};
+      const sin = [];
+      archivos.forEach((f) => {
+        const low = (f.name || "").toLowerCase();
+        const ext = low.split(".").pop();
+        const esPdf = f.mime === "application/pdf" || ext === "pdf";
+        const esAudio = (f.mime || "").startsWith("audio/") || /^(mp3|m4a|wav|ogg|aac|flac|opus)$/.test(ext);
+        const esVideo = (f.mime || "").startsWith("video/") || /^(mp4|mov|webm|m4v)$/.test(ext);
+        if (!esPdf && !esAudio && !esVideo) return sin.push({ ...f, motivo: "tipo no soportado" });
+        // Casilla
+        let slot = "";
+        const nombreBase = f.name.replace(/\.[^.]+$/, "");
+        if (esPdf) {
+          const hint = [nombreBase, ...f.ruta].join(" ").toLowerCase();
+          slot = /letra|texto|acorde|lyrics/.test(_normME(nombreBase)) ? "Letra" : /partitura|score/.test(_normME(nombreBase)) ? "Partitura" : /letra|texto|acorde/.test(_normME(f.ruta[f.ruta.length - 1] || "")) ? "Letra" : "Partitura";
+          void hint;
+        } else if (esVideo) slot = "Video";
+        else slot = smVozDeTexto(nombreBase) || smVozDeTexto(f.ruta[f.ruta.length - 1]) || smVozDeTexto(f.ruta[f.ruta.length - 2]);
+        if (!slot) return sin.push({ ...f, motivo: "no sé a qué voz pertenece" });
+        // Momento y canto desde la ruta
+        let momento = "";
+        const carpetas = f.ruta.filter(Boolean);
+        carpetas.forEach((c) => {
+          const al = SM_MOMENTO_ALIAS[_normME(smLimpiaCarpeta(c))];
+          if (al) momento = al;
+        });
+        let cantoCarpeta = "";
+        for (let i = carpetas.length - 1; i >= 0; i--) {
+          const c = carpetas[i];
+          if (smEsCarpetaCategoria(c) || SM_MOMENTO_ALIAS[_normME(smLimpiaCarpeta(c))]) continue;
+          cantoCarpeta = smLimpiaCarpeta(c);
+          break;
+        }
+        const canto = cantoCarpeta || smLimpiaCarpeta(cantoBaseEnsayo({ nombre: nombreBase.replace(/_/g, " ") }));
+        if (!canto || canto === "General") return sin.push({ ...f, motivo: "no pude deducir el canto" });
+        const k = _normME(canto);
+        const g = (mapa[k] = mapa[k] || { id: k, nombre: canto, momento: "", incluir: true, slots: {}, dup: [] });
+        if (momento && !g.momento) g.momento = momento;
+        if (g.slots[slot]) g.dup.push(f.name);
+        else g.slots[slot] = { fileId: f.id, name: f.name, size: f.size };
+      });
+      const lista = Object.values(mapa).sort((a, b) => a.nombre.localeCompare(b.nombre));
+      lista.forEach((g) => {
+        const ex = existentes[g.id];
+        g.existe = ex ? smExistentePorSlot(ex) : {};
+        if (!g.momento && ex) g.momento = (ex.find((d) => d.momento) || {}).momento || "";
+      });
+      setGrupos(lista);
+      setSinClasificar(sin);
+      setLimite(25);
+      setEstado("listo");
+      setProg("");
+    } catch (e) {
+      setError(e.message || "Error al leer la carpeta");
+      setEstado("idle");
+    }
+  }
+
+  const setG = (id, c) => setGrupos((l) => l.map((g) => (g.id === id ? { ...g, ...c } : g)));
+  const nuevosArchivos = (g) =>
+    Object.keys(g.slots).filter((s) => reemplazar || !g.existe[s]);
+  const seleccionados = grupos.filter((g) => g.incluir && nuevosArchivos(g).length > 0);
+  const totalArchivos = seleccionados.reduce((a, g) => a + nuevosArchivos(g).length, 0);
+
+  async function importar() {
+    if (!seleccionados.length) return;
+    if (!window.confirm(`Se agregarán ${totalArchivos} archivos de ${seleccionados.length} canto(s) como enlaces a tu Drive. ¿Continuar?`)) return;
+    setEstado("importando");
+    setError("");
+    try {
+      const nuevas = [];
+      let hechos = 0;
+      for (const g of seleccionados) {
+        const orden = g.momento ? SM_MOMENTOS.indexOf(g.momento) + 1 : null;
+        for (const sid of nuevosArchivos(g)) {
+          const sl = SM_SLOTS.find((x) => x.id === sid);
+          const f = g.slots[sid];
+          const body = {
+            canto: g.nombre,
+            nombre: `${g.nombre} — ${sl.suf}`,
+            momento: g.momento || "",
+            orden,
+            url: `https://drive.google.com/file/d/${f.fileId}/preview`,
+            categoria: sl.cat,
+            cuerda_mat: sl.cuerda,
+            size: f.size ? (f.size / 1048576 < 1 ? Math.round(f.size / 1024) + " KB" : (f.size / 1048576).toFixed(1) + " MB") : "",
+            audiencia: "coro",
+          };
+          const ex = g.existe[sid];
+          if (ex) await updateRecord(TABLA, ex.id, body);
+          else nuevas.push(body);
+          hechos++;
+        }
+        setProg(`Importando… ${hechos} de ${totalArchivos}`);
+      }
+      for (let i = 0; i < nuevas.length; i += 40) {
+        await supabase(TABLA, { method: "POST", body: nuevas.slice(i, i + 40) });
+        setProg(`Guardando… ${Math.min(i + 40, nuevas.length)} de ${nuevas.length}`);
+      }
+      setResultado(`✓ Listo: ${totalArchivos} archivos de ${seleccionados.length} canto(s) importados.`);
+      setGrupos([]);
+      setSinClasificar([]);
+      setEstado("hecho");
+      setProg("");
+      onReload();
+    } catch (e) {
+      setError(e.message || "Error al importar");
+      setEstado("listo");
+    }
+  }
+
+  const inp = { padding: "8px 10px", borderRadius: 10, border: "1px solid #d8dee7", fontSize: 13, fontFamily: "inherit", outline: "none" };
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e5e9ef", borderRadius: 22, marginBottom: 18, overflow: "hidden", boxShadow: "0 18px 40px -30px rgba(20,40,63,.35)" }}>
+      <button onClick={() => setAbierto((v) => !v)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "16px 22px", border: "none", background: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+        <span style={{ fontSize: 22 }}>📁</span>
+        <span style={{ flex: 1 }}>
+          <span style={{ display: "block", fontSize: 15.5, fontWeight: 800, color: NAVY }}>Importar muchos cantos desde Google Drive</span>
+          <span style={{ display: "block", fontSize: 12.5, color: "#6b7686", marginTop: 2 }}>Pega la carpeta, revisa lo que encontré y se cargan todos de una vez (sin subir archivos uno a uno).</span>
+        </span>
+        <span style={{ color: "#8a93a1", fontSize: 18 }}>{abierto ? "▴" : "▾"}</span>
+      </button>
+      {abierto && (
+        <div style={{ padding: "0 22px 22px", borderTop: "1px solid #eef1f5" }}>
+          <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://drive.google.com/drive/folders/…" style={{ ...inp, flex: 1, minWidth: 240, padding: "12px 14px", fontSize: 14 }} />
+            <button onClick={analizar} disabled={estado === "leyendo" || estado === "importando"} style={{ padding: "12px 22px", borderRadius: 12, border: "none", background: NAVY, color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{estado === "leyendo" ? "Analizando…" : "Analizar carpeta"}</button>
+          </div>
+          <div style={{ fontSize: 12, color: "#7a8494", marginTop: 8, lineHeight: 1.5 }}>
+            La carpeta debe estar compartida como “Cualquiera con el enlace”. Reconozco la estructura <b>Canto / archivos</b> o <b>Canto / Voz / archivos</b> (y carpetas de momento como “Entrada” o “Comunión”), y los archivos por su nombre (Soprano, Altos, Tenor, Bajo, Instrumentos, Partitura, Letra). Los archivos quedan como enlaces a tu Drive; no se copian.
+          </div>
+          {prog && <div style={{ marginTop: 12, fontSize: 13.5, color: NAVY, fontWeight: 700 }}>{prog}</div>}
+          {error && <div style={{ marginTop: 12, padding: "11px 14px", borderRadius: 12, background: "#fdecea", color: "#b42318", fontSize: 13.5, border: "1px solid #f5c2bd" }}>{error}</div>}
+          {resultado && <div style={{ marginTop: 12, padding: "11px 14px", borderRadius: 12, background: "#eefaf3", color: "#1d7a4d", fontSize: 13.5, fontWeight: 700, border: "1px solid #bfe6d0" }}>{resultado}</div>}
+
+          {estado === "listo" && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+                <div style={{ fontSize: 14, color: "#2c3646" }}>
+                  Encontré <b>{grupos.length} cantos</b>. Se importarán <b>{totalArchivos} archivos</b> de {seleccionados.length} canto(s).
+                </div>
+                <label style={{ marginLeft: "auto", fontSize: 12.5, color: "#4b5563", display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <input type="checkbox" checked={reemplazar} onChange={(e) => setReemplazar(e.target.checked)} /> Reemplazar archivos que ya existen
+                </label>
+                <button onClick={() => setGrupos((l) => l.map((g) => ({ ...g, incluir: !l.every((x) => x.incluir) })))} style={{ border: "none", background: "none", color: NAVY, fontWeight: 700, fontSize: 12.5, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>Marcar / desmarcar todos</button>
+              </div>
+              <div style={{ border: "1px solid #e5e9ef", borderRadius: 14, overflow: "hidden" }}>
+                {grupos.slice(0, limite).map((g, i) => {
+                  const nuevos = nuevosArchivos(g);
+                  return (
+                    <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderTop: i ? "1px solid #eef1f5" : "none", flexWrap: "wrap", background: g.incluir && nuevos.length ? "#fff" : "#f7f8fa", opacity: g.incluir && nuevos.length ? 1 : 0.6 }}>
+                      <input type="checkbox" checked={g.incluir} onChange={(e) => setG(g.id, { incluir: e.target.checked })} />
+                      <input value={g.nombre} onChange={(e) => setG(g.id, { nombre: e.target.value })} style={{ ...inp, flex: 1, minWidth: 180, fontWeight: 700 }} />
+                      <select value={g.momento} onChange={(e) => setG(g.id, { momento: e.target.value })} style={{ ...inp, minWidth: 130 }}>
+                        <option value="">Momento…</option>
+                        {SM_MOMENTOS.map((m) => (<option key={m} value={m}>{m}</option>))}
+                      </select>
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", flexBasis: "100%", paddingLeft: 26 }}>
+                        {SM_SLOTS.map((s) => {
+                          const tiene = !!g.slots[s.id];
+                          const ya = !!g.existe[s.id];
+                          if (!tiene && !ya) return null;
+                          return (
+                            <span key={s.id} title={tiene ? g.slots[s.id].name : "ya cargado"} style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 8, background: tiene ? (ya && !reemplazar ? "#eef1f5" : "#e3f6ec") : "#eef1f5", color: tiene ? (ya && !reemplazar ? "#7a8494" : "#1d7a4d") : "#7a8494" }}>
+                              {tiene ? (ya ? (reemplazar ? "↻ " : "• ") : "+ ") : "• "}{s.label}
+                            </span>
+                          );
+                        })}
+                        {g.dup.length > 0 && <span style={{ fontSize: 11, color: "#b45309" }}>· {g.dup.length} archivo(s) repetido(s) omitido(s)</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {grupos.length > limite && (
+                <div style={{ textAlign: "center", marginTop: 10 }}>
+                  <button onClick={() => setLimite((l) => l + 25)} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid #cfd6df", background: "#fff", color: NAVY, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Ver más ({grupos.length - limite} restantes)</button>
+                </div>
+              )}
+              <div style={{ fontSize: 11.5, color: "#7a8494", marginTop: 8 }}>
+                <b>+</b> nuevo · <b>•</b> ya existe (se omite) · <b>↻</b> reemplazará. Puedes corregir el nombre del canto y su momento antes de importar.
+              </div>
+              {sinClasificar.length > 0 && (
+                <details style={{ marginTop: 12, fontSize: 12.5, color: "#6b7686" }}>
+                  <summary style={{ cursor: "pointer", fontWeight: 700, color: "#8a5a00" }}>{sinClasificar.length} archivo(s) que no pude clasificar</summary>
+                  <div style={{ marginTop: 6, maxHeight: 180, overflowY: "auto", lineHeight: 1.6 }}>
+                    {sinClasificar.map((f, i) => (<div key={i}>{[...f.ruta, f.name].join(" / ")} <i style={{ color: "#a2abb8" }}>({f.motivo})</i></div>))}
+                  </div>
+                </details>
+              )}
+              <button onClick={importar} disabled={!seleccionados.length} style={{ marginTop: 16, padding: "14px 28px", borderRadius: 14, border: "none", background: seleccionados.length ? "linear-gradient(145deg,#f4d98a,#d6ab52)" : "#cfd6df", color: NAVY, fontSize: 15, fontWeight: 800, cursor: seleccionados.length ? "pointer" : "default", fontFamily: "inherit" }}>
+                Importar {totalArchivos} archivo{totalArchivos === 1 ? "" : "s"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SubirMaterial({ materialEnsayo, onReload }) {
   const TABLA = "material_ensayo";
   const NAVY = "#14283f";
@@ -26438,6 +26765,8 @@ function SubirMaterial({ materialEnsayo, onReload }) {
         <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>Elige el canto, el momento y suelta los archivos: partitura, letra y una pista por voz.</div>
       </div>
 
+      <div style={{ height: 16 }} />
+      <ImportarDriveMasivo materialEnsayo={materialEnsayo} onReload={onReload} />
       <div ref={formRef} style={{ background: "#fff", border: "1px solid #e5e9ef", borderRadius: 22, padding: "4px 22px 22px", boxShadow: "0 18px 40px -26px rgba(20,40,63,.35)" }}>
         {paso(1, "Canto", `busca entre los ${nombresCantos.length} existentes o crea uno nuevo`)}
         {canto && canto !== "__nuevo__" ? (
