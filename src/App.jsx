@@ -865,6 +865,7 @@ const NAV = [
   { id: "noticias", icon: "◈", label: "Avisos" },
   { id: "biblioteca", icon: "▤", label: "Biblioteca" },
   { id: "cancionero", icon: "♫", label: "Canto Digital" },
+  { id: "cancionero_digital", icon: "📖", label: "Cancionero Digital" },
   { id: "documentos", icon: "⬇", label: "Descargas Misas" },
   { id: "integrantes", icon: "◎", label: "Integrantes" },
   { id: "cumpleanos", icon: "🎂", label: "Cumpleaños" },
@@ -4157,6 +4158,7 @@ function AppInner() {
               )}
               {section === "videos" && <Videos />}
               {section === "cancionero" && <Cancionero user={user} />}
+              {section === "cancionero_digital" && <CancioneroDigital />}
               {section === "reconoceme" && (
                 <Reconoceme
                   members={members}
@@ -11197,7 +11199,7 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
 
 
 // Visor de PDF propio: páginas con flechas, zoom y pantalla completa (pdf.js). Si algo falla, usa el visor de Drive.
-function VisorPDF({ url, nombre }) {
+function VisorPDF({ url, nombre, semitonos = 0, onAcordes, barra }) {
   const [pdf, setPdf] = useState(null);
   const [pagina, setPagina] = useState(1);
   const [zoom, setZoom] = useState(100);
@@ -11207,6 +11209,8 @@ function VisorPDF({ url, nombre }) {
   const caja = useRef(null);
   const marco = useRef(null);
   const lienzo = useRef(null);
+  const onAcordesRef = useRef(onAcordes);
+  onAcordesRef.current = onAcordes;
   useEffect(() => {
     let vivo = true;
     setPdf(null);
@@ -11283,6 +11287,19 @@ function VisorPDF({ url, nombre }) {
           transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null,
         });
         await tarea.promise;
+        // Acordes: se detectan las líneas de acordes de la hoja y, si hay transposición, se repintan
+        if (onAcordesRef.current || semitonos) {
+          const tc = await pg.getTextContent();
+          if (cancelado) return;
+          const lineas = cdLineasDeAcordes(tc.items);
+          if (semitonos) cdPintarTranspuestos(c.getContext("2d"), vp, dpr, lineas, tc.styles, semitonos);
+          if (onAcordesRef.current) {
+            let primero = "";
+            const ord = [...lineas].sort((x, y) => y.transform[5] - x.transform[5] || x.transform[4] - y.transform[4]);
+            if (ord[0]) primero = ord[0].str.split(/\s+/).filter((t) => cdTransponerToken(t, 0) !== null)[0] || "";
+            onAcordesRef.current({ n: lineas.length, primero });
+          }
+        }
       } catch (e) {}
     })();
     return () => {
@@ -11293,7 +11310,7 @@ function VisorPDF({ url, nombre }) {
         } catch (e) {}
       }
     };
-  }, [pdf, pagina, zoom, ancho]);
+  }, [pdf, pagina, zoom, ancho, semitonos]);
   useEffect(() => {
     if (marco.current) marco.current.scrollTop = 0;
   }, [pagina]);
@@ -11327,6 +11344,7 @@ function VisorPDF({ url, nombre }) {
         <button onClick={() => setZoom((z) => Math.min(300, z + 25))} style={bt(false)} aria-label="Acercar">+</button>
         <button onClick={pantallaCompleta} style={{ ...bt(false), marginLeft: "auto" }} aria-label="Pantalla completa" title="Pantalla completa">⛶</button>
       </div>
+      {barra}
       <div ref={marco} style={{ background: "#e9ebef", overflow: "auto", padding: 12, flex: 1, maxHeight: completa ? "none" : "min(78vh, 760px)", minHeight: completa ? 0 : 420, textAlign: "center" }}>
         {!pdf && <div style={{ padding: 60, color: "#8a8a90", fontSize: 13 }}>Cargando documento…</div>}
         <canvas ref={lienzo} style={{ display: pdf ? "inline-block" : "none", boxShadow: "0 6px 24px rgba(18,22,29,.18)", background: "#fff" }} />
@@ -11336,6 +11354,295 @@ function VisorPDF({ url, nombre }) {
 }
 
 // Visor con pestañas: Partitura · Letra · Acordes
+// ── Cancionero Digital: lista de PDFs de la carpeta de Drive + visor con transposición de acordes ──
+const CD_NA_S = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const CD_NA_F = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+const CD_NL_S = ["Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"];
+const CD_NL_F = ["Do", "Reb", "Re", "Mib", "Mi", "Fa", "Solb", "Sol", "Lab", "La", "Sib", "Si"];
+const CD_LAT_IDX = { Do: 0, Re: 2, Mi: 4, Fa: 5, Sol: 7, La: 9, Si: 11 };
+const CD_AM_IDX = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+const CD_SUF = "(?:maj|min|dim|aug|sus|add|m|M|°|\\+|[#b]?\\d+)*";
+const CD_RE_LAT = new RegExp("^(Do|Re|Mi|Fa|Sol|La|Si)([#b]?)(" + CD_SUF + ")(?:/(Do|Re|Mi|Fa|Sol|La|Si)([#b]?))?$");
+const CD_RE_AM = new RegExp("^([A-G])([#b]?)(" + CD_SUF + ")(?:/([A-G])([#b]?))?$");
+
+// Devuelve el acorde transpuesto, o null si el texto no es un acorde
+function cdTransponerToken(tok, semis) {
+  let latino = true;
+  let m = tok.match(CD_RE_LAT);
+  if (!m) {
+    latino = false;
+    m = tok.match(CD_RE_AM);
+  }
+  if (!m) return null;
+  const idxs = latino ? CD_LAT_IDX : CD_AM_IDX;
+  const mover = (raiz, acc) => {
+    const i = (((idxs[raiz] + (acc === "#" ? 1 : acc === "b" ? -1 : 0) + semis) % 12) + 12) % 12;
+    const esc = acc === "b" ? (latino ? CD_NL_F : CD_NA_F) : latino ? CD_NL_S : CD_NA_S;
+    return esc[i];
+  };
+  let out = mover(m[1], m[2]) + m[3];
+  if (m[4]) out += "/" + mover(m[4], m[5]);
+  return out;
+}
+const cdEsSeparador = (t) => /^[|:\-–—()\[\]x\d.,;/]+$/.test(t);
+
+// Busca en una página las líneas formadas solo por acordes. Devuelve [{ it, tokens:[{txt,off}] }]
+function cdLineasDeAcordes(items) {
+  const filas = {};
+  items.forEach((it) => {
+    if (!it.str || !it.str.trim()) return;
+    const k = Math.round(it.transform[5] / 3);
+    (filas[k] = filas[k] || []).push(it);
+  });
+  const res = [];
+  Object.keys(filas).forEach((k) => {
+    const its = filas[k];
+    let hayAcorde = false;
+    let todo = true;
+    its.forEach((it) => {
+      it.str.split(/\s+/).filter(Boolean).forEach((t) => {
+        if (cdTransponerToken(t, 0) !== null) hayAcorde = true;
+        else if (!cdEsSeparador(t)) todo = false;
+      });
+    });
+    if (hayAcorde && todo) its.forEach((it) => res.push(it));
+  });
+  return res;
+}
+
+// Pinta sobre la página los acordes transpuestos (tapa el acorde original y escribe el nuevo)
+function cdPintarTranspuestos(ctx, vp, dpr, itemsAcorde, estilos, semis) {
+  const Util = window.pdfjsLib.Util;
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  itemsAcorde.forEach((it) => {
+    const tr = Util.transform(vp.transform, it.transform);
+    const fs = Math.hypot(tr[2], tr[3]) || 12;
+    const w = it.width * vp.scale;
+    const x = tr[4];
+    const y = tr[5];
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x - 2, y - fs * 0.95, w + 4, fs * 1.25);
+    const st = (estilos && estilos[it.fontName]) || {};
+    ctx.font = `bold ${fs}px ${st.fontFamily || "sans-serif"}`;
+    ctx.fillStyle = "#8a4b12";
+    ctx.textBaseline = "alphabetic";
+    const len = it.str.length || 1;
+    const re = /\S+/g;
+    let mm;
+    while ((mm = re.exec(it.str))) {
+      const nuevo = cdTransponerToken(mm[0], semis);
+      if (nuevo === null) {
+        // separadores: se vuelven a escribir tal cual
+        ctx.fillText(mm[0], x + (mm.index / len) * w, y);
+      } else {
+        ctx.fillText(nuevo, x + (mm.index / len) * w, y);
+      }
+    }
+  });
+  ctx.restore();
+}
+
+async function cdListarCantos() {
+  const out = [];
+  const caminar = async (folderId, ruta, prof) => {
+    let token = "";
+    do {
+      const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
+      const r = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${q}&key=${GDRIVE_API_KEY}&fields=nextPageToken,files(id,name,mimeType)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${token ? `&pageToken=${token}` : ""}`
+      );
+      if (!r.ok) throw new Error("Drive respondió " + r.status);
+      const d = await r.json();
+      for (const f of d.files || []) {
+        if (f.mimeType === "application/vnd.google-apps.folder") {
+          if (prof < 3) await caminar(f.id, [...ruta, f.name], prof + 1);
+        } else if (f.mimeType === "application/pdf" || /\.pdf$/i.test(f.name)) {
+          out.push({ id: f.id, nombre: f.name.replace(/\.pdf$/i, "").trim(), carpeta: ruta.join(" / ") });
+        }
+      }
+      token = d.nextPageToken || "";
+    } while (token);
+  };
+  await caminar(GDRIVE_FOLDER_ID, [], 0);
+  out.sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" }));
+  return out;
+}
+const cdNorm = (s) => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+function CancioneroDigital() {
+  const INK = "#26231f";
+  const ACC = "#a9864d";
+  const MUTED = "#8a847a";
+  const [items, setItems] = useState(() => {
+    try {
+      const c = JSON.parse(localStorage.getItem("cd_lista_v1") || "null");
+      return c && Array.isArray(c.items) ? c.items : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
+  const [q, setQ] = useState("");
+  const [letra, setLetra] = useState("");
+  const [selId, setSelId] = useState(null);
+  const [semis, setSemis] = useState(0);
+  const [info, setInfo] = useState(null); // { n, primero }
+  const [lim, setLim] = useState(80);
+
+  const cargar = () => {
+    setCargando(true);
+    setError("");
+    cdListarCantos()
+      .then((l) => {
+        setItems(l);
+        try {
+          localStorage.setItem("cd_lista_v1", JSON.stringify({ t: Date.now(), items: l }));
+        } catch (e) {}
+      })
+      .catch((e) => setError(e.message || "No se pudo leer la carpeta"))
+      .finally(() => setCargando(false));
+  };
+  useEffect(cargar, []);
+
+  const sel = items.find((x) => x.id === selId) || null;
+  const abrir = (c) => {
+    setSelId(c.id);
+    setInfo(null);
+    let t = 0;
+    try {
+      t = parseInt(localStorage.getItem("cd_tono_" + c.id) || "0", 10) || 0;
+    } catch (e) {}
+    setSemis(t);
+  };
+  const cambiarTono = (n) => {
+    const v = Math.max(-11, Math.min(11, n));
+    setSemis(v);
+    try {
+      if (sel) localStorage.setItem("cd_tono_" + sel.id, String(v));
+    } catch (e) {}
+  };
+  const primeraLetra = (n) => {
+    const l = cdNorm(n).charAt(0).toUpperCase();
+    return /[A-Z]/.test(l) ? l : "#";
+  };
+  const letras = [...new Set(items.map((c) => primeraLetra(c.nombre)))].sort();
+  const nq = cdNorm(q);
+  const filtrados = items.filter((c) => (!nq || cdNorm(c.nombre).includes(nq)) && (!letra || primeraLetra(c.nombre) === letra));
+
+  const bt = { width: 34, height: 34, borderRadius: 10, border: "1px solid #e4dfd2", background: "#fff", color: INK, fontSize: 17, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" };
+  const tonoTxt = semis === 0 ? "Original" : (semis > 0 ? "+" : "") + semis;
+  const nuevoPrimero = info && info.primero ? cdTransponerToken(info.primero, semis) : null;
+
+  const barra = (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "9px 12px", background: "#fbf8f2", borderBottom: "1px solid #eee7d8" }}>
+      <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: ACC }}>Tono</span>
+      <button style={bt} onClick={() => cambiarTono(semis - 1)} aria-label="Bajar medio tono">−</button>
+      <span style={{ minWidth: 62, textAlign: "center", fontSize: 14, fontWeight: 700, color: INK }}>{tonoTxt}</span>
+      <button style={bt} onClick={() => cambiarTono(semis + 1)} aria-label="Subir medio tono">+</button>
+      {semis !== 0 && (
+        <button onClick={() => cambiarTono(0)} style={{ border: "none", background: "none", color: ACC, fontWeight: 700, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>Volver al original</button>
+      )}
+      <span style={{ marginLeft: "auto", fontSize: 12, color: MUTED }}>
+        {info === null ? "" : info.n === 0 ? "Esta hoja no tiene acordes que se puedan transponer" : nuevoPrimero && semis !== 0 ? `Primer acorde: ${info.primero} → ${nuevoPrimero}` : info.primero ? `Primer acorde: ${info.primero}` : ""}
+      </span>
+    </div>
+  );
+
+  return (
+    <div style={{ fontFamily: "var(--font-sans)", color: INK }}>
+      <style>{`
+        .cd-wrap{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:22px;align-items:start}
+        .cd-lista{background:#fffdf9;border:1px solid #ece7dc;border-radius:20px;overflow:hidden;box-shadow:0 24px 50px -34px rgba(90,70,30,.35);position:sticky;top:12px}
+        .cd-scroll{max-height:calc(100vh - 250px);min-height:320px;overflow:auto}
+        .cd-fila{display:block;width:100%;text-align:left;background:none;border:none;border-left:3px solid transparent;border-top:1px solid #f1ece0;padding:13px 18px;cursor:pointer;font-family:inherit;transition:background .12s}
+        .cd-fila:hover{background:#f8f4ea}
+        .cd-fila.on{background:#f3ecdc;border-left-color:#a9864d}
+        .cd-volver{display:none}
+        @media(max-width:900px){
+          .cd-wrap{grid-template-columns:minmax(0,1fr)}
+          .cd-lista{position:static}
+          .cd-scroll{max-height:none}
+          .cd-wrap.abierto .cd-lista{display:none}
+          .cd-wrap:not(.abierto) .cd-visor{display:none}
+          .cd-volver{display:inline-block}
+        }
+      `}</style>
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "#8b94a3", fontWeight: 700 }}>Cancionero Digital</div>
+        <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 38, fontWeight: 600, lineHeight: 1.05, marginTop: 4, letterSpacing: "-0.01em" }}>Todos los cantos</div>
+        <div style={{ fontSize: 13, color: "#6b7280", marginTop: 6 }}>
+          {items.length > 0 ? `${items.length} cantos · toca uno para verlo al instante` : cargando ? "Cargando cantos…" : ""}
+        </div>
+      </div>
+
+      <div className={"cd-wrap" + (sel ? " abierto" : "")}>
+        <div className="cd-lista">
+          <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid #eee7d8" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid #e4dfd2", borderRadius: 12, padding: "9px 12px" }}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#8b94a3" strokeWidth="1.3" /><path d="M9.5 9.5l3 3" stroke="#8b94a3" strokeWidth="1.3" strokeLinecap="round" /></svg>
+              <input value={q} onChange={(e) => { setQ(e.target.value); setLim(80); }} placeholder="Buscar canto" style={{ border: "none", outline: "none", fontSize: 14, flex: 1, background: "none", fontFamily: "inherit", color: INK }} />
+              {q && <button onClick={() => setQ("")} aria-label="Borrar" style={{ border: "none", background: "none", cursor: "pointer", color: MUTED, fontSize: 16 }}>×</button>}
+            </div>
+            {letras.length > 8 && (
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 10 }}>
+                {["", ...letras].map((l) => {
+                  const on = letra === l;
+                  return (
+                    <button key={l || "t"} onClick={() => { setLetra(l); setLim(80); }} style={{ minWidth: l ? 26 : 0, padding: l ? "3px 0" : "3px 10px", fontSize: 11.5, fontWeight: 700, borderRadius: 8, cursor: "pointer", fontFamily: "inherit", border: "1px solid " + (on ? INK : "#e4dfd2"), background: on ? INK : "#fff", color: on ? "#fff" : "#6b6358" }}>{l || "Todos"}</button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <div className="cd-scroll">
+            {error && items.length === 0 && (
+              <div style={{ padding: 20, fontSize: 13.5, color: "#b42318" }}>
+                {error}. <button onClick={cargar} style={{ border: "none", background: "none", color: ACC, fontWeight: 700, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>Reintentar</button>
+              </div>
+            )}
+            {!cargando && !error && items.length === 0 && <div style={{ padding: 20, fontSize: 13.5, color: MUTED }}>La carpeta no tiene cantos todavía.</div>}
+            {cargando && items.length === 0 && <div style={{ padding: 20, fontSize: 13.5, color: MUTED }}>Leyendo la carpeta de Drive…</div>}
+            {filtrados.length === 0 && items.length > 0 && <div style={{ padding: 20, fontSize: 13.5, color: MUTED }}>No hay cantos con “{q}”.</div>}
+            {filtrados.slice(0, lim).map((c) => (
+              <button key={c.id} className={"cd-fila" + (c.id === selId ? " on" : "")} onClick={() => abrir(c)}>
+                <span style={{ display: "block", fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 19, fontWeight: 600, lineHeight: 1.2 }}>{c.nombre}</span>
+                {c.carpeta && <span style={{ display: "block", fontSize: 11, color: MUTED, marginTop: 3, letterSpacing: "0.04em" }}>{c.carpeta}</span>}
+              </button>
+            ))}
+            {filtrados.length > lim && (
+              <div style={{ padding: 14, textAlign: "center" }}>
+                <button onClick={() => setLim((l) => l + 80)} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid #e4dfd2", background: "#fff", color: INK, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Mostrar más ({filtrados.length - lim})</button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="cd-visor">
+          {!sel ? (
+            <div style={{ border: "1px dashed #d9d2c1", borderRadius: 20, padding: "70px 24px", textAlign: "center", color: MUTED, background: "#fffdf9" }}>
+              <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 26, color: INK, marginBottom: 6 }}>Elige un canto</div>
+              <div style={{ fontSize: 13.5 }}>Se abre aquí mismo, con herramienta para cambiar el tono de los acordes.</div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                <div style={{ minWidth: 0 }}>
+                  <button className="cd-volver" onClick={() => setSelId(null)} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 13.5, fontWeight: 600, color: "#4b5563", padding: 0, marginBottom: 6 }}>‹ Cancionero</button>
+                  <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 32, fontWeight: 600, lineHeight: 1.1, letterSpacing: "-0.01em" }}>{sel.nombre}</div>
+                </div>
+                <a href={`https://drive.google.com/file/d/${sel.id}/view`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, fontWeight: 600, color: INK, textDecoration: "underline", textUnderlineOffset: 3, marginTop: 6 }}>Abrir en Drive</a>
+              </div>
+              <VisorPDF key={sel.id} url={`https://drive.google.com/file/d/${sel.id}/view`} nombre={sel.nombre} semitonos={semis} onAcordes={setInfo} barra={barra} />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function VisorMaterialEnsayo({ partituras, letras, cantoNombre, accent }) {
   const ORO = "#c9973f";
   const tabs = [
@@ -14766,6 +15073,7 @@ function BannerWidget({ isAdmin }) {
 const HERRAMIENTAS_CORO = [
   { id: "pauta_misa", icon: "🎼", titulo: "Pauta de Misa", desc: "Canciones y orden de la próxima misa" },
   { id: "material_ensayo", icon: "🎤", titulo: "Material de ensayo", desc: "Cantos, letras y audios por voz" },
+  { id: "cancionero_digital", icon: "📖", titulo: "Cancionero Digital", desc: "Todos los cantos con acordes transponibles" },
   { id: "cancioneros", icon: "📚", titulo: "Cancioneros", desc: "Descarga los cancioneros del coro" },
 ];
 
