@@ -4158,7 +4158,7 @@ function AppInner() {
               )}
               {section === "videos" && <Videos />}
               {section === "cancionero" && <Cancionero user={user} />}
-              {section === "cancionero_digital" && <CancioneroDigital />}
+              {section === "cancionero_digital" && <CancioneroDigital onSalir={() => setSection("dashboard")} />}
               {section === "reconoceme" && (
                 <Reconoceme
                   members={members}
@@ -11199,7 +11199,7 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
 
 
 // Visor de PDF propio: páginas con flechas, zoom y pantalla completa (pdf.js). Si algo falla, usa el visor de Drive.
-function VisorPDF({ url, nombre, semitonos = 0, onAcordes, barra }) {
+function VisorPDF({ url, nombre, semitonos = 0, onAcordes, barra, alto }) {
   const [pdf, setPdf] = useState(null);
   const [pagina, setPagina] = useState(1);
   const [zoom, setZoom] = useState(100);
@@ -11324,7 +11324,8 @@ function VisorPDF({ url, nombre, semitonos = 0, onAcordes, barra }) {
       else if (el.requestFullscreen) el.requestFullscreen();
     } catch (e) {}
   };
-  const bt = (off) => ({ width: 38, height: 38, borderRadius: 10, border: "none", background: "#f1f2f5", color: "#2a2f3a", fontSize: 18, cursor: off ? "default" : "pointer", opacity: off ? 0.35 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 });
+  const compacto = ancho > 0 && ancho < 520;
+  const bt = (off) => ({ width: compacto ? 34 : 38, height: compacto ? 34 : 38, borderRadius: 10, border: "none", background: "#f1f2f5", color: "#2a2f3a", fontSize: 18, cursor: off ? "default" : "pointer", opacity: off ? 0.35 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 });
   if (error) {
     return (
       <div style={{ background: "#e9ebef", borderRadius: 16, overflow: "hidden", border: "1px solid #e6e8ec" }}>
@@ -11334,18 +11335,18 @@ function VisorPDF({ url, nombre, semitonos = 0, onAcordes, barra }) {
   }
   return (
     <div ref={caja} style={{ background: "#fff", border: "1px solid #e6e8ec", borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 18px 40px -30px rgba(18,22,29,.35)", height: completa ? "100vh" : "auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 12px", flexWrap: "wrap", borderBottom: "1px solid #eef0f3" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: compacto ? 3 : 6, padding: compacto ? "8px 6px" : "10px 12px", flexWrap: "wrap", borderBottom: "1px solid #eef0f3" }}>
         <button onClick={() => ir(pagina - 1)} disabled={pagina <= 1} style={bt(pagina <= 1)} aria-label="Página anterior">‹</button>
-        <span style={{ fontSize: 13, fontWeight: 600, color: "#2a2f3a", minWidth: 96, textAlign: "center", whiteSpace: "nowrap" }}>{pdf ? `Página ${pagina} de ${total}` : "Cargando…"}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#2a2f3a", minWidth: compacto ? 48 : 96, textAlign: "center", whiteSpace: "nowrap" }}>{pdf ? (compacto ? `${pagina} / ${total}` : `Página ${pagina} de ${total}`) : "Cargando…"}</span>
         <button onClick={() => ir(pagina + 1)} disabled={pagina >= total} style={bt(pagina >= total)} aria-label="Página siguiente">›</button>
-        <span style={{ width: 1, height: 22, background: "#e6e8ec", margin: "0 6px" }} />
+        <span style={{ width: 1, height: 22, background: "#e6e8ec", margin: compacto ? "0 2px" : "0 6px" }} />
         <button onClick={() => setZoom((z) => Math.max(50, z - 25))} style={bt(false)} aria-label="Alejar">−</button>
-        <span style={{ width: 46, textAlign: "center", fontSize: 13, fontWeight: 600, color: "#2a2f3a" }}>{zoom}%</span>
+        <span style={{ width: compacto ? 40 : 46, textAlign: "center", fontSize: 13, fontWeight: 600, color: "#2a2f3a" }}>{zoom}%</span>
         <button onClick={() => setZoom((z) => Math.min(300, z + 25))} style={bt(false)} aria-label="Acercar">+</button>
         <button onClick={pantallaCompleta} style={{ ...bt(false), marginLeft: "auto" }} aria-label="Pantalla completa" title="Pantalla completa">⛶</button>
       </div>
       {barra}
-      <div ref={marco} style={{ background: "#e9ebef", overflow: "auto", padding: 12, flex: 1, maxHeight: completa ? "none" : "min(78vh, 760px)", minHeight: completa ? 0 : 420, textAlign: "center" }}>
+      <div ref={marco} style={{ background: "#e9ebef", overflow: "auto", padding: 12, flex: 1, maxHeight: completa ? "none" : alto || "min(78vh, 760px)", minHeight: completa ? 0 : 420, textAlign: "center" }}>
         {!pdf && <div style={{ padding: 60, color: "#8a8a90", fontSize: 13 }}>Cargando documento…</div>}
         <canvas ref={lienzo} style={{ display: pdf ? "inline-block" : "none", boxShadow: "0 6px 24px rgba(18,22,29,.18)", background: "#fff" }} />
       </div>
@@ -11359,11 +11360,12 @@ const CD_NA_S = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
 const CD_NA_F = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
 const CD_NL_S = ["Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"];
 const CD_NL_F = ["Do", "Reb", "Re", "Mib", "Mi", "Fa", "Solb", "Sol", "Lab", "La", "Sib", "Si"];
-const CD_LAT_IDX = { Do: 0, Re: 2, Mi: 4, Fa: 5, Sol: 7, La: 9, Si: 11 };
+const CD_LAT_IDX = { do: 0, re: 2, mi: 4, fa: 5, sol: 7, la: 9, si: 11 };
 const CD_AM_IDX = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 const CD_SUF = "(?:maj|min|dim|aug|sus|add|m|M|°|\\+|[#b]?\\d+)*";
-const CD_RE_LAT = new RegExp("^(Do|Re|Mi|Fa|Sol|La|Si)([#b]?)(" + CD_SUF + ")(?:/(Do|Re|Mi|Fa|Sol|La|Si)([#b]?))?$");
-const CD_RE_AM = new RegExp("^([A-G])([#b]?)(" + CD_SUF + ")(?:/([A-G])([#b]?))?$");
+const CD_LAT = "(?:DO|Do|RE|Re|MI|Mi|FA|Fa|SOL|Sol|LA|La|SI|Si)";
+const CD_RE_LAT = new RegExp("^(" + CD_LAT + ")([#b♯♭]?)(" + CD_SUF + ")(?:/(" + CD_LAT + ")([#b♯♭]?))?$");
+const CD_RE_AM = new RegExp("^([A-G])([#b♯♭]?)(" + CD_SUF + ")(?:/([A-G])([#b♯♭]?))?$");
 
 // Devuelve el acorde transpuesto, o null si el texto no es un acorde
 function cdTransponerToken(tok, semis) {
@@ -11376,9 +11378,14 @@ function cdTransponerToken(tok, semis) {
   if (!m) return null;
   const idxs = latino ? CD_LAT_IDX : CD_AM_IDX;
   const mover = (raiz, acc) => {
-    const i = (((idxs[raiz] + (acc === "#" ? 1 : acc === "b" ? -1 : 0) + semis) % 12) + 12) % 12;
-    const esc = acc === "b" ? (latino ? CD_NL_F : CD_NA_F) : latino ? CD_NL_S : CD_NA_S;
-    return esc[i];
+    const sube = acc === "#" || acc === "♯";
+    const baja = acc === "b" || acc === "♭";
+    const i = (((idxs[latino ? raiz.toLowerCase() : raiz] + (sube ? 1 : baja ? -1 : 0) + semis) % 12) + 12) % 12;
+    const esc = baja ? (latino ? CD_NL_F : CD_NA_F) : latino ? CD_NL_S : CD_NA_S;
+    let r = esc[i];
+    // respeta el estilo de la hoja: si estaba en MAYÚSCULAS (SOL, MIm) se mantiene
+    if (latino && raiz.length > 1 && raiz === raiz.toUpperCase()) r = r.replace(/^(Do|Re|Mi|Fa|Sol|La|Si)/, (s) => s.toUpperCase());
+    return r;
   };
   let out = mover(m[1], m[2]) + m[3];
   if (m[4]) out += "/" + mover(m[4], m[5]);
@@ -11415,30 +11422,46 @@ function cdPintarTranspuestos(ctx, vp, dpr, itemsAcorde, estilos, semis) {
   const Util = window.pdfjsLib.Util;
   ctx.save();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const fichas = [];
   itemsAcorde.forEach((it) => {
     const tr = Util.transform(vp.transform, it.transform);
     const fs = Math.hypot(tr[2], tr[3]) || 12;
     const w = it.width * vp.scale;
     const x = tr[4];
     const y = tr[5];
+    // tapa el texto original
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(x - 2, y - fs * 0.95, w + 4, fs * 1.25);
     const st = (estilos && estilos[it.fontName]) || {};
-    ctx.font = `bold ${fs}px ${st.fontFamily || "sans-serif"}`;
-    ctx.fillStyle = "#8a4b12";
-    ctx.textBaseline = "alphabetic";
     const len = it.str.length || 1;
     const re = /\S+/g;
     let mm;
     while ((mm = re.exec(it.str))) {
       const nuevo = cdTransponerToken(mm[0], semis);
-      if (nuevo === null) {
-        // separadores: se vuelven a escribir tal cual
-        ctx.fillText(mm[0], x + (mm.index / len) * w, y);
-      } else {
-        ctx.fillText(nuevo, x + (mm.index / len) * w, y);
-      }
+      fichas.push({ k: Math.round(it.transform[5] / 3), x: x + (mm.index / len) * w, y, fs, fam: st.fontFamily || "sans-serif", txt: nuevo === null ? mm[0] : nuevo });
     }
+  });
+  // Se escribe cada acorde nuevo; si es más largo que el hueco hasta el siguiente, se achica un poco para que no se pisen
+  const filas = {};
+  fichas.forEach((f) => (filas[f.k] = filas[f.k] || []).push(f));
+  ctx.fillStyle = "#1d4ed8";
+  ctx.textBaseline = "alphabetic";
+  Object.keys(filas).forEach((k) => {
+    const fila = filas[k].sort((p, q) => p.x - q.x);
+    fila.forEach((f, n) => {
+      let size = f.fs;
+      ctx.font = `bold ${size}px ${f.fam}`;
+      const sig = fila[n + 1];
+      if (sig) {
+        const hueco = sig.x - f.x - f.fs * 0.3;
+        const ancho = ctx.measureText(f.txt).width;
+        if (ancho > hueco && hueco > f.fs) {
+          size = Math.max(f.fs * 0.72, (f.fs * hueco) / ancho);
+          ctx.font = `bold ${size}px ${f.fam}`;
+        }
+      }
+      ctx.fillText(f.txt, f.x, f.y);
+    });
   });
   ctx.restore();
 }
@@ -11470,10 +11493,11 @@ async function cdListarCantos() {
 }
 const cdNorm = (s) => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-function CancioneroDigital() {
-  const INK = "#26231f";
-  const ACC = "#a9864d";
-  const MUTED = "#8a847a";
+function CancioneroDigital({ onSalir }) {
+  const INK = "#0f1b2d";
+  const ACC = "#2f5d9a";
+  const MUTED = "#6b7686";
+  const LINE = "#e6ebf2";
   const [items, setItems] = useState(() => {
     try {
       const c = JSON.parse(localStorage.getItem("cd_lista_v1") || "null");
@@ -11505,6 +11529,14 @@ function CancioneroDigital() {
       .finally(() => setCargando(false));
   };
   useEffect(cargar, []);
+  // Al cambiar de pantalla (lista ↔ canto) vuelve al inicio de la página
+  useEffect(() => {
+    try {
+      const m = document.querySelector(".main-content");
+      if (m) m.scrollTop = 0;
+      window.scrollTo(0, 0);
+    } catch (e) {}
+  }, [selId]);
 
   const sel = items.find((x) => x.id === selId) || null;
   const abrir = (c) => {
@@ -11531,66 +11563,88 @@ function CancioneroDigital() {
   const nq = cdNorm(q);
   const filtrados = items.filter((c) => (!nq || cdNorm(c.nombre).includes(nq)) && (!letra || primeraLetra(c.nombre) === letra));
 
-  const bt = { width: 34, height: 34, borderRadius: 10, border: "1px solid #e4dfd2", background: "#fff", color: INK, fontSize: 17, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" };
   const tonoTxt = semis === 0 ? "Original" : (semis > 0 ? "+" : "") + semis;
   const nuevoPrimero = info && info.primero ? cdTransponerToken(info.primero, semis) : null;
+  const paso = { width: 38, height: 38, borderRadius: 10, border: "none", background: "#fff", color: INK, fontSize: 20, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 2px rgba(15,27,45,.12)" };
 
   const barra = (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "9px 12px", background: "#fbf8f2", borderBottom: "1px solid #eee7d8" }}>
-      <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: ACC }}>Tono</span>
-      <button style={bt} onClick={() => cambiarTono(semis - 1)} aria-label="Bajar medio tono">−</button>
-      <span style={{ minWidth: 62, textAlign: "center", fontSize: 14, fontWeight: 700, color: INK }}>{tonoTxt}</span>
-      <button style={bt} onClick={() => cambiarTono(semis + 1)} aria-label="Subir medio tono">+</button>
+    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "10px 12px", borderBottom: "1px solid " + LINE, background: "#fafbfd" }}>
+      <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: MUTED }}>Tono</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 4, padding: 4, background: "#eef1f6", borderRadius: 13 }}>
+        <button style={paso} onClick={() => cambiarTono(semis - 1)} aria-label="Bajar medio tono">−</button>
+        <span style={{ minWidth: 72, textAlign: "center", fontSize: 14, fontWeight: 800, color: semis === 0 ? INK : ACC }}>{tonoTxt}</span>
+        <button style={paso} onClick={() => cambiarTono(semis + 1)} aria-label="Subir medio tono">+</button>
+      </div>
       {semis !== 0 && (
-        <button onClick={() => cambiarTono(0)} style={{ border: "none", background: "none", color: ACC, fontWeight: 700, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>Volver al original</button>
+        <button onClick={() => cambiarTono(0)} style={{ border: "none", background: "none", color: ACC, fontWeight: 700, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", padding: "6px 2px" }}>Original</button>
       )}
-      <span style={{ marginLeft: "auto", fontSize: 12, color: MUTED }}>
-        {info === null ? "" : info.n === 0 ? "Esta hoja no tiene acordes que se puedan transponer" : nuevoPrimero && semis !== 0 ? `Primer acorde: ${info.primero} → ${nuevoPrimero}` : info.primero ? `Primer acorde: ${info.primero}` : ""}
+      <span style={{ marginLeft: "auto", fontSize: 12, color: MUTED, fontWeight: 600 }}>
+        {info === null ? "" : info.n === 0 ? "Sin acordes transponibles en esta hoja" : nuevoPrimero && semis !== 0 ? `${info.primero} → ${nuevoPrimero}` : info.primero ? `Empieza en ${info.primero}` : ""}
       </span>
     </div>
   );
 
+  const btnVolver = { display: "inline-flex", alignItems: "center", gap: 6, border: "1px solid " + LINE, background: "#fff", color: INK, borderRadius: 999, padding: "8px 14px 8px 11px", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 1px 2px rgba(15,27,45,.06)" };
+
   return (
-    <div style={{ fontFamily: "var(--font-sans)", color: INK }}>
+    <div className={"cd-root" + (sel ? " cd-song" : "")} style={{ fontFamily: "var(--font-sans)", color: INK }}>
       <style>{`
-        .cd-wrap{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:22px;align-items:start}
-        .cd-lista{background:#fffdf9;border:1px solid #ece7dc;border-radius:20px;overflow:hidden;box-shadow:0 24px 50px -34px rgba(90,70,30,.35);position:sticky;top:12px}
-        .cd-scroll{max-height:calc(100vh - 250px);min-height:320px;overflow:auto}
-        .cd-fila{display:block;width:100%;text-align:left;background:none;border:none;border-left:3px solid transparent;border-top:1px solid #f1ece0;padding:13px 18px;cursor:pointer;font-family:inherit;transition:background .12s}
-        .cd-fila:hover{background:#f8f4ea}
-        .cd-fila.on{background:#f3ecdc;border-left-color:#a9864d}
-        .cd-volver{display:none}
-        @media(max-width:900px){
+        .cd-wrap{display:grid;grid-template-columns:minmax(310px,390px) minmax(0,1fr);gap:20px;align-items:start}
+        .cd-lista{background:#fff;border:1px solid ${LINE};border-radius:20px;overflow:hidden;box-shadow:0 1px 2px rgba(15,27,45,.04),0 16px 40px -28px rgba(15,27,45,.25);position:sticky;top:12px}
+        .cd-scroll{max-height:calc(100vh - 230px);min-height:320px;overflow:auto}
+        .cd-fila{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:none;border-left:3px solid transparent;border-top:1px solid #f0f3f8;padding:14px 16px 14px 15px;cursor:pointer;font-family:inherit;transition:background .12s}
+        .cd-fila:hover{background:#f5f8fc}
+        .cd-fila.on{background:#ecf2fb;border-left-color:${ACC}}
+        .cd-fila:active{background:#e4edf9}
+        .cd-chips{display:flex;gap:6px;flex-wrap:wrap}
+        .cd-solo-movil{display:none}
+        @media(max-width:1024px){
+          /* modo pantalla completa: se oculta el menú lateral, la barra superior y la barra inferior */
+          aside, header.topbar, .bottom-nav{display:none !important}
+          .main-content{padding:0 !important}
+          .cd-root{padding:14px 14px 28px}
           .cd-wrap{grid-template-columns:minmax(0,1fr)}
-          .cd-lista{position:static}
+          .cd-lista{position:static;border-radius:18px}
           .cd-scroll{max-height:none}
-          .cd-wrap.abierto .cd-lista{display:none}
-          .cd-wrap:not(.abierto) .cd-visor{display:none}
-          .cd-volver{display:inline-block}
+          .cd-chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+          .cd-chips::-webkit-scrollbar{display:none}
+          .cd-chips button{flex-shrink:0}
+          .cd-root.cd-song .cd-cabecera, .cd-root.cd-song .cd-lista{display:none}
+          .cd-root:not(.cd-song) .cd-visor{display:none}
+          .cd-root.cd-song{padding:10px 10px 20px}
+          .cd-solo-movil{display:inline-flex}
         }
       `}</style>
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "#8b94a3", fontWeight: 700 }}>Cancionero Digital</div>
-        <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 38, fontWeight: 600, lineHeight: 1.05, marginTop: 4, letterSpacing: "-0.01em" }}>Todos los cantos</div>
-        <div style={{ fontSize: 13, color: "#6b7280", marginTop: 6 }}>
-          {items.length > 0 ? `${items.length} cantos · toca uno para verlo al instante` : cargando ? "Cargando cantos…" : ""}
+
+      <div className="cd-cabecera" style={{ marginBottom: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }} className="cd-solo-movil-wrap">
+          {onSalir && (
+            <button className="cd-solo-movil" onClick={onSalir} style={btnVolver}>
+              <span style={{ fontSize: 18, lineHeight: 1, marginTop: -1 }}>‹</span> Inicio
+            </button>
+          )}
         </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1 }}>Cancionero Digital</div>
+          {items.length > 0 && <span style={{ fontSize: 12.5, fontWeight: 700, color: ACC, background: "#e8f0fb", borderRadius: 999, padding: "4px 11px" }}>{items.length} cantos</span>}
+        </div>
+        <div style={{ fontSize: 14, color: MUTED, marginTop: 6 }}>{cargando && items.length === 0 ? "Cargando cantos…" : "Toca un canto para verlo y cambiar el tono de los acordes."}</div>
       </div>
 
-      <div className={"cd-wrap" + (sel ? " abierto" : "")}>
+      <div className="cd-wrap">
         <div className="cd-lista">
-          <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid #eee7d8" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid #e4dfd2", borderRadius: 12, padding: "9px 12px" }}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#8b94a3" strokeWidth="1.3" /><path d="M9.5 9.5l3 3" stroke="#8b94a3" strokeWidth="1.3" strokeLinecap="round" /></svg>
-              <input value={q} onChange={(e) => { setQ(e.target.value); setLim(80); }} placeholder="Buscar canto" style={{ border: "none", outline: "none", fontSize: 14, flex: 1, background: "none", fontFamily: "inherit", color: INK }} />
-              {q && <button onClick={() => setQ("")} aria-label="Borrar" style={{ border: "none", background: "none", cursor: "pointer", color: MUTED, fontSize: 16 }}>×</button>}
+          <div style={{ padding: "14px 14px 12px", borderBottom: "1px solid " + LINE }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#f4f6fa", border: "1px solid transparent", borderRadius: 14, padding: "0 14px", height: 46 }}>
+              <svg width="16" height="16" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#7b8696" strokeWidth="1.4" /><path d="M9.5 9.5l3 3" stroke="#7b8696" strokeWidth="1.4" strokeLinecap="round" /></svg>
+              <input value={q} onChange={(e) => { setQ(e.target.value); setLim(80); }} placeholder="Buscar canto…" style={{ border: "none", outline: "none", fontSize: 15, flex: 1, background: "none", fontFamily: "inherit", color: INK, minWidth: 0 }} />
+              {q && <button onClick={() => setQ("")} aria-label="Borrar" style={{ border: "none", background: "none", cursor: "pointer", color: MUTED, fontSize: 20, lineHeight: 1 }}>×</button>}
             </div>
             {letras.length > 8 && (
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 10 }}>
+              <div className="cd-chips" style={{ marginTop: 10 }}>
                 {["", ...letras].map((l) => {
                   const on = letra === l;
                   return (
-                    <button key={l || "t"} onClick={() => { setLetra(l); setLim(80); }} style={{ minWidth: l ? 26 : 0, padding: l ? "3px 0" : "3px 10px", fontSize: 11.5, fontWeight: 700, borderRadius: 8, cursor: "pointer", fontFamily: "inherit", border: "1px solid " + (on ? INK : "#e4dfd2"), background: on ? INK : "#fff", color: on ? "#fff" : "#6b6358" }}>{l || "Todos"}</button>
+                    <button key={l || "t"} onClick={() => { setLetra(l); setLim(80); }} style={{ minWidth: l ? 32 : 0, height: 32, padding: l ? 0 : "0 14px", fontSize: 12.5, fontWeight: 700, borderRadius: 10, cursor: "pointer", fontFamily: "inherit", border: "none", background: on ? INK : "#f1f4f9", color: on ? "#fff" : "#4a5565" }}>{l || "Todos"}</button>
                   );
                 })}
               </div>
@@ -11598,22 +11652,25 @@ function CancioneroDigital() {
           </div>
           <div className="cd-scroll">
             {error && items.length === 0 && (
-              <div style={{ padding: 20, fontSize: 13.5, color: "#b42318" }}>
+              <div style={{ padding: 20, fontSize: 14, color: "#b42318" }}>
                 {error}. <button onClick={cargar} style={{ border: "none", background: "none", color: ACC, fontWeight: 700, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>Reintentar</button>
               </div>
             )}
-            {!cargando && !error && items.length === 0 && <div style={{ padding: 20, fontSize: 13.5, color: MUTED }}>La carpeta no tiene cantos todavía.</div>}
-            {cargando && items.length === 0 && <div style={{ padding: 20, fontSize: 13.5, color: MUTED }}>Leyendo la carpeta de Drive…</div>}
-            {filtrados.length === 0 && items.length > 0 && <div style={{ padding: 20, fontSize: 13.5, color: MUTED }}>No hay cantos con “{q}”.</div>}
+            {!cargando && !error && items.length === 0 && <div style={{ padding: 20, fontSize: 14, color: MUTED }}>La carpeta no tiene cantos todavía.</div>}
+            {cargando && items.length === 0 && <div style={{ padding: 20, fontSize: 14, color: MUTED }}>Leyendo la carpeta de Drive…</div>}
+            {filtrados.length === 0 && items.length > 0 && <div style={{ padding: 20, fontSize: 14, color: MUTED }}>No hay cantos con “{q}”.</div>}
             {filtrados.slice(0, lim).map((c) => (
               <button key={c.id} className={"cd-fila" + (c.id === selId ? " on" : "")} onClick={() => abrir(c)}>
-                <span style={{ display: "block", fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 19, fontWeight: 600, lineHeight: 1.2 }}>{c.nombre}</span>
-                {c.carpeta && <span style={{ display: "block", fontSize: 11, color: MUTED, marginTop: 3, letterSpacing: "0.04em" }}>{c.carpeta}</span>}
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 15.5, fontWeight: 600, lineHeight: 1.3, letterSpacing: "-0.01em" }}>{c.nombre}</span>
+                  {c.carpeta && <span style={{ display: "block", fontSize: 11.5, color: MUTED, marginTop: 2 }}>{c.carpeta}</span>}
+                </span>
+                <span style={{ color: "#b5bdca", fontSize: 20, lineHeight: 1 }}>›</span>
               </button>
             ))}
             {filtrados.length > lim && (
               <div style={{ padding: 14, textAlign: "center" }}>
-                <button onClick={() => setLim((l) => l + 80)} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid #e4dfd2", background: "#fff", color: INK, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Mostrar más ({filtrados.length - lim})</button>
+                <button onClick={() => setLim((l) => l + 80)} style={{ padding: "10px 20px", borderRadius: 12, border: "none", background: "#f1f4f9", color: INK, fontWeight: 700, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>Mostrar más ({filtrados.length - lim})</button>
               </div>
             )}
           </div>
@@ -11621,20 +11678,20 @@ function CancioneroDigital() {
 
         <div className="cd-visor">
           {!sel ? (
-            <div style={{ border: "1px dashed #d9d2c1", borderRadius: 20, padding: "70px 24px", textAlign: "center", color: MUTED, background: "#fffdf9" }}>
-              <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 26, color: INK, marginBottom: 6 }}>Elige un canto</div>
-              <div style={{ fontSize: 13.5 }}>Se abre aquí mismo, con herramienta para cambiar el tono de los acordes.</div>
+            <div style={{ border: "1.5px dashed #d5dce8", borderRadius: 20, padding: "80px 24px", textAlign: "center", color: MUTED, background: "#fff" }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: INK, letterSpacing: "-0.02em", marginBottom: 6 }}>Elige un canto</div>
+              <div style={{ fontSize: 14 }}>Se abre aquí, con herramienta para subir o bajar el tono.</div>
             </div>
           ) : (
             <div>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-                <div style={{ minWidth: 0 }}>
-                  <button className="cd-volver" onClick={() => setSelId(null)} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 13.5, fontWeight: 600, color: "#4b5563", padding: 0, marginBottom: 6 }}>‹ Cancionero</button>
-                  <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 32, fontWeight: 600, lineHeight: 1.1, letterSpacing: "-0.01em" }}>{sel.nombre}</div>
-                </div>
-                <a href={`https://drive.google.com/file/d/${sel.id}/view`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, fontWeight: 600, color: INK, textDecoration: "underline", textUnderlineOffset: 3, marginTop: 6 }}>Abrir en Drive</a>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                <button className="cd-solo-movil" onClick={() => setSelId(null)} style={btnVolver} aria-label="Volver a la lista">
+                  <span style={{ fontSize: 18, lineHeight: 1, marginTop: -1 }}>‹</span> Cantos
+                </button>
+                <div style={{ flex: 1, minWidth: 0, fontSize: 20, fontWeight: 800, letterSpacing: "-0.025em", lineHeight: 1.2 }}>{sel.nombre}</div>
+                <a href={`https://drive.google.com/file/d/${sel.id}/view`} target="_blank" rel="noopener noreferrer" title="Abrir en Drive" style={{ fontSize: 12.5, fontWeight: 700, color: ACC, textDecoration: "none", whiteSpace: "nowrap" }}>Drive ↗</a>
               </div>
-              <VisorPDF key={sel.id} url={`https://drive.google.com/file/d/${sel.id}/view`} nombre={sel.nombre} semitonos={semis} onAcordes={setInfo} barra={barra} />
+              <VisorPDF key={sel.id} url={`https://drive.google.com/file/d/${sel.id}/view`} nombre={sel.nombre} semitonos={semis} onAcordes={setInfo} barra={barra} alto="calc(100vh - 150px)" />
             </div>
           )}
         </div>
