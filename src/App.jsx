@@ -10671,6 +10671,112 @@ const fmtTiempoMulti = (s) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
 
+// ── Soporte de archivos MIDI (.mid): se leen y se "tocan" a un audio con un sintetizador simple, ──
+// para que entren al multipista igual que un mp3 (volumen por voz, pausa, adelantar).
+function leerMidi(ab) {
+  const d = new DataView(ab);
+  let p = 0;
+  const u32 = () => { const v = d.getUint32(p); p += 4; return v; };
+  const u16 = () => { const v = d.getUint16(p); p += 2; return v; };
+  const varint = () => { let v = 0, b; do { b = d.getUint8(p++); v = (v << 7) | (b & 0x7f); } while (b & 0x80); return v; };
+  if (u32() !== 0x4d546864) throw new Error("no es MIDI");
+  const hl = u32();
+  u16();
+  const ntr = u16();
+  let div = u16();
+  if (div & 0x8000 || !div) div = 480;
+  p = 8 + hl;
+  const tempos = [{ tick: 0, us: 500000 }];
+  const crudas = [];
+  for (let t = 0; t < ntr && p + 8 <= d.byteLength; t++) {
+    const id = u32();
+    const len = u32();
+    const fin = Math.min(d.byteLength, p + len);
+    if (id !== 0x4d54726b) { p = fin; continue; }
+    let tick = 0, run = 0;
+    const abiertas = {};
+    while (p < fin) {
+      tick += varint();
+      let s = d.getUint8(p);
+      if (s < 0x80) s = run; else { p++; if (s < 0xf0) run = s; }
+      if (s === 0xff) {
+        const ty = d.getUint8(p++);
+        const l = varint();
+        if (ty === 0x51 && l === 3) tempos.push({ tick, us: (d.getUint8(p) << 16) | (d.getUint8(p + 1) << 8) | d.getUint8(p + 2) });
+        p += l;
+      } else if (s === 0xf0 || s === 0xf7) {
+        p += varint();
+      } else {
+        const hi = s & 0xf0, ch = s & 0x0f;
+        if (hi === 0xc0 || hi === 0xd0) p += 1;
+        else {
+          const n1 = d.getUint8(p++), n2 = d.getUint8(p++);
+          const k = ch * 128 + n1;
+          if (hi === 0x90 && n2 > 0) (abiertas[k] = abiertas[k] || []).push({ tick, vel: n2 });
+          else if (hi === 0x80 || (hi === 0x90 && n2 === 0)) {
+            const o = abiertas[k] && abiertas[k].shift();
+            if (o && ch !== 9) crudas.push({ a: o.tick, b: tick, note: n1, vel: o.vel });
+          }
+        }
+      }
+    }
+    Object.keys(abiertas).forEach((k) => abiertas[k].forEach((o) => { if (Math.floor(k / 128) !== 9) crudas.push({ a: o.tick, b: tick, note: k % 128, vel: o.vel }); }));
+    p = fin;
+  }
+  tempos.sort((x, y) => x.tick - y.tick);
+  const seg = [];
+  let acum = 0;
+  tempos.forEach((tp, i) => {
+    if (i > 0) acum += ((tp.tick - tempos[i - 1].tick) * tempos[i - 1].us) / 1e6 / div;
+    seg.push({ tick: tp.tick, sec: acum, us: tp.us });
+  });
+  const aSeg = (tick) => {
+    let s = seg[0];
+    for (let i = 0; i < seg.length && seg[i].tick <= tick; i++) s = seg[i];
+    return s.sec + ((tick - s.tick) * s.us) / 1e6 / div;
+  };
+  return crudas.map((n) => ({ t0: aSeg(n.a), t1: aSeg(n.b), note: n.note, vel: n.vel }));
+}
+async function midiABuffer(ab, sr) {
+  const notas = leerMidi(ab);
+  if (!notas.length) throw new Error("el MIDI no tiene notas");
+  let fin = 0;
+  notas.forEach((n) => { if (n.t1 > fin) fin = n.t1; });
+  fin += 1.2;
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const off = new OAC(1, Math.ceil(fin * sr), sr);
+  const comp = off.createDynamicsCompressor();
+  const filtro = off.createBiquadFilter();
+  filtro.type = "lowpass";
+  filtro.frequency.value = 2800;
+  filtro.connect(comp);
+  comp.connect(off.destination);
+  notas.forEach((n) => {
+    const f = 440 * Math.pow(2, (n.note - 69) / 12);
+    const v = (n.vel / 127) * 0.22;
+    const t0 = n.t0;
+    const t1 = Math.max(n.t1, t0 + 0.06);
+    const g = off.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(v, t0 + 0.03);
+    g.gain.setValueAtTime(v * 0.85, t1);
+    g.gain.linearRampToValueAtTime(0, t1 + 0.2);
+    g.connect(filtro);
+    [["triangle", 1, 1], ["sine", 2, 0.25]].forEach(([tipo, mult, amp]) => {
+      const o = off.createOscillator();
+      o.type = tipo;
+      o.frequency.value = f * mult;
+      const ga = off.createGain();
+      ga.gain.value = amp;
+      o.connect(ga);
+      ga.connect(g);
+      o.start(t0);
+      o.stop(t1 + 0.25);
+    });
+  });
+  return off.startRendering();
+}
+
 // Respaldo limpio cuando el modo multipista no puede cargar: una tarjeta por voz con su propio reproductor
 function PistasSueltas({ lista, motivo, visor }) {
   const INK = "#2a2825";
@@ -10764,7 +10870,20 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
           try {
             const r = await fetch(fuentes[intento]);
             if (!r.ok) throw new Error("HTTP " + r.status);
-            const dec = await decodificar(c, await r.arrayBuffer());
+            const ab = await r.arrayBuffer();
+            let dec;
+            try {
+              const cab = new Uint8Array(ab.slice(0, 4));
+              if (cab[0] === 0x4d && cab[1] === 0x54 && cab[2] === 0x68 && cab[3] === 0x64) {
+                dec = await midiABuffer(ab, c.sampleRate || 24000);
+              } else dec = await decodificar(c, ab.slice(0));
+            } catch (e0) {
+              const b = new Uint8Array(ab.slice(0, 12));
+              const ascii = Array.from(b).map((x) => (x >= 32 && x < 127 ? String.fromCharCode(x) : ".")).join("");
+              throw new Error(
+                `no se pudo decodificar "${(t.doc.nombre || "").slice(-40)}" · tipo ${r.headers.get("content-type") || "?"} · ${Math.round(ab.byteLength / 1024)} KB · inicio "${ascii}"`
+              );
+            }
             // Pasa a mono para ahorrar memoria en celulares
             let buffer = dec;
             if (dec.numberOfChannels > 1) {
@@ -10910,14 +11029,27 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   };
   const setP = (i, cambio) =>
     setPistas((p) => p.map((x, j) => (j === i ? { ...x, ...cambio } : x)));
-  const conEstado = (arr) => arr.map((x, i) => ({ ...x, estado: pistasRef.current[i]?.estado || "cargando" }));
-  const restablecer = () => setPistas(() => conEstado(inicial()));
-  const soloMiVoz = () =>
-    setPistas((p) => p.map((x) => ({ ...x, on: !!miCuerda && x.vozId === miCuerda })));
-  const sinMiVoz = () =>
-    setPistas((p) => p.map((x) => ({ ...x, on: !!x.vozId && x.vozId !== miCuerda })));
-  const soloMezcla = () => setPistas((p) => p.map((x) => ({ ...x, on: !x.vozId })));
-  const alternar = (i) => setPistas((p) => p.map((x, j) => (j === i ? { ...x, on: !x.on } : x)));
+  // Modelo de uso simple: eliges QUÉ voz quieres estudiar (foco) y cuánto se oyen las demás (fondo).
+  const vocesDisp = lista.filter((t) => t.voz).map((t) => t.voz.id);
+  const tieneMiVoz = !!miCuerda && vocesDisp.includes(miCuerda);
+  const [foco, setFoco] = useState(() =>
+    !hayStems ? "mezcla" : miCuerda && vocesDisp.includes(miCuerda) ? miCuerda : "todas"
+  );
+  const [fondo, setFondo] = useState(30);
+  const [avanzado, setAvanzado] = useState(false);
+  useEffect(() => {
+    setPistas((p) =>
+      p.map((x) => {
+        if (!hayStems) return { ...x, on: true, vol: 85 };
+        if (foco === "manual") return x;
+        if (foco === "mezcla") return { ...x, on: !x.vozId, vol: 85 };
+        if (foco === "todas") return { ...x, on: !!x.vozId, vol: 85 };
+        if (!x.vozId) return { ...x, on: false };
+        if (x.vozId === foco) return { ...x, on: true, vol: 100 };
+        return { ...x, on: fondo > 0, vol: fondo };
+      })
+    );
+  }, [foco, fondo]);
 
   // Barra espaciadora: reproducir / pausar
   const toggleRef = useRef(null);
@@ -10939,108 +11071,123 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   if (todasFallan)
     return <PistasSueltas lista={lista} motivo={motivoRef.current} visor={visor} />;
 
-  const INK = "#2a2825";
+  const INK = "#26231f";
   const ACC = "#a9864d";
   const MUTED = "#8a847a";
   const cargando = pistas.some((x) => x.estado === "cargando");
   const nListas = pistas.filter((x) => x.estado === "ok").length;
+  const nFallas = pistas.filter((x) => x.estado === "error").length;
   const pct = dur ? Math.min(100, (pos / dur) * 100) : 0;
-  const tieneMiVoz = !!miCuerda && pistas.some((p) => p.vozId === miCuerda);
-  const mismas = (arr) => pistas.length === arr.length && pistas.every((x, j) => x.on === arr[j]);
-  const modoTodas = mismas(inicial().map((x) => x.on));
-  const modoMezcla = hayMezcla && hayStems && mismas(pistas.map((x) => !x.vozId));
-  const modoMia = tieneMiVoz && mismas(pistas.map((x) => x.vozId === miCuerda));
-  const modoSin = tieneMiVoz && mismas(pistas.map((x) => x.vozId !== miCuerda));
-  const modo = (activo) => ({
-    flex: 1,
-    padding: "9px 4px",
-    whiteSpace: "nowrap",
-    borderRadius: 9,
-    border: "none",
-    cursor: "pointer",
-    fontFamily: "inherit",
-    fontSize: 12.5,
-    fontWeight: 600,
-    background: activo ? "#fff" : "transparent",
-    color: activo ? INK : MUTED,
-    boxShadow: activo ? "0 1px 4px rgba(60,50,30,.14), 0 0 0 1px rgba(60,50,30,.06)" : "none",
-    transition: "all .15s",
-  });
+  const estadoDe = (vozId) => {
+    const x = pistas.find((q) => q.vozId === vozId);
+    return x ? x.estado : "ok";
+  };
+  const opciones = [
+    ...vocesDisp.map((v) => ({ id: v, label: ETIQUETA_VOZ_MULTI[v] || v, sub: v === miCuerda ? "Tu voz" : "", err: estadoDe(v) === "error" })),
+    ...(hayStems && vocesDisp.length > 1 ? [{ id: "todas", label: "Todo el coro", sub: "", err: false }] : []),
+    ...(hayStems && hayMezcla ? [{ id: "mezcla", label: "Canción completa", sub: "", err: pistas.filter((q) => !q.vozId).every((q) => q.estado === "error") }] : []),
+  ];
+  const focoEsVoz = vocesDisp.includes(foco);
+  const ayuda =
+    foco === "manual" ? "Mezcla personalizada" :
+    foco === "todas" ? "Se oyen todas las voces por igual" :
+    foco === "mezcla" ? "Suena la grabación completa" :
+    focoEsVoz ? (fondo === 0 ? `Solo ${ETIQUETA_VOZ_MULTI[foco] || foco}` : `${ETIQUETA_VOZ_MULTI[foco] || foco} al frente, las demás de fondo`) : "";
+  const btnSalto = { width: 40, height: 40, borderRadius: "50%", border: "1px solid #e4dfd2", background: "#fff", color: INK, cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" };
 
   return (
     <div className="me-grid">
       <style>{`
-        .me-grid{display:grid;grid-template-columns:minmax(300px,390px) minmax(0,1fr);gap:28px;align-items:start;margin-bottom:12px}
+        .me-grid{display:grid;grid-template-columns:minmax(310px,400px) minmax(0,1fr);gap:28px;align-items:start;margin-bottom:12px}
         @media(max-width:900px){.me-grid{grid-template-columns:1fr;gap:20px}}
-        .mp-range{-webkit-appearance:none;appearance:none;height:4px;border-radius:4px;outline:none;cursor:pointer;background:#e6e1d6}
-        .mp-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid #a9864d;box-shadow:0 1px 4px rgba(60,50,30,.25)}
-        .mp-range::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #a9864d;box-shadow:0 1px 4px rgba(60,50,30,.25)}
+        .mp-range{-webkit-appearance:none;appearance:none;height:5px;border-radius:5px;outline:none;cursor:pointer;background:#e6e1d6}
+        .mp-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid #a9864d;box-shadow:0 1px 4px rgba(60,50,30,.25)}
+        .mp-range::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid #a9864d}
         .mp-range:disabled{cursor:default;opacity:.45}
-        .mp-play{transition:transform .15s,box-shadow .15s}.mp-play:hover{transform:scale(1.05)}
-        .mp-sw{position:relative;width:40px;height:23px;border-radius:12px;border:none;padding:0;cursor:pointer;transition:background .2s;flex-shrink:0}
-        .mp-sw i{position:absolute;top:3px;left:3px;width:17px;height:17px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(60,50,30,.35)}
-        .mp-sw[aria-checked=true] i{transform:translateX(17px)}
-        .mp-fila{transition:opacity .2s}
+        .mp-play{transition:transform .15s}.mp-play:hover{transform:scale(1.05)}
+        .mp-op{transition:all .15s;font-family:inherit;cursor:pointer;text-align:left}
+        .mp-op:hover:not(:disabled){border-color:#a9864d !important}
       `}</style>
-      <div style={{ position: "sticky", top: 12, background: "linear-gradient(180deg,#fffdf9 0%,#f8f5ee 100%)", color: INK, borderRadius: 22, padding: "22px 22px 14px", border: "1px solid #ece7dc", boxShadow: "0 24px 50px -32px rgba(90,70,30,.35), inset 0 1px 0 #fff", fontFamily: "var(--font-sans)" }}>
-        {/* Transporte */}
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <button className="mp-play" onClick={playing ? pausar : reproducir} disabled={cargando || nListas === 0} aria-label={playing ? "Pausar" : "Reproducir"}
-            style={{ width: 54, height: 54, borderRadius: "50%", border: "none", background: INK, color: "#fff", cursor: cargando ? "default" : "pointer", opacity: cargando || nListas === 0 ? 0.4 : 1, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 18px -6px rgba(42,40,37,.5)" }}>
-            {playing ? (
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor"><rect x="3" y="2" width="4" height="14" rx="1" /><rect x="11" y="2" width="4" height="14" rx="1" /></svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor"><path d="M5 2.5v13l11-6.5z" /></svg>
-            )}
-          </button>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-              <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 40, fontWeight: 600, lineHeight: 1, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em" }}>{fmtTiempoMulti(pos)}</span>
-              <span style={{ fontSize: 13, color: MUTED, fontVariantNumeric: "tabular-nums" }}>/ {fmtTiempoMulti(dur)}</span>
-            </div>
-            <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>
-              {cargando ? `Cargando pistas ${nListas} de ${pistas.length}…` : (
-                <button onClick={() => irA(0)} style={{ background: "none", border: "none", color: MUTED, cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12, textDecoration: "underline", textUnderlineOffset: 3 }}>Volver al inicio</button>
-              )}
-            </div>
-          </div>
+      <div style={{ position: "sticky", top: 12, background: "#fffdf9", color: INK, borderRadius: 22, padding: "22px 20px 18px", border: "1px solid #ece7dc", boxShadow: "0 24px 50px -32px rgba(90,70,30,.35)", fontFamily: "var(--font-sans)" }}>
+        {/* 1. Qué quiero oír */}
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: ACC, marginBottom: 10 }}>¿Qué quieres escuchar?</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {opciones.map((o) => {
+            const sel = foco === o.id;
+            return (
+              <button key={o.id} className="mp-op" disabled={o.err} onClick={() => setFoco(o.id)}
+                style={{ padding: "12px 14px", borderRadius: 14, border: "1.5px solid " + (sel ? INK : "#e8e2d4"), background: sel ? INK : "#fff", color: sel ? "#fff" : INK, opacity: o.err ? 0.4 : 1 }}>
+                <span style={{ display: "block", fontSize: 14.5, fontWeight: 700 }}>{o.label}</span>
+                <span style={{ display: "block", fontSize: 11, marginTop: 2, color: sel ? "#e8d9b4" : o.err ? MUTED : ACC, fontWeight: 600, minHeight: 14 }}>{o.err ? "No disponible" : o.sub}</span>
+              </button>
+            );
+          })}
         </div>
-        <input className="mp-range" type="range" min={0} max={dur || 1} step={0.1} value={Math.min(pos, dur || 1)} onChange={(e) => irA(parseFloat(e.target.value))} aria-label="Posición" disabled={cargando}
-          style={{ width: "100%", marginTop: 18, background: `linear-gradient(90deg,${ACC} ${pct}%,#e6e1d6 ${pct}%)` }} />
 
-        {/* Modos */}
-        {(tieneMiVoz || (hayMezcla && hayStems)) && (
-          <div style={{ display: "flex", gap: 3, padding: 3, borderRadius: 12, background: "#efebe2", marginTop: 20 }}>
-            <button onClick={restablecer} style={modo(modoTodas)}>Voces</button>
-            {tieneMiVoz && <button onClick={soloMiVoz} style={modo(modoMia)}>Mi voz</button>}
-            {tieneMiVoz && <button onClick={sinMiVoz} style={modo(modoSin)}>Sin mi voz</button>}
-            {hayMezcla && hayStems && <button onClick={soloMezcla} style={modo(modoMezcla)}>Canción</button>}
+        {/* Las demás voces */}
+        {focoEsVoz && vocesDisp.length > 1 && (
+          <div style={{ marginTop: 16, padding: "12px 14px", background: "#f7f3ea", borderRadius: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 600 }}>
+              <span>Las demás voces</span>
+              <span style={{ color: MUTED, fontWeight: 500 }}>{fondo === 0 ? "en silencio" : fondo >= 85 ? "igual de fuertes" : "de fondo"}</span>
+            </div>
+            <input className="mp-range" type="range" min={0} max={100} step={5} value={fondo} onChange={(e) => setFondo(parseInt(e.target.value, 10))} aria-label="Volumen de las demás voces"
+              style={{ width: "100%", marginTop: 10, background: `linear-gradient(90deg,${ACC} ${fondo}%,#e0d9c8 ${fondo}%)` }} />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, color: MUTED, marginTop: 4 }}><span>Silencio</span><span>Fuerte</span></div>
           </div>
         )}
 
-        {/* Voces */}
-        <div style={{ marginTop: tieneMiVoz || (hayMezcla && hayStems) ? 6 : 20 }}>
-          {pistas.map((p, i) => {
-            const err = p.estado === "error";
-            const on = p.on && !err;
-            const mia = p.vozId && p.vozId === miCuerda;
-            const esMezcla = !p.vozId && hayStems;
-            return (
-              <div key={p.id} className="mp-fila" style={{ padding: "13px 0", marginTop: esMezcla ? 6 : 0, borderTop: esMezcla ? "1px solid #e2dccf" : "none", borderBottom: !esMezcla && i < pistas.length - 1 && pistas[i + 1] && pistas[i + 1].vozId ? "1px solid #eee9de" : "none", opacity: err ? 0.4 : on ? 1 : 0.55 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <button className="mp-sw" role="switch" aria-checked={on} aria-label={p.label} disabled={err} onClick={() => alternar(i)} style={{ background: on ? ACC : "#d8d2c4" }}><i /></button>
-                  <button onClick={() => !err && alternar(i)} style={{ flex: 1, textAlign: "left", background: "none", border: "none", color: "inherit", cursor: err ? "default" : "pointer", fontFamily: "inherit", padding: 0, fontSize: 15, fontWeight: 600, letterSpacing: "-0.005em" }}>
-                    {p.label}
-                    {mia && <span style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 700, color: ACC, letterSpacing: "0.06em" }}>TU VOZ</span>}
-                    {esMezcla && <span style={{ display: "block", fontSize: 11.5, fontWeight: 500, color: MUTED, marginTop: 2 }}>Voces e instrumentos juntos, como suena la canción</span>}
-                  </button>
-                  <span style={{ fontSize: 12, color: MUTED, fontVariantNumeric: "tabular-nums", minWidth: 52, textAlign: "right" }}>{err ? "No disponible" : cargando && p.estado === "cargando" ? "…" : on ? p.vol + "%" : "Silenciada"}</span>
-                </div>
-                <input className="mp-range" type="range" min={0} max={100} value={p.vol} disabled={err || !on} onChange={(e) => setP(i, { vol: parseInt(e.target.value, 10) })} aria-label={"Volumen " + p.label}
-                  style={{ width: "100%", marginTop: 11, background: `linear-gradient(90deg,${ACC} ${p.vol}%,#e6e1d6 ${p.vol}%)` }} />
-              </div>
-            );
-          })}
+        {/* 2. Reproducción */}
+        <div style={{ marginTop: 20, paddingTop: 18, borderTop: "1px solid #eee9de" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>
+            <button onClick={() => irA(pos - 10)} disabled={cargando} style={btnSalto} aria-label="Retroceder 10 segundos">−10</button>
+            <button className="mp-play" onClick={playing ? pausar : reproducir} disabled={cargando || nListas === 0} aria-label={playing ? "Pausar" : "Reproducir"}
+              style={{ width: 64, height: 64, borderRadius: "50%", border: "none", background: ACC, color: "#fff", cursor: cargando ? "default" : "pointer", opacity: cargando || nListas === 0 ? 0.45 : 1, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 10px 20px -8px rgba(169,134,77,.7)" }}>
+              {playing ? (
+                <svg width="22" height="22" viewBox="0 0 18 18" fill="currentColor"><rect x="3" y="2" width="4" height="14" rx="1" /><rect x="11" y="2" width="4" height="14" rx="1" /></svg>
+              ) : (
+                <svg width="22" height="22" viewBox="0 0 18 18" fill="currentColor"><path d="M5 2.5v13l11-6.5z" /></svg>
+              )}
+            </button>
+            <button onClick={() => irA(pos + 10)} disabled={cargando} style={btnSalto} aria-label="Adelantar 10 segundos">+10</button>
+          </div>
+          <input className="mp-range" type="range" min={0} max={dur || 1} step={0.1} value={Math.min(pos, dur || 1)} onChange={(e) => irA(parseFloat(e.target.value))} aria-label="Posición" disabled={cargando}
+            style={{ width: "100%", marginTop: 18, background: `linear-gradient(90deg,${ACC} ${pct}%,#e6e1d6 ${pct}%)` }} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: MUTED, marginTop: 6, fontVariantNumeric: "tabular-nums" }}>
+            <span>{fmtTiempoMulti(pos)}</span>
+            <span>{fmtTiempoMulti(dur)}</span>
+          </div>
+          <div style={{ textAlign: "center", fontSize: 12.5, color: cargando ? ACC : MUTED, marginTop: 10, minHeight: 18, fontWeight: cargando ? 600 : 400 }}>
+            {cargando ? `Preparando las pistas… ${nListas} de ${pistas.length}` : nFallas > 0 ? `${nFallas} pista${nFallas > 1 ? "s" : ""} no se pudo${nFallas > 1 ? "ieron" : ""} cargar · ${ayuda}` : ayuda}
+          </div>
+        </div>
+
+        {/* 3. Mezclador (opcional) */}
+        <div style={{ marginTop: 14, borderTop: "1px solid #eee9de", paddingTop: 12 }}>
+          <button onClick={() => setAvanzado((v) => !v)} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: INK, padding: 0, display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ color: ACC }}>{avanzado ? "▾" : "▸"}</span> Mezclador por voz
+          </button>
+          {avanzado && (
+            <div style={{ marginTop: 10 }}>
+              {pistas.map((p, i) => {
+                const err = p.estado === "error";
+                const v = p.on ? p.vol : 0;
+                return (
+                  <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", opacity: err ? 0.4 : 1 }}>
+                    <span style={{ width: 104, fontSize: 13, fontWeight: 600 }}>{p.label}</span>
+                    <input className="mp-range" type="range" min={0} max={100} value={v} disabled={err} aria-label={"Volumen " + p.label}
+                      onChange={(e) => {
+                        const n = parseInt(e.target.value, 10);
+                        if (foco !== "manual") setFoco("manual");
+                        setP(i, { vol: n, on: n > 0 });
+                      }}
+                      style={{ flex: 1, background: `linear-gradient(90deg,${ACC} ${v}%,#e6e1d6 ${v}%)` }} />
+                    <span style={{ width: 34, textAlign: "right", fontSize: 11.5, color: MUTED, fontVariantNumeric: "tabular-nums" }}>{err ? "—" : v}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
       {visor}
@@ -26212,12 +26359,12 @@ const SM_MOMENTOS = ["Entrada", "Acto Penitencial", "Gloria", "Salmo", "Aleluya"
 const SM_SLOTS = [
   { id: "Partitura", label: "Partitura", icon: "🎼", cat: "Partituras", cuerda: "Todas", tipo: "partitura", acepta: ".pdf,application/pdf", suf: "Partitura" },
   { id: "Letra", label: "Letra", icon: "📝", cat: "Letras", cuerda: "Todas", tipo: "letra", acepta: ".pdf,application/pdf", suf: "Letra" },
-  { id: "Soprano", label: "Sopranos", icon: "🎙", cat: "Audio", cuerda: "Soprano", tipo: "audio", acepta: "audio/*", suf: "Soprano" },
-  { id: "Contralto", label: "Altos", icon: "🎙", cat: "Audio", cuerda: "Contralto", tipo: "audio", acepta: "audio/*", suf: "Contralto" },
-  { id: "Tenor", label: "Tenores", icon: "🎙", cat: "Audio", cuerda: "Tenor", tipo: "audio", acepta: "audio/*", suf: "Tenor" },
-  { id: "Bajo", label: "Bajos", icon: "🎙", cat: "Audio", cuerda: "Bajo", tipo: "audio", acepta: "audio/*", suf: "Bajo" },
-  { id: "Instrumentos", label: "Instrumentos", icon: "🎹", cat: "Audio", cuerda: "Instrumentos", tipo: "audio", acepta: "audio/*", suf: "Instrumentos" },
-  { id: "Mezcla", label: "Mezcla completa", icon: "🎚", cat: "Audio", cuerda: "Todas", tipo: "audio", acepta: "audio/*", suf: "General" },
+  { id: "Soprano", label: "Sopranos", icon: "🎙", cat: "Audio", cuerda: "Soprano", tipo: "audio", acepta: "audio/*,.mid,.midi", suf: "Soprano" },
+  { id: "Contralto", label: "Altos", icon: "🎙", cat: "Audio", cuerda: "Contralto", tipo: "audio", acepta: "audio/*,.mid,.midi", suf: "Contralto" },
+  { id: "Tenor", label: "Tenores", icon: "🎙", cat: "Audio", cuerda: "Tenor", tipo: "audio", acepta: "audio/*,.mid,.midi", suf: "Tenor" },
+  { id: "Bajo", label: "Bajos", icon: "🎙", cat: "Audio", cuerda: "Bajo", tipo: "audio", acepta: "audio/*,.mid,.midi", suf: "Bajo" },
+  { id: "Instrumentos", label: "Instrumentos", icon: "🎹", cat: "Audio", cuerda: "Instrumentos", tipo: "audio", acepta: "audio/*,.mid,.midi", suf: "Instrumentos" },
+  { id: "Mezcla", label: "Mezcla completa", icon: "🎚", cat: "Audio", cuerda: "Todas", tipo: "audio", acepta: "audio/*,.mid,.midi", suf: "General" },
   { id: "Video", label: "Video", icon: "🎬", cat: "Video", cuerda: "Todas", tipo: "video", acepta: "video/*", suf: "Video" },
 ];
 
@@ -26226,7 +26373,7 @@ function smDetectarSlot(nombre, mime) {
   const n = _normME(nombre || "");
   const ext = (nombre || "").toLowerCase().split(".").pop();
   const esPdf = mime === "application/pdf" || ext === "pdf";
-  const esAudio = (mime || "").startsWith("audio/") || /^(mp3|m4a|wav|ogg|aac|flac|opus|mpeg|mpga)$/.test(ext);
+  const esAudio = (mime || "").startsWith("audio/") || /^(mp3|m4a|wav|ogg|aac|flac|opus|mpeg|mpga|mid|midi)$/.test(ext);
   const esVideo = (mime || "").startsWith("video/") || /^(mp4|mov|webm|m4v)$/.test(ext);
   if (esPdf) return /letra|texto|acorde|lyrics/.test(n) ? "Letra" : "Partitura";
   if (esVideo) return "Video";
@@ -26376,7 +26523,7 @@ function ImportarDriveMasivo({ materialEnsayo, onReload }) {
         const low = (f.name || "").toLowerCase();
         const ext = low.split(".").pop();
         const esPdf = f.mime === "application/pdf" || ext === "pdf";
-        const esAudio = (f.mime || "").startsWith("audio/") || /^(mp3|m4a|wav|ogg|aac|flac|opus)$/.test(ext);
+        const esAudio = (f.mime || "").startsWith("audio/") || /^(mp3|m4a|wav|ogg|aac|flac|opus|mid|midi)$/.test(ext);
         const esVideo = (f.mime || "").startsWith("video/") || /^(mp4|mov|webm|m4v)$/.test(ext);
         if (!esPdf && !esAudio && !esVideo) return sin.push({ ...f, motivo: "tipo no soportado" });
         // Casilla
