@@ -15583,7 +15583,7 @@ function CheckInObligatorio({ pautas, user }) {
   const [cargando, setCargando] = useState(false);
   const [err, setErr] = useState("");
   const abierto = !!pauta && mjCheckinEstado(pauta, cfg, ahora) === "abierto";
-  const aplica = !!(pauta && user && user.id && !esVisita(user));
+  const aplica = !!(pauta && user && user.id && !esVisita(user) && user.cuerda !== "Admin");
   const lk = aplica ? `mj_checkin_${pauta.id}_${user.id}` : "";
   useEffect(() => {
     if (!aplica) return;
@@ -15622,9 +15622,45 @@ function CheckInObligatorio({ pautas, user }) {
     } catch (e) {
       setErr(e && e.mj ? e.message : "No se pudo registrar. Revisa tu conexión e intenta de nuevo.");
       setErrTipo(e && e.mj ? e.tipo : "red");
+      // Si está lejos de la capilla no se le bloquea la app: queda un aviso discreto y se registra al llegar
+      if (e && e.mj && e.tipo === "lejos") setEstado("pendiente");
     }
     setCargando(false);
   };
+  // Mientras falta el Check in: reintento silencioso (sin pantallas) al volver a la app y cada minuto, solo si el permiso ya está dado
+  const silencioso = async () => {
+    try {
+      if (!navigator.permissions || !navigator.permissions.query) return;
+      const perm = await navigator.permissions.query({ name: "geolocation" });
+      if (perm.state !== "granted") return;
+      await mjRegistrarCheckIn(pauta, user);
+      try {
+        localStorage.setItem(lk, "1");
+      } catch (e) {}
+      setEstado("listo");
+    } catch (e) {}
+  };
+  useEffect(() => {
+    if (!aplica || !abierto || estado === "listo" || estado === "revisando") return;
+    const vis = () => document.visibilityState === "visible" && silencioso();
+    document.addEventListener("visibilitychange", vis);
+    const t = setInterval(silencioso, 60000);
+    return () => {
+      document.removeEventListener("visibilitychange", vis);
+      clearInterval(t);
+    };
+  }, [aplica, abierto, estado]);
+  if (aplica && abierto && estado === "pendiente")
+    return createPortal(
+      <button onClick={() => setEstado("pedir")} style={{ position: "fixed", left: 10, right: 10, bottom: 76, zIndex: 3500, maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "1px solid #bbf7d0", background: "#ecfdf5", color: "#14532d", borderRadius: 16, padding: "11px 14px", cursor: "pointer", fontFamily: "var(--font-sans, Inter, system-ui, sans-serif)", boxShadow: "0 10px 26px rgba(22,101,52,.22)" }}>
+        <span style={{ fontSize: 22 }}>📍</span>
+        <span style={{ flex: 1, fontSize: 13.5, lineHeight: 1.35 }}>
+          <b>Falta tu Check in.</b> Se registra al llegar a la capilla.
+        </span>
+        <span style={{ background: "#17a35d", color: "#fff", borderRadius: 999, padding: "7px 13px", fontSize: 12.5, fontWeight: 800 }}>Marcar</span>
+      </button>,
+      document.body
+    );
   if (!aplica || !abierto || estado !== "pedir") return null;
   return createPortal(
     <div style={{ position: "fixed", inset: 0, zIndex: 6000, background: "rgba(15,27,45,.62)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, fontFamily: "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)" }}>
@@ -15644,6 +15680,11 @@ function CheckInObligatorio({ pautas, user }) {
         </button>
         <div style={{ marginTop: 10, fontSize: 13, color: "#64748b", lineHeight: 1.4 }}>Toca el botón y, si el teléfono pregunta, vuelve a tocar «Permitir».</div>
         {err && <div style={{ marginTop: 12, fontSize: 14, color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "10px 12px", lineHeight: 1.45 }}>{err}</div>}
+        {(errTipo === "permiso" || errTipo === "red") && (
+          <button onClick={() => setEstado("pendiente")} style={{ marginTop: 12, border: "none", background: "none", color: "#475569", fontSize: 14, fontWeight: 700, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" }}>
+            Entrar a la app y marcar después
+          </button>
+        )}
         {errTipo === "permiso" && (
           <div style={{ marginTop: 12, textAlign: "left", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 16, padding: "14px" }}>
             <div style={{ fontSize: 15, fontWeight: 800, color: "#0f1b2d", marginBottom: 6 }}>Para activarlo:</div>
