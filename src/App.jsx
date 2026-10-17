@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, Component } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Component } from "react";
 import { EscuelaCanto } from "./EscuelaCanto";
 import Landing from "./Landing";
 import CursoGuitarra from "./CursoGuitarra";
@@ -1834,6 +1834,12 @@ function AppInner() {
     return "landing";
   })();
   const [view, setView] = useState(_initialView);
+  // Service worker: deja la app guardada para abrirla sin internet (capilla)
+  useEffect(() => {
+    if ("serviceWorker" in navigator && (window.location.protocol === "https:" || window.location.hostname === "localhost")) {
+      navigator.serviceWorker.register("/OneSignalSDKWorker.js", { scope: "/" }).catch(() => {});
+    }
+  }, []);
   const [showPushModal, setShowPushModal] = useState(false);
   const [pushBloqueado, setPushBloqueado] = useState(false);
   const [user, setUser] = useState(null);
@@ -1860,7 +1866,26 @@ function AppInner() {
   const [podcasts, setPodcasts] = useState([]);
   const [fotos, setFotos] = useState([]);
   const [comunidades, setComunidades] = useState([]);
-  const [pautas, setPautas] = useState([]);
+  const [pautasRaw, setPautas] = useState([]);
+  const [accesosPauta, setAccesosPauta] = useState({});
+  // Cada pauta puede mostrarse solo a los integrantes que elige el admin
+  const pautas = useMemo(() => mjFiltrarPautasPorAcceso(pautasRaw, accesosPauta, user), [pautasRaw, accesosPauta, user && user.id, user && user.cuerda]);
+  // Guardado sin conexión AUTOMÁTICO: cada vez que hay internet y pautas publicadas, se guardan en el teléfono
+  useEffect(() => {
+    if (!user || !pautas || !pautas.length) return;
+    let t = null;
+    const guardar = () => {
+      if (!navigator.onLine) return;
+      clearTimeout(t);
+      t = setTimeout(() => mmPrepararOffline(pautas).catch(() => {}), 2500);
+    };
+    guardar();
+    window.addEventListener("online", guardar);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("online", guardar);
+    };
+  }, [user && user.id, pautas]);
   const [reconocimientos, setReconocimientos] = useState([]);
   const [materialEnsayo, setMaterialEnsayo] = useState([]);
   const [materialCoro, setMaterialCoro] = useState([]);
@@ -2017,6 +2042,7 @@ function AppInner() {
       setBiblioteca(bib || []);
       setPodcasts(pod || []);
       setPautas(pau || []);
+      mjCargarAccesosPauta().then(setAccesosPauta).catch(() => {});
       setAsistencia(asis || []);
       setFotos(gal || []);
       setComunidades(com || []);
@@ -2964,17 +2990,21 @@ function AppInner() {
 
   if (view === "landing")
     return (
-      <Landing
-        onPortal={() => {
-          localStorage.removeItem("sb_access_token");
-          localStorage.removeItem("sb_refresh_token");
-          setView("login");
-        }}
-      />
+      <>
+        <Landing
+          onPortal={() => {
+            localStorage.removeItem("sb_access_token");
+            localStorage.removeItem("sb_refresh_token");
+            setView("login");
+          }}
+        />
+        <AccesoModoMisaOffline />
+      </>
     );
 
   if (view !== "app")
     return (
+      <>
       <AuthScreen
         view={view}
         setView={setView}
@@ -2983,6 +3013,8 @@ function AppInner() {
         onGuestEnter={handleGuestEnter}
         onBack={() => setView("landing")}
       />
+      <AccesoModoMisaOffline />
+      </>
     );
 
   async function activarNotificaciones(userId) {
@@ -3118,6 +3150,8 @@ function AppInner() {
           </button>
         </div>
       )}
+
+      <CheckInObligatorio pautas={pautas} user={user} />
 
       {/* ── Modal explicativo notificaciones push ── */}
       {showPushModal &&
@@ -11221,20 +11255,26 @@ function VisorPDF({ url, nombre, semitonos = 0, onAcordes, barra, alto, pegado }
       try {
         const lib = await cargarPdfJs();
         const id = /(?:drive|docs)\.google\.com/i.test(url || "") ? driveIdEnsayo(url) : null;
-        const fuentes = id ? fuentesMultipista(url) : [url];
-        let r = null;
-        for (const f of fuentes) {
-          try {
-            const rr = await fetch(f);
-            if (rr.ok && !/text\/html/i.test(rr.headers.get("content-type") || "")) {
-              r = rr;
-              break;
-            }
-          } catch (e) {}
+        const clave = id || url;
+        // 1) copia guardada en el teléfono (sirve sin internet)  2) descarga y se guarda
+        let buf = await mjIdbGet(clave).catch(() => null);
+        if (!buf) {
+          const fuentes = id ? fuentesMultipista(url) : [url];
+          let r = null;
+          for (const f of fuentes) {
+            try {
+              const rr = await fetch(f);
+              if (rr.ok && !/text\/html/i.test(rr.headers.get("content-type") || "")) {
+                r = rr;
+                break;
+              }
+            } catch (e) {}
+          }
+          if (!r) throw new Error("descarga");
+          buf = await r.arrayBuffer();
+          mjIdbPut(clave, buf.slice(0)).catch(() => {});
         }
-        if (!r) throw new Error("descarga");
-        const buf = await r.arrayBuffer();
-        const doc = await lib.getDocument({ data: buf }).promise;
+        const doc = await lib.getDocument({ data: buf.slice(0) }).promise;
         if (vivo) setPdf(doc);
       } catch (e) {
         if (vivo) setError(true);
@@ -15249,8 +15289,571 @@ function BotonAudioPauta({ url, size = 26, bg = "#1e3a5f", fs = 10 }) {
   );
 }
 
+// ── Acceso por pauta: config "pauta_acceso_<id>" = {restringida, ids[]} ──
+async function mjCargarAccesosPauta() {
+  const url = `${SUPABASE_URL}/rest/v1/config?select=key,value&key=like.${encodeURIComponent("pauta_acceso_")}*`;
+  const tokens = [_authToken, SUPABASE_KEY, SUPABASE_SERVICE_KEY].filter((v, i, ar) => v && ar.indexOf(v) === i);
+  for (const t of tokens) {
+    try {
+      const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${t}` } });
+      if (!r.ok) continue;
+      const rows = await r.json();
+      const mapa = {};
+      (Array.isArray(rows) ? rows : []).forEach((x) => {
+        try {
+          mapa[x.key.slice("pauta_acceso_".length)] = typeof x.value === "string" ? JSON.parse(x.value) : x.value;
+        } catch (e) {}
+      });
+      return mapa;
+    } catch (e) {}
+  }
+  return {};
+}
+function mjFiltrarPautasPorAcceso(pautas, accesos, user) {
+  if (!user || user.cuerda === "Admin") return pautas;
+  return (pautas || []).filter((p) => {
+    const ac = accesos && accesos[p.id];
+    if (!ac || !ac.restringida) return true;
+    return (ac.ids || []).map(String).includes(String(user.id));
+  });
+}
+function AccesoPautaBoton({ pauta, abrirInicial, onGuardado, estilo }) {
+  const [abierto, setAbierto] = useState(!!abrirInicial);
+  const [cargando, setCargando] = useState(false);
+  const [lista, setLista] = useState([]);
+  const [restringida, setRestringida] = useState(false);
+  const [sel, setSel] = useState([]);
+  const [q, setQ] = useState("");
+  const [msg, setMsg] = useState("");
+  const [estado, setEstado] = useState(null);
+  useEffect(() => {
+    mjCargarAccesosPauta().then((m) => setEstado(m[pauta.id] || null)).catch(() => {});
+  }, [pauta.id, abierto]);
+  useEffect(() => {
+    if (!abierto) return;
+    setCargando(true);
+    Promise.all([supabase("integrantes", { order: "&order=nombre.asc" }).catch(() => []), mjCargarAccesosPauta()]).then(([m, ac]) => {
+      setLista((m || []).filter((u) => u.cuerda && u.cuerda.trim() !== "" && u.cuerda !== "Admin"));
+      const a0 = ac[pauta.id];
+      setRestringida(!!(a0 && a0.restringida));
+      setSel(((a0 && a0.ids) || []).map(String));
+      setCargando(false);
+    });
+  }, [abierto]);
+  const guardar = async () => {
+    const ok = await setConfig(`pauta_acceso_${pauta.id}`, JSON.stringify({ restringida, ids: sel }));
+    setMsg(ok ? "✓ Guardado" : "No se pudo guardar");
+    if (ok) {
+      onGuardado && onGuardado();
+      setTimeout(() => {
+        setAbierto(false);
+        setMsg("");
+      }, 700);
+    }
+  };
+  const alternar = (id) => setSel((s) => (s.includes(String(id)) ? s.filter((x) => x !== String(id)) : [...s, String(id)]));
+  const vis = lista.filter((u) => (u.nombre || "").toLowerCase().includes(q.toLowerCase()));
+  const grupos = {};
+  vis.forEach((u) => (grupos[u.cuerda] = grupos[u.cuerda] || []).push(u));
+  const etiqueta = estado && estado.restringida ? `👁 Acceso: ${(estado.ids || []).length} elegidos` : "👁 Acceso: todos";
+  const f = "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)";
+  return (
+    <>
+      <button onClick={() => setAbierto(true)} style={estilo || { background: "rgba(255,255,255,0.16)", border: "none", color: "#fff", borderRadius: 9, padding: "6px 12px", fontSize: 11.5, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+        {etiqueta}
+      </button>
+      {abierto &&
+        createPortal(
+          <div onClick={() => setAbierto(false)} style={{ position: "fixed", inset: 0, zIndex: 5000, background: "rgba(15,27,45,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 14, fontFamily: f }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, width: "100%", maxWidth: 460, maxHeight: "88vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 60px rgba(15,27,45,.35)" }}>
+              <div style={{ padding: "18px 20px 10px" }}>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "#2f5d9a" }}>Quién puede ver la pauta</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#0f1b2d", margin: "4px 0 10px" }}>{pauta.titulo || "Misa"}</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[[false, "Todos los integrantes"], [true, "Solo los que elija"]].map(([v, l]) => (
+                    <button key={l} onClick={() => setRestringida(v)} style={{ flex: 1, border: "2px solid " + (restringida === v ? "#2f5d9a" : "#e6ebf2"), background: restringida === v ? "#eef4fb" : "#fff", color: "#0f1b2d", borderRadius: 12, padding: "10px 6px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {restringida && (
+                <div style={{ padding: "0 20px", display: "flex", flexDirection: "column", minHeight: 0, flex: 1 }}>
+                  <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar integrante…" style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: "10px 12px", fontSize: 14, fontFamily: "inherit", outline: "none", marginBottom: 8 }} />
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, fontSize: 12.5, color: "#64748b" }}>
+                    <b style={{ color: "#0f1b2d" }}>{sel.length}</b> de {lista.length} podrán verla
+                    <span style={{ flex: 1 }} />
+                    <button onClick={() => setSel(lista.map((u) => String(u.id)))} style={{ border: "none", background: "none", color: "#2f5d9a", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}>Todos</button>
+                    <button onClick={() => setSel([])} style={{ border: "none", background: "none", color: "#2f5d9a", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}>Ninguno</button>
+                  </div>
+                  <div style={{ overflowY: "auto", flex: 1, minHeight: 120, border: "1px solid #eef2f7", borderRadius: 12 }}>
+                    {cargando && <div style={{ padding: 16, fontSize: 13, color: "#64748b" }}>Cargando integrantes…</div>}
+                    {Object.keys(grupos).sort().map((g) => (
+                      <div key={g}>
+                        <div style={{ padding: "6px 12px", fontSize: 10.5, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "#64748b", background: "#f8fafc" }}>{g}</div>
+                        {grupos[g].map((u) => (
+                          <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderTop: "1px solid #f1f5f9", fontSize: 14.5, cursor: "pointer" }}>
+                            <input type="checkbox" checked={sel.includes(String(u.id))} onChange={() => alternar(u.id)} style={{ width: 20, height: 20 }} />
+                            {u.nombre}
+                          </label>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!restringida && <div style={{ padding: "4px 20px 10px", fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>Todos los integrantes verán esta pauta.</div>}
+              <div style={{ padding: "14px 20px 18px", display: "flex", gap: 8, alignItems: "center" }}>
+                <button onClick={() => setAbierto(false)} style={{ border: "1px solid #e6ebf2", background: "#fff", borderRadius: 12, padding: "12px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Cancelar</button>
+                <button onClick={guardar} style={{ flex: 1, border: "none", background: "#2f5d9a", color: "#fff", borderRadius: 12, padding: "12px 16px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>{msg || "Guardar"}</button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
+  );
+}
+
+// ── Check in: el integrante marca su presencia el mismo día de la misa ──
+function mjHoyISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+// ── Horario del Check in (editable en Administración) ──
+const MJ_CHECKIN_DEF = { desde: "17:00", hasta: "20:00", fecha: "" };
+function mjParseCheckinCfg(v) {
+  try {
+    const o = typeof v === "string" ? JSON.parse(v) : v || {};
+    return { ...MJ_CHECKIN_DEF, ...(o || {}) };
+  } catch (e) {
+    return { ...MJ_CHECKIN_DEF };
+  }
+}
+function useCheckinCfg() {
+  const [cfg, setCfg] = useState(() => {
+    try {
+      return mjParseCheckinCfg(localStorage.getItem("mj_checkin_cfg"));
+    } catch (e) {
+      return { ...MJ_CHECKIN_DEF };
+    }
+  });
+  useEffect(() => {
+    getConfig("checkin_config")
+      .then((v) => {
+        if (v) {
+          setCfg(mjParseCheckinCfg(v));
+          try {
+            localStorage.setItem("mj_checkin_cfg", typeof v === "string" ? v : JSON.stringify(v));
+          } catch (e) {}
+        }
+      })
+      .catch(() => {});
+  }, []);
+  return cfg;
+}
+// Fecha en que vale el Check in: la de la pauta, salvo que el admin fije otra para la próxima misa
+function mjPautaEfectiva(p, cfg, pautas) {
+  if (cfg.fecha && /^\d{4}-\d{2}-\d{2}$/.test(cfg.fecha)) {
+    const prox = proximaPauta(pautas);
+    if (prox && prox.id === p.id) return { ...p, fecha: cfg.fecha };
+  }
+  return p;
+}
+// "antes" | "abierto" | "cerrado" (pauta ya con fecha efectiva)
+function mjCheckinEstado(p, cfg, ahora) {
+  const d = ahora || new Date();
+  const hoy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  if (hoy < p.fecha) return "antes";
+  if (hoy > p.fecha) return "cerrado";
+  if (hm < cfg.desde) return "antes";
+  if (hm > cfg.hasta) return "cerrado";
+  return "abierto";
+}
+
+// ── Ubicación: el Check in solo vale estando en la capilla ──
+const MJ_CAPILLA = { lat: -33.5325371, lng: -70.7770535, radio: 250, nombre: "Capilla Sagrada Familia (Alfredo Silva Carvallo 1617, Maipú)" };
+function mjDistanciaM(a, b, c, d) {
+  const R = 6371000,
+    rad = (x) => (x * Math.PI) / 180;
+  const h = Math.sin(rad(c - a) / 2) ** 2 + Math.cos(rad(a)) * Math.cos(rad(c)) * Math.sin(rad(d - b) / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function mjErrUbic(msg, tipo) {
+  const e = new Error(msg);
+  e.mj = true;
+  e.tipo = tipo || "lejos";
+  return e;
+}
+async function mjVerificarUbicacion() {
+  if (!navigator.geolocation) throw mjErrUbic("Tu teléfono no permite verificar la ubicación.", "permiso");
+  const pos = await new Promise((res, rej) =>
+    navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 })
+  ).catch((e) => {
+    if (e && e.code === 1) throw mjErrUbic("El teléfono no nos dejó ver tu ubicación.", "permiso");
+    throw mjErrUbic("No pudimos ver tu ubicación. Revisa que el GPS (ubicación) del teléfono esté encendido.", "permiso");
+  });
+  const { latitude, longitude, accuracy } = pos.coords;
+  const dist = mjDistanciaM(latitude, longitude, MJ_CAPILLA.lat, MJ_CAPILLA.lng);
+  if (dist > MJ_CAPILLA.radio + Math.min(accuracy || 0, 150))
+    throw mjErrUbic(`La asistencia solo se registra estando en la capilla (${MJ_CAPILLA.nombre}). Estás a unos ${dist >= 1000 ? (dist / 1000).toFixed(1) + " km" : Math.round(dist) + " m"}.`);
+  if (accuracy && accuracy > 600) throw mjErrUbic("La ubicación no es muy clara todavía.", "permiso");
+  return true;
+}
+async function mjRegistrarCheckIn(pauta, user) {
+  await mjVerificarUbicacion();
+  const claves = [_authToken || SUPABASE_KEY, SUPABASE_SERVICE_KEY];
+  const hdr = (t) => ({ apikey: t === SUPABASE_SERVICE_KEY ? SUPABASE_SERVICE_KEY : SUPABASE_KEY, Authorization: `Bearer ${t}`, "Content-Type": "application/json" });
+  let ultimo = null;
+  for (const t of claves) {
+    try {
+      // 1) evento de misa de ese día (el que usa el admin para pasar lista)
+      let r = await fetch(`${SUPABASE_URL}/rest/v1/eventos?select=id,titulo,tipo&fecha=eq.${pauta.fecha}`, { headers: hdr(t) });
+      let evs = r.ok ? await r.json() : [];
+      let ev = evs.find((e) => e.tipo === "misa") || null;
+      if (!ev) {
+        r = await fetch(`${SUPABASE_URL}/rest/v1/eventos`, {
+          method: "POST",
+          headers: { ...hdr(t), Prefer: "return=representation" },
+          body: JSON.stringify({ titulo: pauta.titulo || "Misa", fecha: pauta.fecha, hora: pauta.hora || "", lugar: pauta.lugar || "", tipo: "misa", descripcion: "Creado por Check in" }),
+        });
+        if (r.ok) {
+          const nv = await r.json();
+          ev = Array.isArray(nv) ? nv[0] : nv;
+        }
+      }
+      if (!ev || !ev.id) {
+        ultimo = new Error("evento");
+        continue;
+      }
+      const eid = String(ev.id);
+      r = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?select=id,estado&evento_id=eq.${encodeURIComponent(eid)}&member_id=eq.${user.id}`, { headers: hdr(t) });
+      const ex = r.ok ? await r.json() : [];
+      if (ex.length) {
+        if (ex[0].estado === "presente") {
+          window.dispatchEvent(new Event("mj-checkin"));
+          return true;
+        }
+        r = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?id=eq.${ex[0].id}`, { method: "PATCH", headers: { ...hdr(t), Prefer: "return=minimal" }, body: JSON.stringify({ estado: "presente" }) });
+      } else {
+        r = await fetch(`${SUPABASE_URL}/rest/v1/asistencia`, { method: "POST", headers: { ...hdr(t), Prefer: "return=minimal" }, body: JSON.stringify({ evento_id: eid, member_id: user.id, estado: "presente" }) });
+      }
+      if (r.ok) {
+        window.dispatchEvent(new Event("mj-checkin"));
+        return true;
+      }
+      ultimo = new Error("guardar " + r.status);
+    } catch (e) {
+      ultimo = e;
+    }
+  }
+  throw ultimo || new Error("fallo");
+}
+async function mjYaRegistrado(pauta, user) {
+  for (const t of [_authToken || SUPABASE_KEY, SUPABASE_SERVICE_KEY]) {
+    try {
+      const h = { apikey: t === SUPABASE_SERVICE_KEY ? SUPABASE_SERVICE_KEY : SUPABASE_KEY, Authorization: `Bearer ${t}` };
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/eventos?select=id,tipo&fecha=eq.${pauta.fecha}`, { headers: h });
+      if (!r.ok) continue;
+      const ev = (await r.json()).find((e) => e.tipo === "misa");
+      if (!ev) return false;
+      const r2 = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?select=estado&evento_id=eq.${encodeURIComponent(String(ev.id))}&member_id=eq.${user.id}`, { headers: h });
+      if (!r2.ok) continue;
+      const ex = await r2.json();
+      return ex.some((x) => x.estado === "presente");
+    } catch (e) {}
+  }
+  return null; // no se pudo comprobar
+}
+// Popup obligatorio el día de la misa: no se cierra hasta hacer Check in (una sola vez por misa)
+function CheckInObligatorio({ pautas, user }) {
+  const cfg = useCheckinCfg();
+  const [ahora, setAhora] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setAhora(new Date()), 30000);
+    return () => clearInterval(t);
+  }, []);
+  const hoy = mjHoyISO();
+  const pauta = (pautas || [])
+    .filter((p) => p.publicada && p.fecha)
+    .map((p) => mjPautaEfectiva(p, cfg, pautas))
+    .find((p) => p.fecha === hoy);
+  const [estado, setEstado] = useState("revisando"); // revisando | pedir | listo
+  const [cargando, setCargando] = useState(false);
+  const [err, setErr] = useState("");
+  const abierto = !!pauta && mjCheckinEstado(pauta, cfg, ahora) === "abierto";
+  const aplica = !!(pauta && user && user.id && !esVisita(user));
+  const lk = aplica ? `mj_checkin_${pauta.id}_${user.id}` : "";
+  useEffect(() => {
+    if (!aplica) return;
+    let vivo = true;
+    try {
+      if (localStorage.getItem(lk)) {
+        setEstado("listo");
+        return;
+      }
+    } catch (e) {}
+    // Se confirma en el servidor: si ya marcó (aunque sea en otro dispositivo o sesión), no se vuelve a pedir
+    mjYaRegistrado(pauta, user).then((ok) => {
+      if (!vivo) return;
+      if (ok) {
+        try {
+          localStorage.setItem(lk, "1");
+        } catch (e) {}
+        setEstado("listo");
+      } else setEstado("pedir");
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [aplica, pauta && pauta.id, user && user.id]);
+  const [errTipo, setErrTipo] = useState("");
+  const hacer = async () => {
+    setCargando(true);
+    setErr("");
+    setErrTipo("");
+    try {
+      await mjRegistrarCheckIn(pauta, user);
+      try {
+        localStorage.setItem(lk, "1");
+      } catch (e) {}
+      setEstado("listo");
+    } catch (e) {
+      setErr(e && e.mj ? e.message : "No se pudo registrar. Revisa tu conexión e intenta de nuevo.");
+      setErrTipo(e && e.mj ? e.tipo : "red");
+    }
+    setCargando(false);
+  };
+  if (!aplica || !abierto || estado !== "pedir") return null;
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, zIndex: 6000, background: "rgba(15,27,45,.62)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, fontFamily: "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)" }}>
+      <div style={{ background: "#fff", borderRadius: 26, padding: "28px 24px 22px", maxWidth: 380, width: "100%", textAlign: "center", boxShadow: "0 28px 70px rgba(15,27,45,.4)" }}>
+        <div style={{ width: 60, height: 60, borderRadius: 20, margin: "0 auto 14px", background: "linear-gradient(135deg,#22b573,#15803d)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, boxShadow: "0 8px 20px rgba(21,128,61,.3)" }}>✔</div>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "#15803d" }}>Hoy hay misa</div>
+        <div style={{ fontSize: 22, fontWeight: 800, color: "#0f1b2d", letterSpacing: "-0.02em", margin: "6px 0 4px" }}>{pauta.titulo || "Misa"}</div>
+        <div style={{ fontSize: 13.5, color: "#6b7686", marginBottom: 14 }}>
+          {pauta.hora ? `${pauta.hora} hrs` : ""}
+          {pauta.lugar ? `${pauta.hora ? " · " : ""}${pauta.lugar}` : ""}
+        </div>
+        <div style={{ fontSize: 15, color: "#2b3646", lineHeight: 1.5, background: "#f1f7f3", border: "1px solid #d4eadc", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
+          Para marcar tu asistencia necesitamos saber que estás en la capilla. Debes hacerlo <b>antes de que inicie la misa</b>.
+        </div>
+        <button onClick={() => hacer()} disabled={cargando} style={{ width: "100%", border: "none", background: "#17a35d", color: "#fff", borderRadius: 16, padding: "20px 16px", fontSize: 24, fontWeight: 800, letterSpacing: "0.04em", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 8px 20px rgba(23,163,93,.3)" }}>
+          {cargando ? "Registrando…" : "PERMITIR"}
+        </button>
+        <div style={{ marginTop: 10, fontSize: 13, color: "#64748b", lineHeight: 1.4 }}>Toca el botón y, si el teléfono pregunta, vuelve a tocar «Permitir».</div>
+        {err && <div style={{ marginTop: 12, fontSize: 14, color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "10px 12px", lineHeight: 1.45 }}>{err}</div>}
+        {errTipo === "permiso" && (
+          <div style={{ marginTop: 12, textAlign: "left", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 16, padding: "14px" }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#0f1b2d", marginBottom: 6 }}>Para activarlo:</div>
+            {/iPhone|iPad|iPod/i.test(navigator.userAgent) ? (
+              <ol style={{ margin: 0, paddingLeft: 20, fontSize: 14.5, color: "#334155", lineHeight: 1.6 }}>
+                <li>Abre <b>Ajustes</b> del iPhone</li>
+                <li>Toca <b>Privacidad y seguridad → Localización</b></li>
+                <li>Enciende <b>Localización</b> y en <b>Safari</b> elige <b>«Al usar la app»</b></li>
+                <li>Vuelve aquí y toca <b>PERMITIR</b></li>
+              </ol>
+            ) : (
+              <ol style={{ margin: 0, paddingLeft: 20, fontSize: 14.5, color: "#334155", lineHeight: 1.6 }}>
+                <li>Toca el <b>candado 🔒</b> arriba, junto al nombre de la página</li>
+                <li>Toca <b>Permisos → Ubicación</b></li>
+                <li>Elige <b>Permitir</b></li>
+                <li>Vuelve aquí y toca <b>PERMITIR</b></li>
+              </ol>
+            )}
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function CheckInPauta({ pauta: pautaBase, pautas, user }) {
+  const cfg = useCheckinCfg();
+  const pauta = mjPautaEfectiva(pautaBase, cfg, pautas);
+  const lk = `mj_checkin_${pauta.id}_${user && user.id}`;
+  const [hecho, setHecho] = useState(() => {
+    try {
+      return !!localStorage.getItem(lk);
+    } catch (e) {
+      return false;
+    }
+  });
+  const [cargando, setCargando] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    const f = () => {
+      try {
+        if (localStorage.getItem(lk)) setHecho(true);
+      } catch (e) {}
+    };
+    // el popup del día guarda la marca local al terminar
+    const g = () => setTimeout(f, 50);
+    window.addEventListener("mj-checkin", g);
+    if (user && user.id && !esVisita(user) && mjCheckinEstado(pauta, cfg) === "abierto" && !hecho)
+      mjYaRegistrado(pauta, user).then((ok) => {
+        if (ok) {
+          try {
+            localStorage.setItem(lk, "1");
+          } catch (e) {}
+          setHecho(true);
+        }
+      });
+    return () => window.removeEventListener("mj-checkin", g);
+  }, [pauta.id, user && user.id]);
+  if (!user || esVisita(user) || !user.id) return null;
+  const est = mjCheckinEstado(pauta, cfg);
+  const esHoy = est === "abierto";
+  const diaHoy = pauta.fecha === mjHoyISO();
+  const click = async () => {
+    setCargando(true);
+    setErr("");
+    try {
+      await mjRegistrarCheckIn(pauta, user);
+      try {
+        localStorage.setItem(lk, "1");
+      } catch (e) {}
+      setHecho(true);
+    } catch (e) {
+      setErr(e && e.mj ? e.message : "No se pudo registrar. Revisa tu conexión e intenta de nuevo.");
+    }
+    setCargando(false);
+  };
+  const base = { border: "none", borderRadius: 9, padding: "6px 12px", fontSize: 11.5, fontWeight: 800, fontFamily: "inherit", whiteSpace: "nowrap" };
+  if (hecho) return <span style={{ ...base, background: "#dcfce7", color: "#166534" }}>✓ Presente</span>;
+  return (
+    <>
+      <button onClick={click} disabled={!esHoy || cargando} title={esHoy ? "Registrar mi asistencia" : `Se habilita el día de la misa de ${cfg.desde} a ${cfg.hasta}`} style={{ ...base, background: esHoy ? "#17a35d" : "rgba(255,255,255,.18)", color: "#fff", cursor: esHoy ? "pointer" : "not-allowed", opacity: esHoy ? 1 : 0.75 }}>
+        {cargando ? "Registrando…" : esHoy ? "✔ Check in" : est === "cerrado" ? "Check in cerrado" : diaHoy ? `Check in desde las ${cfg.desde}` : "Check in · el día de la misa"}
+      </button>
+      {err && <span style={{ flexBasis: "100%", fontSize: 11, color: "#fecaca" }}>{err}</span>}
+    </>
+  );
+}
+
+// ── Compartir Cantos de Misa: QR hacia la vista pública (sin audios ni descargas) ──
+function mjLinkMisaPublica(id) {
+  return `${window.location.origin}/?misa=${encodeURIComponent(id)}`;
+}
+function CompartirCantosMisa({ pauta, estilo }) {
+  const [abierto, setAbierto] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+  const link = mjLinkMisaPublica(pauta.id);
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 1800);
+    } catch (e) {}
+  };
+  const nativo = () => {
+    if (navigator.share) navigator.share({ title: "Cantos de la Misa", text: `Cantos de la misa · ${pauta.titulo || ""}`, url: link }).catch(() => {});
+    else copiar();
+  };
+  return (
+    <>
+      <button onClick={() => setAbierto(true)} style={estilo || { background: "rgba(255,255,255,0.16)", border: "none", color: "#fff", borderRadius: 9, padding: "6px 12px", fontSize: 11.5, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+        Compartir Cantos de Misa
+      </button>
+      {abierto &&
+        createPortal(
+          <div onClick={() => setAbierto(false)} style={{ position: "fixed", inset: 0, zIndex: 5000, background: "rgba(15,27,45,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, fontFamily: "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)" }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 24, padding: "24px 22px 20px", maxWidth: 340, width: "100%", textAlign: "center", boxShadow: "0 24px 60px rgba(15,27,45,.35)" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "#2f5d9a" }}>Compartir con la asamblea</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#0f1b2d", letterSpacing: "-0.02em", margin: "6px 0 4px" }}>Cantos de Misa</div>
+              <div style={{ fontSize: 13, color: "#6b7686", lineHeight: 1.45, marginBottom: 16 }}>Quien escanee este código verá los cantos de la misa, sin audios ni descargas.</div>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+                <QRImg data={link} size={220} borderColor="#2f5d9a" />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={copiar} style={{ flex: 1, border: "1px solid #e6ebf2", background: "#fff", color: "#0f1b2d", borderRadius: 12, padding: "11px 8px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{copiado ? "✓ Copiado" : "Copiar link"}</button>
+                <button onClick={nativo} style={{ flex: 1, border: "none", background: "#2f5d9a", color: "#fff", borderRadius: 12, padding: "11px 8px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Compartir</button>
+              </div>
+              <button onClick={() => setAbierto(false)} style={{ marginTop: 12, border: "none", background: "none", color: "#6b7686", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cerrar</button>
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
+  );
+}
+
+// ── Página pública (escaneando el QR): la pauta en Modo Misa, solo lectura ──
+function MisaPublica({ id }) {
+  const [pauta, setPauta] = useState(null);
+  const [estado, setEstado] = useState("cargando");
+  useEffect(() => {
+    fetch(`${SUPABASE_URL}/rest/v1/pautas_misa?id=eq.${encodeURIComponent(id)}&publicada=eq.true&limit=1`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    })
+      .then((r) => r.json())
+      .then((rows) => {
+        if (Array.isArray(rows) && rows[0]) {
+          setPauta(rows[0]);
+          setEstado("ok");
+        } else setEstado("nada");
+      })
+      .catch(() => setEstado("error"));
+  }, [id]);
+  if (estado === "ok" && pauta) {
+    const fecha = new Date(pauta.fecha + "T00:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
+    const cs = mjCancionesDe(pauta).filter((c) => c && c.cancion);
+    return <ModoMisa publico pauta={{ ...pauta, notas: "" }} canciones={cs} fecha={fecha} onSalir={() => {}} />;
+  }
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f4f6fa", fontFamily: "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)", color: "#0f1b2d", padding: 24, textAlign: "center" }}>
+      {estado === "cargando" ? "Cargando cantos…" : "Esta pauta no está disponible."}
+    </div>
+  );
+}
+
+// ── Acceso sin conexión: se muestra en la portada / ingreso cuando hay pauta guardada ──
+function AccesoModoMisaOffline() {
+  const [abierto, setAbierto] = useState(false);
+  const [sel, setSel] = useState(null);
+  const datos = mjLeerPautasOffline();
+  if (!datos.pautas.length) return null;
+  const fmt = (p) => new Date(p.fecha + "T00:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
+  const p = sel || (datos.pautas.length === 1 ? datos.pautas[0] : null);
+  return (
+    <>
+      <button onClick={() => setAbierto(true)} style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: 18, zIndex: 3000, border: "1px solid #bbf7d0", background: "#ecfdf5", color: "#166534", borderRadius: 999, padding: "11px 18px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", boxShadow: "0 6px 20px rgba(22,101,52,.18)" }}>
+        ⛪ Modo Misa (sin conexión)
+      </button>
+      {abierto && p && createPortal(<ModoMisa pauta={p} canciones={p.canciones || []} fecha={fmt(p)} sinRed={!navigator.onLine} onSalir={() => { setAbierto(false); setSel(null); }} />, document.body)}
+      {abierto && !p &&
+        createPortal(
+          <div style={{ position: "fixed", inset: 0, zIndex: 4000, background: "#f4f6fa", overflowY: "auto", fontFamily: "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)", padding: 16 }}>
+            <button onClick={() => setAbierto(false)} style={{ border: "1px solid #e6ebf2", background: "#fff", borderRadius: 999, padding: "9px 15px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>‹ Volver</button>
+            <div style={{ fontSize: 24, fontWeight: 800, margin: "16px 0 12px", color: "#0f1b2d" }}>Elige la misa</div>
+            {datos.pautas.map((x) => (
+              <div key={x.id} onClick={() => setSel(x)} style={{ background: "#fff", border: "1px solid #e6ebf2", borderRadius: 16, padding: "14px 16px", marginBottom: 10, cursor: "pointer" }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#0f1b2d" }}>{x.titulo || "Misa"}</div>
+                <div style={{ fontSize: 13, color: "#6b7686", textTransform: "capitalize" }}>{fmt(x)}{x.hora ? ` · ${x.hora}` : ""}</div>
+              </div>
+            ))}
+          </div>,
+          document.body
+        )}
+    </>
+  );
+}
+
 // ── Modo Misa: la pauta publicada a pantalla completa, con las letras (PDF) leídas dentro de la app ──
-function ModoMisa({ pauta, canciones, fecha, onSalir }) {
+function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico }) {
+  const [enLinea, setEnLinea] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
+  useEffect(() => {
+    const f = () => setEnLinea(navigator.onLine);
+    window.addEventListener("online", f);
+    window.addEventListener("offline", f);
+    return () => {
+      window.removeEventListener("online", f);
+      window.removeEventListener("offline", f);
+    };
+  }, []);
+  const offline = !!sinRed || !enLinea;
   const INK = "#0f1b2d";
   const ACC = "#2f5d9a";
   const MUTED = "#6b7686";
@@ -15277,7 +15880,7 @@ function ModoMisa({ pauta, canciones, fecha, onSalir }) {
   const flecha = (off) => ({ width: 40, height: 40, borderRadius: "50%", border: "1px solid " + LINE, background: "#fff", color: INK, fontSize: 20, cursor: off ? "default" : "pointer", opacity: off ? 0.3 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 });
   const d = abierta !== null ? docs[abierta] : null;
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 4000, background: "#f4f6fa", overflowY: d ? "hidden" : "auto", fontFamily: "var(--font-sans)", color: INK, WebkitOverflowScrolling: "touch" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 4000, background: "#f4f6fa", overflowY: d ? "hidden" : "auto", fontFamily: "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)", color: INK, WebkitOverflowScrolling: "touch" }}>
       {d ? (
         <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "#fff", borderBottom: "1px solid " + LINE, flexShrink: 0 }}>
@@ -15302,10 +15905,18 @@ function ModoMisa({ pauta, canciones, fecha, onSalir }) {
       ) : (
         <div style={{ maxWidth: 760, margin: "0 auto", padding: "0 0 40px" }}>
           <div style={{ position: "sticky", top: 0, zIndex: 2, background: "rgba(244,246,250,.92)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, borderBottom: "1px solid " + LINE }}>
-            <button onClick={onSalir} style={btn} aria-label="Volver a la página principal">
-              <span style={{ fontSize: 19, lineHeight: 1, marginTop: -1 }}>‹</span> Inicio
-            </button>
-            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: ACC }}>Modo Misa</div>
+            {!publico && (
+              <button onClick={onSalir} style={btn} aria-label="Volver a la página principal">
+                <span style={{ fontSize: 19, lineHeight: 1, marginTop: -1 }}>‹</span> Inicio
+              </button>
+            )}
+            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: ACC, flex: 1 }}>{publico ? "Cantos de la Misa" : "Modo Misa"}</div>
+            {!publico && offline && (
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: "#92400e", background: "#fef3c7", borderRadius: 999, padding: "6px 11px" }}>Sin conexión · guardado</span>
+            )}
+            {!publico && !offline && mjLeerPautasOffline().pautas.some((x) => x.id === pauta.id) && (
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: "#166534", background: "#dcfce7", borderRadius: 999, padding: "6px 11px" }}>✓ Disponible sin conexión</span>
+            )}
           </div>
           <div style={{ padding: "20px 16px 8px" }}>
             <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1 }}>{pauta.titulo || "Misa"}</div>
@@ -15324,7 +15935,7 @@ function ModoMisa({ pauta, canciones, fecha, onSalir }) {
                   <span style={{ minWidth: 34, height: 34, padding: "0 8px", borderRadius: 10, background: "#e8f0fb", color: ACC, fontSize: 12.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{x.etiqueta}</span>
                   <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.3 }}>{x.titulo}</span>
                 </div>
-                {x.audio && <BotonAudioPauta url={x.audio} size={34} fs={12} />}
+                {x.audio && !offline && !publico && <BotonAudioPauta url={x.audio} size={34} fs={12} />}
                 {x.url ? (
                   <button onClick={() => setAbierta(i)} style={{ border: "none", background: ACC, color: "#fff", borderRadius: 11, padding: "10px 14px", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>Ver letra</button>
                 ) : (
@@ -15386,9 +15997,12 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
             {pauta.lugar ? ` · ${pauta.lugar}` : ""}
           </div>
         </div>
+        <CheckInPauta pauta={pauta} pautas={pautas} user={user} />
         <button onClick={() => setModoMisa(true)} style={{ background: "#fff", border: "none", color: "#1e3a5f", borderRadius: 9, padding: "6px 12px", fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>
           Modo Misa ⛶
         </button>
+        <CompartirCantosMisa pauta={pauta} />
+        {respaldar && <AccesoPautaBoton pauta={pauta} />}
         <button onClick={onCerrar} style={{ background: "rgba(255,255,255,0.16)", border: "none", color: "#fff", borderRadius: 9, padding: "6px 11px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
           Cerrar ✕
         </button>
@@ -16307,7 +16921,7 @@ function InformacionesWidget({ isAdmin }) {
   const textoRef = useRef(null);
   const [expandido, setExpandido] = useState(false);
   const [desborda, setDesborda] = useState(false);
-  const ALTO_MIN = 64;
+  const ALTO_MIN = 86;
   useEffect(() => {
     if (textoRef.current)
       setDesborda(textoRef.current.scrollHeight > ALTO_MIN + 6);
@@ -16334,8 +16948,8 @@ function InformacionesWidget({ isAdmin }) {
     } catch (e) {}
     setSaving(false);
   }
-  const ORO = "#b8860b";
-  const ORO_CLARO = "#fdf6e3";
+  const ORO = "#2f5d9a";
+  const ORO_CLARO = "#f1f6fd";
   const tbBtn = {
     border: "1px solid rgba(60,60,67,0.2)",
     background: "white",
@@ -16357,7 +16971,7 @@ function InformacionesWidget({ isAdmin }) {
   const tbSep = {
     width: 1,
     alignSelf: "stretch",
-    background: "#e6d9a8",
+    background: "#d6e3f5",
     margin: "2px 4px",
   };
   function alignIcon(kind) {
@@ -16404,62 +17018,39 @@ function InformacionesWidget({ isAdmin }) {
   return (
     <div
       style={{
-        background: "linear-gradient(180deg,#fffdf6,#ffffff)",
-        borderRadius: 18,
-        border: "1px solid #ecdfb0",
-        borderLeft: `4px solid ${ORO}`,
-        padding: "10px 14px",
-        boxShadow: "0 3px 10px rgba(184,134,11,0.08)",
-        marginBottom: 10,
+        position: "relative",
+        background: "#fff",
+        borderRadius: 20,
+        border: "1px solid #e3eaf5",
+        padding: "14px 16px 14px 18px",
+        boxShadow: "0 1px 2px rgba(15,39,68,.04), 0 10px 28px rgba(47,93,154,.09)",
+        marginBottom: 12,
+        overflow: "hidden",
       }}
     >
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, background: "linear-gradient(180deg,#4f8fe0,#2f5d9a)" }} />
+      <div style={{ position: "absolute", right: -40, top: -50, width: 160, height: 160, borderRadius: "50%", background: "radial-gradient(circle,rgba(79,143,224,.12),transparent 70%)", pointerEvents: "none" }} />
       <div
         style={{
+          position: "relative",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: 6,
+          marginBottom: 8,
           gap: 10,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 9,
-              background: "rgba(184,134,11,0.12)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <svg
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke={ORO}
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
+          <div style={{ width: 32, height: 32, borderRadius: 11, background: "linear-gradient(135deg,#4f8fe0,#2f5d9a)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 10px rgba(47,93,154,.3)" }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z" />
+              <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+              <path d="M18.5 6a9 9 0 0 1 0 12" />
             </svg>
           </div>
           <div>
-            <div
-              style={{
-                fontSize: 13.5,
-                fontWeight: 800,
-                color: "#1c1c1e",
-                letterSpacing: "-0.01em",
-              }}
-            >
-              Informaciones
-            </div>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "#2f5d9a", lineHeight: 1 }}>Coro Misioneros</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#0f1b2d", letterSpacing: "-0.02em", marginTop: 3, lineHeight: 1.1 }}>Informaciones</div>
           </div>
         </div>
         {isAdmin && !editing && (
@@ -16469,8 +17060,10 @@ function InformacionesWidget({ isAdmin }) {
               fontSize: 12,
               fontWeight: 700,
               color: ORO,
-              background: "none",
+              background: "#eef4fb",
               border: "none",
+              borderRadius: 999,
+              padding: "6px 12px",
               cursor: "pointer",
             }}
           >
@@ -16488,7 +17081,7 @@ function InformacionesWidget({ isAdmin }) {
               flexWrap: "wrap",
               alignItems: "center",
               background: ORO_CLARO,
-              border: "1px solid #ecdfb0",
+              border: "1px solid #d6e3f5",
               borderRadius: 12,
               padding: 6,
             }}
@@ -16757,9 +17350,9 @@ function InformacionesWidget({ isAdmin }) {
           <div
             ref={textoRef}
             style={{
-              fontSize: 12.5,
-              lineHeight: 1.5,
-              color: "#2a2a30",
+              fontSize: 14,
+              lineHeight: 1.6,
+              color: "#2b3646",
               maxHeight: expandido ? "none" : ALTO_MIN,
               overflow: "hidden",
               position: "relative",
@@ -22880,25 +23473,142 @@ function YoutubeEmbed({ url }) {
 
 // ── Extracción de texto de PDF con pdf.js (gratis, sin IA) ──
 // Reconstruye el layout de acordes-sobre-letra usando coordenadas X/Y
+// ── Modo sin conexión: PDF en IndexedDB + pauta en localStorage ──
+const MJ_PAUTA_KEY = "mj_modomisa_v1";
+function mjIdb() {
+  return new Promise((res, rej) => {
+    try {
+      const rq = indexedDB.open("mj_offline", 1);
+      rq.onupgradeneeded = () => rq.result.createObjectStore("pdfs");
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => rej(rq.error);
+    } catch (e) {
+      rej(e);
+    }
+  });
+}
+async function mjIdbGet(k) {
+  const db = await mjIdb();
+  return new Promise((res, rej) => {
+    const r = db.transaction("pdfs").objectStore("pdfs").get(k);
+    r.onsuccess = () => res(r.result || null);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function mjIdbPut(k, v) {
+  const db = await mjIdb();
+  return new Promise((res, rej) => {
+    const t = db.transaction("pdfs", "readwrite");
+    t.objectStore("pdfs").put(v, k);
+    t.oncomplete = () => res(true);
+    t.onerror = () => rej(t.error);
+  });
+}
+function mjClavePdf(url) {
+  return /(?:drive|docs)\.google\.com/i.test(url || "") ? driveIdEnsayo(url) : url;
+}
+function mjLeerPautasOffline() {
+  try {
+    const o = JSON.parse(localStorage.getItem(MJ_PAUTA_KEY) || "null");
+    return o && Array.isArray(o.pautas) ? o : { pautas: [], ts: 0 };
+  } catch (e) {
+    return { pautas: [], ts: 0 };
+  }
+}
+function mjCancionesDe(p) {
+  try {
+    return typeof p.canciones === "string" ? JSON.parse(p.canciones || "[]") : p.canciones || [];
+  } catch (e) {
+    return [];
+  }
+}
+// Guarda en el teléfono las pautas próximas y sus letras. onProg(hechos,total)
+async function mmPrepararOffline(pautas, onProg) {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const lim = new Date(hoy.getTime() - 86400000);
+  const nuevas = (pautas || []).filter((p) => p && p.publicada && p.fecha && new Date(p.fecha + "T00:00:00") >= lim);
+  if (!nuevas.length) return { total: 0, fallas: 0 };
+  const ant = mjLeerPautasOffline();
+  const mapa = {};
+  ant.pautas.forEach((p) => {
+    if (new Date(p.fecha + "T00:00:00") >= lim) mapa[p.id] = p;
+  });
+  nuevas.forEach((p) => {
+    mapa[p.id] = { id: p.id, titulo: p.titulo, fecha: p.fecha, hora: p.hora, lugar: p.lugar, notas: p.notas, guion_url: p.guion_url, canciones: mjCancionesDe(p).map((c) => ({ orden: c.orden, cancion: c.cancion, url_letra: c.url_letra })) };
+  });
+  const urls = [];
+  Object.values(mapa).forEach((p) => {
+    if (/^https?:/i.test(p.guion_url || "")) urls.push(p.guion_url);
+    (p.canciones || []).forEach((c) => /^https?:/i.test(c.url_letra || "") && urls.push(c.url_letra));
+  });
+  const unicas = [...new Set(urls)];
+  let hechos = 0,
+    fallas = 0;
+  for (const u of unicas) {
+    const k = mjClavePdf(u);
+    try {
+      if (!(await mjIdbGet(k))) {
+        const id = /(?:drive|docs)\.google\.com/i.test(u) ? driveIdEnsayo(u) : null;
+        let r = null;
+        for (const f of id ? fuentesMultipista(u) : [u]) {
+          try {
+            const rr = await fetch(f);
+            if (rr.ok && !/text\/html/i.test(rr.headers.get("content-type") || "")) {
+              r = rr;
+              break;
+            }
+          } catch (e) {}
+        }
+        if (!r) throw new Error("x");
+        await mjIdbPut(k, await r.arrayBuffer());
+      }
+    } catch (e) {
+      fallas++;
+    }
+    hechos++;
+    onProg && onProg(hechos, unicas.length);
+  }
+  const lista = Object.values(mapa).sort((x, y) => (x.fecha < y.fecha ? -1 : 1));
+  try {
+    localStorage.setItem(MJ_PAUTA_KEY, JSON.stringify({ pautas: lista, ts: Date.now(), fallas }));
+  } catch (e) {}
+  return { total: unicas.length, fallas };
+}
+
 let _pdfjsPromise = null;
 function cargarPdfJs() {
   if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
   if (_pdfjsPromise) return _pdfjsPromise;
-  _pdfjsPromise = new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-    s.onload = () => {
-      try {
+  const cargar = (src) =>
+    new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => {
+        s.remove();
+        reject(new Error("No se pudo cargar pdf.js"));
+      };
+      document.head.appendChild(s);
+    });
+  // Primero la copia propia (sirve sin internet); si no está, la del CDN
+  _pdfjsPromise = cargar("/pdfjs/pdf.min.js")
+    .then(() => {
+      if (!window.pdfjsLib) throw new Error("pdf.js local inválido");
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.js";
+      return window.pdfjsLib;
+    })
+    .catch(() =>
+      cargar("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js").then(() => {
         window.pdfjsLib.GlobalWorkerOptions.workerSrc =
           "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-        resolve(window.pdfjsLib);
-      } catch (e) {
-        reject(e);
-      }
-    };
-    s.onerror = () => reject(new Error("No se pudo cargar pdf.js"));
-    document.head.appendChild(s);
-  });
+        return window.pdfjsLib;
+      })
+    )
+    .catch((e) => {
+      _pdfjsPromise = null;
+      throw e;
+    });
   return _pdfjsPromise;
 }
 
@@ -24098,7 +24808,6 @@ function CancioneroDetallePauta({
         year: "numeric",
       })
     : "";
-  const qrLink = `${window.location.origin}${window.location.pathname}?cancionero_pauta=${pauta?.id}`;
 
   function getNombreCancion(id) {
     const c = canciones.find((x) => x.id === id);
@@ -24347,68 +25056,14 @@ function CancioneroDetallePauta({
           )}
         </Card>
 
-        {/* ── Panel QR ── */}
+        {/* ── Compartir ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <Card style={{ padding: 20, textAlign: "center" }}>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: C.dark,
-                marginBottom: 4,
-              }}
-            >
-              📱 Código QR
-            </div>
-            <div
-              style={{
-                fontSize: 11,
-                color: C.gray,
-                marginBottom: 14,
-                lineHeight: 1.5,
-              }}
-            >
-              Escanea para ver la pauta en el celular
-            </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                marginBottom: 12,
-              }}
-            >
-              <QRImg data={qrLink} size={150} />
-            </div>
-            <div
-              style={{
-                fontSize: 9,
-                color: C.gray,
-                wordBreak: "break-all",
-                background: C.light,
-                borderRadius: 9,
-                padding: "6px 10px",
-                lineHeight: 1.5,
-              }}
-            >
-              {qrLink}
-            </div>
-            <button
-              onClick={() => copiarTexto(qrLink)}
-              style={{
-                marginTop: 10,
-                width: "100%",
-                padding: 8,
-                borderRadius: 10,
-                border: `1px solid ${C.border}`,
-                background: C.white,
-                fontSize: 12,
-                cursor: "pointer",
-                color: C.gray,
-              }}
-            >
-              📋 Copiar link
-            </button>
-          </Card>
+          {pauta && pauta.id && (
+            <CompartirCantosMisa
+              pauta={pauta}
+              estilo={{ width: "100%", background: "#2f5d9a", border: "none", color: "#fff", borderRadius: 12, padding: "12px 14px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}
+            />
+          )}
 
           {/* Resumen de momentos */}
           <Card style={{ padding: 16 }}>
@@ -24879,6 +25534,7 @@ create policy "cancionero_pautas_all" on cancionero_pautas for all using (true);
 const ADMIN_TABS = [
   { id: "integrantes", label: "Integrantes", icon: "👥" },
   { id: "asistencia", label: "Asistencia", icon: "✅" },
+  { id: "checkin_config", label: "Check in", icon: "📍" },
   { id: "documentos", label: "Descargas Misas", icon: "📄" },
   { id: "material_coro_admin", label: "Material Coro", icon: "🎵" },
   { id: "descargas_admin", label: "Descargas libres", icon: "📄" },
@@ -24904,6 +25560,7 @@ const ADMIN_TAB_META = {
   integrantes: { color: "#1e3a5f", bg: "#eef2f9", desc: "Gestiona el equipo" },
   asistencia: { color: "#0d7a4e", bg: "#e6f7f0", desc: "Marcar presente" },
   historial: { color: "#0d7a4e", bg: "#e6f7f0", desc: "Ver registros" },
+  checkin_config: { color: "#0d7a4e", bg: "#e6f7f0", desc: "Horario y fecha" },
   material_coro_admin: {
     color: "#6d28d9",
     bg: "#f3e8ff",
@@ -24939,6 +25596,7 @@ const ADMIN_GRUPOS = [
     ids: [
       "integrantes",
       "asistencia",
+      "checkin_config",
       "historial",
       "material_coro_admin",
       "comunidades",
@@ -32120,8 +32778,10 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     tipo: "grupo", // "grupo" | "parroquial"
     mostrar_col_letra: false,
     mostrar_col_audio: false,
+    acceso_solo: false,
   };
   const [form, setForm] = useState(emptyPauta);
+  const [abrirAccesoId, setAbrirAccesoId] = useState(null);
   const [tituloMode, setTituloMode] = useState("select"); // "select" | "custom"
   const [canciones, setCanciones] = useState([]); // filas de la pauta
   const [showColLetra, setShowColLetra] = useState(true);
@@ -32236,7 +32896,15 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       setForm(emptyPauta);
       setCanciones([]);
       setMsg("");
-      if (publish) {
+      if (form.acceso_solo && created && created.id) {
+        await setConfig(`pauta_acceso_${created.id}`, JSON.stringify({ restringida: true, ids: [] }));
+        mjCargarAccesosPauta().catch(() => {});
+      }
+      if (publish && form.acceso_solo) {
+        setSelected(created);
+        setAbrirAccesoId(created.id);
+        setNotifStatus("🔒 Pauta restringida: elige quiénes la ven. No se notificó a nadie.");
+      } else if (publish) {
         setSelected(created);
         await notificarIntegrantes(created, members);
         sendPushToAll(
@@ -32820,6 +33488,15 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                 onChange={(v) => setForm((p) => ({ ...p, notas: v }))}
                 placeholder="Indicaciones para el coro. Ej:&#10;**Ofertorio:** solo cantan varones.&#10;**Comunión:** cantan mujeres."
               />
+              {/* Quién puede ver la pauta */}
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 10, margin: "12px 0 4px", padding: "10px 12px", background: "#eef4fb", border: "1px solid #d6e3f5", borderRadius: 12, cursor: "pointer", fontSize: 13, color: "#1e3a5f", lineHeight: 1.4 }}>
+                <input type="checkbox" checked={!!form.acceso_solo} onChange={(e) => setForm((p) => ({ ...p, acceso_solo: e.target.checked }))} style={{ width: 18, height: 18, marginTop: 1 }} />
+                <span>
+                  <b>Mostrar solo a los integrantes que yo elija</b>
+                  <br />
+                  <span style={{ fontSize: 12, color: "#64748b" }}>Al guardar eliges quiénes la ven. No se envía aviso a los demás.</span>
+                </span>
+              </label>
               {/* Guion de la misa */}
               <div style={{ marginTop: 14 }}>
                 <label
@@ -33677,56 +34354,18 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   </button>
                 )}
                 <PautaWhatsappBoton pauta={selected} canciones={cancionesData} respaldar={isAdmin} />
+                {isAdmin && selected.id && (
+                  <AccesoPautaBoton key={selected.id} pauta={selected} abrirInicial={abrirAccesoId === selected.id} estilo={{ background: "#eef4fb", color: "#1e3a5f", border: "1px solid #dbe4f0", borderRadius: 10, padding: "9px 16px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }} />
+                )}
               </div>
-              {selected.id &&
-                (() => {
-                  const qrData = `https://343mhn.csb.app/pauta-publica.html?pauta=${selected.id}`;
-                  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
-                    qrData
-                  )}&color=1a3a2a&bgcolor=ffffff&margin=8`;
-                  return (
-                    <div
-                      style={{
-                        flexShrink: 0,
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: 4,
-                      }}
-                    >
-                      <div
-                        style={{
-                          background: "white",
-                          borderRadius: 12,
-                          padding: 6,
-                          border: `2px solid ${
-                            selected.publicada ? "#0a5ac8" : "#fbbf24"
-                          }`,
-                          boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
-                        }}
-                      >
-                        <img
-                          src={qrUrl}
-                          alt="QR Pauta"
-                          width={100}
-                          height={100}
-                          style={{ display: "block", borderRadius: 4 }}
-                        />
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 9,
-                          color: C.gray,
-                          fontWeight: 600,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.04em",
-                        }}
-                      >
-                        {selected.publicada ? "Código QR" : "QR (Borrador)"}
-                      </div>
-                    </div>
-                  );
-                })()}
+              {selected.id && selected.publicada && (
+                <div style={{ flexShrink: 0 }}>
+                  <CompartirCantosMisa
+                    pauta={selected}
+                    estilo={{ background: "#2f5d9a", border: "none", color: "#fff", borderRadius: 10, padding: "9px 16px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -34513,6 +35152,67 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function AdminCheckIn() {
+  const [cfg, setCfg] = useState({ ...MJ_CHECKIN_DEF });
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    getConfig("checkin_config")
+      .then((v) => v && setCfg(mjParseCheckinCfg(v)))
+      .catch(() => {});
+  }, []);
+  const guardar = async () => {
+    if (cfg.desde >= cfg.hasta) {
+      setMsg("La hora de inicio debe ser menor que la de término.");
+      return;
+    }
+    const ok = await setConfig("checkin_config", JSON.stringify(cfg));
+    if (ok) {
+      try {
+        localStorage.setItem("mj_checkin_cfg", JSON.stringify(cfg));
+      } catch (e) {}
+    }
+    setMsg(ok ? "✓ Guardado. Se aplica de inmediato a todos." : "No se pudo guardar. Intenta de nuevo.");
+  };
+  const inp = { padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(60,60,67,0.2)", fontSize: 15, fontFamily: "inherit", outline: "none", background: "#fff" };
+  const lab = { fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 5, display: "block" };
+  return (
+    <div style={{ maxWidth: 520 }}>
+      <div style={{ fontSize: 16, fontWeight: 800, color: "#0f1b2d", marginBottom: 4 }}>📍 Check in de asistencia</div>
+      <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.5, marginBottom: 16 }}>
+        El Check in se habilita el día de la misa dentro de este horario y solo funciona estando en la capilla ({MJ_CAPILLA.nombre}).
+      </div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+        <div>
+          <label style={lab}>Desde</label>
+          <input type="time" value={cfg.desde} onChange={(e) => setCfg({ ...cfg, desde: e.target.value })} style={inp} />
+        </div>
+        <div>
+          <label style={lab}>Hasta</label>
+          <input type="time" value={cfg.hasta} onChange={(e) => setCfg({ ...cfg, hasta: e.target.value })} style={inp} />
+        </div>
+      </div>
+      <div style={{ marginBottom: 6 }}>
+        <label style={lab}>Fecha de la misa para el Check in (opcional)</label>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <input type="date" value={cfg.fecha || ""} onChange={(e) => setCfg({ ...cfg, fecha: e.target.value })} style={inp} />
+          {cfg.fecha && (
+            <button onClick={() => setCfg({ ...cfg, fecha: "" })} style={{ border: "none", background: "#f1f5f9", borderRadius: 10, padding: "9px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+              Usar la fecha de la pauta
+            </button>
+          )}
+        </div>
+      </div>
+      <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.45, marginBottom: 16 }}>
+        Si lo dejas vacío, se usa la fecha de cada pauta. Si eliges una fecha, vale para la próxima misa publicada (útil si la misa cambia de día).
+      </div>
+      <button onClick={guardar} style={{ border: "none", background: "#17a35d", color: "#fff", borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+        Guardar
+      </button>
+      {msg && <div style={{ marginTop: 12, fontSize: 13, color: msg.startsWith("✓") ? "#166534" : "#b91c1c" }}>{msg}</div>}
     </div>
   );
 }
@@ -42070,6 +42770,7 @@ function Admin({
               <AdminPodcasts podcasts={podcasts} onReload={onReload} />
             )}
             {tab === "pautas" && <AdminPautasMisa onReload={onReload} />}
+            {tab === "checkin_config" && <AdminCheckIn />}
             {tab === "asistencia" && (
               <AdminAsistencia
                 members={members}
@@ -49398,6 +50099,14 @@ function Cumpleanos({ members }) {
 }
 
 export default function App() {
+  let misaId = null;
+  try {
+    misaId = new URLSearchParams(window.location.search).get("misa");
+  } catch (e) {}
+  return misaId ? <MisaPublica id={misaId} /> : <AppPrincipal />;
+}
+
+function AppPrincipal() {
   return (
     <ErrorBoundary>
       <AppInner />
