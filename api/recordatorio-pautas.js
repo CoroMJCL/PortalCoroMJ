@@ -55,10 +55,25 @@ export default async function handler(req, res) {
       vistas[p.id] = new Set(rows.map((r) => r.key.slice(("pv_" + p.id + "_").length).split("_")[0]));
     }
 
+    // Pautas restringidas por el admin: solo se recuerda a quienes pueden verlas
+    const acceso = {};
+    try {
+      const rows = await sb(`config?select=key,value&key=like.${encodeURIComponent("pauta_acceso_")}*`);
+      for (const r of rows) {
+        try {
+          acceso[r.key.slice("pauta_acceso_".length)] = typeof r.value === "string" ? JSON.parse(r.value) : r.value;
+        } catch (e) {}
+      }
+    } catch (e) {}
+    const puede = (p, m) => {
+      const ac = acceso[p.id];
+      return !ac || !ac.restringida || (ac.ids || []).map(String).includes(String(m.id));
+    };
+
     // Pendientes por integrante → agrupa para mandar un solo mensaje por persona
     const grupos = {};
     for (const m of miembros) {
-      const pend = pautas.filter((p) => !vistas[p.id].has(String(m.id)));
+      const pend = pautas.filter((p) => puede(p, m) && !vistas[p.id].has(String(m.id)));
       if (!pend.length) continue;
       const k = pend.map((p) => p.id).join(",");
       (grupos[k] = grupos[k] || { pend, ids: [] }).ids.push(String(m.id));
