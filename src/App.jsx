@@ -15415,6 +15415,66 @@ function AccesoPautaBoton({ pauta, abrirInicial, onGuardado, estilo }) {
   );
 }
 
+// ── Resumen de asistencia que se muestra al hacer Check in ──
+async function mjResumenAsistencia(user) {
+  for (const t of [_authToken || SUPABASE_KEY, SUPABASE_SERVICE_KEY]) {
+    try {
+      const h = { apikey: t === SUPABASE_SERVICE_KEY ? SUPABASE_SERVICE_KEY : SUPABASE_KEY, Authorization: `Bearer ${t}` };
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?select=estado&member_id=eq.${user.id}`, { headers: h });
+      if (!r.ok) continue;
+      const rows = await r.json();
+      const rm = await fetch(`${SUPABASE_URL}/rest/v1/integrantes?select=asistencia_especial&id=eq.${user.id}`, { headers: h }).catch(() => null);
+      const esp = rm && rm.ok ? ((await rm.json())[0] || {}).asistencia_especial : false;
+      const ev = rows.filter((x) => !["justificado", "excluido", "nuevo"].includes(x.estado));
+      const pres = ev.filter((x) => x.estado === "presente").length;
+      return {
+        pct: esp ? 100 : ev.length ? Math.round((pres / ev.length) * 100) : null,
+        presentes: rows.filter((x) => x.estado === "presente").length,
+        ausentes: rows.filter((x) => x.estado === "ausente").length,
+        justificados: rows.filter((x) => x.estado === "justificado").length,
+        total: ev.length,
+      };
+    } catch (e) {}
+  }
+  return null;
+}
+function ResumenAsistenciaModal({ user, onCerrar }) {
+  const [r, setR] = useState(undefined);
+  useEffect(() => {
+    mjResumenAsistencia(user).then(setR).catch(() => setR(null));
+  }, []);
+  const pct = r ? r.pct : null;
+  const nivel = pct === null ? null : pct >= 75 ? { t: "BUENA", c: "#15803d", bg: "#dcfce7", e: "🌟", m: "¡Vas muy bien! Gracias por tu compromiso con el coro. Sigue así." } : pct >= 50 ? { t: "REGULAR", c: "#b45309", bg: "#fef3c7", e: "🙂", m: "Puedes mejorar. Cada ensayo y misa cuenta: ¡te necesitamos!" } : { t: "BAJA", c: "#b91c1c", bg: "#fee2e2", e: "⚠️", m: "Tu asistencia necesita atención. Haz el esfuerzo por venir, el coro te necesita." };
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, zIndex: 6500, background: "rgba(15,27,45,.62)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, fontFamily: "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)" }}>
+      <div style={{ background: "#fff", borderRadius: 26, padding: "26px 22px 20px", maxWidth: 380, width: "100%", textAlign: "center", boxShadow: "0 28px 70px rgba(15,27,45,.4)" }}>
+        <div style={{ width: 56, height: 56, borderRadius: 18, margin: "0 auto 10px", background: "linear-gradient(135deg,#22b573,#15803d)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>✔</div>
+        <div style={{ fontSize: 21, fontWeight: 800, color: "#0f1b2d", letterSpacing: "-0.02em" }}>¡Asistencia registrada!</div>
+        <div style={{ fontSize: 13.5, color: "#64748b", margin: "4px 0 16px" }}>Gracias por estar presente hoy.</div>
+        {r === undefined && <div style={{ fontSize: 14, color: "#64748b", padding: 10 }}>Calculando tu asistencia…</div>}
+        {nivel && (
+          <div style={{ background: nivel.bg, borderRadius: 18, padding: "16px 14px", marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: nivel.c }}>Tu asistencia</div>
+            <div style={{ fontSize: 46, fontWeight: 800, color: nivel.c, lineHeight: 1.1, margin: "4px 0" }}>{pct}%</div>
+            <div style={{ height: 10, background: "rgba(255,255,255,.7)", borderRadius: 99, overflow: "hidden", margin: "6px 4px 10px" }}>
+              <div style={{ width: pct + "%", height: "100%", background: nivel.c, borderRadius: 99 }} />
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: nivel.c }}>{nivel.e} Asistencia {nivel.t}</div>
+            <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.45, marginTop: 6 }}>{nivel.m}</div>
+            <div style={{ fontSize: 12.5, color: "#475569", marginTop: 10 }}>
+              {r.presentes} presente{r.presentes !== 1 ? "s" : ""} · {r.ausentes} ausente{r.ausentes !== 1 ? "s" : ""}
+              {r.justificados ? ` · ${r.justificados} justificada${r.justificados !== 1 ? "s" : ""}` : ""}
+            </div>
+          </div>
+        )}
+        {r === null && <div style={{ fontSize: 14, color: "#64748b", marginBottom: 14 }}>Tu asistencia quedó registrada.</div>}
+        <button onClick={onCerrar} style={{ width: "100%", border: "none", background: "#2f5d9a", color: "#fff", borderRadius: 14, padding: "15px", fontSize: 17, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>Continuar</button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ── Check in: el integrante marca su presencia el mismo día de la misa ──
 function mjHoyISO() {
   const d = new Date();
@@ -15618,7 +15678,7 @@ function CheckInObligatorio({ pautas, user }) {
       try {
         localStorage.setItem(lk, "1");
       } catch (e) {}
-      setEstado("listo");
+      setEstado("resumen");
     } catch (e) {
       setErr(e && e.mj ? e.message : "No se pudo registrar. Revisa tu conexión e intenta de nuevo.");
       setErrTipo(e && e.mj ? e.tipo : "red");
@@ -15637,11 +15697,11 @@ function CheckInObligatorio({ pautas, user }) {
       try {
         localStorage.setItem(lk, "1");
       } catch (e) {}
-      setEstado("listo");
+      setEstado("resumen");
     } catch (e) {}
   };
   useEffect(() => {
-    if (!aplica || !abierto || estado === "listo" || estado === "revisando") return;
+    if (!aplica || !abierto || estado === "listo" || estado === "revisando" || estado === "resumen") return;
     const vis = () => document.visibilityState === "visible" && silencioso();
     document.addEventListener("visibilitychange", vis);
     const t = setInterval(silencioso, 60000);
@@ -15650,6 +15710,7 @@ function CheckInObligatorio({ pautas, user }) {
       clearInterval(t);
     };
   }, [aplica, abierto, estado]);
+  if (aplica && estado === "resumen") return <ResumenAsistenciaModal user={user} onCerrar={() => setEstado("listo")} />;
   if (aplica && abierto && estado === "pendiente")
     return createPortal(
       <button onClick={() => setEstado("pedir")} style={{ position: "fixed", left: 10, right: 10, bottom: 76, zIndex: 3500, maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "1px solid #bbf7d0", background: "#ecfdf5", color: "#14532d", borderRadius: 16, padding: "11px 14px", cursor: "pointer", fontFamily: "var(--font-sans, Inter, system-ui, sans-serif)", boxShadow: "0 10px 26px rgba(22,101,52,.22)" }}>
@@ -15723,6 +15784,7 @@ function CheckInPauta({ pauta: pautaBase, pautas, user }) {
     }
   });
   const [cargando, setCargando] = useState(false);
+  const [verResumen, setVerResumen] = useState(false);
   const [err, setErr] = useState("");
   useEffect(() => {
     const f = () => {
@@ -15757,13 +15819,20 @@ function CheckInPauta({ pauta: pautaBase, pautas, user }) {
         localStorage.setItem(lk, "1");
       } catch (e) {}
       setHecho(true);
+      setVerResumen(true);
     } catch (e) {
       setErr(e && e.mj ? e.message : "No se pudo registrar. Revisa tu conexión e intenta de nuevo.");
     }
     setCargando(false);
   };
   const base = { border: "none", borderRadius: 9, padding: "6px 12px", fontSize: 11.5, fontWeight: 800, fontFamily: "inherit", whiteSpace: "nowrap" };
-  if (hecho) return <span style={{ ...base, background: "#dcfce7", color: "#166534" }}>✓ Presente</span>;
+  if (hecho)
+    return (
+      <>
+        <span style={{ ...base, background: "#dcfce7", color: "#166534" }}>✓ Presente</span>
+        {verResumen && <ResumenAsistenciaModal user={user} onCerrar={() => setVerResumen(false)} />}
+      </>
+    );
   return (
     <>
       <button onClick={click} disabled={!esHoy || cargando} title={esHoy ? "Registrar mi asistencia" : `Se habilita el día de la misa de ${cfg.desde} a ${cfg.hasta}`} style={{ ...base, background: esHoy ? "#17a35d" : "rgba(255,255,255,.18)", color: "#fff", cursor: esHoy ? "pointer" : "not-allowed", opacity: esHoy ? 1 : 0.75 }}>
