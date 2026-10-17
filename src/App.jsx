@@ -15481,7 +15481,7 @@ function mjHoyISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 // ── Horario del Check in (editable en Administración) ──
-const MJ_CHECKIN_DEF = { desde: "17:00", hasta: "20:00", fecha: "" };
+const MJ_CHECKIN_DEF = { desde: "17:00", hasta: "19:59", fecha: "" };
 function mjParseCheckinCfg(v) {
   try {
     const o = typeof v === "string" ? JSON.parse(v) : v || {};
@@ -15734,7 +15734,7 @@ function CheckInObligatorio({ pautas, user }) {
           {pauta.lugar ? `${pauta.hora ? " · " : ""}${pauta.lugar}` : ""}
         </div>
         <div style={{ fontSize: 15, color: "#2b3646", lineHeight: 1.5, background: "#f1f7f3", border: "1px solid #d4eadc", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
-          Para marcar tu asistencia necesitamos saber que estás en la capilla. Debes hacerlo <b>antes de que inicie la misa</b>.
+          Para marcar tu asistencia necesitamos saber que estás en la capilla. Debes hacerlo <b>antes de que inicie la misa</b>. Si no marcas antes de las <b>{cfg.hasta}</b>, quedarás <b>ausente</b>.
         </div>
         <button onClick={() => hacer()} disabled={cargando} style={{ width: "100%", border: "none", background: "#17a35d", color: "#fff", borderRadius: 16, padding: "20px 16px", fontSize: 24, fontWeight: 800, letterSpacing: "0.04em", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 8px 20px rgba(23,163,93,.3)" }}>
           {cargando ? "Registrando…" : "PERMITIR"}
@@ -35269,6 +35269,24 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
 function AdminCheckIn() {
   const [cfg, setCfg] = useState({ ...MJ_CHECKIN_DEF });
   const [msg, setMsg] = useState("");
+  const [cerrando, setCerrando] = useState(false);
+  const [cierreMsg, setCierreMsg] = useState("");
+  const cerrarAhora = async () => {
+    if (!window.confirm("¿Marcar como AUSENTES a todos los que no hicieron Check in? (solo se aplica si ya pasó la hora de término)")) return;
+    setCerrando(true);
+    setCierreMsg("");
+    try {
+      const r = await fetch("/api/cerrar-checkin");
+      const d = await r.json();
+      if (!d.ok) setCierreMsg("Error: " + (d.error || "no se pudo procesar"));
+      else if (!d.resumen) setCierreMsg("Todavía no corresponde: " + (d.nota || "el Check in sigue abierto") + ".");
+      else if (!d.resumen.length) setCierreMsg("Ya estaba cerrado: no hay nadie más que marcar.");
+      else setCierreMsg("✓ Listo. " + d.resumen.map((x) => `${x.pauta || "Misa"}: ${x.ausentes} ausente(s)`).join(" · "));
+    } catch (e) {
+      setCierreMsg("No se pudo conectar con el servidor.");
+    }
+    setCerrando(false);
+  };
   useEffect(() => {
     getConfig("checkin_config")
       .then((v) => v && setCfg(mjParseCheckinCfg(v)))
@@ -35319,7 +35337,17 @@ function AdminCheckIn() {
       <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.45, marginBottom: 16 }}>
         Si lo dejas vacío, se usa la fecha de cada pauta. Si eliges una fecha, vale para la próxima misa publicada (útil si la misa cambia de día).
       </div>
-      <button onClick={guardar} style={{ border: "none", background: "#17a35d", color: "#fff", borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+      <div style={{ marginTop: 22, padding: "14px 16px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 14, maxWidth: 520 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#9a3412", marginBottom: 4 }}>Ausentes automáticos</div>
+        <div style={{ fontSize: 12.5, color: "#7c4a1d", lineHeight: 1.5, marginBottom: 10 }}>
+          Quien no marque Check in antes de la hora de término queda <b>ausente</b> en Asistencia. Se hace solo cada noche. Si quieres hacerlo ahora (solo funciona pasada la hora de término), usa este botón.
+        </div>
+        <button onClick={cerrarAhora} disabled={cerrando} style={{ border: "none", background: "#ea580c", color: "#fff", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+          {cerrando ? "Procesando…" : "Marcar ausentes ahora"}
+        </button>
+        {cierreMsg && <div style={{ marginTop: 10, fontSize: 12.5, color: "#7c2d12", lineHeight: 1.45 }}>{cierreMsg}</div>}
+      </div>
+      <button onClick={guardar} style={{ marginTop: 22, border: "none", background: "#17a35d", color: "#fff", borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
         Guardar
       </button>
       {msg && <div style={{ marginTop: 12, fontSize: 13, color: msg.startsWith("✓") ? "#166534" : "#b91c1c" }}>{msg}</div>}
