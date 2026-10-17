@@ -3,6 +3,7 @@ import { EscuelaCanto } from "./EscuelaCanto";
 import Landing from "./Landing";
 import CursoGuitarra from "./CursoGuitarra";
 import { PDFDocument } from "pdf-lib";
+import { createPortal } from "react-dom";
 
 // ══════════════════════════════════════════
 //  SUPABASE CONFIG
@@ -11199,7 +11200,7 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
 
 
 // Visor de PDF propio: páginas con flechas, zoom y pantalla completa (pdf.js). Si algo falla, usa el visor de Drive.
-function VisorPDF({ url, nombre, semitonos = 0, onAcordes, barra, alto }) {
+function VisorPDF({ url, nombre, semitonos = 0, onAcordes, barra, alto, pegado }) {
   const [pdf, setPdf] = useState(null);
   const [pagina, setPagina] = useState(1);
   const [zoom, setZoom] = useState(100);
@@ -11272,7 +11273,7 @@ function VisorPDF({ url, nombre, semitonos = 0, onAcordes, barra, alto }) {
       try {
         const pg = await pdf.getPage(pagina);
         const base = pg.getViewport({ scale: 1 });
-        const escala = ((ancho - 24) / base.width) * (zoom / 100);
+        const escala = ((ancho - (pegado ? 0 : 24)) / base.width) * (zoom / 100);
         const vp = pg.getViewport({ scale: escala });
         const dpr = window.devicePixelRatio || 1;
         const c = lienzo.current;
@@ -11334,7 +11335,7 @@ function VisorPDF({ url, nombre, semitonos = 0, onAcordes, barra, alto }) {
     );
   }
   return (
-    <div ref={caja} style={{ background: "#fff", border: "1px solid #e6e8ec", borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 18px 40px -30px rgba(18,22,29,.35)", height: completa ? "100vh" : "auto" }}>
+    <div ref={caja} style={{ background: "#fff", border: pegado ? "none" : "1px solid #e6e8ec", borderRadius: pegado ? 0 : 16, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: pegado ? "none" : "0 18px 40px -30px rgba(18,22,29,.35)", height: completa ? "100vh" : "auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: compacto ? 3 : 6, padding: compacto ? "8px 6px" : "10px 12px", flexWrap: "wrap", borderBottom: "1px solid #eef0f3" }}>
         <button onClick={() => ir(pagina - 1)} disabled={pagina <= 1} style={bt(pagina <= 1)} aria-label="Página anterior">‹</button>
         <span style={{ fontSize: 13, fontWeight: 600, color: "#2a2f3a", minWidth: compacto ? 48 : 96, textAlign: "center", whiteSpace: "nowrap" }}>{pdf ? (compacto ? `${pagina} / ${total}` : `Página ${pagina} de ${total}`) : "Cargando…"}</span>
@@ -11346,7 +11347,7 @@ function VisorPDF({ url, nombre, semitonos = 0, onAcordes, barra, alto }) {
         <button onClick={pantallaCompleta} style={{ ...bt(false), marginLeft: "auto" }} aria-label="Pantalla completa" title="Pantalla completa">⛶</button>
       </div>
       {barra}
-      <div ref={marco} style={{ background: "#e9ebef", overflow: "auto", padding: 12, flex: 1, maxHeight: completa ? "none" : alto || "min(78vh, 760px)", minHeight: completa ? 0 : 420, textAlign: "center" }}>
+      <div ref={marco} style={{ background: "#e9ebef", overflow: "auto", padding: pegado ? 0 : 12, flex: 1, maxHeight: completa ? "none" : alto || "min(78vh, 760px)", minHeight: completa ? 0 : 420, textAlign: "center" }}>
         {!pdf && <div style={{ padding: 60, color: "#8a8a90", fontSize: 13 }}>Cargando documento…</div>}
         <canvas ref={lienzo} style={{ display: pdf ? "inline-block" : "none", boxShadow: "0 6px 24px rgba(18,22,29,.18)", background: "#fff" }} />
       </div>
@@ -15248,6 +15249,96 @@ function BotonAudioPauta({ url, size = 26, bg = "#1e3a5f", fs = 10 }) {
   );
 }
 
+// ── Modo Misa: la pauta publicada a pantalla completa, con las letras (PDF) leídas dentro de la app ──
+function ModoMisa({ pauta, canciones, fecha, onSalir }) {
+  const INK = "#0f1b2d";
+  const ACC = "#2f5d9a";
+  const MUTED = "#6b7686";
+  const LINE = "#e6ebf2";
+  const ok = (u) => !!u && /^https?:/i.test(u);
+  const docs = [
+    ...(ok(pauta.guion_url) ? [{ k: "guion", titulo: "Guion de la misa", etiqueta: "Guion", url: pauta.guion_url, audio: "" }] : []),
+    ...canciones.map((c, i) => ({ k: "c" + i, titulo: c.cancion || "Canción", etiqueta: String(c.orden || i + 1), url: ok(c.url_letra) ? c.url_letra : "", audio: ok(c.url_audio) ? c.url_audio : "" })),
+  ];
+  const [abierta, setAbierta] = useState(null);
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+  const conPdf = docs.map((d, i) => (d.url ? i : -1)).filter((i) => i >= 0);
+  const pos = abierta === null ? -1 : conPdf.indexOf(abierta);
+  const ir = (n) => {
+    if (n >= 0 && n < conPdf.length) setAbierta(conPdf[n]);
+  };
+  const btn = { display: "inline-flex", alignItems: "center", gap: 6, border: "1px solid " + LINE, background: "#fff", color: INK, borderRadius: 999, padding: "9px 15px 9px 12px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 1px 2px rgba(15,27,45,.06)", flexShrink: 0 };
+  const flecha = (off) => ({ width: 40, height: 40, borderRadius: "50%", border: "1px solid " + LINE, background: "#fff", color: INK, fontSize: 20, cursor: off ? "default" : "pointer", opacity: off ? 0.3 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 });
+  const d = abierta !== null ? docs[abierta] : null;
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 4000, background: "#f4f6fa", overflowY: d ? "hidden" : "auto", fontFamily: "var(--font-sans)", color: INK, WebkitOverflowScrolling: "touch" }}>
+      {d ? (
+        <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "#fff", borderBottom: "1px solid " + LINE, flexShrink: 0 }}>
+            <button onClick={() => setAbierta(null)} style={btn} aria-label="Volver a la pauta">
+              <span style={{ fontSize: 19, lineHeight: 1, marginTop: -1 }}>‹</span> Pauta
+            </button>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: ACC }}>{d.etiqueta}</div>
+              <div style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.titulo}</div>
+            </div>
+            {conPdf.length > 1 && (
+              <>
+                <button onClick={() => ir(pos - 1)} disabled={pos <= 0} style={flecha(pos <= 0)} aria-label="Canción anterior">‹</button>
+                <button onClick={() => ir(pos + 1)} disabled={pos >= conPdf.length - 1} style={flecha(pos >= conPdf.length - 1)} aria-label="Canción siguiente">›</button>
+              </>
+            )}
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <VisorPDF key={d.k} url={d.url} nombre={d.titulo} pegado alto="calc(100vh - 128px)" />
+          </div>
+        </div>
+      ) : (
+        <div style={{ maxWidth: 760, margin: "0 auto", padding: "0 0 40px" }}>
+          <div style={{ position: "sticky", top: 0, zIndex: 2, background: "rgba(244,246,250,.92)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, borderBottom: "1px solid " + LINE }}>
+            <button onClick={onSalir} style={btn} aria-label="Volver a la página principal">
+              <span style={{ fontSize: 19, lineHeight: 1, marginTop: -1 }}>‹</span> Inicio
+            </button>
+            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: ACC }}>Modo Misa</div>
+          </div>
+          <div style={{ padding: "20px 16px 8px" }}>
+            <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1 }}>{pauta.titulo || "Misa"}</div>
+            <div style={{ fontSize: 14, color: MUTED, marginTop: 6, textTransform: "capitalize" }}>
+              {fecha}
+              {pauta.hora ? ` · ${pauta.hora}` : ""}
+              {pauta.lugar ? ` · ${pauta.lugar}` : ""}
+            </div>
+            {pauta.notas && <div style={{ marginTop: 12, padding: "12px 14px", background: "#fff", border: "1px solid " + LINE, borderRadius: 14, fontSize: 13.5, color: "#475569", whiteSpace: "pre-wrap" }}>{pauta.notas}</div>}
+          </div>
+          <div style={{ padding: "8px 12px" }}>
+            {docs.length === 0 && <div style={{ padding: 20, fontSize: 14, color: MUTED }}>Esta pauta aún no tiene canciones.</div>}
+            {docs.map((x, i) => (
+              <div key={x.k} style={{ display: "flex", alignItems: "center", gap: 12, background: "#fff", border: "1px solid " + LINE, borderRadius: 16, padding: "12px 12px 12px 14px", marginBottom: 10, boxShadow: "0 1px 2px rgba(15,27,45,.03)" }}>
+                <div onClick={() => x.url && setAbierta(i)} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 12, cursor: x.url ? "pointer" : "default" }}>
+                  <span style={{ minWidth: 34, height: 34, padding: "0 8px", borderRadius: 10, background: "#e8f0fb", color: ACC, fontSize: 12.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{x.etiqueta}</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.3 }}>{x.titulo}</span>
+                </div>
+                {x.audio && <BotonAudioPauta url={x.audio} size={34} fs={12} />}
+                {x.url ? (
+                  <button onClick={() => setAbierta(i)} style={{ border: "none", background: ACC, color: "#fff", borderRadius: 11, padding: "10px 14px", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>Ver letra</button>
+                ) : (
+                  <span style={{ fontSize: 12, color: "#a7b0bd", flexShrink: 0 }}>Sin letra</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, pautaId, user }) {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
@@ -15258,6 +15349,7 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
   const elegida = pautaId ? pub.find((p) => p.id === pautaId) : null;
   const pauta =
     elegida || prox || pub.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
+  const [modoMisa, setModoMisa] = useState(false);
   useEffect(() => {
     if (pauta && user) registrarVistaPauta(pauta, user, "inicio");
   }, [pauta && pauta.id, user && user.id]);
@@ -15283,6 +15375,7 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
   const td = { padding: "7px 8px", fontSize: 12.5, color: "#1e293b", borderBottom: "1px solid #eef2f7", verticalAlign: "top" };
   return (
     <div style={{ marginTop: 10, background: "#fff", border: "1px solid #dbe4f0", borderRadius: 16, overflow: "hidden", boxShadow: "0 6px 20px rgba(30,58,95,0.08)" }}>
+      {modoMisa && createPortal(<ModoMisa pauta={pauta} canciones={canciones} fecha={fecha} onSalir={() => setModoMisa(false)} />, document.body)}
       <div style={{ background: "linear-gradient(135deg,#1e3a5f,#2f5d9a)", color: "#fff", padding: "12px 16px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 180 }}>
           <div style={{ fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.75 }}>Pauta de Misa</div>
@@ -15293,8 +15386,8 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
             {pauta.lugar ? ` · ${pauta.lugar}` : ""}
           </div>
         </div>
-        <button onClick={() => setSection("pauta_misa")} style={{ background: "rgba(255,255,255,0.16)", border: "none", color: "#fff", borderRadius: 9, padding: "6px 11px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
-          Abrir completa ↗
+        <button onClick={() => setModoMisa(true)} style={{ background: "#fff", border: "none", color: "#1e3a5f", borderRadius: 9, padding: "6px 12px", fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>
+          Modo Misa ⛶
         </button>
         <button onClick={onCerrar} style={{ background: "rgba(255,255,255,0.16)", border: "none", color: "#fff", borderRadius: 9, padding: "6px 11px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
           Cerrar ✕
@@ -15588,38 +15681,36 @@ function AvisoPautaNueva({ pautas, onVer }) {
     } catch {}
     setVistas(n);
   };
-  const fmt = (p) =>
-    new Date(p.fecha + "T00:00:00").toLocaleDateString("es-CL", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-    });
+  const fmtCorto = (p) =>
+    new Date(p.fecha + "T00:00:00").toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "short" });
+  const uno = sinVer.length === 1;
   return (
-    <div style={{ padding: "10px 14px", marginBottom: 10, borderRadius: 14, background: "linear-gradient(135deg,#fff8e1,#fff1c7)", border: "1px solid #f1d88a", boxShadow: "0 2px 10px rgba(201,162,39,.15)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-        <span style={{ fontSize: 20 }}>🔔</span>
-        <div style={{ flex: 1, fontSize: 13, fontWeight: 800, color: "#7a5a00" }}>
-          {sinVer.length === 1 ? "¡Hay una nueva pauta publicada!" : `¡Hay ${sinVer.length} pautas nuevas publicadas!`}
-        </div>
-        {sinVer.length > 1 && (
-          <button onClick={() => marcar(sinVer.map((p) => p.id))} style={{ background: "none", border: "none", color: "#8a6d1f", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
-            Marcar todas como vistas
+    <div style={{ marginBottom: 10, borderRadius: 12, background: "linear-gradient(90deg,#ecf8f1,#f6fcf8)", border: "1px solid #cfe9db", borderLeft: "3px solid #1f9d63", overflow: "hidden" }}>
+      <style>{`@keyframes pn-pulso{0%{box-shadow:0 0 0 0 rgba(31,157,99,.45)}70%{box-shadow:0 0 0 7px rgba(31,157,99,0)}100%{box-shadow:0 0 0 0 rgba(31,157,99,0)}}.pn-btn{background:#17804f;color:#fff;border:none;border-radius:999px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit;transition:background .15s}.pn-btn:hover{background:#136b42}`}</style>
+      {!uno && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px 2px" }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#1f9d63", animation: "pn-pulso 2s infinite", flexShrink: 0 }} />
+          <div style={{ flex: 1, fontSize: 12, fontWeight: 800, color: "#0f5132", letterSpacing: "0.01em" }}>{sinVer.length} pautas nuevas</div>
+          <button onClick={() => marcar(sinVer.map((p) => p.id))} style={{ background: "none", border: "none", color: "#2f7a55", fontSize: 11.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            Marcar vistas
           </button>
-        )}
-      </div>
-      {sinVer.map((p) => (
-        <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: "1px solid rgba(201,162,39,.25)" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: "#5c4300", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.titulo || "Misa"}</div>
-            <div style={{ fontSize: 11.5, color: "#8a6d1f", textTransform: "capitalize" }}>
-              {fmt(p)}
+        </div>
+      )}
+      {sinVer.map((p, n) => (
+        <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: uno ? "9px 10px 9px 12px" : "7px 10px 7px 12px", borderTop: !uno && n > 0 ? "1px solid #dcefe4" : "none" }}>
+          {uno && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#1f9d63", animation: "pn-pulso 2s infinite", flexShrink: 0 }} />}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+            {uno && <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#1f9d63" }}>Nueva pauta</span>}
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#0f3d29", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>{p.titulo || "Misa"}</span>
+            <span style={{ fontSize: 11.5, color: "#4f7f67", textTransform: "capitalize", whiteSpace: "nowrap" }}>
+              {fmtCorto(p)}
               {p.hora ? ` · ${p.hora}` : ""}
-            </div>
+            </span>
           </div>
-          <button onClick={() => { marcar([p.id]); onVer(p.id); }} style={{ background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 9, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+          <button className="pn-btn" onClick={() => { marcar([p.id]); onVer(p.id); }}>
             Ver pauta
           </button>
-          <button onClick={() => marcar([p.id])} title="Descartar" style={{ background: "none", border: "none", color: "#8a6d1f", fontSize: 15, cursor: "pointer", padding: 4 }}>
+          <button onClick={() => marcar([p.id])} title="Descartar" aria-label="Descartar" style={{ background: "none", border: "none", color: "#7fa893", fontSize: 14, cursor: "pointer", padding: "2px 4px", lineHeight: 1 }}>
             ✕
           </button>
         </div>
