@@ -15367,7 +15367,7 @@ function AccesoPautaBoton({ pauta, abrirInicial, onGuardado, estilo }) {
   const f = "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)";
   return (
     <>
-      <button onClick={() => setAbierto(true)} style={estilo || { background: "rgba(255,255,255,0.16)", border: "none", color: "#fff", borderRadius: 9, padding: "6px 12px", fontSize: 11.5, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+      <button onClick={() => setAbierto(true)} style={estilo || { background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.22)", color: "#fff", borderRadius: 999, height: 38, padding: "0 15px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
         {etiqueta}
       </button>
       {abierto &&
@@ -15931,17 +15931,17 @@ function CheckInPauta({ pauta: pautaBase, pautas, user }) {
     }
     setCargando(false);
   };
-  const base = { border: "none", borderRadius: 9, padding: "6px 12px", fontSize: 11.5, fontWeight: 800, fontFamily: "inherit", whiteSpace: "nowrap" };
+  const base = { border: "1px solid rgba(255,255,255,.22)", borderRadius: 999, height: 38, padding: "0 15px", fontSize: 13, fontWeight: 700, fontFamily: "inherit", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 };
   if (hecho)
     return (
       <>
-        <span style={{ ...base, background: "#dcfce7", color: "#166534" }}>✓ Presente</span>
+        <span style={{ ...base, background: "#dcfce7", color: "#166534", border: "1px solid #bbf7d0" }}>✓ Presente</span>
         {verResumen && <ResumenAsistenciaModal user={user} pendiente={pend} onCerrar={() => setVerResumen(false)} />}
       </>
     );
   return (
     <>
-      <button onClick={click} disabled={!esHoy || cargando} title={esHoy ? "Registrar mi asistencia" : `Se habilita el día de la misa de ${cfg.desde} a ${cfg.hasta}`} style={{ ...base, background: esHoy ? "#17a35d" : "rgba(255,255,255,.18)", color: "#fff", cursor: esHoy ? "pointer" : "not-allowed", opacity: esHoy ? 1 : 0.75 }}>
+      <button onClick={click} disabled={!esHoy || cargando} title={esHoy ? "Registrar mi asistencia" : `Se habilita el día de la misa de ${cfg.desde} a ${cfg.hasta}`} style={{ ...base, background: esHoy ? "linear-gradient(135deg,#22b573,#15803d)" : "rgba(255,255,255,.12)", border: esHoy ? "1px solid rgba(255,255,255,.35)" : base.border, boxShadow: esHoy ? "0 6px 16px rgba(21,128,61,.4)" : "none", color: "#fff", cursor: esHoy ? "pointer" : "not-allowed", opacity: esHoy ? 1 : 0.8 }}>
         {cargando ? "Registrando…" : esHoy ? "✔ Check in" : est === "cerrado" ? "Check in cerrado" : diaHoy ? `Check in desde las ${cfg.desde}` : "Check in · el día de la misa"}
       </button>
       {err && <span style={{ flexBasis: "100%", fontSize: 11, color: "#fecaca" }}>{err}</span>}
@@ -15970,7 +15970,8 @@ function CompartirCantosMisa({ pauta, estilo }) {
   };
   return (
     <>
-      <button onClick={() => setAbierto(true)} style={estilo || { background: "rgba(255,255,255,0.16)", border: "none", color: "#fff", borderRadius: 9, padding: "6px 12px", fontSize: 11.5, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+      <button onClick={() => setAbierto(true)} style={estilo || { background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.22)", color: "#fff", borderRadius: 999, height: 38, padding: "0 15px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 7 }}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 10.6l6.8-4M8.6 13.4l6.8 4" /></svg>
         Compartir Cantos de Misa
       </button>
       {abierto &&
@@ -16291,74 +16292,74 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
   });
   const th = { textAlign: "left", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b", padding: "6px 8px", borderBottom: "1px solid #e2e8f0" };
   const td = { padding: "7px 8px", fontSize: 12.5, color: "#1e293b", borderBottom: "1px solid #eef2f7", verticalAlign: "top" };
+  const ico = (d) => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.9 }}>{d}</svg>
+  );
+  const chip = { display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,.14)", border: "1px solid rgba(255,255,255,.18)", borderRadius: 999, padding: "5px 11px", fontSize: 12.5, fontWeight: 600 };
   return (
-    <div style={{ marginTop: 10, background: "#fff", border: "1px solid #dbe4f0", borderRadius: 16, overflow: "hidden", boxShadow: "0 6px 20px rgba(30,58,95,0.08)" }}>
+    <div style={{ marginTop: 10, background: "#fff", border: "1px solid #e1e9f4", borderRadius: 22, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,39,68,.05), 0 16px 40px rgba(30,58,95,.14)", fontFamily: "var(--font-sans)" }}>
       {modoMisa && createPortal(<ModoMisa pauta={pauta} canciones={canciones} fecha={fecha} onSalir={() => setModoMisa(false)} />, document.body)}
-      <div style={{ background: "linear-gradient(135deg,#1e3a5f,#2f5d9a)", color: "#fff", padding: "12px 16px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ flex: 1, minWidth: 180 }}>
-          <div style={{ fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.75 }}>Pauta de Misa</div>
-          <div style={{ fontSize: 15, fontWeight: 800 }}>{pauta.titulo || "Misa"}</div>
-          <div style={{ fontSize: 12, opacity: 0.9, textTransform: "capitalize" }}>
-            {fecha}
-            {pauta.hora ? ` · ${pauta.hora}` : ""}
-            {pauta.lugar ? ` · ${pauta.lugar}` : ""}
+      <div style={{ position: "relative", background: "linear-gradient(135deg,#17345c 0%,#2a5a9c 62%,#3f7cc8 100%)", color: "#fff", padding: "20px 20px 18px", overflow: "hidden" }}>
+        <div style={{ position: "absolute", right: -70, top: -90, width: 260, height: 260, borderRadius: "50%", background: "radial-gradient(circle,rgba(255,255,255,.2),transparent 68%)", pointerEvents: "none" }} />
+        <div style={{ position: "relative", display: "flex", alignItems: "flex-start", gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.75 }}>Pauta de Misa</div>
+            <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.025em", lineHeight: 1.15, margin: "5px 0 11px" }}>{pauta.titulo || "Misa"}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+              <span style={chip}>{ico(<><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4" /></>)}{fecha.charAt(0).toUpperCase() + fecha.slice(1)}</span>
+              {pauta.hora && <span style={chip}>{ico(<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>)}{pauta.hora}</span>}
+              {pauta.lugar && <span style={chip}>{ico(<><path d="M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11z" /><circle cx="12" cy="10" r="2.5" /></>)}{pauta.lugar}</span>}
+            </div>
           </div>
+          <button onClick={onCerrar} aria-label="Cerrar" title="Cerrar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid rgba(255,255,255,.22)", background: "rgba(255,255,255,.12)", color: "#fff", fontSize: 15, cursor: "pointer", flexShrink: 0, fontFamily: "inherit" }}>
+            ✕
+          </button>
         </div>
-        <CheckInPauta pauta={pauta} pautas={pautas} user={user} />
-        <button onClick={() => setModoMisa(true)} style={{ background: "#fff", border: "none", color: "#1e3a5f", borderRadius: 9, padding: "6px 12px", fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>
-          Modo Misa ⛶
-        </button>
-        <CompartirCantosMisa pauta={pauta} />
-        {respaldar && <AccesoPautaBoton pauta={pauta} />}
-        <button onClick={onCerrar} style={{ background: "rgba(255,255,255,0.16)", border: "none", color: "#fff", borderRadius: 9, padding: "6px 11px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
-          Cerrar ✕
-        </button>
+        <div style={{ position: "relative", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 16 }}>
+          <button onClick={() => setModoMisa(true)} style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 38, padding: "0 18px", border: "none", borderRadius: 999, background: "#fff", color: "#1e3a5f", fontSize: 13.5, fontWeight: 800, cursor: "pointer", fontFamily: "var(--font-sans)", boxShadow: "0 2px 8px rgba(8,20,45,.25)" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" /><path d="M4 21.5V5.5" /></svg>
+            Modo Misa
+          </button>
+          <CheckInPauta pauta={pauta} pautas={pautas} user={user} />
+          <CompartirCantosMisa pauta={pauta} />
+          {respaldar && <AccesoPautaBoton pauta={pauta} />}
+        </div>
       </div>
-      <div style={{ padding: "6px 12px 12px", overflowX: "auto" }}>
+      <div style={{ padding: "16px 16px 16px" }}>
         {canciones.length === 0 ? (
-          <div style={{ padding: 12, fontSize: 12.5, color: "#64748b" }}>Esta pauta aún no tiene canciones.</div>
+          <div style={{ padding: 12, fontSize: 14, color: "#64748b" }}>Esta pauta aún no tiene canciones.</div>
         ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 420 }}>
-            <thead>
-              <tr>
-                <th style={th}>Momento</th>
-                <th style={th}>Canción</th>
-                <th style={th}>Letra</th>
-                <th style={th}>Audio</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "0 4px 10px" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: "#2f5d9a" }}>Repertorio</div>
+              <div style={{ fontSize: 12, color: "#94a3b8" }}>{canciones.length} {canciones.length === 1 ? "canto" : "cantos"}</div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {canciones.map((c, i) => (
-                <tr key={i}>
-                  <td style={{ ...td, color: "#2f5d9a", fontWeight: 700, fontSize: 11 }}>{c.orden || i + 1}</td>
-                  <td style={{ ...td, fontWeight: 600 }}>{c.cancion || "—"}</td>
-                  <td style={td}>
-                    {c.url_letra && /^https?:/i.test(c.url_letra) ? (
-                      <a href={c.url_letra} target="_blank" rel="noreferrer" style={{ color: "#0a5ac8", fontWeight: 700, fontSize: 12 }}>
-                        Ver PDF
-                      </a>
-                    ) : (
-                      <span style={{ color: "#cbd5e1" }}>—</span>
-                    )}
-                  </td>
-                  <td style={td}>
-                    {c.url_audio && /^https?:/i.test(c.url_audio) ? (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, background: "#f7f9fd", border: "1px solid #e8eef7", borderRadius: 16, padding: "11px 12px" }}>
+                  <span style={{ minWidth: 32, height: 32, borderRadius: 11, background: "#e4edfa", color: "#2f5d9a", fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{c.orden || i + 1}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, color: "#0f1b2d", letterSpacing: "-0.01em", lineHeight: 1.3 }}>{c.cancion || "—"}</span>
+                  {c.url_letra && /^https?:/i.test(c.url_letra) && (
+                    <a href={c.url_letra} target="_blank" rel="noreferrer" style={{ color: "#0a5ac8", fontWeight: 700, fontSize: 13, textDecoration: "none", flexShrink: 0 }}>
+                      Ver PDF
+                    </a>
+                  )}
+                  {c.url_audio && /^https?:/i.test(c.url_audio) && (
+                    <span style={{ flexShrink: 0 }}>
                       <BotonAudioPauta url={c.url_audio} />
-                    ) : (
-                      <span style={{ color: "#cbd5e1" }}>—</span>
-                    )}
-                  </td>
-                </tr>
+                    </span>
+                  )}
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
         {pauta.notas && (
-          <div style={{ marginTop: 8, fontSize: 12, color: "#475569", whiteSpace: "pre-wrap" }}>{pauta.notas}</div>
+          <div style={{ marginTop: 14, background: "#fffbeb", border: "1px solid #fde9a8", borderRadius: 14, padding: "11px 14px", fontSize: 13.5, lineHeight: 1.55, color: "#6b4e0b", whiteSpace: "pre-wrap" }}>{pauta.notas}</div>
         )}
-        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           {pauta.guion_url && /^https?:/i.test(pauta.guion_url) && (
-            <a href={pauta.guion_url} target="_blank" rel="noreferrer" style={{ background: "#eef4fb", color: "#1e3a5f", border: "1px solid #dbe4f0", borderRadius: 9, padding: "7px 12px", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>
+            <a href={pauta.guion_url} target="_blank" rel="noreferrer" style={{ background: "#eef4fb", color: "#1e3a5f", border: "1px solid #dbe4f0", borderRadius: 999, padding: "9px 15px", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
               📖 Ver guion de la misa
             </a>
           )}
