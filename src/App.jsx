@@ -16336,9 +16336,14 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {canciones.map((c, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, background: "#f7f9fd", border: "1px solid #e8eef7", borderRadius: 16, padding: "11px 12px" }}>
-                  <span style={{ minWidth: 32, height: 32, borderRadius: 11, background: "#e4edfa", color: "#2f5d9a", fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{c.orden || i + 1}</span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, color: "#0f1b2d", letterSpacing: "-0.01em", lineHeight: 1.3 }}>{c.cancion || "—"}</span>
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, background: "#f7f9fd", border: "1px solid #e8eef7", borderRadius: 16, padding: "12px 14px" }}>
+                  <span style={{ width: 30, height: 30, borderRadius: "50%", background: "#1e3a5f", color: "#fff", fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
+                  <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-start" }}>
+                    {c.orden && (
+                      <span style={{ background: "#e4edfa", color: "#2f5d9a", fontSize: 11.5, fontWeight: 800, letterSpacing: "0.01em", padding: "4px 12px", borderRadius: 999, lineHeight: 1.3 }}>{c.orden}</span>
+                    )}
+                    <span style={{ fontSize: 15, fontWeight: 700, color: "#0f1b2d", letterSpacing: "-0.01em", lineHeight: 1.3 }}>{c.cancion || "—"}</span>
+                  </div>
                   {c.url_letra && /^https?:/i.test(c.url_letra) && (
                     <a href={c.url_letra} target="_blank" rel="noreferrer" style={{ color: "#0a5ac8", fontWeight: 700, fontSize: 13, textDecoration: "none", flexShrink: 0 }}>
                       Ver PDF
