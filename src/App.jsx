@@ -16149,7 +16149,7 @@ function AccesoModoMisaOffline() {
 }
 
 // ── Modo Misa: la pauta publicada a pantalla completa, con las letras (PDF) leídas dentro de la app ──
-function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico }) {
+function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico, abrirEn }) {
   const [enLinea, setEnLinea] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   useEffect(() => {
     const f = () => setEnLinea(navigator.onLine);
@@ -16170,7 +16170,7 @@ function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico }) {
     ...(ok(pauta.guion_url) ? [{ k: "guion", titulo: "Guion de la misa", etiqueta: "Guion", url: pauta.guion_url, audio: "" }] : []),
     ...canciones.map((c, i) => ({ k: "c" + i, titulo: c.cancion || "Canción", etiqueta: String(c.orden || i + 1), url: ok(c.url_letra) ? c.url_letra : "", audio: ok(c.url_audio) ? c.url_audio : "" })),
   ];
-  const [abierta, setAbierta] = useState(null);
+  const [abierta, setAbierta] = useState(abrirEn != null && docs[abrirEn] && docs[abrirEn].url ? abrirEn : null);
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -16268,6 +16268,7 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
   const pauta =
     elegida || prox || pub.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
   const [modoMisa, setModoMisa] = useState(false);
+  const [mmIdx, setMmIdx] = useState(null);
   useEffect(() => {
     if (pauta && user) registrarVistaPauta(pauta, user, "inicio");
   }, [pauta && pauta.id, user && user.id]);
@@ -16293,7 +16294,7 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
   const td = { padding: "7px 8px", fontSize: 12.5, color: "#1e293b", borderBottom: "1px solid #eef2f7", verticalAlign: "top" };
   return (
     <div style={{ marginTop: 10, background: "#fff", border: "1px solid #dbe4f0", borderRadius: 16, overflow: "hidden", boxShadow: "0 6px 20px rgba(30,58,95,0.08)" }}>
-      {modoMisa && createPortal(<ModoMisa pauta={pauta} canciones={canciones} fecha={fecha} onSalir={() => setModoMisa(false)} />, document.body)}
+      {modoMisa && createPortal(<ModoMisa key={String(mmIdx)} abrirEn={mmIdx} pauta={pauta} canciones={canciones} fecha={fecha} onSalir={() => setModoMisa(false)} />, document.body)}
       <div style={{ background: "linear-gradient(135deg,#1e3a5f,#2f5d9a)", color: "#fff", padding: "12px 16px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 180 }}>
           <div style={{ fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.75 }}>Pauta de Misa</div>
@@ -16305,14 +16306,17 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
           </div>
         </div>
         <CheckInPauta pauta={pauta} pautas={pautas} user={user} />
-        <button onClick={() => setModoMisa(true)} style={{ background: "#fff", border: "none", color: "#1e3a5f", borderRadius: 9, padding: "6px 12px", fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>
-          Modo Misa ⛶
-        </button>
         <CompartirCantosMisa pauta={pauta} />
         {respaldar && <AccesoPautaBoton pauta={pauta} />}
         <button onClick={onCerrar} style={{ background: "rgba(255,255,255,0.16)", border: "none", color: "#fff", borderRadius: 9, padding: "6px 11px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
           Cerrar ✕
         </button>
+      </div>
+      <div style={{ padding: "12px 12px 0" }}>
+        <button onClick={() => { setMmIdx(null); setModoMisa(true); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, border: "none", background: "linear-gradient(135deg,#17a35d,#15803d)", color: "#fff", borderRadius: 14, padding: "15px 16px", fontSize: 17, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 8px 20px rgba(21,128,61,.28)" }}>
+          <span style={{ fontSize: 22 }}>📖</span> Abrir las canciones (Modo Misa)
+        </button>
+        <div style={{ textAlign: "center", fontSize: 12, color: "#64748b", margin: "6px 0 2px" }}>Lee las letras en tu pantalla. No necesitas descargar nada.</div>
       </div>
       <div style={{ padding: "6px 12px 12px", overflowX: "auto" }}>
         {canciones.length === 0 ? (
@@ -16334,9 +16338,9 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
                   <td style={{ ...td, fontWeight: 600 }}>{c.cancion || "—"}</td>
                   <td style={td}>
                     {c.url_letra && /^https?:/i.test(c.url_letra) ? (
-                      <a href={c.url_letra} target="_blank" rel="noreferrer" style={{ color: "#0a5ac8", fontWeight: 700, fontSize: 12 }}>
-                        Ver PDF
-                      </a>
+                      <button onClick={() => { setMmIdx((/^https?:/i.test(pauta.guion_url || "") ? 1 : 0) + i); setModoMisa(true); }} style={{ border: "none", background: "#e8f0fb", color: "#2f5d9a", borderRadius: 999, padding: "6px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                        📖 Leer
+                      </button>
                     ) : (
                       <span style={{ color: "#cbd5e1" }}>—</span>
                     )}
@@ -16358,9 +16362,9 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
         )}
         <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
           {pauta.guion_url && /^https?:/i.test(pauta.guion_url) && (
-            <a href={pauta.guion_url} target="_blank" rel="noreferrer" style={{ background: "#eef4fb", color: "#1e3a5f", border: "1px solid #dbe4f0", borderRadius: 9, padding: "7px 12px", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>
+            <button onClick={() => { setMmIdx(0); setModoMisa(true); }} style={{ background: "#eef4fb", color: "#1e3a5f", border: "1px solid #dbe4f0", borderRadius: 9, padding: "7px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
               📖 Ver guion de la misa
-            </a>
+            </button>
           )}
           <PautaWhatsappBoton pauta={pauta} canciones={canciones} compacto respaldar={respaldar} />
         </div>
@@ -33009,6 +33013,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const [notifStatus, setNotifStatus] = useState("");
   const [subiendoGuion, setSubiendoGuion] = useState(false);
   const [visorGuion, setVisorGuion] = useState(null); // URL del guion a mostrar en el visor
+  const [mmView, setMmView] = useState(null); // índice abierto en Modo Misa (desde la vista de pauta)
 
   async function subirGuion(e) {
     const file = e.target.files && e.target.files[0];
@@ -34336,6 +34341,13 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     );
     return (
       <div style={{ maxWidth: 1100 }}>
+        {mmView != null && createPortal(<ModoMisa key={String(mmView)} abrirEn={mmView < 0 ? null : mmView} pauta={selected} canciones={cancionesData} fecha={fechaFmt} onSalir={() => setMmView(null)} />, document.body)}
+        <div style={{ marginBottom: 14 }}>
+          <button onClick={() => setMmView(-1)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, border: "none", background: "linear-gradient(135deg,#17a35d,#15803d)", color: "#fff", borderRadius: 14, padding: "15px 16px", fontSize: 17, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 8px 20px rgba(21,128,61,.28)" }}>
+            <span style={{ fontSize: 22 }}>📖</span> Abrir las canciones (Modo Misa)
+          </button>
+          <div style={{ textAlign: "center", fontSize: 12, color: "#64748b", marginTop: 6 }}>Lee las letras en tu pantalla. No necesitas descargar nada.</div>
+        </div>
         {/* Visor de guion (Google Drive) */}
         {visorGuion && (
           <div
@@ -34842,28 +34854,13 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                               Pendiente
                             </span>
                           ) : c.url_letra && c.url_letra.includes("http") ? (
-                            <a
-                              href={c.url_letra}
-                              target="_blank"
-                              rel="noopener"
-                              title="Ver PDF"
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                width: 34,
-                                height: 22,
-                                borderRadius: 5,
-                                background: "#c0392b",
-                                color: "white",
-                                fontSize: 9,
-                                fontWeight: 800,
-                                letterSpacing: "0.05em",
-                                textDecoration: "none",
-                              }}
+                            <button
+                              onClick={() => setMmView((/^https?:/i.test(selected.guion_url || "") ? 1 : 0) + i)}
+                              title="Leer en pantalla"
+                              style={{ border: "none", background: "#e8f0fb", color: "#2f5d9a", borderRadius: 999, padding: "6px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}
                             >
-                              PDF
-                            </a>
+                              📖 Leer
+                            </button>
                           ) : c.url_letra ? (
                             <span style={{ fontSize: 11.5, color: "#8a8a90" }}>
                               {c.url_letra}
