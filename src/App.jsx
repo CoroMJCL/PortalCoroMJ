@@ -16240,6 +16240,7 @@ function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico }) {
             {docs.map((x, i) => (
               <div key={x.k} style={{ display: "flex", alignItems: "center", gap: 12, background: "#fff", border: "1px solid " + LINE, borderRadius: 16, padding: "12px 12px 12px 14px", marginBottom: 10, boxShadow: "0 1px 2px rgba(15,27,45,.03)" }}>
                 <div onClick={() => x.url && setAbierta(i)} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 12, cursor: x.url ? "pointer" : "default" }}>
+                  <span style={{ width: 26, height: 26, borderRadius: "50%", background: "#1e3a5f", color: "#fff", fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
                   <span style={{ minWidth: 34, height: 34, padding: "0 8px", borderRadius: 10, background: "#e8f0fb", color: ACC, fontSize: 12.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{x.etiqueta}</span>
                   <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.3 }}>{x.titulo}</span>
                 </div>
