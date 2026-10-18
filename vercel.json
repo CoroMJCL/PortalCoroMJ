@@ -1,6 +1,6 @@
 {
   "crons": [
     { "path": "/api/recordatorio-pautas", "schedule": "0 13 * * *" },
-    { "path": "/api/recordatorio-pautas", "schedule": "0 22 * * *" }
+    { "path": "/api/cerrar-checkin", "schedule": "30 3 * * *" }
   ]
 }

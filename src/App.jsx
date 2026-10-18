@@ -1870,6 +1870,14 @@ function AppInner() {
   const [accesosPauta, setAccesosPauta] = useState({});
   // Cada pauta puede mostrarse solo a los integrantes que elige el admin
   const pautas = useMemo(() => mjFiltrarPautasPorAcceso(pautasRaw, accesosPauta, user), [pautasRaw, accesosPauta, user && user.id, user && user.cuerda]);
+  // Recuerda quién es en este teléfono (solo nombre e id) para poder marcar asistencia aunque no haya internet para iniciar sesión
+  useEffect(() => {
+    if (user && user.id && !esVisita(user)) {
+      try {
+        localStorage.setItem("mj_ident", JSON.stringify({ id: user.id, nombre: user.nombre || "", cuerda: user.cuerda || "" }));
+      } catch (e) {}
+    }
+  }, [user && user.id]);
   // Guardado sin conexión AUTOMÁTICO: cada vez que hay internet y pautas publicadas, se guardan en el teléfono
   useEffect(() => {
     if (!user || !pautas || !pautas.length) return;
@@ -2998,7 +3006,6 @@ function AppInner() {
             setView("login");
           }}
         />
-        <AccesoModoMisaOffline />
       </>
     );
 
@@ -3014,6 +3021,7 @@ function AppInner() {
         onBack={() => setView("landing")}
       />
       <AccesoModoMisaOffline />
+      <AccesoCheckInOffline />
       </>
     );
 
@@ -15438,7 +15446,7 @@ async function mjResumenAsistencia(user) {
   }
   return null;
 }
-function ResumenAsistenciaModal({ user, onCerrar }) {
+function ResumenAsistenciaModal({ user, onCerrar, pendiente }) {
   const [r, setR] = useState(undefined);
   useEffect(() => {
     mjResumenAsistencia(user).then(setR).catch(() => setR(null));
@@ -15450,8 +15458,8 @@ function ResumenAsistenciaModal({ user, onCerrar }) {
       <div style={{ background: "#fff", borderRadius: 26, padding: "26px 22px 20px", maxWidth: 380, width: "100%", textAlign: "center", boxShadow: "0 28px 70px rgba(15,27,45,.4)" }}>
         <div style={{ width: 56, height: 56, borderRadius: 18, margin: "0 auto 10px", background: "linear-gradient(135deg,#22b573,#15803d)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>✔</div>
         <div style={{ fontSize: 21, fontWeight: 800, color: "#0f1b2d", letterSpacing: "-0.02em" }}>¡Asistencia registrada!</div>
-        <div style={{ fontSize: 13.5, color: "#64748b", margin: "4px 0 16px" }}>Gracias por estar presente hoy.</div>
-        {r === undefined && <div style={{ fontSize: 14, color: "#64748b", padding: 10 }}>Calculando tu asistencia…</div>}
+        <div style={{ fontSize: 13.5, color: "#64748b", margin: "4px 0 16px" }}>{pendiente ? "Quedó guardada en tu teléfono y se enviará apenas tengas internet." : "Gracias por estar presente hoy."}</div>
+        {r === undefined && !pendiente && <div style={{ fontSize: 14, color: "#64748b", padding: 10 }}>Calculando tu asistencia…</div>}
         {nivel && (
           <div style={{ background: nivel.bg, borderRadius: 18, padding: "16px 14px", marginBottom: 14 }}>
             <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: nivel.c }}>Tu asistencia</div>
@@ -15481,7 +15489,7 @@ function mjHoyISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 // ── Horario del Check in (editable en Administración) ──
-const MJ_CHECKIN_DEF = { desde: "17:00", hasta: "19:59", fecha: "" };
+const MJ_CHECKIN_DEF = { desde: "17:00", hasta: "19:59", fecha: "", radio: 300 };
 function mjParseCheckinCfg(v) {
   try {
     const o = typeof v === "string" ? JSON.parse(v) : v || {};
@@ -15533,36 +15541,57 @@ function mjCheckinEstado(p, cfg, ahora) {
 }
 
 // ── Ubicación: el Check in solo vale estando en la capilla ──
-const MJ_CAPILLA = { lat: -33.5325371, lng: -70.7770535, radio: 250, nombre: "Capilla Sagrada Familia (Alfredo Silva Carvallo 1617, Maipú)" };
+const MJ_CAPILLA = { lat: -33.5325371, lng: -70.7770535, radio: 300, nombre: "Capilla Sagrada Familia (Alfredo Silva Carvallo 1617, Maipú)" };
 function mjDistanciaM(a, b, c, d) {
   const R = 6371000,
     rad = (x) => (x * Math.PI) / 180;
   const h = Math.sin(rad(c - a) / 2) ** 2 + Math.cos(rad(a)) * Math.cos(rad(c)) * Math.sin(rad(d - b) / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
-function mjErrUbic(msg, tipo) {
+function mjErrUbic(msg, tipo, extra) {
   const e = new Error(msg);
   e.mj = true;
   e.tipo = tipo || "lejos";
+  if (extra) Object.assign(e, extra);
   return e;
 }
+function mjCfgLocal() {
+  try {
+    return mjParseCheckinCfg(localStorage.getItem("mj_checkin_cfg"));
+  } catch (e) {
+    return { ...MJ_CHECKIN_DEF };
+  }
+}
+// Posición: primero rápida (Wi‑Fi/antenas, sirve dentro de la capilla), y si no alcanza, GPS de alta precisión
 async function mjVerificarUbicacion() {
   if (!navigator.geolocation) throw mjErrUbic("Tu teléfono no permite verificar la ubicación.", "permiso");
-  const pos = await new Promise((res, rej) =>
-    navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 })
-  ).catch((e) => {
+  const radio = Number(mjCfgLocal().radio) || MJ_CAPILLA.radio;
+  const get = (o) => new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, o));
+  const evaluar = (pos) => {
+    const { latitude, longitude, accuracy } = pos.coords;
+    const dist = mjDistanciaM(latitude, longitude, MJ_CAPILLA.lat, MJ_CAPILLA.lng);
+    return { latitude, longitude, accuracy: accuracy || 0, dist, ok: dist - Math.min(accuracy || 0, 500) <= radio };
+  };
+  let ev = null;
+  try {
+    ev = evaluar(await get({ enableHighAccuracy: false, timeout: 8000, maximumAge: 120000 }));
+  } catch (e) {
     if (e && e.code === 1) throw mjErrUbic("El teléfono no nos dejó ver tu ubicación.", "permiso");
-    throw mjErrUbic("No pudimos ver tu ubicación. Revisa que el GPS (ubicación) del teléfono esté encendido.", "permiso");
-  });
-  const { latitude, longitude, accuracy } = pos.coords;
-  const dist = mjDistanciaM(latitude, longitude, MJ_CAPILLA.lat, MJ_CAPILLA.lng);
-  if (dist > MJ_CAPILLA.radio + Math.min(accuracy || 0, 150))
-    throw mjErrUbic(`La asistencia solo se registra estando en la capilla (${MJ_CAPILLA.nombre}). Estás a unos ${dist >= 1000 ? (dist / 1000).toFixed(1) + " km" : Math.round(dist) + " m"}.`);
-  if (accuracy && accuracy > 600) throw mjErrUbic("La ubicación no es muy clara todavía.", "permiso");
-  return true;
+  }
+  if (!ev || !ev.ok) {
+    try {
+      ev = evaluar(await get({ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }));
+    } catch (e) {
+      if (e && e.code === 1) throw mjErrUbic("El teléfono no nos dejó ver tu ubicación.", "permiso");
+      if (!ev) throw mjErrUbic("No pudimos ver tu ubicación. Revisa que el GPS (ubicación) del teléfono esté encendido.", "permiso");
+    }
+  }
+  if (!ev.ok)
+    throw mjErrUbic(`La asistencia solo se registra estando en la capilla (${MJ_CAPILLA.nombre}). Estás a unos ${ev.dist >= 1000 ? (ev.dist / 1000).toFixed(1) + " km" : Math.round(ev.dist) + " m"}.`, "lejos", { dist: Math.round(ev.dist), acc: Math.round(ev.accuracy) });
+  return { lat: ev.latitude, lng: ev.longitude, acc: Math.round(ev.accuracy), dist: Math.round(ev.dist) };
 }
-async function mjRegistrarCheckIn(pauta, user) {
-  await mjVerificarUbicacion();
+// Escribe la asistencia en la base de datos. Lanza TypeError si no hay internet.
+async function mjEscribirAsistencia(pauta, user) {
   const claves = [_authToken || SUPABASE_KEY, SUPABASE_SERVICE_KEY];
   const hdr = (t) => ({ apikey: t === SUPABASE_SERVICE_KEY ? SUPABASE_SERVICE_KEY : SUPABASE_KEY, Authorization: `Bearer ${t}`, "Content-Type": "application/json" });
   let ultimo = null;
@@ -15571,7 +15600,7 @@ async function mjRegistrarCheckIn(pauta, user) {
       // 1) evento de misa de ese día (el que usa el admin para pasar lista)
       let r = await fetch(`${SUPABASE_URL}/rest/v1/eventos?select=id,titulo,tipo&fecha=eq.${pauta.fecha}`, { headers: hdr(t) });
       let evs = r.ok ? await r.json() : [];
-      let ev = evs.find((e) => e.tipo === "misa") || null;
+      let ev = evs.find((e) => String(e.tipo || "").toLowerCase() === "misa") || null;
       if (!ev) {
         r = await fetch(`${SUPABASE_URL}/rest/v1/eventos`, {
           method: "POST",
@@ -15584,31 +15613,92 @@ async function mjRegistrarCheckIn(pauta, user) {
         }
       }
       if (!ev || !ev.id) {
-        ultimo = new Error("evento");
+        ultimo = new Error("No se encontró ni se pudo crear el evento de la misa");
         continue;
       }
       const eid = String(ev.id);
       r = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?select=id,estado&evento_id=eq.${encodeURIComponent(eid)}&member_id=eq.${user.id}`, { headers: hdr(t) });
       const ex = r.ok ? await r.json() : [];
       if (ex.length) {
-        if (ex[0].estado === "presente") {
-          window.dispatchEvent(new Event("mj-checkin"));
-          return true;
-        }
+        if (ex[0].estado === "presente") return true;
         r = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?id=eq.${ex[0].id}`, { method: "PATCH", headers: { ...hdr(t), Prefer: "return=minimal" }, body: JSON.stringify({ estado: "presente" }) });
       } else {
         r = await fetch(`${SUPABASE_URL}/rest/v1/asistencia`, { method: "POST", headers: { ...hdr(t), Prefer: "return=minimal" }, body: JSON.stringify({ evento_id: eid, member_id: user.id, estado: "presente" }) });
       }
-      if (r.ok) {
-        window.dispatchEvent(new Event("mj-checkin"));
-        return true;
-      }
-      ultimo = new Error("guardar " + r.status);
+      if (r.ok) return true;
+      ultimo = new Error("No se pudo guardar la asistencia (" + r.status + " " + (await r.text().catch(() => "")).slice(0, 120) + ")");
     } catch (e) {
       ultimo = e;
     }
   }
   throw ultimo || new Error("fallo");
+}
+// Cola sin internet: el Check in (ya validado en la capilla) queda guardado y se envía apenas haya conexión
+const MJ_COLA_KEY = "mj_checkin_cola";
+function mjLeerCola() {
+  try {
+    return JSON.parse(localStorage.getItem(MJ_COLA_KEY) || "[]") || [];
+  } catch (e) {
+    return [];
+  }
+}
+function mjEncolarCheckIn(item) {
+  const c = mjLeerCola().filter((x) => !(x.pautaId === item.pautaId && x.userId === item.userId));
+  c.push(item);
+  try {
+    localStorage.setItem(MJ_COLA_KEY, JSON.stringify(c));
+  } catch (e) {}
+}
+let _mjSincronizando = false;
+async function mjSincronizarCheckIns() {
+  if (_mjSincronizando || !navigator.onLine) return;
+  const cola = mjLeerCola();
+  if (!cola.length) return;
+  _mjSincronizando = true;
+  const resto = [];
+  for (const it of cola) {
+    try {
+      await mjEscribirAsistencia({ fecha: it.fecha, titulo: it.titulo, hora: it.hora, lugar: it.lugar }, { id: it.userId });
+      try {
+        localStorage.setItem(`mj_checkin_${it.pautaId}_${it.userId}`, "1");
+      } catch (e) {}
+    } catch (e) {
+      resto.push(it);
+    }
+  }
+  try {
+    localStorage.setItem(MJ_COLA_KEY, JSON.stringify(resto));
+  } catch (e) {}
+  _mjSincronizando = false;
+  if (resto.length < cola.length) window.dispatchEvent(new Event("mj-checkin"));
+}
+// Deja constancia de por qué falló un Check in (se ve en Administración → Check in)
+async function mjLogErrCheckIn(pauta, user, e) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/config`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({
+        key: `checkin_err_${pauta.id}_${user.id}`,
+        value: JSON.stringify({ n: user.nombre || "", msg: String((e && e.message) || e).slice(0, 200), tipo: (e && e.tipo) || "otro", dist: e && e.dist, acc: e && e.acc, ts: new Date().toISOString(), ua: navigator.userAgent.slice(0, 90) }),
+      }),
+    });
+  } catch (x) {}
+}
+async function mjRegistrarCheckIn(pauta, user) {
+  const ub = await mjVerificarUbicacion();
+  try {
+    await mjEscribirAsistencia(pauta, user);
+    window.dispatchEvent(new Event("mj-checkin"));
+    return true;
+  } catch (e) {
+    // Sin internet (típico dentro de la capilla): se guarda y se envía después
+    if (e instanceof TypeError || !navigator.onLine) {
+      mjEncolarCheckIn({ pautaId: pauta.id, userId: user.id, nombre: user.nombre || "", fecha: pauta.fecha, titulo: pauta.titulo, hora: pauta.hora, lugar: pauta.lugar, ts: Date.now(), lat: ub.lat, lng: ub.lng, acc: ub.acc });
+      return "pendiente";
+    }
+    throw e;
+  }
 }
 async function mjYaRegistrado(pauta, user) {
   for (const t of [_authToken || SUPABASE_KEY, SUPABASE_SERVICE_KEY]) {
@@ -15669,17 +15759,29 @@ function CheckInObligatorio({ pautas, user }) {
     };
   }, [aplica, pauta && pauta.id, user && user.id]);
   const [errTipo, setErrTipo] = useState("");
+  const [pend, setPend] = useState(false);
+  // Constancia de que a esta persona SÍ se le mostró el aviso de Check in (se ve en Administración → Check in)
+  useEffect(() => {
+    if (!(aplica && abierto && estado === "pedir")) return;
+    fetch(`${SUPABASE_URL}/rest/v1/config`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ key: `checkin_visto_${pauta.id}_${user.id}`, value: JSON.stringify({ n: user.nombre || "", ts: new Date().toISOString() }) }),
+    }).catch(() => {});
+  }, [aplica, abierto, estado]);
   const hacer = async () => {
     setCargando(true);
     setErr("");
     setErrTipo("");
     try {
-      await mjRegistrarCheckIn(pauta, user);
+      const r = await mjRegistrarCheckIn(pauta, user);
       try {
         localStorage.setItem(lk, "1");
       } catch (e) {}
+      setPend(r === "pendiente");
       setEstado("resumen");
     } catch (e) {
+      if (!(e && e.mj && e.tipo === "lejos" && (e.dist || 0) > 1500)) mjLogErrCheckIn(pauta, user, e);
       setErr(e && e.mj ? e.message : "No se pudo registrar. Revisa tu conexión e intenta de nuevo.");
       setErrTipo(e && e.mj ? e.tipo : "red");
       // Si está lejos de la capilla no se le bloquea la app: queda un aviso discreto y se registra al llegar
@@ -15693,10 +15795,11 @@ function CheckInObligatorio({ pautas, user }) {
       if (!navigator.permissions || !navigator.permissions.query) return;
       const perm = await navigator.permissions.query({ name: "geolocation" });
       if (perm.state !== "granted") return;
-      await mjRegistrarCheckIn(pauta, user);
+      const r = await mjRegistrarCheckIn(pauta, user);
       try {
         localStorage.setItem(lk, "1");
       } catch (e) {}
+      setPend(r === "pendiente");
       setEstado("resumen");
     } catch (e) {}
   };
@@ -15710,7 +15813,7 @@ function CheckInObligatorio({ pautas, user }) {
       clearInterval(t);
     };
   }, [aplica, abierto, estado]);
-  if (aplica && estado === "resumen") return <ResumenAsistenciaModal user={user} onCerrar={() => setEstado("listo")} />;
+  if (aplica && estado === "resumen") return <ResumenAsistenciaModal user={user} pendiente={pend} onCerrar={() => setEstado("listo")} />;
   if (aplica && abierto && estado === "pendiente")
     return createPortal(
       <button onClick={() => setEstado("pedir")} style={{ position: "fixed", left: 10, right: 10, bottom: 76, zIndex: 3500, maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "1px solid #bbf7d0", background: "#ecfdf5", color: "#14532d", borderRadius: 16, padding: "11px 14px", cursor: "pointer", fontFamily: "var(--font-sans, Inter, system-ui, sans-serif)", boxShadow: "0 10px 26px rgba(22,101,52,.22)" }}>
@@ -15785,6 +15888,7 @@ function CheckInPauta({ pauta: pautaBase, pautas, user }) {
   });
   const [cargando, setCargando] = useState(false);
   const [verResumen, setVerResumen] = useState(false);
+  const [pend, setPend] = useState(false);
   const [err, setErr] = useState("");
   useEffect(() => {
     const f = () => {
@@ -15814,13 +15918,15 @@ function CheckInPauta({ pauta: pautaBase, pautas, user }) {
     setCargando(true);
     setErr("");
     try {
-      await mjRegistrarCheckIn(pauta, user);
+      const r = await mjRegistrarCheckIn(pauta, user);
       try {
         localStorage.setItem(lk, "1");
       } catch (e) {}
+      setPend(r === "pendiente");
       setHecho(true);
       setVerResumen(true);
     } catch (e) {
+      if (!(e && e.mj && e.tipo === "lejos" && (e.dist || 0) > 1500)) mjLogErrCheckIn(pauta, user, e);
       setErr(e && e.mj ? e.message : "No se pudo registrar. Revisa tu conexión e intenta de nuevo.");
     }
     setCargando(false);
@@ -15830,7 +15936,7 @@ function CheckInPauta({ pauta: pautaBase, pautas, user }) {
     return (
       <>
         <span style={{ ...base, background: "#dcfce7", color: "#166534" }}>✓ Presente</span>
-        {verResumen && <ResumenAsistenciaModal user={user} onCerrar={() => setVerResumen(false)} />}
+        {verResumen && <ResumenAsistenciaModal user={user} pendiente={pend} onCerrar={() => setVerResumen(false)} />}
       </>
     );
   return (
@@ -15916,6 +16022,97 @@ function MisaPublica({ id }) {
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f4f6fa", fontFamily: "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)", color: "#0f1b2d", padding: 24, textAlign: "center" }}>
       {estado === "cargando" ? "Cargando cantos…" : "Esta pauta no está disponible."}
     </div>
+  );
+}
+
+// ── Check in sin sesión: sirve aunque no haya internet en la capilla (se guarda y se envía después) ──
+function AccesoCheckInOffline() {
+  const [ahora, setAhora] = useState(new Date());
+  const [abierto, setAbierto] = useState(false);
+  const [cargando, setCargando] = useState(false);
+  const [err, setErr] = useState("");
+  const [fin, setFin] = useState(null); // null | "ok" | "pendiente"
+  const [, forzar] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setAhora(new Date()), 30000);
+    const f = () => forzar((n) => n + 1);
+    window.addEventListener("mj-checkin", f);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("mj-checkin", f);
+    };
+  }, []);
+  let ident = null;
+  try {
+    ident = JSON.parse(localStorage.getItem("mj_ident") || "null");
+  } catch (e) {}
+  if (!ident || !ident.id) return null;
+  const cfg = mjCfgLocal();
+  const lista = mjLeerPautasOffline().pautas.map((p) => ({ ...p, publicada: true }));
+  const hoy = mjHoyISO();
+  const pauta = lista.map((p) => mjPautaEfectiva(p, cfg, lista)).find((p) => p.fecha === hoy);
+  if (!pauta) return null;
+  const lk = `mj_checkin_${pauta.id}_${ident.id}`;
+  let hecho = false;
+  try {
+    hecho = !!localStorage.getItem(lk);
+  } catch (e) {}
+  const enVentana = mjCheckinEstado(pauta, cfg, ahora) === "abierto";
+  if ((hecho && !fin) || (!enVentana && !fin)) return null;
+  const marcar = async () => {
+    setCargando(true);
+    setErr("");
+    try {
+      const r = await mjRegistrarCheckIn(pauta, ident);
+      try {
+        localStorage.setItem(lk, "1");
+      } catch (e) {}
+      setFin(r === "pendiente" ? "pendiente" : "ok");
+    } catch (e) {
+      if (!(e && e.mj && e.tipo === "lejos" && (e.dist || 0) > 1500)) mjLogErrCheckIn(pauta, ident, e);
+      setErr(e && e.mj ? e.message : "No se pudo registrar. Intenta de nuevo.");
+    }
+    setCargando(false);
+  };
+  const f = "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)";
+  return (
+    <>
+      {!abierto && !fin && (
+        <button onClick={() => setAbierto(true)} style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: 70, zIndex: 3000, border: "none", background: "#17a35d", color: "#fff", borderRadius: 999, padding: "13px 20px", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: f, whiteSpace: "nowrap", boxShadow: "0 8px 22px rgba(23,163,93,.35)" }}>
+          📍 Marcar mi asistencia
+        </button>
+      )}
+      {(abierto || fin) &&
+        createPortal(
+          <div style={{ position: "fixed", inset: 0, zIndex: 6000, background: "rgba(15,27,45,.62)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, fontFamily: f }}>
+            <div style={{ background: "#fff", borderRadius: 26, padding: "26px 22px 20px", maxWidth: 380, width: "100%", textAlign: "center", boxShadow: "0 28px 70px rgba(15,27,45,.4)" }}>
+              {fin ? (
+                <>
+                  <div style={{ fontSize: 46 }}>✅</div>
+                  <div style={{ fontSize: 21, fontWeight: 800, color: "#0f1b2d", margin: "6px 0" }}>¡Asistencia registrada!</div>
+                  <div style={{ fontSize: 14.5, color: "#475569", lineHeight: 1.5, marginBottom: 16 }}>{fin === "pendiente" ? "Quedó guardada en tu teléfono y se enviará apenas tengas internet." : "Gracias por estar presente."}</div>
+                  <button onClick={() => { setAbierto(false); setFin(null); }} style={{ width: "100%", border: "none", background: "#2f5d9a", color: "#fff", borderRadius: 14, padding: 15, fontSize: 17, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>Continuar</button>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "#15803d" }}>Hoy hay misa</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "#0f1b2d", margin: "6px 0 4px" }}>Hola, {String(ident.nombre || "").split(" ")[0]}</div>
+                  <div style={{ fontSize: 15, color: "#2b3646", lineHeight: 1.5, background: "#f1f7f3", border: "1px solid #d4eadc", borderRadius: 14, padding: "12px 14px", margin: "12px 0 16px" }}>
+                    Para marcar tu asistencia necesitamos saber que estás en la capilla. Debes hacerlo antes de las <b>{cfg.hasta}</b>.
+                  </div>
+                  <button onClick={marcar} disabled={cargando} style={{ width: "100%", border: "none", background: "#17a35d", color: "#fff", borderRadius: 16, padding: "20px 16px", fontSize: 24, fontWeight: 800, letterSpacing: "0.04em", cursor: "pointer", fontFamily: "inherit" }}>
+                    {cargando ? "Registrando…" : "PERMITIR"}
+                  </button>
+                  <div style={{ marginTop: 10, fontSize: 13, color: "#64748b" }}>Toca el botón y, si el teléfono pregunta, vuelve a tocar «Permitir».</div>
+                  {err && <div style={{ marginTop: 12, fontSize: 14, color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "10px 12px", lineHeight: 1.45 }}>{err}</div>}
+                  <button onClick={() => setAbierto(false)} style={{ marginTop: 12, border: "none", background: "none", color: "#475569", fontSize: 14, fontWeight: 700, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" }}>Ahora no</button>
+                </>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
 
@@ -23645,7 +23842,7 @@ async function mmPrepararOffline(pautas, onProg) {
     if (new Date(p.fecha + "T00:00:00") >= lim) mapa[p.id] = p;
   });
   nuevas.forEach((p) => {
-    mapa[p.id] = { id: p.id, titulo: p.titulo, fecha: p.fecha, hora: p.hora, lugar: p.lugar, notas: p.notas, guion_url: p.guion_url, canciones: mjCancionesDe(p).map((c) => ({ orden: c.orden, cancion: c.cancion, url_letra: c.url_letra })) };
+    mapa[p.id] = { id: p.id, publicada: true, titulo: p.titulo, fecha: p.fecha, hora: p.hora, lugar: p.lugar, notas: p.notas, guion_url: p.guion_url, canciones: mjCancionesDe(p).map((c) => ({ orden: c.orden, cancion: c.cancion, url_letra: c.url_letra })) };
   });
   const urls = [];
   Object.values(mapa).forEach((p) => {
@@ -35271,6 +35468,47 @@ function AdminCheckIn() {
   const [msg, setMsg] = useState("");
   const [cerrando, setCerrando] = useState(false);
   const [cierreMsg, setCierreMsg] = useState("");
+  const [fallas, setFallas] = useState(null);
+  const [diag, setDiag] = useState(null);
+  const cargarDiag = async () => {
+    try {
+      const hdr = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` };
+      const pj = await fetch(`${SUPABASE_URL}/rest/v1/pautas_misa?select=id,titulo,fecha,hora,publicada&publicada=eq.true&order=fecha.asc&fecha=gte.${mjHoyISO()}&limit=5`, { headers: hdr }).then((r) => r.json());
+      const vistos = await fetch(`${SUPABASE_URL}/rest/v1/config?select=key,value&key=like.${encodeURIComponent("checkin_visto_")}*`, { headers: hdr }).then((r) => r.json());
+      setDiag({ pautas: Array.isArray(pj) ? pj : [], vistos: Array.isArray(vistos) ? vistos : [] });
+    } catch (e) {
+      setDiag({ pautas: [], vistos: [], error: true });
+    }
+  };
+  useEffect(() => {
+    cargarDiag();
+  }, []);
+  const cargarFallas = async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/config?select=key,value&key=like.${encodeURIComponent("checkin_err_")}*`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } });
+      const rows = r.ok ? await r.json() : [];
+      const l = rows
+        .map((x) => {
+          try {
+            return { k: x.key, ...(typeof x.value === "string" ? JSON.parse(x.value) : x.value) };
+          } catch (e) {
+            return null;
+          }
+        })
+        .filter(Boolean)
+        .sort((x, y) => String(y.ts).localeCompare(String(x.ts)));
+      setFallas(l);
+    } catch (e) {
+      setFallas([]);
+    }
+  };
+  useEffect(() => {
+    cargarFallas();
+  }, []);
+  const limpiarFallas = async () => {
+    await fetch(`${SUPABASE_URL}/rest/v1/config?key=like.${encodeURIComponent("checkin_err_")}*`, { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } }).catch(() => {});
+    cargarFallas();
+  };
   const cerrarAhora = async () => {
     if (!window.confirm("¿Marcar como AUSENTES a todos los que no hicieron Check in? (solo se aplica si ya pasó la hora de término)")) return;
     setCerrando(true);
@@ -35336,6 +35574,60 @@ function AdminCheckIn() {
       </div>
       <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.45, marginBottom: 16 }}>
         Si lo dejas vacío, se usa la fecha de cada pauta. Si eliges una fecha, vale para la próxima misa publicada (útil si la misa cambia de día).
+      </div>
+      <div style={{ marginBottom: 6, marginTop: 6 }}>
+        <label style={lab}>Distancia permitida a la capilla (metros)</label>
+        <input type="number" min="50" max="2000" step="50" value={cfg.radio || 300} onChange={(e) => setCfg({ ...cfg, radio: Number(e.target.value) })} style={{ ...inp, width: 140 }} />
+      </div>
+      <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.45, marginBottom: 16 }}>
+        Dentro de edificios el teléfono calcula la ubicación con error. Si a alguien dentro de la capilla le dice que está lejos, sube este valor (por ejemplo 400 o 500).
+      </div>
+      {(() => {
+        if (!diag) return null;
+        const lista = (diag.pautas || []).map((p) => ({ ...p, publicada: true }));
+        const prox = lista.map((p) => mjPautaEfectiva(p, cfg, lista))[0];
+        const est = prox ? mjCheckinEstado(prox, cfg, new Date()) : null;
+        const mn = (h) => (h ? parseInt(h.slice(0, 2), 10) * 60 + parseInt(h.slice(3, 5), 10) : null);
+        const mh = prox && prox.hora ? mn(prox.hora) : null;
+        const avisos = [];
+        if (!prox) avisos.push("No hay ninguna pauta publicada de hoy en adelante, por eso el Check in no se muestra a nadie.");
+        if (prox && mh != null && (mn(cfg.hasta) < mh - 30 || mn(cfg.desde) > mh)) avisos.push(`El horario del Check in (${cfg.desde}–${cfg.hasta}) no coincide con la hora de la misa (${prox.hora}). Revísalo y vuelve a guardar.`);
+        const vistosHoy = prox ? (diag.vistos || []).filter((v) => v.key.startsWith(`checkin_visto_${prox.id}_`)).length : 0;
+        return (
+          <div style={{ margin: "6px 0 14px", padding: "14px 16px", background: avisos.length ? "#fffbeb" : "#f0fdf4", border: "1px solid " + (avisos.length ? "#fde68a" : "#bbf7d0"), borderRadius: 14, maxWidth: 520 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0f1b2d", marginBottom: 6 }}>Estado del Check in</div>
+            {prox && (
+              <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.6 }}>
+                Próxima misa: <b>{prox.titulo || "Misa"}</b> · {prox.fecha} {prox.hora || ""}
+                <br />
+                Ventana: <b>{cfg.desde} a {cfg.hasta}</b> · Ahora: <b>{est === "abierto" ? "ABIERTO" : est === "antes" ? "aún no abre" : "cerrado"}</b>
+                <br />
+                Personas a las que ya se les mostró el aviso: <b>{vistosHoy}</b>
+              </div>
+            )}
+            {avisos.map((t, i) => (
+              <div key={i} style={{ marginTop: 8, fontSize: 13, color: "#92400e", fontWeight: 700, lineHeight: 1.45 }}>⚠ {t}</div>
+            ))}
+            <button onClick={cargarDiag} style={{ marginTop: 8, border: "none", background: "#e2e8f0", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Actualizar</button>
+          </div>
+        );
+      })()}
+      <div style={{ marginTop: 6, padding: "14px 16px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, maxWidth: 520 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0f1b2d", flex: 1 }}>Intentos que fallaron</div>
+          <button onClick={cargarFallas} style={{ border: "none", background: "#e2e8f0", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Actualizar</button>
+          {fallas && fallas.length > 0 && <button onClick={limpiarFallas} style={{ border: "none", background: "#e2e8f0", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Limpiar</button>}
+        </div>
+        {fallas === null && <div style={{ fontSize: 12.5, color: "#64748b" }}>Cargando…</div>}
+        {fallas && fallas.length === 0 && <div style={{ fontSize: 12.5, color: "#64748b" }}>Ninguno registrado.</div>}
+        {fallas && fallas.slice(0, 40).map((f) => (
+          <div key={f.k} style={{ borderTop: "1px solid #e2e8f0", padding: "7px 0", fontSize: 12.5, color: "#334155", lineHeight: 1.4 }}>
+            <b>{f.n || "?"}</b> · {f.ts ? new Date(f.ts).toLocaleString("es-CL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
+            <br />
+            {f.msg}
+            {f.dist != null ? ` · a ${f.dist} m (error del GPS ±${f.acc} m)` : ""}
+          </div>
+        ))}
       </div>
       <div style={{ marginTop: 22, padding: "14px 16px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 14, maxWidth: 520 }}>
         <div style={{ fontSize: 13.5, fontWeight: 800, color: "#9a3412", marginBottom: 4 }}>Ausentes automáticos</div>
@@ -50245,6 +50537,16 @@ export default function App() {
 }
 
 function AppPrincipal() {
+  // Envía los Check in que quedaron guardados por falta de internet
+  useEffect(() => {
+    mjSincronizarCheckIns();
+    window.addEventListener("online", mjSincronizarCheckIns);
+    const t = setInterval(mjSincronizarCheckIns, 60000);
+    return () => {
+      window.removeEventListener("online", mjSincronizarCheckIns);
+      clearInterval(t);
+    };
+  }, []);
   return (
     <ErrorBoundary>
       <AppInner />
