@@ -16334,26 +16334,30 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
               <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: "#2f5d9a" }}>Repertorio</div>
               <div style={{ fontSize: 12, color: "#94a3b8" }}>{canciones.length} {canciones.length === 1 ? "canto" : "cantos"}</div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ overflowX: "auto" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "26px minmax(0,1fr) 58px 34px", columnGap: 10, alignItems: "center", padding: "0 6px 7px", fontSize: 10.5, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8a97ab", borderBottom: "1px solid #e3eaf4" }}>
+                <span>#</span>
+                <span>Canto</span>
+                <span>Letra</span>
+                <span style={{ textAlign: "center" }}>Audio</span>
+              </div>
               {canciones.map((c, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, background: "#f7f9fd", border: "1px solid #e8eef7", borderRadius: 16, padding: "12px 14px" }}>
-                  <span style={{ width: 30, height: 30, borderRadius: "50%", background: "#1e3a5f", color: "#fff", fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
-                  <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-start" }}>
-                    {c.orden && (
-                      <span style={{ background: "#e4edfa", color: "#2f5d9a", fontSize: 11.5, fontWeight: 800, letterSpacing: "0.01em", padding: "4px 12px", borderRadius: 999, lineHeight: 1.3 }}>{c.orden}</span>
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "26px minmax(0,1fr) 58px 34px", columnGap: 10, alignItems: "center", padding: "11px 6px", borderBottom: i === canciones.length - 1 ? "none" : "1px solid #edf1f7" }}>
+                  <span style={{ color: "#8a97ab", fontWeight: 800, fontSize: 13 }}>{i + 1}</span>
+                  <span style={{ minWidth: 0 }}>
+                    {c.orden && <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#2f5d9a", marginBottom: 2 }}>{c.orden}</span>}
+                    <span style={{ display: "block", fontSize: 14.5, fontWeight: 700, color: "#0f1b2d", letterSpacing: "-0.01em", lineHeight: 1.3 }}>{c.cancion || "—"}</span>
+                  </span>
+                  <span>
+                    {c.url_letra && /^https?:/i.test(c.url_letra) ? (
+                      <a href={c.url_letra} target="_blank" rel="noreferrer" style={{ color: "#0a5ac8", fontWeight: 700, fontSize: 13, textDecoration: "none" }}>Ver PDF</a>
+                    ) : (
+                      <span style={{ color: "#cbd5e1" }}>—</span>
                     )}
-                    <span style={{ fontSize: 15, fontWeight: 700, color: "#0f1b2d", letterSpacing: "-0.01em", lineHeight: 1.3 }}>{c.cancion || "—"}</span>
-                  </div>
-                  {c.url_letra && /^https?:/i.test(c.url_letra) && (
-                    <a href={c.url_letra} target="_blank" rel="noreferrer" style={{ color: "#0a5ac8", fontWeight: 700, fontSize: 13, textDecoration: "none", flexShrink: 0 }}>
-                      Ver PDF
-                    </a>
-                  )}
-                  {c.url_audio && /^https?:/i.test(c.url_audio) && (
-                    <span style={{ flexShrink: 0 }}>
-                      <BotonAudioPauta url={c.url_audio} />
-                    </span>
-                  )}
+                  </span>
+                  <span style={{ display: "flex", justifyContent: "center" }}>
+                    {c.url_audio && /^https?:/i.test(c.url_audio) ? <BotonAudioPauta url={c.url_audio} /> : <span style={{ color: "#cbd5e1" }}>—</span>}
+                  </span>
                 </div>
               ))}
             </div>
