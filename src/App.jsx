@@ -17238,29 +17238,18 @@ function EucaristiaDiariaWidget() {
       href={URL_EUC}
       target="_blank"
       rel="noopener noreferrer"
-      style={{ display: "block", textDecoration: "none", color: "inherit", background: "#fff", border: "1px solid #e1e9f4", borderRadius: 20, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,39,68,.05), 0 10px 28px rgba(30,58,95,.10)", fontFamily: "var(--font-sans)" }}
+      style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", color: "inherit", background: "#fff", border: "1px solid #e1e9f4", borderRadius: 16, padding: "10px 12px", boxShadow: "0 1px 2px rgba(15,39,68,.05), 0 6px 16px rgba(30,58,95,.08)", fontFamily: "var(--font-sans)" }}
     >
-      <div style={{ position: "relative", background: "linear-gradient(135deg,#17345c 0%,#2a5a9c 65%,#3f7cc8 100%)", color: "#fff", padding: "18px 18px 16px", overflow: "hidden" }}>
-        <div style={{ position: "absolute", right: -50, top: -60, width: 190, height: 190, borderRadius: "50%", background: "radial-gradient(circle,rgba(255,255,255,.2),transparent 68%)", pointerEvents: "none" }} />
-        <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ width: 42, height: 42, borderRadius: 14, background: "rgba(255,255,255,.14)", border: "1px solid rgba(255,255,255,.22)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18M6 9h12" /></svg>
-          </span>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.75 }}>Cada día</div>
-            <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2 }}>Eucaristía Diaria</div>
-          </div>
-        </div>
-      </div>
-      <div style={{ padding: "14px 18px 16px" }}>
-        <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "#475569" }}>
-          Liturgia del día, calendario litúrgico y material de formación pastoral.
-        </div>
-        <div style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 7, background: "#1e3a5f", color: "#fff", borderRadius: 999, height: 36, padding: "0 16px", fontSize: 13, fontWeight: 700 }}>
-          Abrir sitio
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7M8 7h9v9" /></svg>
-        </div>
-      </div>
+      <span style={{ width: 38, height: 38, borderRadius: 12, background: "linear-gradient(135deg,#1e3a5f,#3f7cc8)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18M6 9h12" /></svg>
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: 14.5, fontWeight: 800, color: "#14305a", letterSpacing: "-0.01em", lineHeight: 1.2 }}>Eucaristía Diaria</span>
+        <span style={{ display: "block", fontSize: 12, color: "#64748b", marginTop: 2 }}>Liturgia del día</span>
+      </span>
+      <span style={{ width: 30, height: 30, borderRadius: "50%", background: "#eef4fb", color: "#1e3a5f", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7M8 7h9v9" /></svg>
+      </span>
     </a>
   );
 }
@@ -18421,6 +18410,7 @@ function Dashboard({
               )}
             </div>
             <div className="dash-col dash-side">
+              <EucaristiaDiariaWidget />
               {isAdmin && <ActividadAdminWidget pautas={pautas} members={members} />}
               <InformacionesWidget isAdmin={isAdmin} />
               <GaleriaWidget
@@ -18430,7 +18420,6 @@ function Dashboard({
               />
               <AgendaInvitado isAdmin={isAdmin} />
             <div className="dash-col dash-right">
-              <EucaristiaDiariaWidget />
               <PautasCompacto
                 pautas={pautas}
                 isAdmin={isAdmin}
