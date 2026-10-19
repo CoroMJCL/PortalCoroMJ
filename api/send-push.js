@@ -85,6 +85,19 @@ export default async function handler(req, res) {
       url: destinoUrl,
     };
 
+    // 0) Integrantes concretos (external_id = id del integrante): solo a ellos.
+    const { externalIds } = req.body || {};
+    if (Array.isArray(externalIds) && externalIds.length > 0) {
+      let recipients = 0;
+      let ultimo = null;
+      for (let i = 0; i < externalIds.length; i += 1000) {
+        const r = await enviar({ ...base, target_channel: "push", include_aliases: { external_id: externalIds.slice(i, i + 1000).map(String) } });
+        ultimo = r.data;
+        recipients += r.data?.recipients || 0;
+      }
+      return res.status(200).json({ ok: recipients > 0, via: "external_ids", recipients, onesignal: ultimo });
+    }
+
     // 1) IDs explícitos (si los pasan).
     if (Array.isArray(subscriptionIds) && subscriptionIds.length > 0) {
       const r = await enviar({ ...base, target_channel: "push", include_subscription_ids: subscriptionIds });
