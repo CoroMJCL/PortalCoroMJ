@@ -33409,7 +33409,10 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       } else {
         let cuerpo = lineas.slice(0, 4).join(" · ");
         if (lineas.length > 4) cuerpo += ` · y ${lineas.length - 4} cambio(s) más`;
-        const r = await sendPushToUsers(ids, "✏️ Cambios en la pauta de misa", `${pauta.titulo || "Misa"}: ${cuerpo}`.slice(0, 220), "/", !(ac && ac.restringida));
+        const tituloAviso = "✏️ Cambios en la pauta de misa";
+        const textoAviso = `${pauta.titulo || "Misa"}: ${cuerpo}`.slice(0, 220);
+        // Pauta sin restricción: mismo envío que usa "Nueva pauta" (a todos los suscritos). Restringida: solo a quienes tienen acceso.
+        const r = ac && ac.restringida ? await sendPushToUsers(ids, tituloAviso, textoAviso, "/", false) : await sendPushToAll(tituloAviso, textoAviso, "/");
         if (r.ok) {
           setAvisoRes(`✅ Aviso enviado (${r.recipients || ids.length} dispositivo(s)).`);
           setCambiosPend(null);
