@@ -27,6 +27,11 @@ function authHeader(key) {
 
 // Pide a OneSignal la lista de subscriptions y devuelve los IDs realmente suscritos.
 async function listarSuscritos() {
+  return (await listarSuscritosDetalle()).map((x) => x.id);
+}
+
+// Igual que listarSuscritos pero devuelve también el external_id (id del integrante) de cada dispositivo.
+async function listarSuscritosDetalle() {
   const ids = [];
   const limit = 300;
   const keysAProbar = LEGACY_KEY ? [LEGACY_KEY, API_KEY] : [API_KEY];
@@ -49,7 +54,7 @@ async function listarSuscritos() {
           typeof p.notification_types === "number"
             ? p.notification_types > 0
             : p.invalid_identifier === false;
-        if (subscrito) ids.push(p.id);
+        if (subscrito) ids.push({ id: p.id, ext: p.external_user_id || null });
       }
       if (players.length < limit) break;
       offset += limit;
@@ -88,14 +93,46 @@ export default async function handler(req, res) {
     // 0) Integrantes concretos (external_id = id del integrante): solo a ellos.
     const { externalIds } = req.body || {};
     if (Array.isArray(externalIds) && externalIds.length > 0) {
+      const ids = externalIds.map(String);
       let recipients = 0;
       let ultimo = null;
-      for (let i = 0; i < externalIds.length; i += 1000) {
-        const r = await enviar({ ...base, target_channel: "push", include_aliases: { external_id: externalIds.slice(i, i + 1000).map(String) } });
+      let via = "external_ids";
+      let detalle = null;
+      for (let i = 0; i < ids.length; i += 1000) {
+        const r = await enviar({ ...base, target_channel: "push", include_aliases: { external_id: ids.slice(i, i + 1000) } });
         ultimo = r.data;
         recipients += r.data?.recipients || 0;
       }
-      return res.status(200).json({ ok: recipients > 0, via: "external_ids", recipients, onesignal: ultimo });
+      if (recipients === 0) {
+        // Plan B: buscar los dispositivos suscritos que pertenecen a esos integrantes y enviarles por su ID de dispositivo.
+        try {
+          const subs = await listarSuscritosDetalle();
+          const set = new Set(ids);
+          const subIds = subs.filter((x) => x.ext && set.has(String(x.ext))).map((x) => x.id);
+          if (subIds.length > 0) {
+            via = "dispositivos_por_integrante";
+            for (let i = 0; i < subIds.length; i += 1000) {
+              const r = await enviar({ ...base, target_channel: "push", include_subscription_ids: subIds.slice(i, i + 1000) });
+              ultimo = r.data;
+              recipients += r.data?.recipients || 0;
+            }
+          } else if (req.body.fallbackTodos && subs.length > 0) {
+            // Pauta sin restricción: si ningún dispositivo está identificado con su integrante, se avisa a todos los dispositivos suscritos.
+            via = "todos_los_dispositivos";
+            const todos = subs.map((x) => x.id);
+            for (let i = 0; i < todos.length; i += 1000) {
+              const r = await enviar({ ...base, target_channel: "push", include_subscription_ids: todos.slice(i, i + 1000) });
+              ultimo = r.data;
+              recipients += r.data?.recipients || 0;
+            }
+          } else {
+            detalle = { dispositivos_suscritos: subs.length, identificados_con_integrante: subs.filter((x) => x.ext).length, integrantes_a_avisar: ids.length };
+          }
+        } catch (e) {
+          detalle = { error: String(e?.message || e) };
+        }
+      }
+      return res.status(200).json({ ok: recipients > 0, via, recipients, detalle, onesignal: ultimo });
     }
 
     // 1) IDs explícitos (si los pasan).

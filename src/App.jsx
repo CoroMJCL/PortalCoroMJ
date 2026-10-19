@@ -260,12 +260,12 @@ async function sendPushToAll(title, body, url = "/") {
 }
 
 // Envía notificación solo a integrantes concretos (por su id).
-async function sendPushToUsers(externalIds, title, body, url = "/") {
+async function sendPushToUsers(externalIds, title, body, url = "/", fallbackTodos = false) {
   try {
     const res = await fetch("/api/send-push", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, body, url, externalIds }),
+      body: JSON.stringify({ title, body, url, externalIds, fallbackTodos }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data?.ok === false) return { ok: false, data };
@@ -33409,12 +33409,17 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       } else {
         let cuerpo = lineas.slice(0, 4).join(" · ");
         if (lineas.length > 4) cuerpo += ` · y ${lineas.length - 4} cambio(s) más`;
-        const r = await sendPushToUsers(ids, "✏️ Cambios en la pauta de misa", `${pauta.titulo || "Misa"}: ${cuerpo}`.slice(0, 220), "/");
+        const r = await sendPushToUsers(ids, "✏️ Cambios en la pauta de misa", `${pauta.titulo || "Misa"}: ${cuerpo}`.slice(0, 220), "/", !(ac && ac.restringida));
         if (r.ok) {
           setAvisoRes(`✅ Aviso enviado (${r.recipients || ids.length} dispositivo(s)).`);
           setCambiosPend(null);
         } else {
-          setAvisoRes("No se pudo enviar el aviso. Intenta de nuevo.");
+          const d = r.data && r.data.detalle;
+          setAvisoRes(
+            d && d.dispositivos_suscritos !== undefined
+              ? `Nadie recibió el aviso: ninguno de los ${ids.length} integrantes tiene un dispositivo con notificaciones activas e identificado (${d.identificados_con_integrante} de ${d.dispositivos_suscritos} dispositivos identificados).`
+              : "No se pudo enviar el aviso. Intenta de nuevo." + (d && d.error ? " (" + d.error + ")" : "")
+          );
         }
       }
     } catch (e) {
