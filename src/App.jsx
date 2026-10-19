@@ -324,9 +324,18 @@ function mjResumenCambiosPauta(vieja, nueva) {
     if (!o) return;
     if (n(o.url_letra) !== n(c.url_letra)) out.push(`Letra actualizada: ${nom(c)}`);
     if (n(o.url_audio) !== n(c.url_audio)) out.push(`Audio actualizado: ${nom(c)}`);
+    if (n(o.autor) !== n(c.autor)) out.push(`Autor de ${nom(c)}: ${n(o.autor) || "—"} → ${n(c.autor) || "—"}`);
+    const iO = n(o.interprete || o.salmista), iC = n(c.interprete || c.salmista);
+    if (iO !== iC) out.push(`Intérprete de ${nom(c)}: ${iO || "—"} → ${iC || "—"}`);
+    if (!!o.pendiente !== !!c.pendiente) out.push(c.pendiente ? `Por confirmar: ${nom(c)}` : `Confirmado: ${nom(c)}`);
   });
   if (n(vieja.notas) !== n(nueva.notas)) out.push("Se actualizaron las notas");
   if (n(vieja.guion_url) !== n(nueva.guion_url)) out.push("Se actualizó el guion de la misa");
+  // Cualquier otra diferencia en los cantos que no se haya descrito arriba
+  if (!out.length) {
+    const norm = (l) => JSON.stringify(l.map((c) => Object.keys(c).sort().reduce((m, k) => ((m[k] = n(c[k])), m), {})));
+    if (norm(A) !== norm(B)) out.push("Se modificaron datos de los cantos");
+  }
   return out;
 }
 
@@ -33371,6 +33380,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       setMode("view");
       setAvisoRes("");
       setCambiosPend(lineasCambio.length ? { pauta: updated, lineas: lineasCambio } : null);
+      if (lineasCambio.length) notificarCambiosAuto(updated, lineasCambio);
       try {
         setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50);
       } catch (e) {}
@@ -33391,42 +33401,21 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     setSaving(false);
   }
 
-  async function avisarCambios() {
-    if (!cambiosPend || avisando) return;
+  // Al guardar cambios en una pauta ya publicada: se avisa de inmediato a todos, sin botones.
+  async function notificarCambiosAuto(pauta, lineas) {
     setAvisando(true);
-    setAvisoRes("");
+    setAvisoRes("Enviando aviso a los integrantes...");
     try {
-      const { pauta, lineas } = cambiosPend;
-      const accesos = await mjCargarAccesosPauta();
-      const ac = accesos[pauta.id];
-      const ids = (members || [])
-        .filter((m) => m && m.id && m.cuerda && String(m.cuerda).trim() !== "" && m.cuerda !== "Admin" && !esVisita(m))
-        .filter((m) => !m.acceso || m.acceso === "aprobado")
-        .filter((m) => !ac || !ac.restringida || (ac.ids || []).map(String).includes(String(m.id)))
-        .map((m) => String(m.id));
-      if (!ids.length) {
-        setAvisoRes("No hay integrantes con acceso a esta pauta a quienes avisar.");
-      } else {
-        let cuerpo = lineas.slice(0, 4).join(" · ");
-        if (lineas.length > 4) cuerpo += ` · y ${lineas.length - 4} cambio(s) más`;
-        const tituloAviso = "✏️ Cambios en la pauta de misa";
-        const textoAviso = `${pauta.titulo || "Misa"}: ${cuerpo}`.slice(0, 220);
-        // Siempre a todos los suscritos (mismo envío que "Nueva pauta"), tenga o no restricción de acceso.
-        const r = await sendPushToAll(tituloAviso, textoAviso, "/");
-        if (r.ok) {
-          setAvisoRes(`✅ Aviso enviado (${r.recipients || ids.length} dispositivo(s)).`);
-          setCambiosPend(null);
-        } else {
-          const d = r.data && r.data.detalle;
-          setAvisoRes(
-            d && d.dispositivos_suscritos !== undefined
-              ? `Nadie recibió el aviso: ninguno de los ${ids.length} integrantes tiene un dispositivo con notificaciones activas e identificado (${d.identificados_con_integrante} de ${d.dispositivos_suscritos} dispositivos identificados).`
-              : "No se pudo enviar el aviso. Intenta de nuevo." + (d && d.error ? " (" + d.error + ")" : "")
-          );
-        }
-      }
+      let cuerpo = lineas.slice(0, 4).join(" · ");
+      if (lineas.length > 4) cuerpo += ` · y ${lineas.length - 4} cambio(s) más`;
+      const r = await sendPushToAll("✏️ Cambios en la pauta de misa", `${pauta.titulo || "Misa"}: ${cuerpo}`.slice(0, 220), "/");
+      setAvisoRes(
+        r.ok
+          ? `✅ Se notificó a todos los integrantes (${r.recipients || 0} dispositivo(s)).`
+          : "⚠️ Los cambios se guardaron, pero no se pudo enviar la notificación."
+      );
     } catch (e) {
-      setAvisoRes("No se pudo enviar el aviso: " + (e.message || e));
+      setAvisoRes("⚠️ Los cambios se guardaron, pero no se pudo enviar la notificación.");
     }
     setAvisando(false);
   }
@@ -34494,27 +34483,15 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     );
     return (
       <div style={{ maxWidth: 1100 }}>
-        {isAdmin && (cambiosPend && cambiosPend.pauta.id === selected.id || avisoRes) && (
-          <div style={{ position: "sticky", top: 8, zIndex: 60, background: "#eef4fb", border: "1px solid #9fbde3", borderRadius: 16, padding: "14px 16px", marginBottom: 14, boxShadow: "0 10px 30px rgba(30,58,95,.22)" }}>
-            {cambiosPend && cambiosPend.pauta.id === selected.id && (
-              <>
-                <div style={{ fontSize: 14, fontWeight: 800, color: "#14305a", marginBottom: 6 }}>Cambios guardados. ¿Avisar a los integrantes?</div>
-                <ul style={{ margin: "0 0 12px", paddingLeft: 18, fontSize: 13, color: "#334155", lineHeight: 1.6 }}>
-                  {cambiosPend.lineas.map((l, i) => (
-                    <li key={i}>{l}</li>
-                  ))}
-                </ul>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button onClick={avisarCambios} disabled={avisando} style={{ border: "none", background: "#1e3a5f", color: "#fff", borderRadius: 999, height: 38, padding: "0 18px", fontSize: 13, fontWeight: 700, cursor: avisando ? "default" : "pointer", fontFamily: "inherit", opacity: avisando ? 0.7 : 1 }}>
-                    {avisando ? "Enviando..." : "🔔 Notificar a los integrantes"}
-                  </button>
-                  <button onClick={() => setCambiosPend(null)} disabled={avisando} style={{ border: "1px solid #c9daf0", background: "#fff", color: "#1e3a5f", borderRadius: 999, height: 38, padding: "0 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                    No avisar
-                  </button>
-                </div>
-              </>
-            )}
-            {avisoRes && <div style={{ fontSize: 13, fontWeight: 700, color: avisoRes.startsWith("✅") ? "#065f46" : "#b91c1c", marginTop: cambiosPend && cambiosPend.pauta.id === selected.id ? 10 : 0 }}>{avisoRes}</div>}
+        {isAdmin && cambiosPend && cambiosPend.pauta.id === selected.id && (
+          <div style={{ background: "#eef4fb", border: "1px solid #9fbde3", borderRadius: 16, padding: "14px 16px", marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "#14305a", marginBottom: 6 }}>Cambios guardados y avisados</div>
+            <ul style={{ margin: "0 0 8px", paddingLeft: 18, fontSize: 13, color: "#334155", lineHeight: 1.6 }}>
+              {cambiosPend.lineas.map((l, i) => (
+                <li key={i}>{l}</li>
+              ))}
+            </ul>
+            {avisoRes && <div style={{ fontSize: 13, fontWeight: 700, color: avisoRes.startsWith("✅") ? "#065f46" : avisoRes.startsWith("⚠️") ? "#b91c1c" : "#475569" }}>{avisoRes}</div>}
           </div>
         )}
         {/* Visor de guion (Google Drive) */}
