@@ -16304,7 +16304,7 @@ function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico }) {
               {pauta.hora ? ` · ${pauta.hora}` : ""}
               {pauta.lugar ? ` · ${pauta.lugar}` : ""}
             </div>
-            {pauta.notas && <div style={{ marginTop: 12, padding: "12px 14px", background: "#fff", border: "1px solid " + LINE, borderRadius: 14, fontSize: 13.5, color: "#475569", whiteSpace: "pre-wrap" }}>{pauta.notas}</div>}
+            {pauta.notas && <div style={{ marginTop: 12, padding: "12px 14px", background: "#fff", border: "1px solid " + LINE, borderRadius: 14, fontSize: 13.5, color: "#475569" }}>{renderNotas(pauta.notas)}</div>}
           </div>
           <div style={{ padding: "8px 12px" }}>
             {docs.length === 0 && <div style={{ padding: 20, fontSize: 14, color: MUTED }}>Esta pauta aún no tiene canciones.</div>}
@@ -16436,7 +16436,7 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
           </>
         )}
         {pauta.notas && (
-          <div style={{ marginTop: 14, background: "#fffbeb", border: "1px solid #fde9a8", borderRadius: 14, padding: "11px 14px", fontSize: 13.5, lineHeight: 1.55, color: "#6b4e0b", whiteSpace: "pre-wrap" }}>{pauta.notas}</div>
+          <div style={{ marginTop: 14, background: "#fffbeb", border: "1px solid #fde9a8", borderRadius: 14, padding: "11px 14px", fontSize: 13.5, lineHeight: 1.55, color: "#6b4e0b" }}>{renderNotas(pauta.notas)}</div>
         )}
         <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           {pauta.guion_url && /^https?:/i.test(pauta.guion_url) && (
@@ -32469,20 +32469,22 @@ const TITULO_CELEBRACION_OPTIONS = [
 // Renderiza notas con **negrita** y saltos de línea
 function renderNotas(texto) {
   if (!texto) return null;
-  return texto.split("\n").map((linea, li) => {
-    const partes = linea.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+  const lineas = String(texto).split("\n");
+  return lineas.map((linea, li) => {
+    // **negrita**: se alterna con cada "**"; asteriscos sobrantes o vacíos no se muestran
+    const partes = linea.split("**");
     return (
       <span key={li}>
         {partes.map((p, pi) =>
-          p.startsWith("**") && p.endsWith("**") ? (
+          p === "" ? null : pi % 2 === 1 ? (
             <strong key={pi} style={{ fontWeight: 700 }}>
-              {p.slice(2, -2)}
+              {p}
             </strong>
           ) : (
             <span key={pi}>{p}</span>
           )
         )}
-        {li < texto.split("\n").length - 1 && <br />}
+        {li < lineas.length - 1 && <br />}
       </span>
     );
   });
@@ -33369,6 +33371,9 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       setMode("view");
       setAvisoRes("");
       setCambiosPend(lineasCambio.length ? { pauta: updated, lineas: lineasCambio } : null);
+      try {
+        setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50);
+      } catch (e) {}
       if (publish) {
         await notificarIntegrantes(updated, members);
         sendPushToAll(
@@ -34482,7 +34487,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     return (
       <div style={{ maxWidth: 1100 }}>
         {isAdmin && (cambiosPend && cambiosPend.pauta.id === selected.id || avisoRes) && (
-          <div style={{ background: "#eef4fb", border: "1px solid #c9daf0", borderRadius: 16, padding: "14px 16px", marginBottom: 14 }}>
+          <div style={{ position: "sticky", top: 8, zIndex: 60, background: "#eef4fb", border: "1px solid #9fbde3", borderRadius: 16, padding: "14px 16px", marginBottom: 14, boxShadow: "0 10px 30px rgba(30,58,95,.22)" }}>
             {cambiosPend && cambiosPend.pauta.id === selected.id && (
               <>
                 <div style={{ fontSize: 14, fontWeight: 800, color: "#14305a", marginBottom: 6 }}>Cambios guardados. ¿Avisar a los integrantes?</div>
