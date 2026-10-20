@@ -754,7 +754,7 @@ export default function Landing({ onPortal }) {
         .verso{position:absolute;z-index:3;left:100px;top:228px;width:min(340px,36vw);display:flex;flex-direction:column;gap:12px;padding:18px 22px 18px;border-radius:20px;background:rgba(10,18,40,0.36);border:1px solid rgba(255,255,255,0.22);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 30px rgba(0,0,0,0.25);color:#fff;font-family:'Outfit','Plus Jakarta Sans',sans-serif}
         .verso-k{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:500;letter-spacing:0.26em;text-transform:uppercase;color:rgba(255,255,255,0.75)}
         .verso-k b{width:6px;height:6px;border-radius:50%;background:#f5b942;box-shadow:0 0 0 3px rgba(245,185,66,0.25)}
-        .verso-h{font-size:24px;font-weight:700;line-height:1.1;letter-spacing:-0.02em;color:#fff}
+        .verso-h{text-wrap:balance;font-size:24px;font-weight:700;line-height:1.1;letter-spacing:-0.02em;color:#fff}
         .verso-t{margin:0;font-size:15px;font-weight:300;line-height:1.5;letter-spacing:0.005em;color:rgba(255,255,255,0.92)}
         .verso-c{font-size:11px;font-weight:500;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.7)}
         .verso-b{align-self:flex-start;margin-top:2px;background:#fff;color:#08122d;border:none;border-radius:980px;padding:9px 18px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}
@@ -988,8 +988,8 @@ export default function Landing({ onPortal }) {
         <IgStats C={C} />
         <div className="verso">
           <div className="verso-k"><b />Una invitación</div>
-          <div className="verso-h">{C.verso_titulo || "Tu voz también es misión"}</div>
-          <p className="verso-t">{C.verso_texto || "Dios te regaló una voz: úsala para alabarlo. Ven a cantar con nosotros, a servir en cada misa y a ser parte de una familia que anuncia a Cristo con alegría."}</p>
+          <div className="verso-h">{C.verso_titulo || "Hazme instrumento de tu paz"}</div>
+          <p className="verso-t">{C.verso_texto || "Tu voz puede llevar paz a cada celebración. Ven a ser instrumento de Dios: canta con nosotros, sirve en cada misa y anuncia a Cristo con alegría."}</p>
           {C.verso_cita && <div className="verso-c">{C.verso_cita}</div>}
           <button className="verso-b" onClick={() => go("bot")}>Quiero unirme al coro <span aria-hidden="true">→</span></button>
         </div>
