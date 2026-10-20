@@ -330,8 +330,8 @@ function IgStat({ valor, etiqueta }) {
   const v = useContador(valor);
   return (
     <div className="ig-i">
-      <div className="ig-n">{v}</div>
-      <div className="ig-l">{etiqueta}</div>
+      <span className="ig-n">{v}</span>
+      <span className="ig-l">{etiqueta}</span>
     </div>
   );
 }
@@ -339,17 +339,13 @@ function IgStats({ C }) {
   if (C.ig_mostrar === "no") return null;
   if (!C.ig_seguidores && !C.ig_vistas) return null;
   return (
-    <div className="ig">
-      <div className="ig-k">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>
-        <span>Nuestra comunidad</span>
-      </div>
-      <div className="ig-row">
-        {C.ig_seguidores && <IgStat valor={C.ig_seguidores} etiqueta="Seguidores en Instagram" />}
-        {C.ig_seguidores && C.ig_vistas && <div className="ig-sep" />}
-        {C.ig_vistas && <IgStat valor={C.ig_vistas} etiqueta="Visualizaciones" />}
-      </div>
-      {C.ig_nota && <div className="ig-nota">{C.ig_nota}</div>}
+    <div className="ig" title={C.ig_nota || undefined}>
+      <span className="ig-ico">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>
+      </span>
+      {C.ig_seguidores && <IgStat valor={C.ig_seguidores} etiqueta="seguidores" />}
+      {C.ig_seguidores && C.ig_vistas && <span className="ig-sep" />}
+      {C.ig_vistas && <IgStat valor={C.ig_vistas} etiqueta="visualizaciones" />}
     </div>
   );
 }
@@ -816,14 +812,13 @@ export default function Landing({ onPortal }) {
         .pm-row svg{flex-shrink:0;margin-top:2px;color:#f5b942}
         .pm-count{font-size:11.5px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#f5b942}
         .pm-row b{font-weight:700;color:#fff;font-size:15px;letter-spacing:0.02em}
-        .ig{position:absolute;z-index:3;top:112px;left:60px;display:flex;flex-direction:column;gap:10px;padding:16px 22px;border-radius:20px;background:rgba(10,18,40,0.36);border:1px solid rgba(255,255,255,0.22);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:#fff;font-family:'Outfit','Plus Jakarta Sans',sans-serif}
-        .ig-k{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:500;letter-spacing:0.26em;text-transform:uppercase;color:rgba(255,255,255,0.75)}
-        .ig-row{display:flex;align-items:center;gap:22px}
-        .ig-sep{width:1px;align-self:stretch;background:rgba(255,255,255,0.25)}
-        .ig-n{font-size:38px;font-weight:300;line-height:1;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
-        .ig-l{margin-top:6px;font-size:10.5px;font-weight:400;letter-spacing:0.08em;color:rgba(255,255,255,0.75);white-space:nowrap}
-        .ig-nota{font-size:10px;color:rgba(255,255,255,0.5);letter-spacing:0.04em}
-        @media(max-width:900px){.ig{top:92px;left:20px;right:20px;padding:12px 16px}.ig-n{font-size:28px}.ig-row{gap:16px}}
+        .ig{position:absolute;z-index:3;top:108px;left:60px;display:inline-flex;align-items:center;gap:14px;padding:7px 18px 7px 8px;border-radius:999px;background:rgba(8,18,45,0.42);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 6px 22px rgba(0,0,0,0.18)}
+        .ig-ico{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#f5b942;background:rgba(245,185,66,0.14);border:1px solid rgba(245,185,66,0.38);flex-shrink:0}
+        .ig-i{display:flex;align-items:baseline;gap:6px;white-space:nowrap}
+        .ig-sep{width:1px;height:16px;background:rgba(255,255,255,0.22)}
+        .ig-n{font-size:17px;font-weight:700;line-height:1;letter-spacing:-0.01em;font-variant-numeric:tabular-nums}
+        .ig-l{font-size:11.5px;font-weight:500;letter-spacing:0.02em;color:rgba(255,255,255,0.72)}
+        @media(max-width:900px){.ig{top:92px;left:20px;max-width:calc(100% - 40px);gap:10px;padding:6px 14px 6px 6px}.ig-n{font-size:15px}.ig-l{font-size:10.5px}.ig-i{gap:4px}}
         .verso{position:absolute;z-index:3;left:100px;top:236px;width:min(380px,38vw);padding:2px 0 2px 18px;border-left:2px solid rgba(245,185,66,0.85);color:#fff;font-family:'Outfit','Plus Jakarta Sans',sans-serif;text-shadow:0 2px 18px rgba(6,14,36,0.45)}
         .verso-k{font-size:10px;font-weight:500;letter-spacing:0.32em;text-transform:uppercase;color:rgba(255,255,255,0.78);margin-bottom:10px}
         .verso-h{text-wrap:balance;font-size:30px;font-weight:300;line-height:1.18;letter-spacing:-0.015em;color:#fff}
