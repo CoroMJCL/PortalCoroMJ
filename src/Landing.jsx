@@ -373,14 +373,29 @@ function ProximaMisa({ C }) {
   const hora = (src.hora || "").slice(0, 5);
   return (
     <div className="pm">
-      <div className="pm-date">
+      <div className="pm-k"><b />Próxima misa</div>
+      <div className="pm-top">
         <span className="pm-day">{String(d.getDate()).padStart(2, "0")}</span>
-        <span className="pm-mon">{dia} · {mes}</span>
+        <span className="pm-bar" />
+        <span className="pm-mw">
+          <span className="pm-mon">{mes}</span>
+          <span className="pm-wd">{d.toLocaleDateString("es-CL", { weekday: "long" })}</span>
+        </span>
       </div>
-      <div className="pm-info">
-        <div className="pm-k"><b />Próxima misa</div>
-        {hora && <div className="pm-h">{hora}<small>HRS</small></div>}
-        {src.lugar && <div className="pm-l">{src.lugar}</div>}
+      <div className="pm-rule" />
+      <div className="pm-meta">
+        {hora && (
+          <span className="pm-row">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+            <span><b>{hora}</b> hrs</span>
+          </span>
+        )}
+        {src.lugar && (
+          <span className="pm-row">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11z" /><circle cx="12" cy="10" r="2.5" /></svg>
+            <span>{src.lugar}</span>
+          </span>
+        )}
       </div>
     </div>
   );
@@ -733,16 +748,20 @@ export default function Landing({ onPortal }) {
         .hero-kicker::before{content:'';width:28px;height:1px;background:rgba(255,255,255,0.4)}
         .hero-h1{font-size:clamp(70px,9.5vw,124px);font-weight:900;line-height:0.88;color:#fff;letter-spacing:-0.03em}
         .hero-h1 .it{font-family:'Fraunces',serif;font-style:italic;font-weight:400;display:block;line-height:0.92;font-size:clamp(66px,9vw,118px)}
-        .pm{width:max-content;max-width:100%;display:flex;align-items:stretch;gap:18px;padding:14px 20px 14px 16px;border-radius:18px;background:rgba(10,18,40,0.38);border:1px solid rgba(255,255,255,0.22);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 30px rgba(0,0,0,0.25);color:#fff;font-family:'Outfit','Plus Jakarta Sans',sans-serif}
-        .pm-date{display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;min-width:84px;padding-right:18px;border-right:1px solid rgba(255,255,255,0.25)}
-        .pm-day{font-size:44px;font-weight:300;line-height:0.95;letter-spacing:-0.02em}
-        .pm-mon{margin-top:7px;font-size:10px;font-weight:500;letter-spacing:0.16em;white-space:nowrap;color:rgba(255,255,255,0.8)}
-        .pm-info{display:flex;flex-direction:column;justify-content:center;gap:3px;text-align:left}
-        .pm-k{display:flex;align-items:center;gap:7px;font-size:9.5px;font-weight:500;letter-spacing:0.26em;text-transform:uppercase;color:rgba(255,255,255,0.7)}
+        .pm{width:300px;max-width:100%;display:flex;flex-direction:column;gap:14px;padding:16px 22px 18px;border-radius:20px;background:linear-gradient(160deg,rgba(14,24,52,0.62),rgba(8,16,38,0.5));border:1px solid rgba(245,185,66,0.5);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 0 0 1px rgba(245,185,66,0.12),0 18px 44px rgba(0,0,0,0.4);color:#fff;font-family:'Outfit','Plus Jakarta Sans',sans-serif}
+        .pm-k{display:flex;align-items:center;gap:8px;font-size:9.5px;font-weight:500;letter-spacing:0.3em;text-transform:uppercase;color:rgba(255,255,255,0.72)}
         .pm-k b{width:6px;height:6px;border-radius:50%;background:#f5b942;box-shadow:0 0 0 3px rgba(245,185,66,0.25)}
-        .pm-h{display:flex;align-items:baseline;gap:6px;font-size:26px;font-weight:400;line-height:1.1;letter-spacing:0.02em;font-variant-numeric:tabular-nums}
-        .pm-h small{font-size:10px;font-weight:500;letter-spacing:0.22em;opacity:0.65}
-        .pm-l{white-space:nowrap;font-size:11.5px;font-weight:400;letter-spacing:0.04em;color:rgba(255,255,255,0.85)}
+        .pm-top{display:flex;align-items:center;gap:16px}
+        .pm-day{font-size:64px;font-weight:200;line-height:0.9;letter-spacing:-0.03em;font-variant-numeric:tabular-nums}
+        .pm-bar{width:1px;align-self:stretch;background:linear-gradient(180deg,transparent,rgba(245,185,66,0.9),transparent)}
+        .pm-mw{display:flex;flex-direction:column;gap:5px}
+        .pm-mon{font-size:30px;font-weight:300;letter-spacing:0.22em;line-height:1}
+        .pm-wd{font-size:11px;font-weight:500;letter-spacing:0.24em;text-transform:uppercase;color:rgba(255,255,255,0.72)}
+        .pm-rule{height:1px;background:linear-gradient(90deg,rgba(245,185,66,0.7),rgba(255,255,255,0.08))}
+        .pm-meta{display:flex;flex-direction:column;gap:8px}
+        .pm-row{display:flex;align-items:flex-start;gap:9px;font-size:13px;line-height:1.35;letter-spacing:0.02em;color:rgba(255,255,255,0.88)}
+        .pm-row svg{flex-shrink:0;margin-top:1px;color:#f5b942}
+        .pm-row b{font-weight:600;color:#fff;font-size:15px;letter-spacing:0.04em}
         .ig{position:absolute;z-index:3;top:112px;left:60px;display:flex;flex-direction:column;gap:10px;padding:16px 22px;border-radius:20px;background:rgba(10,18,40,0.36);border:1px solid rgba(255,255,255,0.22);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:#fff;font-family:'Outfit','Plus Jakarta Sans',sans-serif}
         .ig-k{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:500;letter-spacing:0.26em;text-transform:uppercase;color:rgba(255,255,255,0.75)}
         .ig-row{display:flex;align-items:center;gap:22px}
@@ -757,8 +776,7 @@ export default function Landing({ onPortal }) {
         .verso-t{margin-top:12px;font-size:14px;font-weight:400;letter-spacing:0.04em;color:rgba(255,255,255,0.85)}
         @media(min-width:901px) and (max-height:760px){.verso{display:none}}
         @media(max-width:900px){.verso{left:20px;top:34%;width:min(300px,56vw);padding-left:14px}.verso-h{font-size:24px}}
-        @media(max-width:480px){.verso{top:auto;bottom:445px;width:min(260px,64vw)}.verso-h{font-size:19px}.verso-t{display:none}.verso-k{margin-bottom:6px}}
-        @media(max-width:480px) and (max-height:800px){.verso{display:none}}
+        @media(max-width:480px){.verso{display:none}}
         .hero-right{display:flex;flex-direction:column;align-items:flex-end;gap:16px;max-width:420px}
         .hero-sub{font-size:13.5px;font-weight:300;color:rgba(255,255,255,0.55);line-height:1.75;text-align:right}
         .hero-btns{display:flex;gap:10px}
@@ -954,15 +972,11 @@ export default function Landing({ onPortal }) {
           .tools{padding:72px 24px}
           .tools-grid{grid-template-columns:1fr;gap:20px}
         }
-        @media(min-width:700px) and (max-width:900px){
+        @media(min-width:740px) and (max-width:900px){
           .hero-c{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:20px;row-gap:18px;align-items:end}
           .hero-c > div:first-child{grid-column:1;grid-row:1}
           .hero-right{display:contents}
-          .pm{grid-column:2;grid-row:1;align-self:end;flex-direction:column;align-items:stretch;gap:12px;width:224px;padding:16px 18px;border-color:rgba(245,185,66,0.55);box-shadow:0 0 0 1px rgba(245,185,66,0.16),0 16px 40px rgba(0,0,0,0.38)}
-          .pm-date{flex-direction:row;align-items:baseline;justify-content:flex-start;gap:10px;min-width:0;padding:0 0 12px;border-right:none;border-bottom:1px solid rgba(255,255,255,0.25)}
-          .pm-day{font-size:54px}
-          .pm-mon{margin-top:0}
-          .pm-l{white-space:normal;line-height:1.35}
+          .pm{grid-column:2;grid-row:1;align-self:end;width:262px}
           .hero-sub{grid-column:1 / -1;grid-row:2}
           .hero-btns{grid-column:1 / -1;grid-row:3}
         }
