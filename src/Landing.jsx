@@ -678,7 +678,6 @@ export default function Landing({ onPortal }) {
   useEffect(() => { dbGet().then(d => { setC(d); try { if (d.hero_img) localStorage.setItem("mj_hero_img", d.hero_img); } catch (e) {} }); }, []);
   const heroRef = useRef(null);
   const [heroOk, setHeroOk] = useState(false);
-  const [heroFast, setHeroFast] = useState(false);
   // Foto de portada: se pide con prioridad y aparece con un fundido cuando ya está lista
   useEffect(() => {
     setHeroOk(false);
@@ -689,11 +688,9 @@ export default function Landing({ onPortal }) {
       l.rel = "preload"; l.as = "image"; l.href = C.hero_img; l.setAttribute("fetchpriority", "high");
       document.head.appendChild(l);
     } catch (e) {}
-    const t0 = Date.now();
     const im = new Image();
     im.decoding = "async";
-    // si la foto ya estaba en el navegador (carga casi instantánea) aparece sin fundido
-    im.onload = im.onerror = () => { if (!off) { setHeroFast(Date.now() - t0 < 150); setHeroOk(true); } };
+    im.onload = im.onerror = () => { if (!off) setHeroOk(true); };
     im.src = C.hero_img;
     return () => { off = true; };
   }, [C.hero_img]);
@@ -790,7 +787,6 @@ export default function Landing({ onPortal }) {
         .hero{background:#08122d}
         .hero-bg{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center center;opacity:0;transition:opacity 1.1s ease;will-change:transform;transform:scale(1.14)}
         .hero-bg.ok{opacity:1}
-        .hero-bg.fast{transition:none}
         @media(max-width:900px){.hero-bg{background-position:60% center}}
         .hero-ov{position:absolute;inset:0;z-index:1;background:linear-gradient(160deg,rgba(6,14,36,0.6) 0%,rgba(6,14,36,0.2) 40%,rgba(6,14,36,0.7) 70%,rgba(6,14,36,0.97) 100%)}
         .hero-c{position:relative;z-index:2;padding:0 60px 68px;width:100%;display:flex;justify-content:space-between;align-items:flex-end}
@@ -1063,7 +1059,7 @@ export default function Landing({ onPortal }) {
 
       {/* HERO */}
       <section id="inicio" className="hero">
-        <div ref={heroRef} className={"hero-bg" + (heroOk ? " ok" : "") + (heroFast ? " fast" : "")} style={C.hero_img ? { backgroundImage: `url('${C.hero_img}')` } : undefined}/>
+        <div ref={heroRef} className={"hero-bg" + (heroOk ? " ok" : "")} style={C.hero_img ? { backgroundImage: `url('${C.hero_img}')` } : undefined}/>
         <div className="hero-ov"/>
         <IgStats C={C} />
         <div className="verso">
