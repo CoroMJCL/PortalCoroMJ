@@ -371,6 +371,9 @@ function ProximaMisa({ C }) {
   const dia = d.toLocaleDateString("es-CL", { weekday: "short" }).replace(".", "").slice(0, 3).toUpperCase();
   const mes = d.toLocaleDateString("es-CL", { month: "short" }).replace(".", "").slice(0, 3).toUpperCase();
   const hora = (src.hora || "").slice(0, 5);
+  const hoyCL = new Date().toLocaleDateString("en-CA", { timeZone: "America/Santiago" });
+  const dias = Math.round((Date.parse(src.fecha + "T00:00:00Z") - Date.parse(hoyCL + "T00:00:00Z")) / 86400000);
+  const cuenta = isNaN(dias) || dias < 0 ? "" : dias === 0 ? "Es hoy" : dias === 1 ? "Es mañana" : `Faltan ${dias} días`;
   return (
     <div className="pm">
       <div className="pm-k"><b />Próxima misa</div>
@@ -397,6 +400,7 @@ function ProximaMisa({ C }) {
           </span>
         )}
       </div>
+      {cuenta && <div className="pm-count">{cuenta}</div>}
     </div>
   );
 }
@@ -667,6 +671,41 @@ export default function Landing({ onPortal }) {
   const [editing, setEditing] = useState({}); const [saving, setSaving] = useState({}); const [upKey, setUpKey] = useState(null);
   const msgsRef = useRef(null);
   useEffect(() => { dbGet().then(setC); }, []);
+  const heroRef = useRef(null);
+  const [heroOk, setHeroOk] = useState(false);
+  // Foto de portada: se pide con prioridad y aparece con un fundido cuando ya está lista
+  useEffect(() => {
+    setHeroOk(false);
+    if (!C.hero_img) return;
+    let off = false;
+    try {
+      const l = document.createElement("link");
+      l.rel = "preload"; l.as = "image"; l.href = C.hero_img; l.setAttribute("fetchpriority", "high");
+      document.head.appendChild(l);
+    } catch (e) {}
+    const im = new Image();
+    im.decoding = "async";
+    im.onload = im.onerror = () => { if (!off) setHeroOk(true); };
+    im.src = C.hero_img;
+    return () => { off = true; };
+  }, [C.hero_img]);
+  // Movimiento suave de la foto al bajar (se desactiva si el dispositivo pide menos animaciones)
+  useEffect(() => {
+    if (typeof window === "undefined" || (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const el = heroRef.current;
+        if (!el) return;
+        el.style.transform = `translate3d(0,${Math.min(window.scrollY, 700) * 0.1}px,0) scale(1.14)`;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => { window.removeEventListener("scroll", onScroll); if (raf) cancelAnimationFrame(raf); };
+  }, []);
   useEffect(() => { if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight; }, [chat, typing]);
   const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
@@ -740,7 +779,9 @@ export default function Landing({ onPortal }) {
 
         /* HERO */
         .hero{height:100vh;position:relative;overflow:hidden;display:flex;align-items:flex-end}
-        .hero-bg{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center center}
+        .hero{background:#08122d}
+        .hero-bg{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center center;opacity:0;transition:opacity 1.1s ease;will-change:transform;transform:scale(1.14)}
+        .hero-bg.ok{opacity:1}
         @media(max-width:900px){.hero-bg{background-position:60% center}}
         .hero-ov{position:absolute;inset:0;z-index:1;background:linear-gradient(160deg,rgba(6,14,36,0.6) 0%,rgba(6,14,36,0.2) 40%,rgba(6,14,36,0.7) 70%,rgba(6,14,36,0.97) 100%)}
         .hero-c{position:relative;z-index:2;padding:0 60px 68px;width:100%;display:flex;justify-content:space-between;align-items:flex-end}
@@ -748,6 +789,13 @@ export default function Landing({ onPortal }) {
         .hero-kicker::before{content:'';width:28px;height:1px;background:rgba(255,255,255,0.4)}
         .hero-h1{font-size:clamp(70px,9.5vw,124px);font-weight:900;line-height:0.88;color:#fff;letter-spacing:-0.03em}
         .hero-h1 .it{font-family:'Fraunces',serif;font-style:italic;font-weight:400;display:block;line-height:0.92;font-size:clamp(66px,9vw,118px)}
+        @keyframes heroUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+        .ig{animation:heroUp .9s .1s both cubic-bezier(.2,.7,.2,1)}
+        .verso{animation:heroUp .9s .35s both cubic-bezier(.2,.7,.2,1)}
+        .hero-c > div:first-child{animation:heroUp .9s .2s both cubic-bezier(.2,.7,.2,1)}
+        .pm{animation:heroUp .9s .5s both cubic-bezier(.2,.7,.2,1)}
+        .hero-sub{animation:heroUp .9s .65s both cubic-bezier(.2,.7,.2,1)}
+        .hero-btns{animation:heroUp .9s .8s both cubic-bezier(.2,.7,.2,1)}
         .pm{width:max-content;max-width:100%;display:flex;flex-direction:column;gap:12px;padding:2px 0 2px 18px;border-left:2px solid rgba(245,185,66,0.9);color:#fff;font-family:'Plus Jakarta Sans','Outfit',sans-serif;text-shadow:0 2px 18px rgba(6,14,36,0.5)}
         .pm-k{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:rgba(255,255,255,0.8)}
         .pm-k b{width:6px;height:6px;border-radius:50%;background:#f5b942;box-shadow:0 0 0 3px rgba(245,185,66,0.25)}
@@ -761,6 +809,7 @@ export default function Landing({ onPortal }) {
         .pm-meta{display:flex;flex-direction:column;gap:7px}
         .pm-row{display:flex;align-items:flex-start;gap:9px;font-size:13px;font-weight:500;line-height:1.35;letter-spacing:0.01em;color:rgba(255,255,255,0.92)}
         .pm-row svg{flex-shrink:0;margin-top:2px;color:#f5b942}
+        .pm-count{font-size:11.5px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#f5b942}
         .pm-row b{font-weight:700;color:#fff;font-size:15px;letter-spacing:0.02em}
         .ig{position:absolute;z-index:3;top:112px;left:60px;display:flex;flex-direction:column;gap:10px;padding:16px 22px;border-radius:20px;background:rgba(10,18,40,0.36);border:1px solid rgba(255,255,255,0.22);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:#fff;font-family:'Outfit','Plus Jakarta Sans',sans-serif}
         .ig-k{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:500;letter-spacing:0.26em;text-transform:uppercase;color:rgba(255,255,255,0.75)}
@@ -1005,7 +1054,7 @@ export default function Landing({ onPortal }) {
 
       {/* HERO */}
       <section id="inicio" className="hero">
-        <div className="hero-bg" style={{ backgroundImage: `url('${C.hero_img}')` }}/>
+        <div ref={heroRef} className={"hero-bg" + (heroOk ? " ok" : "")} style={{ backgroundImage: `url('${C.hero_img}')` }}/>
         <div className="hero-ov"/>
         <IgStats C={C} />
         <div className="verso">
