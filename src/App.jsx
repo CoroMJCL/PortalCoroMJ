@@ -16207,8 +16207,14 @@ function AccesoModoMisaOffline() {
   const p = sel || (datos.pautas.length === 1 ? datos.pautas[0] : null);
   return (
     <>
-      <button onClick={() => setAbierto(true)} style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: 18, zIndex: 3000, border: "1px solid #bbf7d0", background: "#ecfdf5", color: "#166534", borderRadius: 999, padding: "11px 18px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", boxShadow: "0 6px 20px rgba(22,101,52,.18)" }}>
-        ⛪ Modo Misa (sin conexión)
+      <button onClick={() => setAbierto(true)} style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: 22, zIndex: 3000, display: "inline-flex", alignItems: "center", gap: 11, height: 52, padding: "0 22px 0 9px", border: "none", background: "#fff", color: "#14305a", borderRadius: 999, cursor: "pointer", fontFamily: "var(--font-sans, 'Plus Jakarta Sans', Inter, system-ui, sans-serif)", whiteSpace: "nowrap", textAlign: "left", boxShadow: "0 12px 32px rgba(5,15,40,.38), 0 0 0 1px rgba(255,255,255,.6)" }}>
+        <span style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#1e3a5f,#3f7cc8)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" /><path d="M4 21.5V5.5" /></svg>
+        </span>
+        <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
+          <span style={{ fontSize: 14.5, fontWeight: 800, letterSpacing: "-0.01em" }}>Modo Misa</span>
+          <span style={{ fontSize: 11.5, fontWeight: 500, color: "#64748b", marginTop: 2 }}>Sin conexión · pauta guardada</span>
+        </span>
       </button>
       {abierto && p && createPortal(<ModoMisa pauta={p} canciones={p.canciones || []} fecha={fmt(p)} sinRed={!navigator.onLine} onSalir={() => { setAbierto(false); setSel(null); }} />, document.body)}
       {abierto && !p &&
