@@ -23,6 +23,17 @@
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
     <title>Portal Coro Misioneros de Jesús</title>
+    <script>
+      /* Portada: empieza a bajar la última foto conocida antes de que cargue el resto de la app */
+      try {
+        var h = localStorage.getItem("mj_hero_img");
+        if (h && location.pathname === "/") {
+          var l = document.createElement("link");
+          l.rel = "preload"; l.as = "image"; l.href = h; l.setAttribute("fetchpriority", "high");
+          document.head.appendChild(l);
+        }
+      } catch (e) {}
+    </script>
   </head>
 
   <body>
