@@ -751,17 +751,13 @@ export default function Landing({ onPortal }) {
         .ig-l{margin-top:6px;font-size:10.5px;font-weight:400;letter-spacing:0.08em;color:rgba(255,255,255,0.75);white-space:nowrap}
         .ig-nota{font-size:10px;color:rgba(255,255,255,0.5);letter-spacing:0.04em}
         @media(max-width:900px){.ig{top:92px;left:20px;right:20px;padding:12px 16px}.ig-n{font-size:28px}.ig-row{gap:16px}}
-        .verso{position:absolute;z-index:3;left:100px;top:228px;width:min(340px,36vw);display:flex;flex-direction:column;gap:12px;padding:18px 22px 18px;border-radius:20px;background:rgba(10,18,40,0.36);border:1px solid rgba(255,255,255,0.22);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 30px rgba(0,0,0,0.25);color:#fff;font-family:'Outfit','Plus Jakarta Sans',sans-serif}
-        .verso-k{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:500;letter-spacing:0.26em;text-transform:uppercase;color:rgba(255,255,255,0.75)}
-        .verso-k b{width:6px;height:6px;border-radius:50%;background:#f5b942;box-shadow:0 0 0 3px rgba(245,185,66,0.25)}
-        .verso-h{text-wrap:balance;font-size:24px;font-weight:700;line-height:1.1;letter-spacing:-0.02em;color:#fff}
-        .verso-t{margin:0;font-size:15px;font-weight:300;line-height:1.5;letter-spacing:0.005em;color:rgba(255,255,255,0.92)}
-        .verso-c{font-size:11px;font-weight:500;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.7)}
-        .verso-b{align-self:flex-start;margin-top:2px;background:#fff;color:#08122d;border:none;border-radius:980px;padding:9px 18px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}
-        .verso-b:hover{background:#e8f0fc;transform:translateY(-1px)}
+        .verso{position:absolute;z-index:3;left:100px;top:236px;width:min(380px,38vw);padding:2px 0 2px 18px;border-left:2px solid rgba(245,185,66,0.85);color:#fff;font-family:'Outfit','Plus Jakarta Sans',sans-serif;text-shadow:0 2px 18px rgba(6,14,36,0.45)}
+        .verso-k{font-size:10px;font-weight:500;letter-spacing:0.32em;text-transform:uppercase;color:rgba(255,255,255,0.78);margin-bottom:10px}
+        .verso-h{text-wrap:balance;font-size:30px;font-weight:300;line-height:1.18;letter-spacing:-0.015em;color:#fff}
+        .verso-t{margin-top:12px;font-size:14px;font-weight:400;letter-spacing:0.04em;color:rgba(255,255,255,0.85)}
         @media(min-width:901px) and (max-height:760px){.verso{display:none}}
-        @media(max-width:900px){.verso{left:20px;top:34%;width:min(300px,52vw);padding:14px 16px;gap:10px}.verso-h{font-size:21px}.verso-t{font-size:14px}}
-        @media(max-width:480px){.verso{top:auto;bottom:445px;width:min(250px,60vw);padding:12px 14px;gap:8px}.verso-h{font-size:18px}.verso-t{font-size:12.5px;line-height:1.4}.verso-b{display:none}}
+        @media(max-width:900px){.verso{left:20px;top:34%;width:min(300px,56vw);padding-left:14px}.verso-h{font-size:24px}}
+        @media(max-width:480px){.verso{top:auto;bottom:445px;width:min(260px,64vw)}.verso-h{font-size:19px}.verso-t{display:none}.verso-k{margin-bottom:6px}}
         @media(max-width:480px) and (max-height:800px){.verso{display:none}}
         .hero-right{display:flex;flex-direction:column;align-items:flex-end;gap:16px;max-width:420px}
         .hero-sub{font-size:13.5px;font-weight:300;color:rgba(255,255,255,0.55);line-height:1.75;text-align:right}
@@ -987,11 +983,9 @@ export default function Landing({ onPortal }) {
         <div className="hero-ov"/>
         <IgStats C={C} />
         <div className="verso">
-          <div className="verso-k"><b />Una invitación</div>
-          <div className="verso-h">{C.verso_titulo || "Hazme instrumento de tu paz"}</div>
-          <p className="verso-t">{C.verso_texto || "Tu voz puede llevar paz a cada celebración. Ven a ser instrumento de Dios: canta con nosotros, sirve en cada misa y anuncia a Cristo con alegría."}</p>
-          {C.verso_cita && <div className="verso-c">{C.verso_cita}</div>}
-          <button className="verso-b" onClick={() => go("bot")}>Quiero unirme al coro <span aria-hidden="true">→</span></button>
+          <div className="verso-k">Una invitación</div>
+          <div className="verso-h">{C.verso_titulo || "Que tu voz sea un canto de paz"}</div>
+          <div className="verso-t">{C.verso_texto || "Ven y canta con nosotros."}</div>
         </div>
         <div className="hero-c">
           <div>
