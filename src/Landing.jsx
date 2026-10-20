@@ -663,14 +663,19 @@ function ToolChords() {
 }
 
 export default function Landing({ onPortal }) {
-  const [C, setC] = useState(DEFAULT);
+  // La foto de portada no parte con la del código (antigua): usa la última conocida o espera a la configuración real
+  const [C, setC] = useState(() => {
+    let h = "";
+    try { h = localStorage.getItem("mj_hero_img") || ""; } catch (e) {}
+    return { ...DEFAULT, hero_img: h };
+  });
   const [chat, setChat] = useState([{ role: "bot", text: "Hola, soy el asistente del Coro MJ. ¿En qué te puedo orientar?" }]);
   const [inp, setInp] = useState(""); const [typing, setTyping] = useState(false); const [hist, setHist] = useState([]);
   const [formOk, setFormOk] = useState(false);
   const [admin, setAdmin] = useState(false);
   const [editing, setEditing] = useState({}); const [saving, setSaving] = useState({}); const [upKey, setUpKey] = useState(null);
   const msgsRef = useRef(null);
-  useEffect(() => { dbGet().then(setC); }, []);
+  useEffect(() => { dbGet().then(d => { setC(d); try { if (d.hero_img) localStorage.setItem("mj_hero_img", d.hero_img); } catch (e) {} }); }, []);
   const heroRef = useRef(null);
   const [heroOk, setHeroOk] = useState(false);
   // Foto de portada: se pide con prioridad y aparece con un fundido cuando ya está lista
@@ -1054,7 +1059,7 @@ export default function Landing({ onPortal }) {
 
       {/* HERO */}
       <section id="inicio" className="hero">
-        <div ref={heroRef} className={"hero-bg" + (heroOk ? " ok" : "")} style={{ backgroundImage: `url('${C.hero_img}')` }}/>
+        <div ref={heroRef} className={"hero-bg" + (heroOk ? " ok" : "")} style={C.hero_img ? { backgroundImage: `url('${C.hero_img}')` } : undefined}/>
         <div className="hero-ov"/>
         <IgStats C={C} />
         <div className="verso">
