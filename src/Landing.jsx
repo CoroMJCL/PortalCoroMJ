@@ -748,20 +748,20 @@ export default function Landing({ onPortal }) {
         .hero-kicker::before{content:'';width:28px;height:1px;background:rgba(255,255,255,0.4)}
         .hero-h1{font-size:clamp(70px,9.5vw,124px);font-weight:900;line-height:0.88;color:#fff;letter-spacing:-0.03em}
         .hero-h1 .it{font-family:'Fraunces',serif;font-style:italic;font-weight:400;display:block;line-height:0.92;font-size:clamp(66px,9vw,118px)}
-        .pm{width:300px;max-width:100%;display:flex;flex-direction:column;gap:14px;padding:16px 22px 18px;border-radius:20px;background:linear-gradient(160deg,rgba(14,24,52,0.62),rgba(8,16,38,0.5));border:1px solid rgba(245,185,66,0.5);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 0 0 1px rgba(245,185,66,0.12),0 18px 44px rgba(0,0,0,0.4);color:#fff;font-family:'Outfit','Plus Jakarta Sans',sans-serif}
-        .pm-k{display:flex;align-items:center;gap:8px;font-size:9.5px;font-weight:500;letter-spacing:0.3em;text-transform:uppercase;color:rgba(255,255,255,0.72)}
+        .pm{width:max-content;max-width:100%;display:flex;flex-direction:column;gap:12px;padding:2px 0 2px 18px;border-left:2px solid rgba(245,185,66,0.9);color:#fff;font-family:'Plus Jakarta Sans','Outfit',sans-serif;text-shadow:0 2px 18px rgba(6,14,36,0.5)}
+        .pm-k{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:rgba(255,255,255,0.8)}
         .pm-k b{width:6px;height:6px;border-radius:50%;background:#f5b942;box-shadow:0 0 0 3px rgba(245,185,66,0.25)}
-        .pm-top{display:flex;align-items:center;gap:16px}
-        .pm-day{font-size:64px;font-weight:200;line-height:0.9;letter-spacing:-0.03em;font-variant-numeric:tabular-nums}
-        .pm-bar{width:1px;align-self:stretch;background:linear-gradient(180deg,transparent,rgba(245,185,66,0.9),transparent)}
+        .pm-top{display:flex;align-items:center;gap:14px}
+        .pm-day{font-size:62px;font-weight:700;line-height:0.88;letter-spacing:-0.045em;font-variant-numeric:tabular-nums}
+        .pm-bar{display:none}
         .pm-mw{display:flex;flex-direction:column;gap:5px}
-        .pm-mon{font-size:30px;font-weight:300;letter-spacing:0.22em;line-height:1}
-        .pm-wd{font-size:11px;font-weight:500;letter-spacing:0.24em;text-transform:uppercase;color:rgba(255,255,255,0.72)}
-        .pm-rule{height:1px;background:linear-gradient(90deg,rgba(245,185,66,0.7),rgba(255,255,255,0.08))}
-        .pm-meta{display:flex;flex-direction:column;gap:8px}
-        .pm-row{display:flex;align-items:flex-start;gap:9px;font-size:13px;line-height:1.35;letter-spacing:0.02em;color:rgba(255,255,255,0.88)}
-        .pm-row svg{flex-shrink:0;margin-top:1px;color:#f5b942}
-        .pm-row b{font-weight:600;color:#fff;font-size:15px;letter-spacing:0.04em}
+        .pm-mon{font-size:24px;font-weight:700;letter-spacing:0.16em;line-height:1}
+        .pm-wd{font-size:11px;font-weight:600;letter-spacing:0.22em;text-transform:uppercase;color:rgba(255,255,255,0.78)}
+        .pm-rule{display:none}
+        .pm-meta{display:flex;flex-direction:column;gap:7px}
+        .pm-row{display:flex;align-items:flex-start;gap:9px;font-size:13px;font-weight:500;line-height:1.35;letter-spacing:0.01em;color:rgba(255,255,255,0.92)}
+        .pm-row svg{flex-shrink:0;margin-top:2px;color:#f5b942}
+        .pm-row b{font-weight:700;color:#fff;font-size:15px;letter-spacing:0.02em}
         .ig{position:absolute;z-index:3;top:112px;left:60px;display:flex;flex-direction:column;gap:10px;padding:16px 22px;border-radius:20px;background:rgba(10,18,40,0.36);border:1px solid rgba(255,255,255,0.22);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:#fff;font-family:'Outfit','Plus Jakarta Sans',sans-serif}
         .ig-k{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:500;letter-spacing:0.26em;text-transform:uppercase;color:rgba(255,255,255,0.75)}
         .ig-row{display:flex;align-items:center;gap:22px}
@@ -976,7 +976,7 @@ export default function Landing({ onPortal }) {
           .hero-c{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:20px;row-gap:18px;align-items:end}
           .hero-c > div:first-child{grid-column:1;grid-row:1}
           .hero-right{display:contents}
-          .pm{grid-column:2;grid-row:1;align-self:end;width:262px}
+          .pm{grid-column:2;grid-row:1;align-self:end;max-width:250px}
           .hero-sub{grid-column:1 / -1;grid-row:2}
           .hero-btns{grid-column:1 / -1;grid-row:3}
         }
