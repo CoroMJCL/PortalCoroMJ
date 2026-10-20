@@ -751,6 +751,17 @@ export default function Landing({ onPortal }) {
         .ig-l{margin-top:6px;font-size:10.5px;font-weight:400;letter-spacing:0.08em;color:rgba(255,255,255,0.75);white-space:nowrap}
         .ig-nota{font-size:10px;color:rgba(255,255,255,0.5);letter-spacing:0.04em}
         @media(max-width:900px){.ig{top:92px;left:20px;right:20px;padding:12px 16px}.ig-n{font-size:28px}.ig-row{gap:16px}}
+        .verso{position:absolute;z-index:3;left:100px;top:252px;width:min(310px,34vw);display:flex;flex-direction:column;gap:12px;padding:18px 22px 18px;border-radius:20px;background:rgba(10,18,40,0.36);border:1px solid rgba(255,255,255,0.22);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 30px rgba(0,0,0,0.25);color:#fff;font-family:'Outfit','Plus Jakarta Sans',sans-serif}
+        .verso-k{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:500;letter-spacing:0.26em;text-transform:uppercase;color:rgba(255,255,255,0.75)}
+        .verso-k b{width:6px;height:6px;border-radius:50%;background:#f5b942;box-shadow:0 0 0 3px rgba(245,185,66,0.25)}
+        .verso-t{margin:0;font-size:18px;font-weight:300;line-height:1.5;letter-spacing:0.005em;color:#fff}
+        .verso-c{font-size:11px;font-weight:500;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.7)}
+        .verso-b{align-self:flex-start;margin-top:2px;background:#fff;color:#08122d;border:none;border-radius:980px;padding:9px 18px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}
+        .verso-b:hover{background:#e8f0fc;transform:translateY(-1px)}
+        @media(min-width:901px) and (max-height:760px){.verso{display:none}}
+        @media(max-width:900px){.verso{left:20px;top:34%;width:min(300px,52vw);padding:14px 16px;gap:10px}.verso-t{font-size:15.5px}}
+        @media(max-width:480px){.verso{top:auto;bottom:430px;width:min(250px,60vw);padding:12px 14px;gap:8px}.verso-t{font-size:14px;line-height:1.45}.verso-b{display:none}}
+        @media(max-width:480px) and (max-height:760px){.verso{display:none}}
         .hero-right{display:flex;flex-direction:column;align-items:flex-end;gap:16px;max-width:420px}
         .hero-sub{font-size:13.5px;font-weight:300;color:rgba(255,255,255,0.55);line-height:1.75;text-align:right}
         .hero-btns{display:flex;gap:10px}
@@ -974,6 +985,12 @@ export default function Landing({ onPortal }) {
         <div className="hero-bg" style={{ backgroundImage: `url('${C.hero_img}')` }}/>
         <div className="hero-ov"/>
         <IgStats C={C} />
+        <div className="verso">
+          <div className="verso-k"><b />Una invitación</div>
+          <p className="verso-t">“{C.verso_texto || "¿A quién enviaré, y quién irá por nosotros? Heme aquí, envíame a mí."}”</p>
+          <div className="verso-c">{C.verso_cita || "Isaías 6, 8"}</div>
+          <button className="verso-b" onClick={() => go("bot")}>Únete al coro <span aria-hidden="true">→</span></button>
+        </div>
         <div className="hero-c">
           <div>
             <div style={{fontSize:"clamp(11px,1.2vw,14px)",fontWeight:700,letterSpacing:"0.45em",textTransform:"uppercase",color:"rgba(255,255,255,0.85)",marginBottom:12,display:"block"}}>CORO</div>
