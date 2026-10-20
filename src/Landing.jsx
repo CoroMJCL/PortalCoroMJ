@@ -954,6 +954,18 @@ export default function Landing({ onPortal }) {
           .tools{padding:72px 24px}
           .tools-grid{grid-template-columns:1fr;gap:20px}
         }
+        @media(min-width:700px) and (max-width:900px){
+          .hero-c{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:20px;row-gap:18px;align-items:end}
+          .hero-c > div:first-child{grid-column:1;grid-row:1}
+          .hero-right{display:contents}
+          .pm{grid-column:2;grid-row:1;align-self:end;flex-direction:column;align-items:stretch;gap:12px;width:224px;padding:16px 18px;border-color:rgba(245,185,66,0.55);box-shadow:0 0 0 1px rgba(245,185,66,0.16),0 16px 40px rgba(0,0,0,0.38)}
+          .pm-date{flex-direction:row;align-items:baseline;justify-content:flex-start;gap:10px;min-width:0;padding:0 0 12px;border-right:none;border-bottom:1px solid rgba(255,255,255,0.25)}
+          .pm-day{font-size:54px}
+          .pm-mon{margin-top:0}
+          .pm-l{white-space:normal;line-height:1.35}
+          .hero-sub{grid-column:1 / -1;grid-row:2}
+          .hero-btns{grid-column:1 / -1;grid-row:3}
+        }
         @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
       `}</style>
 
