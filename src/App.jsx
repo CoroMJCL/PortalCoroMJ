@@ -18069,15 +18069,16 @@ function Dashboard({
               </div>
             </div>
             <CumpleanosCompacto members={members} setSection={setSection} />
-            <div className="dash-pane" style={{ background: "linear-gradient(135deg,#fdf6e3,#fffdf6)", borderRadius: "0 22px 22px 0" }}>
-              <div style={{ width: 38, height: 38, borderRadius: 12, flexShrink: 0, background: "linear-gradient(135deg,#e0bd52,#b8901f)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
-                ✨
+            <div className="dash-pane" style={{ padding: "12px 18px", gap: 12, borderRadius: "0 22px 22px 0" }}>
+              <div style={{ width: 34, height: 34, borderRadius: 11, flexShrink: 0, background: "linear-gradient(145deg,#1e3a5f,#0f2744)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 3px 10px rgba(15,39,68,.22)" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8c76a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18M7 8h10" /></svg>
               </div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "#a9780a", marginBottom: 2 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: "#8a94a6", marginBottom: 2 }}>
+                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#c9a227", flexShrink: 0 }} />
                   Santoral de hoy
                 </div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#3d3206", lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#0f2744", lineHeight: 1.3, letterSpacing: "-0.01em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                   {santoral || "—"}
                 </div>
               </div>
