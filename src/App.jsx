@@ -18005,7 +18005,7 @@ function Dashboard({
           {/* ── Inicio: hero + cuota a lo ancho, luego 2 columnas ── */}
           <style>{`.dash-2col{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(300px,0.9fr);gap:12px;align-items:start}.dash-col{display:flex;flex-direction:column;gap:10px;min-width:0}.dash-side{gap:8px}.dash-side .dash-col{gap:8px}@media(max-width:900px){.dash-2col,.grid-stats{grid-template-columns:1fr !important}}`}</style>
           {/* ── Banda superior: bienvenida · cumpleaños · santoral ── */}
-          <style>{`.dash-band{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.1fr) minmax(0,1fr);margin-bottom:14px;border-radius:22px;background:linear-gradient(180deg,#ffffff,#f7f9fd);border:1px solid #e3e9f2;box-shadow:0 8px 28px rgba(15,39,68,.07);position:relative}.dash-pane{padding:16px 20px;display:flex;align-items:center;gap:14px;min-width:0;border-right:1px solid #edf1f7}.dash-pane:last-child{border-right:none}@media(max-width:900px){.dash-band{grid-template-columns:1fr}.dash-pane{border-right:none;border-bottom:1px solid #edf1f7}.dash-pane:last-child{border-bottom:none}}`}</style>
+          <style>{`.dash-band{display:grid;grid-template-columns:minmax(0,1.5fr);grid-auto-columns:minmax(0,1fr);grid-auto-flow:column;margin-bottom:14px;border-radius:22px;background:linear-gradient(180deg,#ffffff,#f7f9fd);border:1px solid #e3e9f2;box-shadow:0 8px 28px rgba(15,39,68,.07);position:relative}.dash-pane{padding:16px 20px;display:flex;align-items:center;gap:14px;min-width:0;border-right:1px solid #edf1f7}.dash-pane:last-child{border-right:none}@media(max-width:900px){.dash-band{grid-template-columns:1fr;grid-auto-flow:row}.dash-pane{border-right:none;border-bottom:1px solid #edf1f7}.dash-pane:last-child{border-bottom:none}}`}</style>
           <div className="dash-band">
             <div className="dash-pane">
               <div style={{ position: "relative", flexShrink: 0, width: 64, height: 64 }}>
@@ -18066,23 +18066,15 @@ function Dashboard({
                     )}
                   </span>
                 </div>
+                <div title={santoral || ""} style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 7, fontSize: 11.5, lineHeight: 1.35, color: "#475569", minWidth: 0 }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#b8901f" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }}><path d="M12 3v18M7 8h10" /></svg>
+                  <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                    <b style={{ color: "#0f2744", fontWeight: 700 }}>Santoral:</b> {santoral || "—"}
+                  </span>
+                </div>
               </div>
             </div>
             <CumpleanosCompacto members={members} setSection={setSection} />
-            <div className="dash-pane" style={{ padding: "12px 18px", gap: 12, borderRadius: "0 22px 22px 0" }}>
-              <div style={{ width: 34, height: 34, borderRadius: 11, flexShrink: 0, background: "linear-gradient(145deg,#1e3a5f,#0f2744)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 3px 10px rgba(15,39,68,.22)" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8c76a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18M7 8h10" /></svg>
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: "#8a94a6", marginBottom: 2 }}>
-                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#c9a227", flexShrink: 0 }} />
-                  Santoral de hoy
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#0f2744", lineHeight: 1.3, letterSpacing: "-0.01em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                  {santoral || "—"}
-                </div>
-              </div>
-            </div>
           </div>
           <BannerWidget isAdmin={isAdmin} />
           {esCuerdaAdmin(user) && pendientes && pendientes.length > 0 && (
