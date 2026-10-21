@@ -770,7 +770,7 @@ export default function Landing({ onPortal }) {
         .nav-left a{font-size:13px;font-weight:500;color:rgba(255,255,255,0.65);text-decoration:none;cursor:pointer;transition:color .2s;letter-spacing:0.01em}
         .nav-left a:hover{color:#fff}
         .nav-logo{display:flex;justify-content:center;cursor:pointer}
-        .nav-logo img{height:48px;width:48px;object-fit:contain;background:#fff;border-radius:13px;padding:3px;box-shadow:0 2px 12px rgba(0,0,0,0.28)}
+        .nav-logo img{height:64px;width:64px;object-fit:contain}
         .nav-right{display:flex;align-items:center;gap:8px;justify-content:flex-end}
         .nav-soc{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;border:none}
         .nav-soc:hover{background:rgba(255,255,255,0.18)}
@@ -1042,7 +1042,7 @@ export default function Landing({ onPortal }) {
           <a onClick={() => go("contacto")}>Contacto</a>
         </div>
         <div className="nav-logo" onClick={() => go("inicio")}>
-          <img src="/logo-mj.png" alt="Coro MJ" onError={e => e.target.style.display="none"}/>
+          <img src="/LOGOMJ2.png" alt="Coro MJ" onError={e => e.target.style.display="none"}/>
         </div>
         <div className="nav-right">
           {C.instagram_url && <a href={C.instagram_url} target="_blank" rel="noopener noreferrer" className="nav-soc" title="Instagram"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="rgba(255,255,255,0.75)" stroke="none"/></svg></a>}
@@ -1205,7 +1205,7 @@ export default function Landing({ onPortal }) {
             <div className="chat">
               <div className="chat-hd">
                 <div className="chat-av">
-                  <img src="/logo-mj.png" alt="MJ" style={{width:30,height:30,objectFit:"contain",background:"#fff",borderRadius:9,padding:2}} onError={e=>{e.target.style.display="none";e.target.parentNode.innerHTML="🎵"}}/>
+                  <img src="/LOGOMJ2.png" alt="MJ" style={{width:24,height:24,objectFit:"contain"}} onError={e=>{e.target.style.display="none";e.target.parentNode.innerHTML="🎵"}}/>
                 </div>
                 <div>
                   <div className="chat-nm">Coro Misioneros de Jesús</div>
