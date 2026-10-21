@@ -3704,7 +3704,8 @@ function AppInner() {
           aria-label={sideOpen ? "Plegar menú" : "Abrir menú"}
           style={{
             margin: "0 5px 6px",
-            height: 30,
+            height: sideOpen ? 30 : 42,
+            flexDirection: sideOpen ? "row" : "column",
             border: "1px solid rgba(60,60,67,0.12)",
             borderRadius: 8,
             background: "rgba(255,255,255,0.7)",
@@ -3713,9 +3714,9 @@ function AppInner() {
             display: "flex",
             alignItems: "center",
             justifyContent: sideOpen ? "flex-start" : "center",
-            gap: 8,
+            gap: sideOpen ? 8 : 3,
             padding: sideOpen ? "0 10px" : 0,
-            fontSize: 12,
+            fontSize: sideOpen ? 12 : 9.5,
             fontWeight: 600,
             fontFamily: "inherit",
             flexShrink: 0,
@@ -3724,7 +3725,7 @@ function AppInner() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: sideOpen ? "none" : "rotate(180deg)", transition: "transform .24s" }}>
             <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" />
           </svg>
-          {sideOpen && "Plegar menú"}
+          {sideOpen ? "Plegar menú" : "Menú"}
         </button>
         <div
           style={{
@@ -3859,18 +3860,26 @@ function AppInner() {
           <button
             className="hide-mobile"
             onClick={() => setSideOpen((p) => !p)}
+            aria-label="Menú"
             style={{
-              background: "none",
-              border: "none",
+              background: "rgba(60,60,67,0.06)",
+              border: "1px solid rgba(60,60,67,0.12)",
               cursor: "pointer",
-              color: C.gray,
-              fontSize: 18,
-              padding: 4,
-              borderRadius: 9,
+              color: "var(--text-secondary)",
+              height: 34,
+              padding: "0 11px",
+              borderRadius: 999,
               flexShrink: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 7,
+              fontSize: 12.5,
+              fontWeight: 600,
+              fontFamily: "inherit",
             }}
           >
-            ☰
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+            Menú
           </button>
           <button
             className="show-mobile"
