@@ -18005,9 +18005,9 @@ function Dashboard({
           {/* ── Inicio: hero + cuota a lo ancho, luego 2 columnas ── */}
           <style>{`.dash-2col{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(300px,0.9fr);gap:12px;align-items:start}.dash-col{display:flex;flex-direction:column;gap:10px;min-width:0}.dash-side{gap:8px}.dash-side .dash-col{gap:8px}@media(max-width:900px){.dash-2col,.grid-stats{grid-template-columns:1fr !important}}`}</style>
           {/* ── Banda superior: bienvenida · cumpleaños · santoral ── */}
-          <style>{`.dash-band{display:grid;grid-template-columns:minmax(0,1.5fr);grid-auto-columns:minmax(0,1fr);grid-auto-flow:column;margin-bottom:14px;border-radius:22px;background:linear-gradient(180deg,#ffffff,#f7f9fd);border:1px solid #e3e9f2;box-shadow:0 8px 28px rgba(15,39,68,.07);position:relative}.dash-pane{padding:16px 20px;display:flex;align-items:center;gap:14px;min-width:0;border-right:1px solid #edf1f7}.dash-pane:last-child{border-right:none}@media(max-width:900px){.dash-band{grid-template-columns:1fr;grid-auto-flow:row}.dash-pane{border-right:none;border-bottom:1px solid #edf1f7}.dash-pane:last-child{border-bottom:none}}`}</style>
+          <style>{`.dash-band{display:grid;grid-template-columns:minmax(0,1fr);margin-bottom:14px;border-radius:22px;background:linear-gradient(180deg,#ffffff,#f7f9fd);border:1px solid #e3e9f2;box-shadow:0 8px 28px rgba(15,39,68,.07);position:relative}.dash-pane{padding:16px 20px;display:flex;align-items:center;gap:14px;min-width:0;border-right:1px solid #edf1f7}.dash-pane:last-child{border-right:none}@media(max-width:560px){.cum-chip{margin-left:0!important}}@media(max-width:900px){.dash-band{grid-template-columns:1fr}.dash-pane{border-right:none;border-bottom:1px solid #edf1f7}.dash-pane:last-child{border-bottom:none}}`}</style>
           <div className="dash-band">
-            <div className="dash-pane">
+            <div className="dash-pane" style={{ flexWrap: "wrap" }}>
               <div style={{ position: "relative", flexShrink: 0, width: 64, height: 64 }}>
                 <svg width="64" height="64" style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
                   <circle cx="32" cy="32" r="29" fill="none" stroke="#e5eaf2" strokeWidth="3" />
@@ -18046,7 +18046,7 @@ function Dashboard({
                   )}
                 </div>
               </div>
-              <div style={{ minWidth: 0 }}>
+              <div style={{ minWidth: 0, flex: "1 1 170px" }}>
                 <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.26em", textTransform: "uppercase", color: "#8a94a6" }}>
                   Bienvenido/a
                 </div>
@@ -18073,8 +18073,8 @@ function Dashboard({
                   </span>
                 </div>
               </div>
+              <CumpleanosCompacto members={members} setSection={setSection} />
             </div>
-            <CumpleanosCompacto members={members} setSection={setSection} />
           </div>
           <BannerWidget isAdmin={isAdmin} />
           {esCuerdaAdmin(user) && pendientes && pendientes.length > 0 && (
@@ -49859,7 +49859,6 @@ function PautasCompacto({ pautas, isAdmin, setSection }) {
 
 // ── Cumpleaños compacto: el más próximo en una franja horizontal + "Ver más" ──
 function CumpleanosCompacto({ members, setSection }) {
-  const [abierto, setAbierto] = useState(false);
   const MESES = [
     "enero","febrero","marzo","abril","mayo","junio",
     "julio","agosto","septiembre","octubre","noviembre","diciembre",
@@ -49891,7 +49890,6 @@ function CumpleanosCompacto({ members, setSection }) {
 
   const primero = lista[0];
   const mismos = lista.filter((x) => x._d === primero._d);
-  const resto = lista.slice(mismos.length);
   const nombreCorto = (m) =>
     (m.nombre || "").split(" ").slice(0, 2).join(" ") || "Integrante";
   const cuando = (d) =>
@@ -49930,143 +49928,47 @@ function CumpleanosCompacto({ members, setSection }) {
     );
   };
   const esHoy = primero._d === 0;
+  const nombres = mismos.map(nombreCorto).join(" y ");
 
   return (
-    <div
+    <button
+      type="button"
+      className="cum-chip"
+      onClick={() => setSection && setSection("cumpleanos")}
+      title="Ver calendario de cumpleaños"
       style={{
-        background: esHoy ? "linear-gradient(135deg,#eaf2fd,#f7fbff)" : "transparent",
-        borderRight: "1px solid #edf1f7",
-        borderRadius: 0,
-        position: "relative",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        alignSelf: "stretch",
+        marginLeft: "auto",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "7px 16px 7px 7px",
+        maxWidth: "100%",
         minWidth: 0,
+        borderRadius: 999,
+        border: esHoy ? "1px solid #e3c766" : "1px solid #e3e9f2",
+        background: esHoy ? "linear-gradient(135deg,#fffaf0,#fff3d6)" : "linear-gradient(180deg,#ffffff,#f7f9fd)",
+        boxShadow: esHoy ? "0 4px 14px rgba(184,144,31,.18)" : "0 2px 10px rgba(15,39,68,.06)",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        textAlign: "left",
+        flexShrink: 0,
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 9,
-          padding: "16px 20px",
-          minHeight: 64,
-        }}
-      >
-        {avatar(primero, 40)}
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div
-            style={{
-              fontSize: 14,
-              fontWeight: 700,
-              color: "#0f2744",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {mismos.map(nombreCorto).join(" y ")}
-          </div>
-          <div
-            style={{
-              fontSize: 11,
-              color: "#64748b",
-            }}
-          >
-            {esHoy
-              ? "¡Cumple años hoy!"
-              : `Cumple el ${fechaTxt(primero._p)} · ${cuando(primero._d)}`}
-          </div>
-        </div>
-        {resto.length > 0 && (
-          <button
-            onClick={() => setAbierto((v) => !v)}
-            style={{
-              flexShrink: 0,
-              background: "#eaf0f8",
-              color: "#1e3a5f",
-              border: "none",
-              borderRadius: 980,
-              padding: "6px 13px",
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {abierto ? "Ver menos ▴" : "Ver más ▾"}
-          </button>
-        )}
-      </div>
-      {abierto && (
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: "calc(100% + 6px)",
-            zIndex: 30,
-            border: `1px solid ${C.border}`,
-            borderRadius: 14,
-            boxShadow: "0 16px 40px rgba(15,39,68,0.25)",
-            background: C.white,
-            maxHeight: 280,
-            overflowY: "auto",
-            padding: "6px 10px",
-          }}
-        >
-          {resto.map((m) => (
-            <div
-              key={m.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "7px 6px",
-                borderBottom: `1px solid ${C.border}`,
-              }}
-            >
-              {avatar(m, 28)}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    color: C.dark,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  {nombreCorto(m)}
-                </div>
-              </div>
-              <div style={{ fontSize: 11.5, color: C.gray, whiteSpace: "nowrap" }}>
-                {fechaTxt(m._p)} · {cuando(m._d)}
-              </div>
-            </div>
-          ))}
-          {setSection && (
-            <button
-              onClick={() => setSection("cumpleanos")}
-              style={{
-                width: "100%",
-                background: "none",
-                border: "none",
-                padding: "8px 0 4px",
-                fontSize: 12,
-                fontWeight: 600,
-                color: C.primary,
-                cursor: "pointer",
-              }}
-            >
-              Abrir calendario de cumpleaños →
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+      <span style={{ padding: 2, borderRadius: "50%", background: esHoy ? "linear-gradient(135deg,#e8c76a,#b8901f)" : "linear-gradient(135deg,#d9e2f0,#b9c8de)", display: "inline-flex", flexShrink: 0 }}>
+        <span style={{ background: "#fff", borderRadius: "50%", padding: 2, display: "inline-flex" }}>{avatar(primero, 34)}</span>
+      </span>
+      <span style={{ minWidth: 0, display: "block" }}>
+        <span style={{ display: "block", fontSize: 9, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: esHoy ? "#a9780a" : "#8a94a6" }}>
+          {esHoy ? "Cumple años hoy" : "Próximo cumpleaños"}
+        </span>
+        <span style={{ display: "block", fontSize: 13.5, fontWeight: 700, color: "#0f2744", letterSpacing: "-0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 190, marginTop: 1 }}>
+          {nombres}
+        </span>
+        <span style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#64748b", marginTop: 1 }}>
+          {esHoy ? "¡Salúdalo/a!" : `${fechaTxt(primero._p)} · ${cuando(primero._d)}`}
+        </span>
+      </span>
+    </button>
   );
 }
 
