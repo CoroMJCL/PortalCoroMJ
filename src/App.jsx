@@ -615,6 +615,17 @@ async function authSignOut() {
 const LOGO =
   "data:image/jpeg;base64,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";
 
+// Icono de ojo (línea fina) — reemplaza al emoji 👁/🙈 en toda la app
+function IconoOjo({ size = 16, off = false, style }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, verticalAlign: "-0.15em", display: "inline-block", ...style }} aria-hidden="true">
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+      <circle cx="12" cy="12" r="3" />
+      {off && <path d="M4 4l16 16" />}
+    </svg>
+  );
+}
+
 const C = {
   primary: "#1e3a5f",
   primaryDark: "#152d4a",
@@ -4384,7 +4395,7 @@ function AppInner() {
                       color: "white",
                     }}
                   >
-                    <span style={{ fontSize: 20 }}>👁</span>
+                    <span style={{ fontSize: 20, display: "inline-flex" }}><IconoOjo size={22} /></span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 700 }}>
                         Vista previa del Portal Invitado
@@ -4978,7 +4989,7 @@ function AuthScreen({
                         color: "#8a8a90",
                       }}
                     >
-                      {showPassword ? "🙈" : "👁"}
+                      <IconoOjo size={19} off={showPassword} />
                     </button>
                   </div>
                 </div>
@@ -15248,7 +15259,7 @@ function BannerWidget({ isAdmin }) {
             cursor: "pointer",
           }}
         >
-          🙈 Ocultar banner
+          <IconoOjo size={14} off style={{ marginRight: 5 }} />Ocultar banner
         </button>
       )}
     </div>
@@ -15443,12 +15454,12 @@ function AccesoPautaBoton({ pauta, abrirInicial, onGuardado, estilo }) {
   const vis = lista.filter((u) => (u.nombre || "").toLowerCase().includes(q.toLowerCase()));
   const grupos = {};
   vis.forEach((u) => (grupos[u.cuerda] = grupos[u.cuerda] || []).push(u));
-  const etiqueta = estado && estado.restringida ? `👁 Acceso: ${(estado.ids || []).length} elegidos` : "👁 Acceso: todos";
+  const etiqueta = estado && estado.restringida ? `Acceso: ${(estado.ids || []).length} elegidos` : "Acceso: todos";
   const f = "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)";
   return (
     <>
-      <button onClick={() => setAbierto(true)} style={estilo || { background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.22)", color: "#fff", borderRadius: 999, height: 38, padding: "0 15px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
-        {etiqueta}
+      <button onClick={() => setAbierto(true)} style={estilo || { background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.22)", color: "#fff", borderRadius: 999, height: 32, padding: "0 13px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <IconoOjo size={14} />{etiqueta}
       </button>
       {abierto &&
         createPortal(
@@ -16011,7 +16022,7 @@ function CheckInPauta({ pauta: pautaBase, pautas, user }) {
     }
     setCargando(false);
   };
-  const base = { border: "1px solid rgba(255,255,255,.22)", borderRadius: 999, height: 38, padding: "0 15px", fontSize: 13, fontWeight: 700, fontFamily: "inherit", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 };
+  const base = { border: "1px solid rgba(255,255,255,.22)", borderRadius: 999, height: 32, padding: "0 13px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 };
   if (hecho)
     return (
       <>
@@ -16022,7 +16033,7 @@ function CheckInPauta({ pauta: pautaBase, pautas, user }) {
   return (
     <>
       <button onClick={click} disabled={!esHoy || cargando} title={esHoy ? "Registrar mi asistencia" : `Se habilita el día de la misa de ${cfg.desde} a ${cfg.hasta}`} style={{ ...base, background: esHoy ? "linear-gradient(135deg,#22b573,#15803d)" : "rgba(255,255,255,.12)", border: esHoy ? "1px solid rgba(255,255,255,.35)" : base.border, boxShadow: esHoy ? "0 6px 16px rgba(21,128,61,.4)" : "none", color: "#fff", cursor: esHoy ? "pointer" : "not-allowed", opacity: esHoy ? 1 : 0.8 }}>
-        {cargando ? "Registrando…" : esHoy ? "✔ Check in" : est === "cerrado" ? "Check in cerrado" : diaHoy ? `Check in desde las ${cfg.desde}` : "Check in · el día de la misa"}
+        {cargando ? "Registrando…" : esHoy ? "✔ Check in" : est === "cerrado" ? "Check in cerrado" : diaHoy ? `Check in · ${cfg.desde}` : "Check in"}
       </button>
       {err && <span style={{ flexBasis: "100%", fontSize: 11, color: "#fecaca" }}>{err}</span>}
     </>
@@ -16050,9 +16061,9 @@ function CompartirCantosMisa({ pauta, estilo }) {
   };
   return (
     <>
-      <button onClick={() => setAbierto(true)} style={estilo || { background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.22)", color: "#fff", borderRadius: 999, height: 38, padding: "0 15px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 7 }}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 10.6l6.8-4M8.6 13.4l6.8 4" /></svg>
-        Compartir Cantos de Misa
+      <button onClick={() => setAbierto(true)} style={estilo || { background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.22)", color: "#fff", borderRadius: 999, height: 32, padding: "0 13px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 10.6l6.8-4M8.6 13.4l6.8 4" /></svg>
+        {estilo ? "Compartir Cantos de Misa" : "Compartir"}
       </button>
       {abierto &&
         createPortal(
@@ -16402,11 +16413,12 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
             ✕
           </button>
         </div>
-        <div style={{ position: "relative", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 16 }}>
-          <button onClick={() => setModoMisa(true)} style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 38, padding: "0 18px", border: "none", borderRadius: 999, background: "#fff", color: "#1e3a5f", fontSize: 13.5, fontWeight: 800, cursor: "pointer", fontFamily: "var(--font-sans)", boxShadow: "0 2px 8px rgba(8,20,45,.25)" }}>
+        <div style={{ position: "relative", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 14 }}>
+          <button onClick={() => setModoMisa(true)} style={{ display: "inline-flex", alignItems: "center", gap: 7, height: 34, padding: "0 16px", border: "none", borderRadius: 999, background: "#fff", color: "#1e3a5f", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "var(--font-sans)", boxShadow: "0 2px 8px rgba(8,20,45,.25)" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" /><path d="M4 21.5V5.5" /></svg>
             Modo Misa
           </button>
+          <span style={{ width: 1, height: 18, background: "rgba(255,255,255,.28)", margin: "0 2px" }} />
           <CheckInPauta pauta={pauta} pautas={pautas} user={user} />
           <CompartirCantosMisa pauta={pauta} />
           {respaldar && <AccesoPautaBoton pauta={pauta} />}
@@ -16545,7 +16557,7 @@ function PautaRevisiones({ pauta, members, compacto }) {
   return (
     <div style={compacto ? { marginTop: 4 } : { padding: "14px 16px", borderTop: "1px solid #e3e9f2", background: "#f8fafd" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-        {!compacto && <span style={{ fontSize: 13, fontWeight: 800, color: "#0f2744" }}>👁 Quién ha revisado esta pauta</span>}
+        {!compacto && <span style={{ fontSize: 13, fontWeight: 800, color: "#0f2744" }}><IconoOjo size={15} style={{ marginRight: 6 }} />Quién ha revisado esta pauta</span>}
         <span style={{ fontSize: 12, color: "#64748b" }}>{cargando ? "cargando…" : `${vieron.length} de ${lista.length} (${pct}%)`}</span>
         <button onClick={cargar} style={{ marginLeft: "auto", border: "1px solid #dbe4f0", background: "#fff", borderRadius: 999, padding: "3px 10px", fontSize: 11, cursor: "pointer", color: "#1e3a5f" }}>🔄 Actualizar</button>
       </div>
@@ -16639,7 +16651,7 @@ function ActividadAdminWidget({ pautas, members }) {
             </div>
           )}
           <div style={{ borderTop: "1px solid #eef2f7", paddingTop: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#1e3a5f", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>👁 Revisión de pautas</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#1e3a5f", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}><IconoOjo size={13} style={{ marginRight: 5 }} />Revisión de pautas</div>
             {!pauta ? (
               <div style={{ fontSize: 12, color: "#94a3b8" }}>No hay pautas vigentes publicadas.</div>
             ) : (
@@ -34062,7 +34074,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       cursor: "pointer",
                     }}
                   >
-                    👁 Previsualizar guion
+                    <IconoOjo size={14} style={{ marginRight: 5 }} />Previsualizar guion
                   </button>
                 )}
               </div>
@@ -35409,7 +35421,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                           fontSize: 10,
                         }}
                       >
-                        👁 Visible Invitado
+                        <IconoOjo size={13} style={{ marginRight: 4 }} />Visible Invitado
                       </span>
                     )}
                   </div>
@@ -35440,7 +35452,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       transition: "all 0.15s",
                     }}
                   >
-                    {p.visible_visita ? "👁 Invitado: ON" : "🙈 Invitado: OFF"}
+                    <IconoOjo size={14} off={!p.visible_visita} style={{ marginRight: 5 }} />{p.visible_visita ? "Invitado: ON" : "Invitado: OFF"}
                   </button>
                 )}
                 <span style={{ fontSize: 12, color: C.gray }}>Ver pauta →</span>
@@ -43280,7 +43292,7 @@ function Admin({
                       color: "white",
                     }}
                   >
-                    <span style={{ fontSize: 18 }}>👁</span>
+                    <span style={{ fontSize: 18, display: "inline-flex" }}><IconoOjo size={20} /></span>
                     <div style={{ fontSize: 12.5, fontWeight: 700 }}>
                       Vista previa — así lo ve el Invitado{" "}
                       <span
@@ -43323,7 +43335,7 @@ function Admin({
                       color: "white",
                     }}
                   >
-                    <span style={{ fontSize: 18 }}>👁</span>
+                    <span style={{ fontSize: 18, display: "inline-flex" }}><IconoOjo size={20} /></span>
                     <div style={{ fontSize: 12.5, fontWeight: 700 }}>
                       Vista previa — así lo ven los Integrantes{" "}
                       <span
