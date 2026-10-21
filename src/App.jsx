@@ -16303,7 +16303,7 @@ function AccesoModoMisaOffline() {
 }
 
 // ── Modo Misa: la pauta publicada a pantalla completa, con las letras (PDF) leídas dentro de la app ──
-function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico }) {
+function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico, abrirK, volverCierra }) {
   const [enLinea, setEnLinea] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   useEffect(() => {
     const f = () => setEnLinea(navigator.onLine);
@@ -16324,7 +16324,11 @@ function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico }) {
     ...(ok(pauta.guion_url) ? [{ k: "guion", titulo: "Guion de la misa", etiqueta: "Guion", url: pauta.guion_url, audio: "" }] : []),
     ...canciones.map((c, i) => ({ k: "c" + i, titulo: c.cancion || "Canción", etiqueta: String(c.orden || i + 1), url: ok(c.url_letra) ? c.url_letra : "", audio: ok(c.url_audio) ? c.url_audio : "" })),
   ];
-  const [abierta, setAbierta] = useState(null);
+  const [abierta, setAbierta] = useState(() => {
+    if (!abrirK) return null;
+    const ix = docs.findIndex((x) => x.k === abrirK && x.url);
+    return ix >= 0 ? ix : null;
+  });
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -16345,7 +16349,7 @@ function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico }) {
       {d ? (
         <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "#fff", borderBottom: "1px solid " + LINE, flexShrink: 0 }}>
-            <button onClick={() => setAbierta(null)} style={btn} aria-label="Volver a la pauta">
+            <button onClick={() => (volverCierra ? onSalir() : setAbierta(null))} style={btn} aria-label="Volver a la pauta">
               <span style={{ fontSize: 19, lineHeight: 1, marginTop: -1 }}>‹</span> Pauta
             </button>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -16423,6 +16427,7 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
   const pauta =
     elegida || prox || pub.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
   const [modoMisa, setModoMisa] = useState(false);
+  const [modoDoc, setModoDoc] = useState(null);
   useEffect(() => {
     if (pauta && user) registrarVistaPauta(pauta, user, "inicio");
   }, [pauta && pauta.id, user && user.id]);
@@ -16452,7 +16457,7 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
   const chip = { display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,.14)", border: "1px solid rgba(255,255,255,.18)", borderRadius: 999, padding: "5px 11px", fontSize: 12.5, fontWeight: 600 };
   return (
     <div style={{ marginTop: 10, background: "#fff", border: "1px solid #e1e9f4", borderRadius: 22, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,39,68,.05), 0 16px 40px rgba(30,58,95,.14)", fontFamily: "var(--font-sans)" }}>
-      {modoMisa && createPortal(<ModoMisa pauta={pauta} canciones={canciones} fecha={fecha} onSalir={() => setModoMisa(false)} />, document.body)}
+      {modoMisa && createPortal(<ModoMisa pauta={pauta} canciones={canciones} fecha={fecha} abrirK={modoDoc} volverCierra={!!modoDoc} onSalir={() => { setModoMisa(false); setModoDoc(null); }} />, document.body)}
       <div style={{ position: "relative", background: "linear-gradient(135deg,#17345c 0%,#2a5a9c 62%,#3f7cc8 100%)", color: "#fff", padding: "20px 20px 18px", overflow: "hidden" }}>
         <div style={{ position: "absolute", right: -70, top: -90, width: 260, height: 260, borderRadius: "50%", background: "radial-gradient(circle,rgba(255,255,255,.2),transparent 68%)", pointerEvents: "none" }} />
         <div style={{ position: "relative", display: "flex", alignItems: "flex-start", gap: 12 }}>
@@ -16505,7 +16510,7 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
                   </span>
                   <span>
                     {c.url_letra && /^https?:/i.test(c.url_letra) ? (
-                      <a href={c.url_letra} target="_blank" rel="noreferrer" title="Ver letra (PDF)" aria-label="Ver letra (PDF)" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 10, textDecoration: "none" }}><IconoPdf size={24} /></a>
+                      <button type="button" onClick={() => { setModoDoc("c" + i); setModoMisa(true); }} title="Ver letra (PDF)" aria-label="Ver letra (PDF)" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 10, border: "none", background: "transparent", cursor: "pointer", padding: 0 }}><IconoPdf size={24} /></button>
                     ) : (
                       <span style={{ color: "#cbd5e1" }}>—</span>
                     )}
