@@ -16403,7 +16403,7 @@ function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico, abrirK, v
                 </div>
                 {x.audio && !offline && !publico && <BotonAudioPauta url={x.audio} size={34} fs={12} />}
                 {x.url ? (
-                  <button onClick={() => setAbierta(i)} style={{ border: "none", background: ACC, color: "#fff", borderRadius: 11, padding: "10px 14px", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>Ver letra</button>
+                  <button onClick={() => setAbierta(i)} title="Ver letra (PDF)" aria-label="Ver letra (PDF)" style={{ border: "none", background: "transparent", borderRadius: 12, width: 46, height: 46, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, flexShrink: 0 }}><IconoPdf size={28} /></button>
                 ) : (
                   <span style={{ fontSize: 12, color: "#a7b0bd", flexShrink: 0 }}>Sin letra</span>
                 )}
