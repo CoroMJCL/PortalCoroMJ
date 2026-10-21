@@ -1939,7 +1939,13 @@ function AppInner() {
   const [authToken, setAuthToken] = useState(null);
   const [section, setSection] = useState("dashboard");
   const [preParaId, setPreParaId] = useState("");
-  const [sideOpen, setSideOpen] = useState(true);
+  // Menú lateral: parte plegado (solo iconos) para dar más espacio; se recuerda la última elección
+  const [sideOpen, setSideOpen] = useState(() => {
+    try { return localStorage.getItem("mj_side_open") === "1"; } catch (e) { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("mj_side_open", sideOpen ? "1" : "0"); } catch (e) {}
+  }, [sideOpen]);
   const [mobileMenu, setMobileMenu] = useState(false);
 
   // Datos desde Supabase
@@ -3614,6 +3620,8 @@ function AppInner() {
               <button
                 key={item.id}
                 onClick={() => setSection(item.id)}
+                title={sideOpen ? undefined : item.label}
+                aria-label={item.label}
                 style={{
                   width: "100%",
                   display: "flex",
@@ -3690,6 +3698,34 @@ function AppInner() {
             );
           })}
         </nav>
+        <button
+          onClick={() => setSideOpen((p) => !p)}
+          title={sideOpen ? "Plegar menú" : "Abrir menú"}
+          aria-label={sideOpen ? "Plegar menú" : "Abrir menú"}
+          style={{
+            margin: "0 5px 6px",
+            height: 30,
+            border: "1px solid rgba(60,60,67,0.12)",
+            borderRadius: 8,
+            background: "rgba(255,255,255,0.7)",
+            color: "var(--text-secondary)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: sideOpen ? "flex-start" : "center",
+            gap: 8,
+            padding: sideOpen ? "0 10px" : 0,
+            fontSize: 12,
+            fontWeight: 600,
+            fontFamily: "inherit",
+            flexShrink: 0,
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: sideOpen ? "none" : "rotate(180deg)", transition: "transform .24s" }}>
+            <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" />
+          </svg>
+          {sideOpen && "Plegar menú"}
+        </button>
         <div
           style={{
             padding: "8px 5px",
