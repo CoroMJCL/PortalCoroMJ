@@ -1978,6 +1978,12 @@ function AppInner() {
   const [accesosPauta, setAccesosPauta] = useState({});
   // Cada pauta puede mostrarse solo a los integrantes que elige el admin
   const pautas = useMemo(() => mjFiltrarPautasPorAcceso(pautasRaw, accesosPauta, user), [pautasRaw, accesosPauta, user && user.id, user && user.cuerda]);
+  // Próxima pauta publicada que el administrador reservó y a la que este integrante NO fue incluido
+  const pautaBloqueada = useMemo(() => {
+    if (!user || user.cuerda === "Admin" || esVisita(user)) return null;
+    const visibles = new Set((pautas || []).map((p) => String(p.id)));
+    return proximasPautas(pautasRaw).find((p) => !visibles.has(String(p.id))) || null;
+  }, [pautasRaw, pautas, user && user.id, user && user.cuerda]);
   // Recuerda quién es en este teléfono (solo nombre e id) para poder marcar asistencia aunque no haya internet para iniciar sesión
   useEffect(() => {
     if (user && user.id && !esVisita(user)) {
@@ -4254,6 +4260,7 @@ function AppInner() {
               )}
               {section === "dashboard" && !esVisita(user) && (
                 <Dashboard
+                  pautaBloqueada={pautaBloqueada}
                   cumple={cumple}
                   evangelio={evangelio}
                   santoral={santoral}
@@ -16810,7 +16817,38 @@ function AvisoPautaNueva({ pautas, onVer }) {
   );
 }
 
-function HerramientasCoro({ setSection, pautas, isAdmin, user }) {
+// Aviso para quien no fue incluido en una pauta reservada por el administrador
+function PautaReservadaAviso({ pauta }) {
+  const fecha = new Date(pauta.fecha + "T00:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
+  return (
+    <div style={{ marginTop: 10, background: "#fff", border: "1px solid #e1e9f4", borderRadius: 22, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,39,68,.05), 0 16px 40px rgba(30,58,95,.10)", fontFamily: "var(--font-sans, Inter, system-ui, sans-serif)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 18px", background: "linear-gradient(135deg,#17345c 0%,#2a5a9c 100%)", color: "#fff" }}>
+        <div style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(255,255,255,.14)", border: "1px solid rgba(255,255,255,.22)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e8c76a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5" /><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" /></svg>
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.75 }}>Pauta reservada</div>
+          <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2, marginTop: 2 }}>
+            {pauta.titulo || "Misa"} <span style={{ fontWeight: 600, opacity: 0.8 }}>· {fecha.charAt(0).toUpperCase() + fecha.slice(1)}</span>
+          </div>
+        </div>
+      </div>
+      <div style={{ padding: "16px 18px 18px" }}>
+        <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.55 }}>
+          La pauta de esta misa está disponible solo para quienes participan en ella. Como no estás considerado/a en esta celebración, por ahora no tienes acceso a sus cantos.
+        </div>
+        <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 14, background: "#f5f8fd", border: "1px solid #dbe4f0", display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b8901f" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M12 20.5s-7.5-4.6-7.5-10A4.5 4.5 0 0 1 12 7.6a4.5 4.5 0 0 1 7.5 2.9c0 5.4-7.5 10-7.5 10z" /></svg>
+          <div style={{ fontSize: 13.5, color: "#1e3a5f", lineHeight: 1.5, fontWeight: 600 }}>
+            Tu voz hace falta. Anímate a participar en las próximas misas: cada integrante suma, y el coro se vive mejor en comunidad. ¡Te esperamos!
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HerramientasCoro({ setSection, pautas, isAdmin, user, pautaBloqueada }) {
   const [pautaAbierta, setPautaAbierta] = useState(false);
   const [proxCerrada, setProxCerrada] = useState(false);
   const [selId, setSelId] = useState(null);
@@ -16858,6 +16896,7 @@ function HerramientasCoro({ setSection, pautas, isAdmin, user }) {
           })}
         </div>
       )}
+      {pautaBloqueada && (!prox || pautaBloqueada.fecha <= prox.fecha) && <PautaReservadaAviso pauta={pautaBloqueada} />}
       {visible && (
         <div id="pauta-inicio-panel">
         <PautaExpandida
@@ -17904,6 +17943,7 @@ function InformacionesWidget({ isAdmin }) {
 }
 
 function Dashboard({
+  pautaBloqueada,
   cumple,
   evangelio,
   santoral,
@@ -18149,7 +18189,7 @@ function Dashboard({
           )}
           <div className="dash-2col">
             <div className="dash-col">
-              <HerramientasCoro setSection={setSection} pautas={pautas} isAdmin={isAdmin} user={user} />
+              <HerramientasCoro setSection={setSection} pautas={pautas} isAdmin={isAdmin} user={user} pautaBloqueada={pautaBloqueada} />
               {/* ── Avisos del Coro ── */}
               {avisos && avisos.length > 0 && (
                 <div style={{ marginBottom: 14 }}>
