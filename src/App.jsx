@@ -15452,6 +15452,46 @@ function BotonAudioPauta({ url, size = 26, bg = "#1e3a5f", fs = 10 }) {
   );
 }
 
+// ── Título litúrgico de la pauta (ej. "Solemnidad de Todos los Santos"): config "pauta_liturgia_<id>" ──
+const mjLiturgiaCache = {};
+async function mjGuardarLiturgia(id, texto) {
+  const t = (texto || "").trim();
+  mjLiturgiaCache[id] = t;
+  return setConfig(`pauta_liturgia_${id}`, JSON.stringify({ t }));
+}
+function mjLeerLiturgia(v) {
+  let x = v;
+  if (typeof x === "string") {
+    try { x = JSON.parse(x); } catch (e) {}
+  }
+  return typeof x === "string" ? x : (x && x.t) || "";
+}
+function usePautaLiturgia(id) {
+  const [t, setT] = useState(id != null && mjLiturgiaCache[id] !== undefined ? mjLiturgiaCache[id] : "");
+  useEffect(() => {
+    if (id == null) return;
+    let vivo = true;
+    getConfig(`pauta_liturgia_${id}`)
+      .then((v) => {
+        const x = mjLeerLiturgia(v);
+        mjLiturgiaCache[id] = x;
+        if (vivo) setT(x);
+      })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [id]);
+  return t;
+}
+
+function LiturgiaLinea({ id, claro, style }) {
+  const t = usePautaLiturgia(id);
+  if (!t) return null;
+  return (
+    <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.01em", color: claro ? "rgba(255,255,255,.88)" : "#7a5a12", margin: "-6px 0 11px", ...style }}>
+      {t}
+    </div>
+  );
+}
 // ── Acceso por pauta: config "pauta_acceso_<id>" = {restringida, ids[]} ──
 async function mjCargarAccesosPauta() {
   const url = `${SUPABASE_URL}/rest/v1/config?select=key,value&key=like.${encodeURIComponent("pauta_acceso_")}*`;
@@ -16480,6 +16520,7 @@ function PautaExpandida({ pautas, setSection, onCerrar, soloProxima, respaldar, 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.75 }}>Pauta de Misa</div>
             <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.025em", lineHeight: 1.15, margin: "5px 0 11px" }}>{pauta.titulo || "Misa"}</div>
+            <LiturgiaLinea id={pauta.id} claro />
             <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
               <span style={chip}>{ico(<><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4" /></>)}{fecha.charAt(0).toUpperCase() + fecha.slice(1)}</span>
               {pauta.hora && <span style={chip}>{ico(<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>)}{pauta.hora}</span>}
@@ -33382,6 +33423,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     mostrar_col_letra: false,
     mostrar_col_audio: false,
     acceso_solo: false,
+    liturgia: "",
   };
   const [form, setForm] = useState(emptyPauta);
   const [abrirAccesoId, setAbrirAccesoId] = useState(null);
@@ -33494,6 +33536,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       });
       if (!res.ok) throw new Error(await res.text());
       const [created] = await res.json();
+      if (created && created.id && (form.liturgia || "").trim()) await mjGuardarLiturgia(created.id, form.liturgia);
       await onReload();
       setMode(publish ? "view" : null);
       setForm(emptyPauta);
@@ -33549,6 +33592,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       };
       const lineasCambio = pauta.publicada ? mjResumenCambiosPauta(pauta, body) : [];
       await updateRecord("pautas_misa", pauta.id, body);
+      await mjGuardarLiturgia(pauta.id, form.liturgia);
       await onReload();
       const updated = { ...pauta, ...body };
       setSelected(updated);
@@ -33724,7 +33768,15 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       tipo: pauta.tipo || "grupo",
       mostrar_col_letra: pauta.mostrar_col_letra || false,
       mostrar_col_audio: pauta.mostrar_col_audio || false,
+      liturgia: mjLiturgiaCache[pauta.id] || "",
     });
+    getConfig(`pauta_liturgia_${pauta.id}`)
+      .then((v) => {
+        const x = mjLeerLiturgia(v);
+        mjLiturgiaCache[pauta.id] = x;
+        setForm((p) => (p.liturgia ? p : { ...p, liturgia: x }));
+      })
+      .catch(() => {});
     setShowColLetra(pauta.mostrar_col_letra || false);
     setShowColAudio(pauta.mostrar_col_audio || false);
     const inList = TITULO_CELEBRACION_OPTIONS.includes(pauta.titulo);
@@ -33930,6 +33982,18 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   ))}
                 </select>
               )}
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: C.gray, marginBottom: 4 }}>
+                Título litúrgico (opcional)
+              </label>
+              <input
+                type="text"
+                value={form.liturgia || ""}
+                placeholder="Ej: Solemnidad de Todos los Santos"
+                onChange={(e) => setForm((p) => ({ ...p, liturgia: e.target.value }))}
+                style={inp}
+              />
             </div>
             <div>
               <label
@@ -34782,6 +34846,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             }}
           >
             {selected.titulo}
+            <LiturgiaLinea id={selected.id} style={{ margin: "3px 0 0", fontSize: 12.5, fontWeight: 600 }} />
           </h2>
           {isAdmin && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
