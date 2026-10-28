@@ -15414,8 +15414,8 @@ function BotonAudioPauta({ url, size = 26, bg = "#1e3a5f", fs = 10 }) {
   }
   return (
     <>
-    {visor && (
-      <div style={{ position: "fixed", right: 16, bottom: 16, zIndex: 3000, width: 340, maxWidth: "calc(100vw - 32px)", background: "#fff", borderRadius: 14, boxShadow: "0 12px 40px rgba(15,39,68,.3)", border: "1px solid #dbe4f0", overflow: "hidden" }}>
+    {visor && createPortal(
+      <div style={{ position: "fixed", right: 16, bottom: typeof window !== "undefined" && window.innerWidth <= 768 ? "calc(84px + env(safe-area-inset-bottom, 0px))" : 16, zIndex: 5000, width: 340, maxWidth: "calc(100vw - 32px)", background: "#fff", borderRadius: 14, boxShadow: "0 12px 40px rgba(15,39,68,.3)", border: "1px solid #dbe4f0", overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: "#1e3a5f", color: "#fff", fontSize: 12, fontWeight: 700 }}>
           <span>🎧 Audio de referencia</span>
           <button onClick={() => setVisor(false)} style={{ background: "none", border: "none", color: "#fff", fontSize: 15, cursor: "pointer" }}>✕</button>
@@ -15425,7 +15425,8 @@ function BotonAudioPauta({ url, size = 26, bg = "#1e3a5f", fs = 10 }) {
         ) : (
           <iframe title="Audio" src={`https://drive.google.com/file/d/${driveFileId(url)}/preview`} allow="autoplay" style={{ width: "100%", height: 150, border: 0, display: "block" }} />
         )}
-      </div>
+      </div>,
+      document.body
     )}
     <button
       onClick={alternar}
