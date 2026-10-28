@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 // Actualización obligatoria: si hay una versión nueva publicada, avisa y reinicia la app
 // (como las actualizaciones de Windows o del celular). Compara el archivo principal
 // de la app que está corriendo con el que publica el servidor.
-const REVISAR_CADA_MS = 5 * 60 * 1000;
+const REVISAR_CADA_MS = 30 * 1000;
 const CUENTA_S = 120;
 const POSPONER_S = 300;
 
@@ -83,7 +83,7 @@ export default function ActualizacionApp() {
     const revisar = async () => {
       if (!vivo || fin) return;
       const ahora = Date.now();
-      if (ahora - ultimo.current < 60 * 1000) return;
+      if (ahora - ultimo.current < 20 * 1000) return;
       ultimo.current = ahora;
       try {
         const pub = await scriptPublicado();
