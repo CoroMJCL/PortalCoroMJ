@@ -57,6 +57,9 @@ async function scriptPublicado() {
   return m ? m[1] : null;
 }
 
+export const versionActual = scriptActual;
+export const versionPublicada = scriptPublicado;
+
 export default function ActualizacionApp() {
   const [fin, setFin] = useState(null); // hora (ms) en que se reinicia
   const [resta, setResta] = useState(CUENTA_S);

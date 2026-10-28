@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Component } from "react";
 import { EscuelaCanto } from "./EscuelaCanto";
 import Landing from "./Landing";
+import { versionActual, versionPublicada } from "./ActualizacionApp";
 import CursoGuitarra from "./CursoGuitarra";
 import { PDFDocument } from "pdf-lib";
 import { createPortal } from "react-dom";
@@ -1945,6 +1946,11 @@ function AppInner() {
   const [showPushModal, setShowPushModal] = useState(false);
   const [pushBloqueado, setPushBloqueado] = useState(false);
   const [user, setUser] = useState(null);
+  useEffect(() => {
+    if (!user || !user.id) return;
+    const t = setTimeout(() => mjReportarVersion(user), 2500);
+    return () => clearTimeout(t);
+  }, [user && user.id]);
   const [pendingUser, setPendingUser] = useState(null);
   const [pendientes, setPendientes] = useState([]);
   const [authToken, setAuthToken] = useState(null);
@@ -16867,6 +16873,91 @@ function AvisoPautaNueva({ pautas, onVer }) {
   );
 }
 
+// ── Registro de versión por dispositivo: config "ver_<idUsuario>_<dispositivo>" = {u, n, v, t} ──
+function mjIdDispositivo() {
+  try {
+    let d = localStorage.getItem("mj_dev");
+    if (!d) {
+      d = Math.random().toString(36).slice(2, 8);
+      localStorage.setItem("mj_dev", d);
+    }
+    return d;
+  } catch (e) {
+    return "x";
+  }
+}
+function mjReportarVersion(user) {
+  try {
+    const v = versionActual();
+    if (!user || !user.id || !v) return;
+    setConfig(`ver_${user.id}_${mjIdDispositivo()}`, JSON.stringify({ u: String(user.id), n: user.nombre || "", v, t: Date.now() })).catch(() => {});
+  } catch (e) {}
+}
+async function mjCargarVersiones() {
+  const url = `${SUPABASE_URL}/rest/v1/config?select=key,value&key=like.${encodeURIComponent("ver_")}*&limit=1000`;
+  const tokens = [_authToken, SUPABASE_KEY].filter((v, i, ar) => v && ar.indexOf(v) === i);
+  for (const t of tokens) {
+    try {
+      const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${t}` } });
+      if (!r.ok) continue;
+      const rows = await r.json();
+      return (Array.isArray(rows) ? rows : [])
+        .map((x) => {
+          try {
+            return typeof x.value === "string" ? JSON.parse(x.value) : x.value;
+          } catch (e) {
+            return null;
+          }
+        })
+        .filter((x) => x && x.v && x.t && Date.now() - x.t < 30 * 86400000);
+    } catch (e) {}
+  }
+  return [];
+}
+function EstadoVersiones() {
+  const [d, setD] = useState(null);
+  const [env, setEnv] = useState("");
+  const cargar = useCallback(async () => {
+    const [lista, pub] = await Promise.all([mjCargarVersiones(), versionPublicada().catch(() => null)]);
+    const ultima = pub || versionActual();
+    const faltan = lista.filter((x) => x.v !== ultima);
+    const nombres = [...new Set(faltan.map((x) => x.n || "Integrante"))];
+    setD({ total: lista.length, faltan: faltan.length, nombres, uids: [...new Set(faltan.map((x) => String(x.u)))] });
+  }, []);
+  useEffect(() => {
+    cargar();
+    const t = setInterval(cargar, 60000);
+    return () => clearInterval(t);
+  }, [cargar]);
+  if (!d) return null;
+  const avisar = async () => {
+    setEnv("Enviando…");
+    const r = await sendPushToUsers(d.uids, "Actualización disponible", "Cierra y vuelve a abrir el portal para tener la última versión.", "/");
+    setEnv(r && r.ok ? `Aviso enviado a ${r.recipients} dispositivo(s)` : "No se pudo enviar el aviso");
+  };
+  const alDia = d.total > 0 && d.faltan === 0;
+  return (
+    <div style={{ marginTop: 7, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 12, color: "#0f2744" }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, background: alDia ? "#ecf8f0" : "#f3f6fb", border: `1px solid ${alDia ? "#bfe3cc" : "#e3e9f2"}`, fontWeight: 700 }}>
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: d.total === 0 ? "#cbd5e1" : alDia ? "#22a35a" : "#d9a21b" }} />
+        {d.total === 0 ? "Aún sin datos de versión" : alDia ? `Todos al día · ${d.total} dispositivos` : `${d.total - d.faltan} de ${d.total} dispositivos al día`}
+      </span>
+      {d.faltan > 0 && (
+        <>
+          <span style={{ color: "#6b7a90" }}>
+            Faltan: {d.nombres.slice(0, 3).join(", ")}
+            {d.nombres.length > 3 ? ` y ${d.nombres.length - 3} más` : ""}
+          </span>
+          <button type="button" onClick={avisar} style={{ border: "none", borderRadius: 999, padding: "5px 12px", background: "linear-gradient(135deg,#1e3a5f,#2a5a9c)", color: "#fff", fontSize: 11.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+            Avisar a los que faltan
+          </button>
+        </>
+      )}
+      {env && <span style={{ color: "#6b7a90" }}>{env}</span>}
+    </div>
+  );
+}
+
 // Interruptor del administrador: pausa el reinicio automático por versión nueva
 function PausaActualizaciones() {
   const [pausada, setPausada] = useState(null);
@@ -16916,6 +17007,7 @@ function PausaActualizaciones() {
         </span>
       </button>
       {err && <span style={{ fontSize: 11, color: "#b91c1c", marginTop: 4 }}>No se pudo guardar. Intenta de nuevo.</span>}
+      <EstadoVersiones />
     </div>
   );
 }
