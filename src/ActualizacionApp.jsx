@@ -7,6 +7,39 @@ const REVISAR_CADA_MS = 5 * 60 * 1000;
 const CUENTA_S = 120;
 const POSPONER_S = 300;
 
+const SUPABASE_URL = "https://ttbipbhfswcwwgcwaist.supabase.co";
+const SUPABASE_KEY = "sb_publishable_mz6TyeuTP3TA6XQPOunXFQ_ad0Cp9fg";
+export const CLAVE_PAUSA = "actualizaciones_pausadas";
+
+// ¿El administrador pausó las actualizaciones? (si no se puede leer, se asume que no)
+async function pausado() {
+  let tokens = [];
+  try {
+    tokens = [localStorage.getItem("sb_access_token"), SUPABASE_KEY].filter((v, i, ar) => v && ar.indexOf(v) === i);
+  } catch (e) {
+    tokens = [SUPABASE_KEY];
+  }
+  for (const t of tokens) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/config?select=value&key=eq.${CLAVE_PAUSA}&limit=1`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${t}`, "Cache-Control": "no-cache" },
+        cache: "no-store",
+      });
+      if (!r.ok) continue;
+      const d = await r.json();
+      if (!Array.isArray(d) || d.length === 0) return false;
+      let v = d[0] && d[0].value;
+      if (typeof v === "string") {
+        try {
+          v = JSON.parse(v);
+        } catch (e) {}
+      }
+      return !!(v && (v.pausada === true || v === true || v === "true" || v === "1"));
+    } catch (e) {}
+  }
+  return false;
+}
+
 function scriptActual() {
   try {
     const el = [...document.scripts].find((s) => /\/static\/js\/main\.[^/]+\.js/.test(s.src || ""));
@@ -30,6 +63,7 @@ export default function ActualizacionApp() {
   const [pospuesta, setPospuesta] = useState(false);
   const [oculta, setOculta] = useState(false);
   const ultimo = useRef(0);
+  const revisandoFin = useRef(false);
   const actual = useRef(scriptActual());
 
   const reiniciar = () => {
@@ -57,6 +91,8 @@ export default function ActualizacionApp() {
           reciente = ahora - Number(sessionStorage.getItem("mj_reinicio") || 0) < 60 * 1000;
         } catch (e) {}
         if (reciente) return;
+        if (await pausado()) return; // el administrador pidió no reiniciar a nadie por ahora
+        if (!vivo) return;
         setOculta(false);
         setFin(ahora + CUENTA_S * 1000);
       } catch (e) {}
@@ -83,17 +119,31 @@ export default function ActualizacionApp() {
     const tick = () => {
       const s = Math.ceil((fin - Date.now()) / 1000);
       if (s <= 0) {
-        reiniciar();
+        if (!revisandoFin.current) {
+          revisandoFin.current = true;
+          pausado().then((p) => {
+            revisandoFin.current = false;
+            if (p) setFin(null);
+            else reiniciar();
+          });
+        }
         return;
       }
       setResta(s);
     };
     tick();
     const t = setInterval(tick, 500);
+    // Si el administrador activa la pausa con la cuenta en marcha, se cancela
+    const tp = setInterval(() => {
+      pausado().then((p) => {
+        if (p) setFin(null);
+      });
+    }, 15000);
     const vis = () => document.visibilityState === "visible" && tick();
     document.addEventListener("visibilitychange", vis);
     return () => {
       clearInterval(t);
+      clearInterval(tp);
       document.removeEventListener("visibilitychange", vis);
     };
     // eslint-disable-next-line

@@ -16826,6 +16826,59 @@ function AvisoPautaNueva({ pautas, onVer }) {
   );
 }
 
+// Interruptor del administrador: pausa el reinicio automático por versión nueva
+function PausaActualizaciones() {
+  const [pausada, setPausada] = useState(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    getConfig("actualizaciones_pausadas")
+      .then((v) => {
+        let x = v;
+        if (typeof x === "string") {
+          try { x = JSON.parse(x); } catch (e) {}
+        }
+        if (vivo) setPausada(!!(x && (x.pausada === true || x === true || x === "true")));
+      })
+      .catch(() => vivo && setPausada(false));
+    return () => { vivo = false; };
+  }, []);
+  if (pausada === null) return null;
+  const cambiar = async () => {
+    const nuevo = !pausada;
+    setPausada(nuevo);
+    setErr(false);
+    const ok = await setConfig("actualizaciones_pausadas", JSON.stringify({ pausada: nuevo }));
+    if (!ok) {
+      setPausada(!nuevo);
+      setErr(true);
+    }
+  };
+  return (
+    <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-start", marginTop: 9 }}>
+      <button
+        type="button"
+        onClick={cambiar}
+        role="switch"
+        aria-checked={pausada}
+        aria-label="Pausar actualizaciones de la app"
+        style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "6px 8px 6px 12px", borderRadius: 999, cursor: "pointer", fontFamily: "inherit", textAlign: "left", border: pausada ? "1px solid #e3c766" : "1px solid #e3e9f2", background: pausada ? "linear-gradient(135deg,#fffaf0,#fff3d6)" : "linear-gradient(180deg,#ffffff,#f7f9fd)", boxShadow: pausada ? "0 4px 14px rgba(184,144,31,.18)" : "0 2px 10px rgba(15,39,68,.06)" }}
+      >
+        <span style={{ display: "block" }}>
+          <span style={{ display: "block", fontSize: 9, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: pausada ? "#a9780a" : "#8a94a6" }}>Actualizaciones de la app</span>
+          <span style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0f2744", marginTop: 1 }}>
+            {pausada ? "En pausa · nadie se reinicia" : "Activas · se reinician con cada versión"}
+          </span>
+        </span>
+        <span style={{ width: 40, height: 22, borderRadius: 999, background: pausada ? "linear-gradient(135deg,#e8c76a,#b8901f)" : "#cbd5e1", position: "relative", flexShrink: 0, transition: "background .2s" }}>
+          <span style={{ position: "absolute", top: 2, left: pausada ? 20 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,.3)", transition: "left .2s" }} />
+        </span>
+      </button>
+      {err && <span style={{ fontSize: 11, color: "#b91c1c", marginTop: 4 }}>No se pudo guardar. Intenta de nuevo.</span>}
+    </div>
+  );
+}
+
 // Aviso para quien no fue incluido en una pauta reservada por el administrador
 function PautaReservadaAviso({ pauta }) {
   const fecha = new Date(pauta.fecha + "T00:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
@@ -18137,6 +18190,7 @@ function Dashboard({
                     <b style={{ color: "#0f2744", fontWeight: 700 }}>Santoral:</b> {santoral || "—"}
                   </span>
                 </div>
+                {esCuerdaAdmin(user) && <PausaActualizaciones />}
               </div>
               <CumpleanosCompacto members={members} setSection={setSection} />
             </div>
