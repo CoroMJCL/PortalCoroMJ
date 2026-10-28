@@ -69,9 +69,11 @@ export default function ActualizacionApp() {
   const revisandoFin = useRef(false);
   const actual = useRef(scriptActual());
 
+  const publicada = useRef(null);
   const reiniciar = () => {
     try {
       sessionStorage.setItem("mj_reinicio", String(Date.now()));
+      if (publicada.current) sessionStorage.setItem("mj_reinicio_hash", publicada.current);
     } catch (e) {}
     window.location.reload();
   };
@@ -94,6 +96,11 @@ export default function ActualizacionApp() {
           reciente = ahora - Number(sessionStorage.getItem("mj_reinicio") || 0) < 60 * 1000;
         } catch (e) {}
         if (reciente) return;
+        // Si ya se reinició por esta misma versión y el navegador sigue mostrando la anterior, no insistir
+        try {
+          if (sessionStorage.getItem("mj_reinicio_hash") === pub) return;
+        } catch (e) {}
+        publicada.current = pub;
         if (await pausado()) return; // el administrador pidió no reiniciar a nadie por ahora
         if (!vivo) return;
         setOculta(false);
