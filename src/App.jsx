@@ -15463,6 +15463,9 @@ const mjLiturgiaCache = {};
 async function mjGuardarLiturgia(id, texto) {
   const t = (texto || "").trim();
   mjLiturgiaCache[id] = t;
+  try {
+    localStorage.setItem(`mj_lit_${id}`, t);
+  } catch (e) {}
   return setConfig(`pauta_liturgia_${id}`, JSON.stringify({ t }));
 }
 function mjLeerLiturgia(v) {
@@ -15472,15 +15475,28 @@ function mjLeerLiturgia(v) {
   }
   return typeof x === "string" ? x : (x && x.t) || "";
 }
+function mjLiturgiaGuardada(id) {
+  if (id == null) return "";
+  if (mjLiturgiaCache[id] !== undefined) return mjLiturgiaCache[id];
+  try {
+    return localStorage.getItem(`mj_lit_${id}`) || "";
+  } catch (e) {
+    return "";
+  }
+}
 function usePautaLiturgia(id) {
-  const [t, setT] = useState(id != null && mjLiturgiaCache[id] !== undefined ? mjLiturgiaCache[id] : "");
+  const [t, setT] = useState(mjLiturgiaGuardada(id));
   useEffect(() => {
     if (id == null) return;
     let vivo = true;
     getConfig(`pauta_liturgia_${id}`)
       .then((v) => {
+        if (v === null || v === undefined) return; // sin datos o sin red: se conserva lo guardado
         const x = mjLeerLiturgia(v);
         mjLiturgiaCache[id] = x;
+        try {
+          localStorage.setItem(`mj_lit_${id}`, x);
+        } catch (e) {}
         if (vivo) setT(x);
       })
       .catch(() => {});
@@ -15489,6 +15505,16 @@ function usePautaLiturgia(id) {
   return t;
 }
 
+function TituloLiturgicoModo({ id }) {
+  const t = usePautaLiturgia(id);
+  if (!t) return null;
+  return (
+    <>
+      <span style={{ margin: "0 10px", fontWeight: 400, opacity: 0.35 }}>|</span>
+      <span style={{ fontWeight: 600, letterSpacing: "-0.01em", opacity: 0.85 }}>{t}</span>
+    </>
+  );
+}
 function LiturgiaLinea({ id, claro, style }) {
   const t = usePautaLiturgia(id);
   if (!t) return null;
@@ -16438,7 +16464,10 @@ function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico, abrirK, v
             )}
           </div>
           <div style={{ padding: "20px 16px 8px" }}>
-            <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1 }}>{pauta.titulo || "Misa"}</div>
+            <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+              {pauta.titulo || "Misa"}
+              <TituloLiturgicoModo id={pauta.id} />
+            </div>
             <div style={{ fontSize: 14, color: MUTED, marginTop: 6, textTransform: "capitalize" }}>
               {fecha}
               {pauta.hora ? ` · ${pauta.hora}` : ""}
