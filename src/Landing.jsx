@@ -845,7 +845,8 @@ export default function Landing({ onPortal }) {
         .verso-t{margin-top:12px;font-size:14px;font-weight:400;letter-spacing:0.04em;color:rgba(255,255,255,0.85)}
         @media(min-width:901px) and (max-height:760px){.verso{display:none}}
         @media(max-width:900px){.verso{left:20px;top:34%;width:min(300px,56vw);padding-left:14px}.verso-h{font-size:24px}}
-        @media(max-width:480px){.verso{display:none}}
+        @media(max-width:480px){.verso{top:150px;width:min(250px,64vw);padding-left:12px;border-left-width:1.5px}.verso-k{font-size:8.5px;letter-spacing:0.28em;margin-bottom:6px}.verso-h{font-size:18px;line-height:1.2}.verso-t{margin-top:7px;font-size:11.5px}}
+        @media(max-width:480px) and (max-height:780px){.verso{display:none}}
         .hero-right{display:flex;flex-direction:column;align-items:flex-end;gap:16px;max-width:420px}
         .hero-sub{font-size:13.5px;font-weight:300;color:rgba(255,255,255,0.55);line-height:1.75;text-align:right}
         .hero-btns{display:flex;gap:10px}
