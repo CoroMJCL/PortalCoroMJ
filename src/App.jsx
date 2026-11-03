@@ -2162,6 +2162,7 @@ function AppInner() {
         ]);
       setMembers((m || []).filter((u) => u.cuerda && u.cuerda.trim() !== ""));
       setEventos(ev || []);
+      _mjEventosDb = ev || [];
       setDocs(d || []);
       setOraciones(or || []);
       setAvisos(n || []);
@@ -2962,11 +2963,7 @@ function AppInner() {
   }
 
   function handleGuestEnter() {
-    // Sesión de invitado: solo en memoria, sin cuenta Supabase
-    _isGuestSession = true;
-    setUser({ nombre: "Invitado", cuerda: "", acceso: "aprobado", id: null });
-    setSection("dashboard");
-    setView("app");
+    // El portal es solo para integrantes: ya no existe el ingreso de invitados
   }
 
   async function handleSignOut() {
@@ -3280,6 +3277,8 @@ function AppInner() {
       )}
 
       <CheckInObligatorio pautas={pautas} user={user} />
+      <SinCuerdaAsignada user={user} onSalir={handleSignOut} />
+      <ControlAccesoAsistencia user={user} members={members} asistencia={asistencia} eventosDb={eventos} listo={firstLoadDone} onSalir={handleSignOut} />
 
       {/* ── Modal explicativo notificaciones push ── */}
       {showPushModal &&
@@ -4254,16 +4253,7 @@ function AppInner() {
             <Spinner />
           ) : (
             <>
-              {section === "dashboard" && esVisita(user) && (
-                <DashboardVisita
-                  user={user}
-                  pautas={pautas}
-                  setSection={setSection}
-                  isAdmin={false}
-                  evangelio={evangelio}
-                  comunidades={comunidades}
-                />
-              )}
+
               {section === "dashboard" && !esVisita(user) && (
                 <Dashboard
                   pautaBloqueada={pautaBloqueada}
@@ -4377,7 +4367,8 @@ function AppInner() {
                 <Asistencia
                   asistencia={asistencia}
                   members={members}
-                  eventos={gcalEventos}
+                  eventosDb={eventos}
+                  pautas={pautas}
                   user={user}
                   onReload={loadData}
                 />
@@ -4400,6 +4391,8 @@ function AppInner() {
                   materialCoro={materialCoro}
                   onReload={loadData}
                   user={user}
+                  eventosDb={eventos}
+                  pautasAdmin={pautas}
                 />
               )}
               {section === "admin" && user?.cuerda !== "Admin" && (
@@ -4449,57 +4442,6 @@ function AppInner() {
               )}
               {section === "subir_material" && esCuerdaAdmin(user) && (
                 <SubirMaterial materialEnsayo={materialEnsayo} onReload={loadData} />
-              )}
-              {section === "vista_invitado" && esCuerdaAdmin(user) && (
-                <div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      background: "linear-gradient(135deg,#0c1a2e,#0ea5e9)",
-                      borderRadius: 14,
-                      padding: "12px 16px",
-                      marginBottom: 16,
-                      color: "white",
-                    }}
-                  >
-                    <span style={{ fontSize: 20, display: "inline-flex" }}><IconoOjo size={22} /></span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>
-                        Vista previa del Portal Invitado
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: "rgba(255,255,255,0.78)",
-                          lineHeight: 1.5,
-                        }}
-                      >
-                        Así lo ven los coros invitados. Puedes editar el afiche
-                        y la agenda aquí mismo. Para la Sala de Ensayo usa el
-                        menú "Sala de Ensayo".
-                      </div>
-                    </div>
-                  </div>
-                  <DashboardVisita
-                    user={user}
-                    pautas={pautas}
-                    setSection={setSection}
-                    isAdmin={true}
-                    evangelio={evangelio}
-                    comunidades={comunidades}
-                  />
-                  <div
-                    style={{
-                      marginTop: 22,
-                      paddingTop: 18,
-                      borderTop: "1px solid rgba(60,60,67,0.12)",
-                    }}
-                  >
-                    <CancionerosInvitado user={user} isAdmin={true} />
-                  </div>
-                </div>
               )}
               {section === "cantos_pdf" && (
                 <MaterialEnsayo
@@ -14167,22 +14109,6 @@ function SolicitudRow({ s, onReload }) {
           gap: 8,
         }}
       >
-        <button
-          onClick={() => accion({ acceso: "aprobado", cuerda: "" })}
-          disabled={proc}
-          style={{
-            background: "#eaf2ff",
-            border: "1px solid #cfe0fb",
-            color: "#0a5ac8",
-            borderRadius: 10,
-            padding: "9px 14px",
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: proc ? "default" : "pointer",
-          }}
-        >
-          Aprobar como invitado
-        </button>
         <div
           style={{
             display: "flex",
@@ -15655,20 +15581,20 @@ async function mjResumenAsistencia(user) {
   for (const t of [_authToken || SUPABASE_KEY, SUPABASE_SERVICE_KEY]) {
     try {
       const h = { apikey: t === SUPABASE_SERVICE_KEY ? SUPABASE_SERVICE_KEY : SUPABASE_KEY, Authorization: `Bearer ${t}` };
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?select=estado&member_id=eq.${user.id}`, { headers: h });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?select=id,estado,evento_id,member_id&member_id=eq.${user.id}`, { headers: h });
       if (!r.ok) continue;
       const rows = await r.json();
       const rm = await fetch(`${SUPABASE_URL}/rest/v1/integrantes?select=asistencia_especial&id=eq.${user.id}`, { headers: h }).catch(() => null);
       const esp = rm && rm.ok ? ((await rm.json())[0] || {}).asistencia_especial : false;
-      const ev = rows.filter((x) => !["justificado", "excluido", "nuevo"].includes(x.estado));
-      const pres = ev.filter((x) => x.estado === "presente").length;
-      return {
-        pct: esp ? 100 : ev.length ? Math.round((pres / ev.length) * 100) : null,
-        presentes: rows.filter((x) => x.estado === "presente").length,
-        ausentes: rows.filter((x) => x.estado === "ausente").length,
-        justificados: rows.filter((x) => x.estado === "justificado").length,
-        total: ev.length,
-      };
+      // Una misa cuenta una vez aunque haya registros duplicados del mismo día
+      let evDb = _mjEventosDb;
+      try {
+        const re = await fetch(`${SUPABASE_URL}/rest/v1/eventos?select=id,fecha,tipo,titulo`, { headers: h });
+        if (re.ok) evDb = await re.json();
+      } catch (e) {}
+      await mjGcalHistorial();
+      const st = mjStatsAsistencia(mjConsolidarAsistencia(rows, mjMapaEventos(evDb)), user.id, esp);
+      return { pct: st.pct, presentes: st.presentes, ausentes: st.ausentes, justificados: st.justificados, total: st.evaluados };
     } catch (e) {}
   }
   return null;
@@ -15825,7 +15751,7 @@ async function mjEscribirAsistencia(pauta, user) {
   for (const t of claves) {
     try {
       // 1) evento de misa de ese día (el que usa el admin para pasar lista)
-      let r = await fetch(`${SUPABASE_URL}/rest/v1/eventos?select=id,titulo,tipo&fecha=eq.${pauta.fecha}`, { headers: hdr(t) });
+      let r = await fetch(`${SUPABASE_URL}/rest/v1/eventos?select=id,titulo,tipo&fecha=eq.${pauta.fecha}&order=id.asc`, { headers: hdr(t) });
       let evs = r.ok ? await r.json() : [];
       let ev = evs.find((e) => String(e.tipo || "").toLowerCase() === "misa") || null;
       if (!ev) {
@@ -15931,7 +15857,7 @@ async function mjYaRegistrado(pauta, user) {
   for (const t of [_authToken || SUPABASE_KEY, SUPABASE_SERVICE_KEY]) {
     try {
       const h = { apikey: t === SUPABASE_SERVICE_KEY ? SUPABASE_SERVICE_KEY : SUPABASE_KEY, Authorization: `Bearer ${t}` };
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/eventos?select=id,tipo&fecha=eq.${pauta.fecha}`, { headers: h });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/eventos?select=id,tipo&fecha=eq.${pauta.fecha}&order=id.asc`, { headers: h });
       if (!r.ok) continue;
       const ev = (await r.json()).find((e) => e.tipo === "misa");
       if (!ev) return false;
@@ -18233,29 +18159,16 @@ function Dashboard({
     if (setSection) setSection("documentos");
   }
 
-  // Cálculo de asistencia del usuario
-  const misAsistencias = (asistencia || []).filter(
-    (a) => a.member_id === user?.id
-  );
-  const totalEventosConAsistencia = (allEventos || []).filter((e) =>
-    (asistencia || []).some((a) => a.evento_id === e.id)
-  );
-  const misPresentes = misAsistencias.filter(
-    (a) => a.estado === "presente"
-  ).length;
-  const misJustificados = misAsistencias.filter(
-    (a) => a.estado === "justificado"
-  ).length;
-  const misAusentes2 = misAsistencias.filter(
-    (a) => a.estado === "ausente"
-  ).length;
-  const totalEvaluados = misAsistencias.filter(
-    (a) => !["justificado", "excluido", "nuevo"].includes(a.estado)
-  ).length;
-  const pctAsistencia =
-    totalEvaluados > 0
-      ? Math.round((misPresentes / totalEvaluados) * 100)
-      : null;
+  // Cálculo de asistencia del usuario (una misa cuenta una sola vez, aunque tenga registros duplicados)
+  const mapaEvDash = useMapaEventos(_mjEventosDb);
+  const misasDash = useMemo(() => mjConsolidarAsistencia(asistencia, mapaEvDash), [asistencia, mapaEvDash]);
+  const yoDash = (members || []).find((m) => String(m.id) === String(user?.id));
+  const stDash = mjStatsAsistencia(misasDash, user?.id, !!(yoDash && yoDash.asistencia_especial));
+  const misPresentes = stDash.presentes;
+  const misJustificados = stDash.justificados;
+  const misAusentes2 = stDash.ausentes;
+  const totalEvaluados = stDash.evaluados;
+  const pctAsistencia = stDash.pct;
   const tieneEstrella =
     misPresentes > 0 && misAusentes2 === 0 && misJustificados === 0;
 
@@ -26308,7 +26221,6 @@ const ADMIN_TABS = [
   { id: "galeria", label: "Galería", icon: "🖼️" },
   { id: "comunidades", label: "Comunidades", icon: "⛪" },
   { id: "cuentas", label: "Cuentas", icon: "🔐" },
-  { id: "codigo_invitado", label: "Código Invitados", icon: "🔑" },
   { id: "historial", label: "Historial Asistencia", icon: "📅" },
   { id: "cuenta_bancaria", label: "Cuenta Bancaria", icon: "🏦" },
   { id: "visitas", label: "Visitas", icon: "📊" },
@@ -26386,7 +26298,6 @@ const ADMIN_GRUPOS = [
     emoji: "⚙️",
     ids: [
       "cuentas",
-      "codigo_invitado",
       "cuenta_bancaria",
       "notificaciones",
       "api_config",
@@ -36341,996 +36252,1124 @@ function AdminPautasMisa({ onReload }) {
 // ══════════════════════════════════════════
 //  ASISTENCIA (vista pública)
 // ══════════════════════════════════════════
-function Asistencia({ asistencia, members, eventos, user, onReload }) {
-  const eventosConAsistencia = eventos
-    .filter((e) => asistencia.some((a) => a.evento_id === e.id))
-    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-
-  const esEspecial = (memberId) => {
-    const m = (members || []).find((x) => x.id === memberId);
-    return !!(m && m.asistencia_especial);
-  };
-
-  const calcPct = (memberId) => {
-    if (esEspecial(memberId)) return 100; // Caso especial: siempre presente
-    const misReg = asistencia.filter((a) => a.member_id === memberId);
-    const evaluados = misReg.filter(
-      (a) => !["justificado", "excluido", "nuevo"].includes(a.estado)
-    );
-    const presentes = evaluados.filter((a) => a.estado === "presente").length;
-    return evaluados.length > 0
-      ? Math.round((presentes / evaluados.length) * 100)
-      : null;
-  };
-
-  const colorPct = (pct) =>
-    pct === null
-      ? C.gray
-      : pct >= 75
-      ? C.primary
-      : pct >= 50
-      ? "#f59e0b"
-      : "#ef4444";
-  const fmtFecha = (f) =>
-    new Date(f + "T00:00:00").toLocaleDateString("es-CL", {
-      day: "numeric",
-      month: "short",
-    });
-  const [eventoSeleccionado, setEventoSeleccionado] = useState(null);
-
-  const isAdmin = user?.cuerda === "Admin";
-  const cc = CUERDAS[user?.cuerda] || C.primary;
-
-  // Datos personales del usuario logueado
-  const soyEspecial = !!(members || []).find((m) => m.id === user?.id)
-    ?.asistencia_especial;
-  const misReg = asistencia.filter((a) => a.member_id === user?.id);
-  const misPresentes = soyEspecial
-    ? eventosConAsistencia.length
-    : misReg.filter((a) => a.estado === "presente").length;
-  const misAusentes = soyEspecial
-    ? 0
-    : misReg.filter((a) => a.estado === "ausente").length;
-  const misJustificados = soyEspecial
-    ? 0
-    : misReg.filter((a) => a.estado === "justificado").length;
-  const misExcluidos = misReg.filter((a) => a.estado === "excluido").length;
-  const misNuevos = misReg.filter((a) => a.estado === "nuevo").length;
-  const evaluados = misReg.filter(
-    (a) => !["justificado", "excluido", "nuevo"].includes(a.estado)
-  ).length;
-  const pct = calcPct(user?.id);
-  const colPct = colorPct(pct);
-  const circum = 2 * Math.PI * 38;
-  const tieneEstrella =
-    misPresentes > 0 && misAusentes === 0 && misJustificados === 0;
-
-  const msgPct =
-    pct === null
-      ? null
-      : pct >= 75
-      ? "¡Vas muy bien! Sigue así 💪"
-      : pct >= 50
-      ? "Puedes mejorar tu asistencia 🎵"
-      : "Tu asistencia necesita atención ⚠️";
-  const bgPct =
-    pct === null
-      ? C.bg
-      : pct >= 75
-      ? C.primary + "12"
-      : pct >= 50
-      ? "#fef3c7"
-      : "#fee2e2";
-  const borderPct =
-    pct === null
-      ? C.border
-      : pct >= 75
-      ? C.primary + "40"
-      : pct >= 50
-      ? "#f59e0b40"
-      : "#ef444440";
-
-  // Reinicio: el admin elige la fecha; se respalda y se borra todo lo anterior a ella.
-  const [reiniciando, setReiniciando] = useState(false);
-  const [panelReinicio, setPanelReinicio] = useState(false);
-  const [fechaCorte, setFechaCorte] = useState("");
-  async function reiniciarAsistencia() {
-    const CORTE = fechaCorte;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(CORTE)) {
-      alert("Elige primero la fecha desde la que quieres que cuente la asistencia.");
-      return;
-    }
-    const corteTxt = new Date(CORTE + "T00:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" });
-    const token = _authToken || SUPABASE_KEY;
-    const H = {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
+// ══════════════════════════════════════════════════════════════════════
+//  ASISTENCIA — una misa cuenta una sola vez por persona
+//  El Check in y el cierre nocturno anotan en el evento "misa" de la base (tabla eventos);
+//  antes, pasar lista usaba los eventos de Google Calendar, y una misma misa quedaba como dos
+//  eventos distintos. Aquí todo se agrupa por fecha: si una persona tiene varios registros del
+//  mismo día, vale el mejor (presente > justificado > no aplica > nuevo > ausente).
+// ══════════════════════════════════════════════════════════════════════
+const MJ_ESTADOS = {
+  presente: { label: "Presente", corto: "P", color: "#16335a", bg: "#e7eef8", dot: "#2a5a9c" },
+  ausente: { label: "Ausente", corto: "A", color: "#a32a1f", bg: "#fcebea", dot: "#dc5a4e" },
+  justificado: { label: "Justificado", corto: "J", color: "#8a5306", bg: "#fbf1de", dot: "#d99a2b" },
+  excluido: { label: "No aplica", corto: "–", color: "#5b6779", bg: "#eff2f6", dot: "#b6c0cd" },
+  nuevo: { label: "Nuevo", corto: "N", color: "#0b5f75", bg: "#e4f2f6", dot: "#5aa9be" },
+};
+const MJ_PRIORIDAD = { presente: 5, justificado: 4, excluido: 3, nuevo: 2, ausente: 1 };
+let _mjEventosDb = [];
+let _mjGcalHist = null;
+let _mjGcalHistLista = [];
+function mjGrupoEvento(tipo) {
+  return String(tipo || "").toLowerCase() === "ensayo" ? "ensayo" : "misa";
+}
+function mjGcalAEvento(item) {
+  const start = item.start?.dateTime || item.start?.date || "";
+  const titulo = item.summary || "Sin título";
+  const tl = titulo.toLowerCase();
+  const tipo = tl.includes("ensayo")
+    ? "ensayo"
+    : tl.includes("misa") || tl.includes("vigilia") || tl.includes("corpus") || tl.includes("pentecost") || tl.includes("pascua")
+    ? "misa"
+    : "evento";
+  const hora = item.start?.dateTime
+    ? new Date(item.start.dateTime).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hour12: false })
+    : "";
+  return { id: item.id, titulo, fecha: start.split("T")[0], hora, tipo, lugar: item.location || "", gcal: true };
+}
+// Eventos de Google Calendar del último año (para saber la fecha de registros antiguos)
+function mjGcalHistorial() {
+  if (!_mjGcalHist) {
+    const desde = new Date();
+    desde.setFullYear(desde.getFullYear() - 1);
+    const hasta = new Date();
+    hasta.setDate(hasta.getDate() + 60);
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(GCAL_CALENDAR_ID)}/events?key=${GCAL_API_KEY}&timeMin=${desde.toISOString()}&timeMax=${hasta.toISOString()}&maxResults=250&singleEvents=true&orderBy=startTime`;
+    _mjGcalHist = fetch(url)
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) => {
+        _mjGcalHistLista = (d.items || []).map(mjGcalAEvento).filter((e) => e.fecha);
+        return _mjGcalHistLista;
+      })
+      .catch(() => {
+        _mjGcalHist = null; // se reintenta la próxima vez
+        return [];
+      });
+  }
+  return _mjGcalHist;
+}
+function mjMapaEventos(eventosDb) {
+  const m = {};
+  [..._mjGcalHistLista, ...(eventosDb || _mjEventosDb || [])].forEach((e) => {
+    if (e && e.id != null && e.fecha) m[String(e.id)] = { fecha: String(e.fecha).slice(0, 10), grupo: mjGrupoEvento(e.tipo), titulo: e.titulo || "" };
+  });
+  return m;
+}
+function useMapaEventos(eventosDb) {
+  const [ver, setVer] = useState(0);
+  useEffect(() => {
+    let vivo = true;
+    mjGcalHistorial().then(() => vivo && setVer((v) => v + 1));
+    return () => {
+      vivo = false;
     };
-    setReiniciando(true);
+  }, []);
+  return useMemo(() => mjMapaEventos(eventosDb), [ver, eventosDb]);
+}
+const mjClaveMisa = (fecha, grupo) => fecha + (grupo === "ensayo" ? "·ensayo" : "");
+// Agrupa los registros por misa (fecha) y persona
+function mjConsolidarAsistencia(asistencia, mapa) {
+  const misas = {};
+  (asistencia || []).forEach((r) => {
+    if (!r || r.evento_id == null) return;
+    const ev = mapa[String(r.evento_id)];
+    const key = ev ? mjClaveMisa(ev.fecha, ev.grupo) : "id:" + r.evento_id;
+    let m = misas[key];
+    if (!m) m = misas[key] = { key, fecha: ev ? ev.fecha : null, grupo: ev ? ev.grupo : "misa", titulo: ev ? ev.titulo : "", porMiembro: {} };
+    if (ev && !m.titulo) m.titulo = ev.titulo;
+    const mid = String(r.member_id);
+    const prev = m.porMiembro[mid];
+    if (!prev) m.porMiembro[mid] = { estado: r.estado, filas: [r] };
+    else {
+      prev.filas.push(r);
+      if ((MJ_PRIORIDAD[r.estado] || 0) > (MJ_PRIORIDAD[prev.estado] || 0)) prev.estado = r.estado;
+    }
+  });
+  return Object.values(misas).sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+}
+function mjStatsAsistencia(misas, memberId, especial) {
+  const mid = String(memberId);
+  let p = 0,
+    a = 0,
+    j = 0,
+    x = 0,
+    n = 0;
+  (misas || []).forEach((m) => {
+    const r = m.porMiembro[mid];
+    if (!r) return;
+    if (r.estado === "presente") p++;
+    else if (r.estado === "ausente") a++;
+    else if (r.estado === "justificado") j++;
+    else if (r.estado === "excluido") x++;
+    else if (r.estado === "nuevo") n++;
+  });
+  if (especial) return { presentes: (misas || []).filter((m) => m.fecha).length, ausentes: 0, justificados: j, excluidos: x, nuevos: n, evaluados: p + a, pct: 100, especial: true };
+  return { presentes: p, ausentes: a, justificados: j, excluidos: x, nuevos: n, evaluados: p + a, pct: p + a ? Math.round((p / (p + a)) * 100) : null };
+}
+const mjColorPct = (pct) => (pct == null ? "#94a3b8" : pct >= 75 ? "#1e4f8f" : pct >= 50 ? "#c98a12" : "#d0473b");
+function mjHdrAdmin(t) {
+  return { apikey: t === SUPABASE_SERVICE_KEY ? SUPABASE_SERVICE_KEY : SUPABASE_KEY, Authorization: `Bearer ${t}`, "Content-Type": "application/json" };
+}
+// El evento "oficial" de una fecha (el mismo que usan el Check in y el cierre nocturno); si no existe se crea
+async function mjEventoCanonico(fecha, grupo, titulo) {
+  let ultimo = null;
+  for (const t of [_authToken || SUPABASE_KEY, SUPABASE_SERVICE_KEY]) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/eventos?select=id,titulo,tipo,fecha&fecha=eq.${fecha}&order=id.asc`, { headers: mjHdrAdmin(t) });
+      if (!r.ok) {
+        ultimo = new Error("No se pudieron leer los eventos (" + r.status + ")");
+        continue;
+      }
+      const evs = await r.json();
+      const tipoBuscado = grupo === "ensayo" ? "ensayo" : "misa";
+      let ev = evs.find((e) => String(e.tipo || "").toLowerCase() === tipoBuscado);
+      if (ev) return ev;
+      const rc = await fetch(`${SUPABASE_URL}/rest/v1/eventos`, {
+        method: "POST",
+        headers: { ...mjHdrAdmin(t), Prefer: "return=representation" },
+        body: JSON.stringify({ titulo: titulo || (grupo === "ensayo" ? "Ensayo" : "Misa"), fecha, hora: "", lugar: "", tipo: tipoBuscado, descripcion: "Creado al pasar lista" }),
+      });
+      if (!rc.ok) {
+        ultimo = new Error("No se pudo crear el evento (" + rc.status + ")");
+        continue;
+      }
+      const nv = await rc.json();
+      ev = Array.isArray(nv) ? nv[0] : nv;
+      if (ev && ev.id != null) {
+        _mjEventosDb = [..._mjEventosDb, ev];
+        return ev;
+      }
+    } catch (e) {
+      ultimo = e;
+    }
+  }
+  throw ultimo || new Error("No se encontró el evento de la misa");
+}
+// Guarda estados para una misa: escribe en el evento oficial y alinea los registros duplicados del mismo día
+async function mjGuardarAsistenciaMisa({ fecha, grupo, titulo, cambios, misa, members }) {
+  const ev = await mjEventoCanonico(fecha, grupo, titulo);
+  const eid = String(ev.id);
+  const idReal = {};
+  (members || []).forEach((m) => (idReal[String(m.id)] = m.id));
+  const filas = Object.entries(cambios).map(([mid, estado]) => ({ evento_id: eid, member_id: idReal[mid] ?? mid, estado }));
+  if (!filas.length) return 0;
+  let ok = false;
+  let err = null;
+  for (const t of [_authToken || SUPABASE_KEY, SUPABASE_SERVICE_KEY]) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?on_conflict=evento_id,member_id`, {
+        method: "POST",
+        headers: { ...mjHdrAdmin(t), Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify(filas),
+      });
+      if (r.ok) {
+        ok = true;
+        // Registros del mismo día en otro evento (duplicados antiguos): quedan con el mismo estado
+        for (const [mid, estado] of Object.entries(cambios)) {
+          const filasDup = ((misa && misa.porMiembro[mid] && misa.porMiembro[mid].filas) || []).filter((f) => String(f.evento_id) !== eid && f.estado !== estado && f.id != null);
+          for (const f of filasDup) {
+            await fetch(`${SUPABASE_URL}/rest/v1/asistencia?id=eq.${f.id}`, {
+              method: "PATCH",
+              headers: { ...mjHdrAdmin(t), Prefer: "return=minimal" },
+              body: JSON.stringify({ estado }),
+            }).catch(() => {});
+          }
+        }
+        break;
+      }
+      err = new Error("No se pudo guardar (" + r.status + " " + (await r.text().catch(() => "")).slice(0, 140) + ")");
+    } catch (e) {
+      err = e;
+    }
+  }
+  if (!ok) throw err || new Error("No se pudo guardar");
+  return filas.length;
+}
+const mjFechaCorta = (f) => (f ? new Date(f + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" }).replace(".", "") : "—");
+const mjFechaLarga = (f) => (f ? new Date(f + "T12:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" }) : "");
+const mjCap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+function mjIntegrantesAsistencia(members) {
+  return (members || [])
+    .filter((m) => m && m.cuerda && m.cuerda.trim() !== "" && m.cuerda !== "Admin" && m.cuerda !== "Visita" && (!m.acceso || m.acceso === "aprobado"))
+    .sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"));
+}
+
+const AS_CSS = `
+.as-wrap{width:100%;max-width:1320px;font-family:var(--font-sans);color:#0f1b2d}
+.as-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.as-eyebrow{font-size:10.5px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#8a96a8}
+.as-title{font-size:28px;font-weight:800;letter-spacing:-.03em;line-height:1.1;margin-top:4px;color:#0f1b2d}
+.as-sub{font-size:13px;color:#6b7a90;margin-top:5px}
+.as-seg{display:inline-flex;background:#eef2f7;border-radius:12px;padding:3px;gap:2px}
+.as-seg button{border:none;background:transparent;padding:8px 16px;border-radius:9px;font:inherit;font-size:13px;font-weight:700;color:#5b6779;cursor:pointer;white-space:nowrap}
+.as-seg button.on{background:#fff;color:#0f2744;box-shadow:0 1px 3px rgba(15,39,68,.12)}
+.as-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.as-kpi{background:#fff;border:1px solid #e6ecf4;border-radius:16px;padding:14px 16px;box-shadow:0 1px 2px rgba(15,39,68,.04)}
+.as-kpi b{display:block;font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1.1}
+.as-kpi span{font-size:11.5px;color:#6b7a90;font-weight:600}
+.as-card{background:#fff;border:1px solid #e6ecf4;border-radius:18px;box-shadow:0 1px 2px rgba(15,39,68,.04),0 10px 30px rgba(15,39,68,.05)}
+.as-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:14px 16px;border-bottom:1px solid #eef2f7}
+.as-search{flex:1 1 200px;min-width:160px;display:flex;align-items:center;gap:8px;background:#f5f7fb;border:1px solid #e6ecf4;border-radius:11px;padding:0 12px;height:38px}
+.as-search input{border:none;background:transparent;outline:none;font:inherit;font-size:14px;width:100%;color:#0f1b2d}
+.as-chip{border:1px solid #e3e9f2;background:#fff;border-radius:999px;padding:7px 13px;font:inherit;font-size:12.5px;font-weight:700;color:#5b6779;cursor:pointer;white-space:nowrap}
+.as-chip.on{background:#0f2744;border-color:#0f2744;color:#fff}
+.as-select{height:38px;border:1px solid #e3e9f2;border-radius:11px;background:#fff;font:inherit;font-size:13px;font-weight:600;color:#0f1b2d;padding:0 10px}
+.as-table{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.as-table table{border-collapse:separate;border-spacing:0;width:100%;min-width:640px}
+.as-table th{font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#8a96a8;text-align:left;padding:11px 10px;border-bottom:1px solid #eef2f7;background:#fbfcfe;white-space:nowrap;position:sticky;top:0}
+.as-table td{padding:10px;border-bottom:1px solid #f1f4f8;font-size:13.5px;vertical-align:middle}
+.as-table tr:last-child td{border-bottom:none}
+.as-table tbody tr{cursor:pointer;transition:background .12s}
+.as-table tbody tr:hover{background:#f8fafd}
+.as-sticky{position:sticky;left:0;background:inherit;z-index:1}
+.as-table thead .as-sticky{background:#fbfcfe;z-index:2}
+.as-table tbody td.as-sticky{background:#fff}
+.as-table tbody tr:hover td.as-sticky{background:#f8fafd}
+.as-dot{width:22px;height:22px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800}
+.as-avatar{width:34px;height:34px;border-radius:50%;flex-shrink:0;background:linear-gradient(145deg,#1e3a5f,#2a5a9c);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;overflow:hidden}
+.as-avatar img{width:100%;height:100%;object-fit:cover}
+.as-bar{height:6px;border-radius:99px;background:#edf1f6;overflow:hidden;width:90px}
+.as-bar i{display:block;height:100%;border-radius:99px}
+.as-mlist{display:none}
+.as-misas{display:flex;gap:8px;overflow-x:auto;padding:14px 16px;border-bottom:1px solid #eef2f7;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.as-misa{flex-shrink:0;border:1px solid #e3e9f2;background:#fff;border-radius:14px;padding:9px 12px;min-width:118px;text-align:left;cursor:pointer;font:inherit}
+.as-misa.on{background:linear-gradient(135deg,#17345c,#2a5a9c);border-color:transparent;color:#fff;box-shadow:0 6px 16px rgba(30,58,95,.25)}
+.as-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));gap:0 18px;padding:6px 16px 16px}
+.as-fila{display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #f1f4f8}
+.as-fila.cambio{background:linear-gradient(90deg,#fff8e8,transparent)}
+.as-est{display:inline-flex;background:#f1f4f8;border-radius:11px;padding:3px;gap:2px;flex-shrink:0}
+.as-est button{border:none;background:transparent;border-radius:8px;height:34px;min-width:44px;padding:0 9px;font:inherit;font-size:12px;font-weight:800;color:#7a8698;cursor:pointer}
+.as-savebar{position:sticky;bottom:12px;margin:14px auto 0;max-width:640px;display:flex;align-items:center;gap:12px;justify-content:space-between;background:#0f2744;color:#fff;border-radius:16px;padding:10px 10px 10px 18px;box-shadow:0 14px 34px rgba(15,39,68,.35);z-index:20}
+.as-btn{border:none;border-radius:11px;height:40px;padding:0 16px;font:inherit;font-size:13px;font-weight:800;cursor:pointer}
+.as-btn.pri{background:#fff;color:#0f2744}
+.as-btn.sec{background:#f1f4f8;color:#0f2744}
+.as-btn.ghost{background:transparent;color:#5b6779;border:1px solid #e3e9f2}
+.as-modal{position:fixed;inset:0;background:rgba(15,27,45,.42);backdrop-filter:blur(3px);z-index:6000;display:flex;justify-content:flex-end}
+.as-panel{width:min(520px,100%);height:100%;background:#f7f9fc;overflow:auto;box-shadow:-20px 0 50px rgba(15,39,68,.2)}
+@media(max-width:900px){
+  .as-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .as-lista{grid-template-columns:1fr}
+}
+@media(max-width:640px){
+  .as-title{font-size:23px}
+  .as-table{display:none}
+  .as-mlist{display:block}
+  .as-est button{min-width:38px;padding:0 6px}
+  .as-fila{flex-wrap:wrap}
+  .as-fila .as-est{margin-left:45px}
+  .as-modal{align-items:flex-end}
+  .as-panel{height:88%;border-radius:22px 22px 0 0}
+}
+`;
+
+function AsAvatar({ m, size = 34 }) {
+  return (
+    <span className="as-avatar" style={{ width: size, height: size, fontSize: size * 0.36 }}>
+      {m && m.foto_url ? <img src={m.foto_url} alt="" /> : ini((m && m.nombre) || "?")}
+    </span>
+  );
+}
+function AsDot({ estado, size = 22 }) {
+  const e = MJ_ESTADOS[estado];
+  if (!e) return <span className="as-dot" style={{ width: size, height: size, background: "#f4f6f9", color: "#c2cad6" }}>·</span>;
+  return (
+    <span className="as-dot" title={e.label} style={{ width: size, height: size, background: e.bg, color: e.color }}>
+      {e.corto}
+    </span>
+  );
+}
+function AsAnillo({ pct, size = 92 }) {
+  const r = size / 2 - 7;
+  const c = 2 * Math.PI * r;
+  const col = mjColorPct(pct);
+  return (
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#edf1f6" strokeWidth="7" />
+        {pct != null && <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={col} strokeWidth="7" strokeLinecap="round" strokeDasharray={`${(pct / 100) * c} ${c}`} style={{ transition: "stroke-dasharray .6s ease" }} />}
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontSize: size * 0.24, fontWeight: 800, color: pct == null ? "#94a3b8" : "#0f1b2d", letterSpacing: "-0.03em" }}>{pct == null ? "—" : pct + "%"}</span>
+      </div>
+    </div>
+  );
+}
+function AsBarra({ pct }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+      <span style={{ fontWeight: 800, fontSize: 14, minWidth: 40, color: pct == null ? "#94a3b8" : "#0f1b2d" }}>{pct == null ? "—" : pct + "%"}</span>
+      <span className="as-bar">
+        <i style={{ width: (pct || 0) + "%", background: mjColorPct(pct) }} />
+      </span>
+    </div>
+  );
+}
+
+// Detalle de una persona (el admin puede corregir cada misa)
+function AsDetalleIntegrante({ m, misas, esAdmin, onCerrar, onGuardado, members, racha, onDesbloquear }) {
+  const st = mjStatsAsistencia(misas, m.id, m.asistencia_especial);
+  const [guardando, setGuardando] = useState("");
+  const [err, setErr] = useState("");
+  const cambiar = async (misa, estado) => {
+    setGuardando(misa.key);
+    setErr("");
+    try {
+      await mjGuardarAsistenciaMisa({ fecha: misa.fecha, grupo: misa.grupo, titulo: misa.titulo, cambios: { [String(m.id)]: estado }, misa, members });
+      await onGuardado();
+    } catch (e) {
+      setErr(String((e && e.message) || e));
+    }
+    setGuardando("");
+  };
+  const conFecha = misas.filter((x) => x.fecha);
+  return createPortal(
+    <div className="as-modal" onClick={onCerrar}>
+      <style>{AS_CSS}</style>
+      <div className="as-panel" onClick={(e) => e.stopPropagation()}>
+        <div style={{ padding: "18px 20px", background: "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", display: "flex", alignItems: "center", gap: 14, position: "sticky", top: 0, zIndex: 2 }}>
+          <AsAvatar m={m} size={48} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em" }}>{m.nombre}</div>
+            <div style={{ fontSize: 12.5, opacity: 0.8, marginTop: 2 }}>
+              {m.cuerda}
+              {m.asistencia_especial ? " · Asistencia especial" : ""}
+            </div>
+          </div>
+          <button onClick={onCerrar} aria-label="Cerrar" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.12)", color: "#fff", fontSize: 15, cursor: "pointer" }}>
+            ✕
+          </button>
+        </div>
+        <div style={{ padding: 16 }}>
+          <div className="as-card" style={{ padding: 16, display: "flex", alignItems: "center", gap: 16, marginBottom: 14 }}>
+            <AsAnillo pct={st.pct} size={84} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, flex: 1 }}>
+              {[
+                ["Presente", st.presentes, "presente"],
+                ["Ausente", st.ausentes, "ausente"],
+                ["Justificado", st.justificados, "justificado"],
+              ].map(([l, v, k]) => (
+                <div key={k} style={{ background: MJ_ESTADOS[k].bg, borderRadius: 12, padding: "9px 6px", textAlign: "center" }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: MJ_ESTADOS[k].color }}>{v}</div>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: MJ_ESTADOS[k].color, opacity: 0.85 }}>{l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {esAdmin && racha >= MJ_AVISO_AUSENCIAS && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: racha >= MJ_BLOQUEO_AUSENCIAS ? "#fcebea" : "#fbf1de", borderRadius: 14, padding: "12px 14px", marginBottom: 12 }}>
+              <div style={{ flex: "1 1 180px", fontSize: 13, fontWeight: 600, color: racha >= MJ_BLOQUEO_AUSENCIAS ? "#a32a1f" : "#8a5306" }}>
+                {racha >= MJ_BLOQUEO_AUSENCIAS ? `Acceso bloqueado: ${racha} ausencias seguidas.` : "Con aviso: 2 ausencias seguidas. Una más y queda bloqueado."}
+              </div>
+              <button className="as-btn pri" style={{ height: 36, background: "#0f2744", color: "#fff" }} onClick={onDesbloquear}>
+                {racha >= MJ_BLOQUEO_AUSENCIAS ? "Desbloquear" : "Reiniciar conteo"}
+              </button>
+            </div>
+          )}
+          {err && <div style={{ background: "#fcebea", color: "#a32a1f", borderRadius: 10, padding: "9px 12px", fontSize: 12.5, marginBottom: 10 }}>{err}</div>}
+          <div className="as-card" style={{ overflow: "hidden" }}>
+            {conFecha.length === 0 && <div style={{ padding: 18, fontSize: 13, color: "#6b7a90" }}>Aún no hay misas registradas.</div>}
+            {conFecha.map((x) => {
+              const r = x.porMiembro[String(m.id)];
+              const est = r ? r.estado : null;
+              return (
+                <div key={x.key} style={{ padding: "11px 14px", borderBottom: "1px solid #f1f4f8", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ flex: "1 1 150px", minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{mjCap(mjFechaLarga(x.fecha))}</div>
+                    <div style={{ fontSize: 11.5, color: "#8a96a8", marginTop: 1 }}>
+                      {x.grupo === "ensayo" ? "Ensayo" : x.titulo || "Misa"}
+                      {r && r.filas.length > 1 ? " · registro duplicado unificado" : ""}
+                    </div>
+                  </div>
+                  {esAdmin ? (
+                    <div className="as-est" style={{ opacity: guardando === x.key ? 0.5 : 1 }}>
+                      {["presente", "ausente", "justificado", "excluido"].map((k) => (
+                        <button key={k} disabled={!!guardando} onClick={() => est !== k && cambiar(x, k)} title={MJ_ESTADOS[k].label} style={est === k ? { background: MJ_ESTADOS[k].bg, color: MJ_ESTADOS[k].color, boxShadow: "0 1px 2px rgba(15,39,68,.08)" } : null}>
+                          {MJ_ESTADOS[k].corto === "–" ? "N/A" : MJ_ESTADOS[k].corto}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: 12, fontWeight: 800, borderRadius: 999, padding: "5px 11px", background: est ? MJ_ESTADOS[est]?.bg : "#f4f6f9", color: est ? MJ_ESTADOS[est]?.color : "#94a3b8" }}>{est ? MJ_ESTADOS[est]?.label || est : "Sin registro"}</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// Resumen: tabla de integrantes × misas
+function AsRachaBadge({ n }) {
+  if (!n || n < MJ_AVISO_AUSENCIAS) return null;
+  const bloq = n >= MJ_BLOQUEO_AUSENCIAS;
+  return <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".04em", borderRadius: 999, padding: "2px 7px", marginLeft: 6, background: bloq ? "#fcebea" : "#fbf1de", color: bloq ? "#a32a1f" : "#8a5306", whiteSpace: "nowrap" }}>{bloq ? "Bloqueado" : "Aviso"}</span>;
+}
+function AsResumen({ integrantes, misas, onAbrir, rachaDe }) {
+  const [q, setQ] = useState("");
+  const [cuerda, setCuerda] = useState("Todas");
+  const [orden, setOrden] = useState("pct_asc");
+  const conFecha = misas.filter((x) => x.fecha);
+  const columnas = conFecha.slice(0, 10);
+  const cuerdas = ["Todas", ...Array.from(new Set(integrantes.map((m) => m.cuerda))).filter(Boolean)];
+  const filas = integrantes
+    .filter((m) => (cuerda === "Todas" || m.cuerda === cuerda) && (!q || String(m.nombre || "").toLowerCase().includes(q.toLowerCase())))
+    .map((m) => ({ m, st: mjStatsAsistencia(conFecha, m.id, m.asistencia_especial) }))
+    .sort((a, b) => {
+      if (orden === "nombre") return String(a.m.nombre).localeCompare(String(b.m.nombre), "es");
+      const pa = a.st.pct == null ? 101 : a.st.pct;
+      const pb = b.st.pct == null ? 101 : b.st.pct;
+      return orden === "pct_desc" ? (b.st.pct ?? -1) - (a.st.pct ?? -1) : pa - pb;
+    });
+  return (
+    <div className="as-card">
+      <div className="as-tools">
+        <label className="as-search">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a96a8" strokeWidth="2.2" strokeLinecap="round">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar integrante" />
+        </label>
+        <select className="as-select" value={orden} onChange={(e) => setOrden(e.target.value)}>
+          <option value="pct_asc">Menor asistencia primero</option>
+          <option value="pct_desc">Mayor asistencia primero</option>
+          <option value="nombre">Por nombre</option>
+        </select>
+        <div style={{ display: "flex", gap: 6, overflowX: "auto", width: "100%", scrollbarWidth: "none" }}>
+          {cuerdas.map((c) => (
+            <button key={c} className={"as-chip" + (cuerda === c ? " on" : "")} onClick={() => setCuerda(c)}>
+              {c}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="as-table">
+        <table>
+          <thead>
+            <tr>
+              <th className="as-sticky" style={{ minWidth: 200 }}>Integrante</th>
+              <th>Asistencia</th>
+              <th style={{ textAlign: "center" }}>P</th>
+              <th style={{ textAlign: "center" }}>A</th>
+              <th style={{ textAlign: "center" }}>J</th>
+              {columnas.map((x) => (
+                <th key={x.key} style={{ textAlign: "center", letterSpacing: ".04em" }} title={x.titulo}>
+                  {mjFechaCorta(x.fecha)}
+                  {x.grupo === "ensayo" ? <div style={{ fontSize: 9, letterSpacing: ".08em" }}>ENSAYO</div> : null}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filas.map(({ m, st }) => (
+              <tr key={m.id} onClick={() => onAbrir(m)}>
+                <td className="as-sticky">
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <AsAvatar m={m} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 230 }}>
+                        {m.nombre}
+                        {rachaDe && <AsRachaBadge n={rachaDe(m)} />}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: "#8a96a8" }}>
+                        {m.cuerda}
+                        {m.asistencia_especial ? " · especial" : ""}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <AsBarra pct={st.pct} />
+                </td>
+                <td style={{ textAlign: "center", fontWeight: 800, color: MJ_ESTADOS.presente.color }}>{st.presentes}</td>
+                <td style={{ textAlign: "center", fontWeight: 800, color: st.ausentes ? MJ_ESTADOS.ausente.color : "#c2cad6" }}>{st.ausentes}</td>
+                <td style={{ textAlign: "center", fontWeight: 800, color: st.justificados ? MJ_ESTADOS.justificado.color : "#c2cad6" }}>{st.justificados}</td>
+                {columnas.map((x) => (
+                  <td key={x.key} style={{ textAlign: "center" }}>
+                    <AsDot estado={x.porMiembro[String(m.id)]?.estado} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="as-mlist">
+        {filas.map(({ m, st }) => (
+          <button key={m.id} onClick={() => onAbrir(m)} style={{ display: "block", width: "100%", textAlign: "left", border: "none", borderBottom: "1px solid #f1f4f8", background: "#fff", padding: "12px 16px", font: "inherit", cursor: "pointer" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+              <AsAvatar m={m} size={38} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14.5, color: "#0f1b2d" }}>
+                  {m.nombre}
+                  {rachaDe && <AsRachaBadge n={rachaDe(m)} />}
+                </div>
+                <div style={{ fontSize: 11.5, color: "#8a96a8" }}>
+                  {m.cuerda} · {st.presentes} P · {st.ausentes} A · {st.justificados} J
+                </div>
+              </div>
+              <span style={{ fontSize: 17, fontWeight: 800, color: mjColorPct(st.pct) }}>{st.pct == null ? "—" : st.pct + "%"}</span>
+            </div>
+            <div style={{ display: "flex", gap: 5, marginTop: 9, marginLeft: 49, flexWrap: "wrap" }}>
+              {columnas.slice(0, 8).map((x) => (
+                <AsDot key={x.key} estado={x.porMiembro[String(m.id)]?.estado} size={20} />
+              ))}
+            </div>
+          </button>
+        ))}
+      </div>
+      {filas.length === 0 && <div style={{ padding: 22, fontSize: 13, color: "#6b7a90", textAlign: "center" }}>No hay integrantes con ese filtro.</div>}
+    </div>
+  );
+}
+
+// Pasar lista de una misa
+function AsPasarLista({ integrantes, misas, opciones, members, onGuardado }) {
+  const [sel, setSel] = useState(() => {
+    const hoy = mjHoyISO();
+    const o = opciones.find((x) => x.fecha <= hoy) || opciones[0];
+    return o ? o.key : "";
+  });
+  const op = opciones.find((x) => x.key === sel) || null;
+  const misa = misas.find((x) => x.key === sel) || null;
+  const [cambios, setCambios] = useState({});
+  const [guardando, setGuardando] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [accesos, setAccesos] = useState({});
+  const [verNoConv, setVerNoConv] = useState(false);
+  useEffect(() => {
+    mjCargarAccesosPauta().then(setAccesos).catch(() => {});
+  }, []);
+  useEffect(() => {
+    setCambios({});
+    setMsg("");
+    setVerNoConv(false);
+  }, [sel]);
+  const actual = (m) => {
+    const mid = String(m.id);
+    if (cambios[mid]) return cambios[mid];
+    const r = misa && misa.porMiembro[mid];
+    return r ? r.estado : null;
+  };
+  const acc = op && op.pautaId ? accesos[op.pautaId] : null;
+  const permitidos = acc && acc.restringida ? new Set((acc.ids || []).map(String)) : null;
+  const convocados = integrantes.filter((m) => !permitidos || permitidos.has(String(m.id)) || (misa && misa.porMiembro[String(m.id)]));
+  const noConv = integrantes.filter((m) => !convocados.includes(m));
+  const cuenta = { presente: 0, ausente: 0, justificado: 0, excluido: 0, nuevo: 0, sin: 0 };
+  convocados.forEach((m) => {
+    const e = actual(m);
+    if (e && cuenta[e] !== undefined) cuenta[e]++;
+    else cuenta.sin++;
+  });
+  const nCambios = Object.keys(cambios).length;
+  const poner = (m, estado) => {
+    const mid = String(m.id);
+    const r = misa && misa.porMiembro[mid];
+    setCambios((c) => {
+      const n = { ...c };
+      if (r && r.estado === estado) delete n[mid];
+      else n[mid] = estado;
+      return n;
+    });
+  };
+  const masivo = (estado) => {
+    const n = { ...cambios };
+    convocados.forEach((m) => {
+      if (!actual(m)) n[String(m.id)] = m.asistencia_especial ? "presente" : estado;
+    });
+    setCambios(n);
+  };
+  const guardar = async () => {
+    if (!op || !nCambios) return;
+    setGuardando(true);
+    setMsg("");
+    try {
+      const n = await mjGuardarAsistenciaMisa({ fecha: op.fecha, grupo: op.grupo, titulo: op.titulo, cambios, misa, members });
+      await onGuardado();
+      setCambios({});
+      setMsg(`Listo, se guardaron ${n} registro${n === 1 ? "" : "s"}.`);
+    } catch (e) {
+      setMsg("No se pudo guardar: " + String((e && e.message) || e));
+    }
+    setGuardando(false);
+  };
+  const fila = (m) => {
+    const est = actual(m);
+    const cambio = cambios[String(m.id)] !== undefined;
+    return (
+      <div key={m.id} className={"as-fila" + (cambio ? " cambio" : "")}>
+        <AsAvatar m={m} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.nombre}</div>
+          <div style={{ fontSize: 11.5, color: "#8a96a8" }}>
+            {m.cuerda}
+            {m.asistencia_especial ? " · especial" : ""}
+            {!est ? " · sin marcar" : ""}
+          </div>
+        </div>
+        <div className="as-est">
+          {["presente", "ausente", "justificado", "excluido"].map((k) => (
+            <button key={k} onClick={() => poner(m, k)} title={MJ_ESTADOS[k].label} style={est === k ? { background: MJ_ESTADOS[k].bg, color: MJ_ESTADOS[k].color, boxShadow: "0 1px 2px rgba(15,39,68,.08)" } : null}>
+              {k === "presente" ? "Presente" : k === "ausente" ? "Ausente" : k === "justificado" ? "Justif." : "N/A"}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  return (
+    <div className="as-card">
+      <div className="as-misas">
+        {opciones.map((x) => {
+          const on = x.key === sel;
+          return (
+            <button key={x.key} className={"as-misa" + (on ? " on" : "")} onClick={() => (!nCambios || window.confirm("Tienes cambios sin guardar. ¿Cambiar de misa igual?")) && setSel(x.key)}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase", opacity: on ? 0.75 : 0.55 }}>
+                {new Date(x.fecha + "T12:00:00").toLocaleDateString("es-CL", { weekday: "short" }).replace(".", "")}
+                {x.grupo === "ensayo" ? " · ensayo" : ""}
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", marginTop: 2 }}>{mjFechaCorta(x.fecha)}</div>
+              <div style={{ fontSize: 11, opacity: on ? 0.85 : 0.6, marginTop: 1, maxWidth: 150, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {x.registrados ? `${x.registrados} registrados` : "Sin registros"}
+              </div>
+            </button>
+          );
+        })}
+        {opciones.length === 0 && <div style={{ fontSize: 13, color: "#6b7a90", padding: 6 }}>No hay misas para pasar lista. Publica una pauta o crea el evento en la agenda.</div>}
+      </div>
+      {op && (
+        <>
+          <div style={{ padding: "16px 16px 6px", display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+              <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em" }}>
+                {op.grupo === "ensayo" ? "Ensayo" : op.titulo || "Misa"}
+                {op.liturgia ? <span style={{ fontWeight: 600, color: "#6b7a90" }}> · {op.liturgia}</span> : null}
+              </div>
+              <div style={{ fontSize: 13, color: "#6b7a90", marginTop: 3 }}>{mjCap(mjFechaLarga(op.fecha))}</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                {["presente", "ausente", "justificado"].map((k) => (
+                  <span key={k} style={{ fontSize: 12, fontWeight: 800, borderRadius: 999, padding: "5px 11px", background: MJ_ESTADOS[k].bg, color: MJ_ESTADOS[k].color }}>
+                    {cuenta[k]} {MJ_ESTADOS[k].label.toLowerCase()}
+                    {cuenta[k] === 1 || k === "justificado" ? "" : "s"}
+                  </span>
+                ))}
+                <span style={{ fontSize: 12, fontWeight: 800, borderRadius: 999, padding: "5px 11px", background: "#f4f6f9", color: "#6b7a90" }}>{cuenta.sin} sin marcar</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="as-btn sec" onClick={() => masivo("presente")} disabled={!cuenta.sin}>
+                Sin marcar → presentes
+              </button>
+              <button className="as-btn ghost" onClick={() => masivo("ausente")} disabled={!cuenta.sin}>
+                Sin marcar → ausentes
+              </button>
+            </div>
+          </div>
+          {permitidos && <div style={{ margin: "6px 16px 0", fontSize: 12, color: "#6b7a90" }}>Esta pauta es reservada: se muestran los {convocados.length} convocados.</div>}
+          <div className="as-lista">{convocados.map(fila)}</div>
+          {noConv.length > 0 && (
+            <div style={{ padding: "0 16px 16px" }}>
+              <button className="as-btn ghost" onClick={() => setVerNoConv((v) => !v)}>
+                {verNoConv ? "Ocultar" : "Ver"} no convocados ({noConv.length})
+              </button>
+              {verNoConv && <div className="as-lista" style={{ padding: "6px 0 0" }}>{noConv.map(fila)}</div>}
+            </div>
+          )}
+          {msg && <div style={{ margin: "0 16px 16px", fontSize: 13, fontWeight: 600, color: msg.startsWith("Listo") ? "#16335a" : "#a32a1f" }}>{msg}</div>}
+          {nCambios > 0 && (
+            <div className="as-savebar">
+              <span style={{ fontSize: 13.5, fontWeight: 700 }}>
+                {nCambios} cambio{nCambios === 1 ? "" : "s"} sin guardar
+              </span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="as-btn" style={{ background: "transparent", color: "rgba(255,255,255,.8)" }} onClick={() => setCambios({})} disabled={guardando}>
+                  Descartar
+                </button>
+                <button className="as-btn pri" onClick={guardar} disabled={guardando}>
+                  {guardando ? "Guardando…" : "Guardar"}
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// Reinicio del conteo (respalda y borra lo anterior a una fecha)
+function AsReinicio({ asistencia, mapa, onReload }) {
+  const [abierto, setAbierto] = useState(false);
+  const [fechaCorte, setFechaCorte] = useState("");
+  const [trabajando, setTrabajando] = useState(false);
+  async function reiniciar() {
+    const CORTE = fechaCorte;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(CORTE)) return;
+    const corteTxt = new Date(CORTE + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" });
+    const H = mjHdrAdmin(_authToken || SUPABASE_KEY);
+    setTrabajando(true);
     try {
       const rg = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?select=*`, { headers: H });
       if (!rg.ok) throw new Error("No se pudo leer la asistencia");
       const todos = await rg.json();
-      const fechaDe = {};
-      (eventos || []).forEach((e) => (fechaDe[e.id] = e.fecha));
       const viejos = todos.filter((r) => {
-        const f = fechaDe[r.evento_id];
-        if (f) return String(f).slice(0, 10) < CORTE;
+        const ev = mapa[String(r.evento_id)];
+        if (ev) return ev.fecha < CORTE;
         return String(r.created_at || "").slice(0, 10) < CORTE;
       });
-      if (viejos.length === 0) {
+      if (!viejos.length) {
         alert(`No hay registros anteriores al ${corteTxt}. No se borró nada.`);
-        setReiniciando(false);
+        setTrabajando(false);
         return;
       }
-      const ok = window.confirm(
-        `Se reiniciará la asistencia: se respaldarán y borrarán ${viejos.length} registros anteriores al ${corteTxt}.\n` +
-          `Los registros desde esa fecha en adelante (${todos.length - viejos.length}) se mantienen.\n\n¿Continuar?`
-      );
-      if (!ok) {
-        setReiniciando(false);
+      if (!window.confirm(`Se respaldarán y borrarán ${viejos.length} registros anteriores al ${corteTxt}. Los demás (${todos.length - viejos.length}) se mantienen.\n\n¿Continuar?`)) {
+        setTrabajando(false);
         return;
       }
-      // 1) Respaldo (si falla, no se borra nada)
-      const rb = await fetch(`${SUPABASE_URL}/rest/v1/asistencia_historial`, {
-        method: "POST",
-        headers: { ...H, Prefer: "return=minimal" },
-        body: JSON.stringify({ ano: Number(CORTE.slice(0, 4)), datos: viejos }),
-      });
+      const rb = await fetch(`${SUPABASE_URL}/rest/v1/asistencia_historial`, { method: "POST", headers: { ...H, Prefer: "return=minimal" }, body: JSON.stringify({ ano: Number(CORTE.slice(0, 4)), datos: viejos }) });
       if (!rb.ok) throw new Error("No se pudo respaldar: " + (await rb.text()));
-      // 2) Borrado por lotes de los registros antiguos
       const ids = viejos.map((r) => r.id);
       for (let i = 0; i < ids.length; i += 100) {
-        const lote = ids.slice(i, i + 100).join(",");
-        const rd = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?id=in.(${lote})`, {
-          method: "DELETE",
-          headers: H,
-        });
+        const rd = await fetch(`${SUPABASE_URL}/rest/v1/asistencia?id=in.(${ids.slice(i, i + 100).join(",")})`, { method: "DELETE", headers: H });
         if (!rd.ok) throw new Error("No se pudo borrar: " + (await rd.text()));
       }
       alert(`Listo: ${viejos.length} registros respaldados y borrados. La asistencia cuenta desde el ${corteTxt}.`);
+      setAbierto(false);
       if (onReload) onReload();
     } catch (e) {
-      alert("No se reinició la asistencia: " + (e && e.message ? e.message : e));
+      alert("No se reinició la asistencia: " + ((e && e.message) || e));
     }
-    setReiniciando(false);
+    setTrabajando(false);
   }
+  return (
+    <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 12.5, color: "#6b7a90" }}>
+      {!abierto ? (
+        <button className="as-btn ghost" style={{ height: 34, fontSize: 12 }} onClick={() => setAbierto(true)}>
+          Reiniciar conteo desde una fecha…
+        </button>
+      ) : (
+        <>
+          <span>Contar desde:</span>
+          <input type="date" value={fechaCorte} onChange={(e) => setFechaCorte(e.target.value)} className="as-select" />
+          <button className="as-btn sec" style={{ height: 38 }} onClick={reiniciar} disabled={trabajando || !fechaCorte}>
+            {trabajando ? "Reiniciando…" : "Reiniciar"}
+          </button>
+          <button className="as-btn ghost" style={{ height: 38 }} onClick={() => setAbierto(false)}>
+            Cancelar
+          </button>
+          <span style={{ width: "100%", fontSize: 11.5 }}>Lo anterior a esa fecha se respalda en Historial y se borra del conteo.</span>
+        </>
+      )}
+    </div>
+  );
+}
+
+// El portal es solo para integrantes: una cuenta aprobada sin cuerda asignada no entra
+function SinCuerdaAsignada({ user, onSalir }) {
+  if (!user || esCuerdaAdmin(user) || !esVisita(user)) return null;
+  const nombre = String(user.nombre || "").split(" ")[0];
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, zIndex: 9500, background: "linear-gradient(160deg,#0f2744,#1e3a5f 55%,#2a5a9c)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "var(--font-sans)" }}>
+      <div style={{ width: "min(440px,100%)", background: "#fff", borderRadius: 24, padding: "30px 26px 24px", textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.35)" }}>
+        <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", textTransform: "uppercase", color: "#8a96a8" }}>Portal de integrantes</div>
+        <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", color: "#0f1b2d", marginTop: 8, lineHeight: 1.2 }}>{nombre ? `${nombre}, tu cuenta` : "Tu cuenta"} aún no tiene cuerda asignada</div>
+        <div style={{ fontSize: 14.5, color: "#4b5869", lineHeight: 1.55, marginTop: 10 }}>
+          Este portal es exclusivo para los integrantes del Coro Misioneros de Jesús. Conversa con el <b>Encargado del Coro</b> para que te asigne tu cuerda.
+        </div>
+        <button onClick={onSalir} style={{ marginTop: 22, width: "100%", height: 48, border: "none", borderRadius: 14, background: "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+          Cerrar sesión
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ── Bloqueo por ausencias seguidas ───────────────────────────────────────
+// 2 ausencias seguidas → aviso al entrar; 3 → acceso bloqueado hasta que el admin lo desbloquee.
+// Justificado / No aplica / sin registro no cuentan ni cortan la racha; un presente la corta.
+// Desbloquear guarda config "acceso_desbloqueo_<id>" = {hasta: fecha}: las ausencias hasta esa fecha ya no cuentan.
+const MJ_AVISO_AUSENCIAS = 2;
+const MJ_BLOQUEO_AUSENCIAS = 3;
+function mjRachaAusencias(misas, memberId, desde) {
+  const mid = String(memberId);
+  const hoy = mjHoyISO();
+  const lista = (misas || []).filter((m) => m.fecha && m.fecha <= hoy && (!desde || m.fecha > desde)).sort((a, b) => b.fecha.localeCompare(a.fecha));
+  let n = 0;
+  for (const m of lista) {
+    const r = m.porMiembro[mid];
+    if (!r) continue;
+    if (r.estado === "presente") break;
+    if (r.estado === "ausente") n++;
+  }
+  return n;
+}
+async function mjCargarDesbloqueos() {
+  const url = `${SUPABASE_URL}/rest/v1/config?select=key,value&key=like.${encodeURIComponent("acceso_desbloqueo_")}*`;
+  for (const t of [_authToken, SUPABASE_KEY, SUPABASE_SERVICE_KEY].filter((v, i, ar) => v && ar.indexOf(v) === i)) {
+    try {
+      const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${t}` } });
+      if (!r.ok) continue;
+      const rows = await r.json();
+      const mapa = {};
+      (Array.isArray(rows) ? rows : []).forEach((x) => {
+        try {
+          const v = typeof x.value === "string" ? JSON.parse(x.value) : x.value;
+          mapa[x.key.slice("acceso_desbloqueo_".length)] = v || {};
+        } catch (e) {}
+      });
+      return mapa;
+    } catch (e) {}
+  }
+  return null; // no se pudo leer: no se bloquea a nadie
+}
+function mjExentoBloqueo(m) {
+  return !m || esCuerdaAdmin(m) || m.cuerda === "Visita" || !m.cuerda || !!m.asistencia_especial;
+}
+function useDesbloqueos() {
+  const [d, setD] = useState(null);
+  const recargar = useCallback(() => mjCargarDesbloqueos().then((x) => setD(x || {})), []);
+  useEffect(() => {
+    recargar();
+  }, [recargar]);
+  return [d, recargar];
+}
+// Se muestra a cada integrante al entrar: aviso con 2 ausencias seguidas, bloqueo con 3
+function ControlAccesoAsistencia({ user, members, asistencia, eventosDb, listo, onSalir }) {
+  const [gcalListo, setGcalListo] = useState(false);
+  const [desb, setDesb] = useState(undefined);
+  const [avisoCerrado, setAvisoCerrado] = useState(false);
+  const yo = (members || []).find((m) => String(m.id) === String(user?.id)) || user;
+  const exento = !user || !user.id || mjExentoBloqueo(yo);
+  useEffect(() => {
+    if (exento) return;
+    mjGcalHistorial().then(() => setGcalListo(true));
+    mjCargarDesbloqueos().then((x) => setDesb(x));
+  }, [exento, user && user.id]);
+  const mapa = useMemo(() => mjMapaEventos(eventosDb), [eventosDb, gcalListo]);
+  if (exento || !listo || !gcalListo || desb === undefined || desb === null) return null;
+  const misas = mjConsolidarAsistencia(asistencia, mapa);
+  const racha = mjRachaAusencias(misas, user.id, (desb[String(user.id)] || {}).hasta);
+  const nombre = String((yo && yo.nombre) || "").split(" ")[0];
+  if (racha >= MJ_BLOQUEO_AUSENCIAS) {
+    return createPortal(
+      <div style={{ position: "fixed", inset: 0, zIndex: 9500, background: "linear-gradient(160deg,#0f2744,#1e3a5f 55%,#2a5a9c)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "var(--font-sans)" }}>
+        <div style={{ width: "min(440px,100%)", background: "#fff", borderRadius: 24, padding: "30px 26px 24px", textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.35)" }}>
+          <div style={{ width: 58, height: 58, borderRadius: 18, margin: "0 auto", background: "#fcebea", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#c0392b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="4" y="11" width="16" height="10" rx="2.5" />
+              <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+            </svg>
+          </div>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", textTransform: "uppercase", color: "#8a96a8", marginTop: 16 }}>Acceso suspendido</div>
+          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", color: "#0f1b2d", marginTop: 6, lineHeight: 1.2 }}>{nombre ? `${nombre}, tu acceso` : "Tu acceso"} está bloqueado</div>
+          <div style={{ fontSize: 14.5, color: "#4b5869", lineHeight: 1.55, marginTop: 10 }}>
+            Registras <b>{racha} ausencias seguidas</b> en las misas del coro. Para volver a entrar al portal, conversa con el <b>Encargado del Coro</b>.
+          </div>
+          <button onClick={onSalir} style={{ marginTop: 22, width: "100%", height: 48, border: "none", borderRadius: 14, background: "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+            Cerrar sesión
+          </button>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+  if (racha >= MJ_AVISO_AUSENCIAS && !avisoCerrado) {
+    let visto = false;
+    try {
+      visto = sessionStorage.getItem(`mj_aviso_racha_${user.id}`) === String(racha);
+    } catch (e) {}
+    if (visto) return null;
+    const cerrar = () => {
+      try {
+        sessionStorage.setItem(`mj_aviso_racha_${user.id}`, String(racha));
+      } catch (e) {}
+      setAvisoCerrado(true);
+    };
+    return createPortal(
+      <div style={{ position: "fixed", inset: 0, zIndex: 9400, background: "rgba(15,27,45,.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "var(--font-sans)" }}>
+        <div style={{ width: "min(430px,100%)", background: "#fff", borderRadius: 24, padding: "28px 24px 22px", textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.3)" }}>
+          <div style={{ width: 56, height: 56, borderRadius: 18, margin: "0 auto", background: "#fbf1de", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#c98a12" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3 2.5 20h19L12 3z" />
+              <path d="M12 10v4.5M12 17.5v.01" />
+            </svg>
+          </div>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", textTransform: "uppercase", color: "#8a96a8", marginTop: 16 }}>Aviso de asistencia</div>
+          <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em", color: "#0f1b2d", marginTop: 6, lineHeight: 1.25 }}>{nombre ? `${nombre}, llevas` : "Llevas"} {racha} ausencias seguidas</div>
+          <div style={{ fontSize: 14.5, color: "#4b5869", lineHeight: 1.55, marginTop: 10 }}>
+            Te extrañamos en el coro. Si faltas a <b>una misa más</b>, tu acceso al portal quedará <b>bloqueado</b> por falta de participación y tendrás que conversar con el Encargado del Coro.
+          </div>
+          <button onClick={cerrar} style={{ marginTop: 20, width: "100%", height: 48, border: "none", borderRadius: 14, background: "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+            Entendido
+          </button>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+  return null;
+}
+
+function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) {
+  const mapa = useMapaEventos(eventosDb);
+  const misas = useMemo(() => mjConsolidarAsistencia(asistencia, mapa), [asistencia, mapa]);
+  const conFecha = misas.filter((x) => x.fecha);
+  const sinFecha = misas.length - conFecha.length;
+  const isAdmin = esCuerdaAdmin(user);
+  const integrantes = useMemo(() => mjIntegrantesAsistencia(members), [members]);
+  const [vista, setVista] = useState(isAdmin ? "resumen" : "mia");
+  const [detalle, setDetalle] = useState(null);
+  const [desbloqueos, recargarDesbloqueos] = useDesbloqueos();
+  const recargar = async () => {
+    if (onReload) await onReload();
+  };
+  const rachaDe = (m) => (mjExentoBloqueo(m) ? 0 : mjRachaAusencias(conFecha, m.id, ((desbloqueos || {})[String(m.id)] || {}).hasta));
+  const desbloquear = async (m) => {
+    const ultima = conFecha.length ? conFecha[0].fecha : mjHoyISO();
+    const ok = await setConfig(`acceso_desbloqueo_${m.id}`, JSON.stringify({ hasta: ultima, en: new Date().toISOString() }));
+    if (!ok) alert("No se pudo desbloquear. Intenta de nuevo.");
+    await recargarDesbloqueos();
+  };
+  const bloqueados = isAdmin && desbloqueos ? integrantes.filter((m) => rachaDe(m) >= MJ_BLOQUEO_AUSENCIAS) : [];
+  const enAviso = isAdmin && desbloqueos ? integrantes.filter((m) => rachaDe(m) === MJ_AVISO_AUSENCIAS) : [];
+
+  // Misas disponibles para pasar lista: las que tienen registros, las pautas publicadas y los eventos de misa/ensayo recientes
+  const opciones = useMemo(() => {
+    const hoy = mjHoyISO();
+    const lim = new Date();
+    lim.setDate(lim.getDate() - 120);
+    const desde = lim.toISOString().slice(0, 10);
+    const o = {};
+    const add = (fecha, grupo, titulo, extra) => {
+      if (!fecha) return;
+      const key = mjClaveMisa(fecha, grupo);
+      if (!o[key]) o[key] = { key, fecha, grupo, titulo: titulo || "" };
+      if (titulo && !o[key].titulo) o[key].titulo = titulo;
+      if (extra) Object.assign(o[key], extra);
+    };
+    conFecha.forEach((x) => add(x.fecha, x.grupo, x.titulo, { registrados: Object.keys(x.porMiembro).length }));
+    (pautas || []).forEach((p) => {
+      if (p.publicada && p.fecha && p.fecha >= desde && p.fecha <= hoy) add(p.fecha, "misa", p.titulo, { pautaId: p.id, titulo: p.titulo || "Misa", liturgia: mjLiturgiaGuardada(p.id) });
+    });
+    [...(eventosDb || []), ..._mjGcalHistLista].forEach((e) => {
+      const g = mjGrupoEvento(e.tipo);
+      const esMisa = String(e.tipo || "").toLowerCase() === "misa" || g === "ensayo";
+      if (esMisa && e.fecha && e.fecha >= desde && e.fecha <= hoy) add(String(e.fecha).slice(0, 10), g, e.titulo);
+    });
+    return Object.values(o).sort((a, b) => b.fecha.localeCompare(a.fecha));
+  }, [misas, pautas, eventosDb, mapa]);
+
+  const statsTodos = integrantes.map((m) => mjStatsAsistencia(conFecha, m.id, m.asistencia_especial));
+  const conPct = statsTodos.filter((s) => s.pct != null && !s.especial);
+  const promedio = conPct.length ? Math.round(conPct.reduce((a, s) => a + s.pct, 0) / conPct.length) : null;
+  const alDia = conPct.filter((s) => s.pct >= 75).length;
+  const riesgo = conPct.filter((s) => s.pct < 50).length;
+  const primera = conFecha.length ? conFecha[conFecha.length - 1].fecha : null;
+
+  // Vista personal
+  const yo = (members || []).find((m) => String(m.id) === String(user?.id)) || user || {};
+  const mio = mjStatsAsistencia(conFecha, user?.id, yo.asistencia_especial);
+  const msgPct = mio.pct == null ? "Aún no hay misas registradas para ti." : mio.pct >= 75 ? "Vas muy bien, sigue así." : mio.pct >= 50 ? "Puedes mejorar tu asistencia." : "Tu asistencia necesita atención.";
 
   return (
-    <div style={{ maxWidth: 1000 }}>
-      <SectionTitle
-        title="Asistencia del Coro"
-        subtitle="Registro de asistencia a eventos y ensayos"
-        action={
-          isAdmin && (
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-              {panelReinicio && (
-                <>
-                  <label style={{ fontSize: 12, color: C.gray }}>Contar desde:</label>
-                  <input
-                    type="date"
-                    value={fechaCorte}
-                    onChange={(e) => setFechaCorte(e.target.value)}
-                    style={{ padding: "7px 10px", borderRadius: 9, border: `1px solid ${C.border}`, fontSize: 13 }}
-                  />
-                  <Btn onClick={reiniciarAsistencia} disabled={reiniciando || !fechaCorte}>
-                    {reiniciando ? "Reiniciando…" : "Reiniciar"}
-                  </Btn>
-                </>
-              )}
-              <Btn variant="ghost" onClick={() => setPanelReinicio((v) => !v)}>
-                {panelReinicio ? "Cancelar" : "🔄 Reiniciar asistencia"}
-              </Btn>
-            </div>
-          )
-        }
-      />
-
-      {/* ── WIDGET PERSONAL ── */}
-      <div
-        style={{
-          background: bgPct,
-          border: `2px solid ${borderPct}`,
-          borderRadius: 18,
-          padding: 20,
-          marginBottom: 20,
-          display: "flex",
-          alignItems: "center",
-          gap: 20,
-          flexWrap: "wrap",
-        }}
-      >
-        {/* Anillo SVG */}
-        <div
-          style={{ position: "relative", width: 96, height: 96, flexShrink: 0 }}
-        >
-          <svg width="96" height="96" style={{ transform: "rotate(-90deg)" }}>
-            <circle
-              cx="48"
-              cy="48"
-              r="38"
-              fill="none"
-              stroke="#e5e7eb"
-              strokeWidth="7"
-            />
-            {pct !== null && (
-              <circle
-                cx="48"
-                cy="48"
-                r="38"
-                fill="none"
-                stroke={colPct}
-                strokeWidth="7"
-                strokeDasharray={`${(pct / 100) * circum} ${circum}`}
-                strokeLinecap="round"
-                style={{ transition: "stroke-dasharray 0.6s ease" }}
-              />
-            )}
-          </svg>
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {pct !== null ? (
-              <>
-                <span
-                  style={{
-                    fontSize: 20,
-                    fontWeight: 800,
-                    color: colPct,
-                    lineHeight: 1,
-                  }}
-                >
-                  {pct}%
-                </span>
-                {tieneEstrella ? (
-                  <span style={{ fontSize: 16, lineHeight: 1, marginTop: 1 }}>
-                    ⭐
-                  </span>
-                ) : (
-                  <span
-                    style={{
-                      fontSize: 9,
-                      color: C.gray,
-                      fontWeight: 600,
-                      marginTop: 1,
-                    }}
-                  >
-                    asistencia
-                  </span>
-                )}
-              </>
-            ) : (
-              <span
-                style={{
-                  fontSize: 10,
-                  color: C.gray,
-                  textAlign: "center",
-                  lineHeight: 1.3,
-                  padding: "0 8px",
-                }}
-              >
-                sin datos
-              </span>
-            )}
+    <div className="as-wrap">
+      <style>{AS_CSS}</style>
+      <div className="as-head">
+        <div>
+          <div className="as-eyebrow">Coro Misioneros de Jesús</div>
+          <div className="as-title">Asistencia</div>
+          <div className="as-sub">
+            {conFecha.length} misa{conFecha.length === 1 ? "" : "s"} registrada{conFecha.length === 1 ? "" : "s"}
+            {primera ? ` · cuenta desde el ${new Date(primera + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "long" })}` : ""}
           </div>
         </div>
-
-        {/* Info personal */}
-        <div style={{ flex: 1, minWidth: 180 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              marginBottom: 8,
-            }}
-          >
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                background: cc,
-                overflow: "hidden",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "white",
-                fontSize: 14,
-                fontWeight: 700,
-                flexShrink: 0,
-              }}
-            >
-              {user?.foto_url ? (
-                <img
-                  src={user.foto_url}
-                  alt=""
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                ini(user?.nombre || "U")
-              )}
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: C.dark }}>
-                {user?.nombre?.split(" ")[0]}
-              </div>
-              {!esVisita(user) && (
-                <div style={{ fontSize: 11, color: cc, fontWeight: 600 }}>
-                  {rolFullLabel(user)}
-                </div>
-              )}
-            </div>
-          </div>
-          {msgPct && (
-            <div
-              style={{
-                fontSize: 12,
-                color: colPct,
-                fontWeight: 600,
-                marginBottom: 10,
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              {msgPct}
-              {tieneEstrella && <span style={{ fontSize: 16 }}>⭐</span>}
-            </div>
-          )}
-
-          {/* Contadores */}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {isAdmin && (
+          <div className="as-seg">
             {[
-              {
-                label: "Presentes",
-                val: misPresentes,
-                color: C.primary,
-                bg: C.primaryLight,
-                emoji: "✅",
-              },
-              {
-                label: "Ausentes",
-                val: misAusentes,
-                color: "#ef4444",
-                bg: "#fee2e2",
-                emoji: "❌",
-              },
-              {
-                label: "Justificados",
-                val: misJustificados,
-                color: "#f59e0b",
-                bg: "#fef3c7",
-                emoji: "🟡",
-              },
-            ].map((s) => (
-              <div
-                key={s.label}
-                style={{
-                  background: s.bg,
-                  border: `1px solid ${s.color}30`,
-                  borderRadius: 12,
-                  padding: "6px 12px",
-                  textAlign: "center",
-                  minWidth: 70,
-                }}
-              >
-                <div style={{ fontSize: 11, color: s.color, marginBottom: 1 }}>
-                  {s.emoji} {s.label}
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>
-                  {s.val}
-                </div>
-              </div>
+              ["resumen", "Resumen"],
+              ["lista", "Pasar lista"],
+              ["mia", "Mi asistencia"],
+            ].map(([k, l]) => (
+              <button key={k} className={vista === k ? "on" : ""} onClick={() => setVista(k)}>
+                {l}
+              </button>
             ))}
-          </div>
-        </div>
-
-        {/* Historial personal por evento */}
-        {misReg.length > 0 && (
-          <div style={{ width: "100%", marginTop: 4 }}>
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: C.gray,
-                marginBottom: 8,
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Mis últimos eventos
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {eventosConAsistencia.slice(0, 8).map((e) => {
-                const reg = misReg.find((a) => a.evento_id === e.id);
-                const estado = reg?.estado;
-                if (!estado) return null;
-                const color =
-                  estado === "presente"
-                    ? C.primary
-                    : estado === "justificado"
-                    ? "#f59e0b"
-                    : estado === "excluido"
-                    ? "#2d7dd2"
-                    : estado === "nuevo"
-                    ? "#06b6d4"
-                    : "#ef4444";
-                const icono =
-                  estado === "presente"
-                    ? "✅"
-                    : estado === "justificado"
-                    ? "🟡"
-                    : estado === "excluido"
-                    ? "🔵"
-                    : estado === "nuevo"
-                    ? "🆕"
-                    : "❌";
-                const tipoEmoji =
-                  e.tipo === "ensayo" ? "🎵" : e.tipo === "misa" ? "⛪" : "📅";
-                return (
-                  <div
-                    key={e.id}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: 3,
-                      background: color + "15",
-                      border: `1px solid ${color}30`,
-                      borderRadius: 12,
-                      padding: "6px 10px",
-                      fontSize: 11,
-                    }}
-                  >
-                    <span style={{ fontSize: 16 }}>{icono}</span>
-                    <span
-                      style={{
-                        color: C.dark,
-                        fontWeight: 600,
-                        textAlign: "center",
-                        maxWidth: 80,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {tipoEmoji} {e.titulo.split(" ").slice(0, 2).join(" ")}
-                    </span>
-                    <span style={{ color: C.gray, fontSize: 10 }}>
-                      {fmtFecha(e.fecha)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
           </div>
         )}
       </div>
 
-      {/* ── TABLA GENERAL (solo Admin) ── */}
-      {isAdmin && (
-        <>
-          <Card style={{ marginBottom: 20, padding: 0, overflow: "hidden" }}>
-            <div
-              style={{
-                padding: "14px 18px",
-                borderBottom: `1px solid ${C.border}`,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <span style={{ fontSize: 18 }}>📊</span>
-              <span style={{ fontWeight: 700, fontSize: 15, color: C.dark }}>
-                Resumen por integrante
-              </span>
-            </div>
-            <div style={{ overflowX: "auto" }}>
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  fontSize: 13,
-                }}
-              >
-                <thead>
-                  <tr style={{ background: C.bg }}>
-                    <th
-                      style={{
-                        padding: "10px 16px",
-                        textAlign: "left",
-                        color: C.gray,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Integrante
-                    </th>
-                    <th
-                      style={{
-                        padding: "10px 16px",
-                        textAlign: "center",
-                        color: C.gray,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Presentes
-                    </th>
-                    <th
-                      style={{
-                        padding: "10px 16px",
-                        textAlign: "center",
-                        color: C.gray,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Ausentes
-                    </th>
-                    <th
-                      style={{
-                        padding: "10px 16px",
-                        textAlign: "center",
-                        color: C.gray,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Justificados
-                    </th>
-                    <th
-                      style={{
-                        padding: "10px 16px",
-                        textAlign: "center",
-                        color: C.gray,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Asistencia
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {members.map((m, i) => {
-                    const mReg = asistencia.filter((a) => a.member_id === m.id);
-                    const especial = !!m.asistencia_especial;
-                    // Para caso especial: cuenta como presente en todos los eventos con asistencia registrada
-                    const totalEventos = eventosConAsistencia.length;
-                    const presentes = especial
-                      ? totalEventos
-                      : mReg.filter((a) => a.estado === "presente").length;
-                    const ausentes = especial
-                      ? 0
-                      : mReg.filter((a) => a.estado === "ausente").length;
-                    const justificados = especial
-                      ? 0
-                      : mReg.filter((a) => a.estado === "justificado").length;
-                    const excluidos = mReg.filter(
-                      (a) => a.estado === "excluido"
-                    ).length;
-                    const nuevos = mReg.filter(
-                      (a) => a.estado === "nuevo"
-                    ).length;
-                    const p = calcPct(m.id);
-                    const mcc = CUERDAS[m.cuerda] || C.primary;
-                    return (
-                      <tr
-                        key={m.id}
-                        style={{
-                          borderTop: `1px solid ${C.border}`,
-                          background:
-                            m.id === user?.id
-                              ? C.primaryLight + "40"
-                              : i % 2 === 0
-                              ? "#fff"
-                              : C.bg,
-                        }}
-                      >
-                        <td style={{ padding: "10px 16px" }}>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: 32,
-                                height: 32,
-                                borderRadius: "50%",
-                                background: mcc,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                color: "white",
-                                fontSize: 12,
-                                fontWeight: 700,
-                                flexShrink: 0,
-                                overflow: "hidden",
-                              }}
-                            >
-                              {m.foto_url ? (
-                                <img
-                                  src={m.foto_url}
-                                  alt=""
-                                  style={{
-                                    width: "100%",
-                                    height: "100%",
-                                    objectFit: "cover",
-                                  }}
-                                />
-                              ) : (
-                                ini(m.nombre || "?")
-                              )}
-                            </div>
-                            <div>
-                              <div
-                                style={{
-                                  fontWeight: 600,
-                                  color: C.dark,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 5,
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                {m.nombre}{" "}
-                                {m.id === user?.id && (
-                                  <span
-                                    style={{ fontSize: 10, color: C.primary }}
-                                  >
-                                    (tú)
-                                  </span>
-                                )}
-                                {m.asistencia_especial && (
-                                  <span
-                                    title="Caso especial: Vive fuera de la ciudad / Prestando otros servicios pastorales"
-                                    style={{
-                                      fontSize: 10,
-                                      fontWeight: 700,
-                                      background: "#ede9fe",
-                                      color: "#6d28d9",
-                                      borderRadius: 20,
-                                      padding: "1px 7px",
-                                      cursor: "help",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
-                                    ★ Caso especial
-                                  </span>
-                                )}
-                              </div>
-                              <div style={{ fontSize: 11, color: mcc }}>
-                                {rolFullLabel(m)}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td
-                          style={{
-                            padding: "10px 16px",
-                            textAlign: "center",
-                            color: C.primary,
-                            fontWeight: 600,
-                          }}
-                        >
-                          {presentes}
-                        </td>
-                        <td
-                          style={{
-                            padding: "10px 16px",
-                            textAlign: "center",
-                            color: "#ef4444",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {ausentes}
-                        </td>
-                        <td
-                          style={{
-                            padding: "10px 16px",
-                            textAlign: "center",
-                            color: "#f59e0b",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {justificados}
-                        </td>
-                        <td
-                          style={{ padding: "10px 16px", textAlign: "center" }}
-                        >
-                          {p !== null ? (
-                            <div
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 6,
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: 60,
-                                  height: 6,
-                                  borderRadius: 3,
-                                  background: "#e5e7eb",
-                                  overflow: "hidden",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    width: `${p}%`,
-                                    height: "100%",
-                                    background: colorPct(p),
-                                    borderRadius: 3,
-                                    transition: "width 0.3s",
-                                  }}
-                                />
-                              </div>
-                              <span
-                                style={{
-                                  fontWeight: 700,
-                                  color: colorPct(p),
-                                  fontSize: 13,
-                                }}
-                              >
-                                {p}%
-                              </span>
-                              {ausentes === 0 &&
-                                justificados === 0 &&
-                                presentes > 0 && (
-                                  <span
-                                    title="¡Sin ausencias!"
-                                    style={{ fontSize: 14, lineHeight: 1 }}
-                                  >
-                                    ⭐
-                                  </span>
-                                )}
-                            </div>
-                          ) : (
-                            <span style={{ color: C.gray, fontSize: 12 }}>
-                              Sin registros
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+      {isAdmin && vista !== "mia" && (
+        <div className="as-kpis">
+          <div className="as-kpi">
+            <b>{conFecha.length}</b>
+            <span>Misas con registro</span>
+          </div>
+          <div className="as-kpi">
+            <b style={{ color: mjColorPct(promedio) }}>{promedio == null ? "—" : promedio + "%"}</b>
+            <span>Asistencia promedio</span>
+          </div>
+          <div className="as-kpi">
+            <b style={{ color: "#1e4f8f" }}>{alDia}</b>
+            <span>Con 75% o más</span>
+          </div>
+          <div className="as-kpi">
+            <b style={{ color: riesgo ? "#d0473b" : "#0f1b2d" }}>{riesgo}</b>
+            <span>Bajo 50%</span>
+          </div>
+        </div>
+      )}
+      {isAdmin && sinFecha > 0 && vista !== "mia" && (
+        <div style={{ fontSize: 12, color: "#8a5306", background: "#fbf1de", borderRadius: 10, padding: "8px 12px", marginBottom: 12 }}>
+          Hay {sinFecha} evento{sinFecha === 1 ? "" : "s"} con registros cuya fecha no se pudo identificar; se cuentan aparte.
+        </div>
+      )}
 
-          {/* Detalle por evento */}
-          <Card style={{ padding: 0, overflow: "hidden" }}>
-            <div
-              style={{
-                padding: "14px 18px",
-                borderBottom: `1px solid ${C.border}`,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <span style={{ fontSize: 18 }}>📅</span>
-              <span style={{ fontWeight: 700, fontSize: 15, color: C.dark }}>
-                Detalle por evento
-              </span>
+      {isAdmin && vista === "resumen" && (bloqueados.length > 0 || enAviso.length > 0) && (
+        <div className="as-card" style={{ padding: "14px 16px", marginBottom: 14 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".18em", textTransform: "uppercase", color: "#8a96a8", marginBottom: 8 }}>Control de ausencias</div>
+          {bloqueados.map((m) => (
+            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid #f1f4f8", flexWrap: "wrap" }}>
+              <AsAvatar m={m} />
+              <div style={{ flex: "1 1 160px", minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{m.nombre}</div>
+                <div style={{ fontSize: 12, color: "#a32a1f", fontWeight: 600 }}>Bloqueado · {rachaDe(m)} ausencias seguidas</div>
+              </div>
+              <button className="as-btn sec" style={{ height: 36 }} onClick={() => desbloquear(m)}>
+                Desbloquear
+              </button>
             </div>
-            {eventosConAsistencia.length === 0 ? (
-              <div style={{ padding: 32, textAlign: "center", color: C.gray }}>
-                No hay registros de asistencia aún.
+          ))}
+          {enAviso.map((m) => (
+            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid #f1f4f8" }}>
+              <AsAvatar m={m} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{m.nombre}</div>
+                <div style={{ fontSize: 12, color: "#8a5306", fontWeight: 600 }}>Con aviso · 2 ausencias seguidas (una más y queda bloqueado)</div>
               </div>
-            ) : (
-              <div>
-                {eventosConAsistencia.map((e) => {
-                  const regEvento = asistencia.filter(
-                    (a) => a.evento_id === e.id
-                  );
-                  const presentes = regEvento.filter(
-                    (a) => a.estado === "presente"
-                  ).length;
-                  const total = regEvento.filter(
-                    (a) =>
-                      !["justificado", "excluido", "nuevo"].includes(a.estado)
-                  ).length;
-                  const p =
-                    total > 0 ? Math.round((presentes / total) * 100) : 0;
-                  const isOpen = eventoSeleccionado === e.id;
-                  return (
-                    <div
-                      key={e.id}
-                      style={{ borderTop: `1px solid ${C.border}` }}
-                    >
-                      <div
-                        onClick={() =>
-                          setEventoSeleccionado(isOpen ? null : e.id)
-                        }
-                        style={{
-                          padding: "12px 18px",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 12,
-                          background: isOpen
-                            ? C.primaryLight + "30"
-                            : "transparent",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 12,
-                            background: C.primary + "15",
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: 14,
-                              fontWeight: 800,
-                              color: C.primary,
-                              lineHeight: 1,
-                            }}
-                          >
-                            {new Date(e.fecha + "T00:00:00").getDate()}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 8,
-                              color: C.primary,
-                              textTransform: "uppercase",
-                            }}
-                          >
-                            {new Date(e.fecha + "T00:00:00").toLocaleDateString(
-                              "es-CL",
-                              { month: "short" }
-                            )}
-                          </div>
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div
-                            style={{
-                              fontWeight: 600,
-                              color: C.dark,
-                              fontSize: 13,
-                            }}
-                          >
-                            {e.titulo}
-                          </div>
-                          <div style={{ fontSize: 11, color: C.gray }}>
-                            {presentes} presentes ·{" "}
-                            {
-                              regEvento.filter((a) => a.estado === "ausente")
-                                .length
-                            }{" "}
-                            ausentes ·{" "}
-                            {
-                              regEvento.filter(
-                                (a) => a.estado === "justificado"
-                              ).length
-                            }{" "}
-                            justificados
-                            {regEvento.filter((a) => a.estado === "excluido")
-                              .length > 0
-                              ? ` · ${
-                                  regEvento.filter(
-                                    (a) => a.estado === "excluido"
-                                  ).length
-                                } 🔵`
-                              : ""}
-                            {regEvento.filter((a) => a.estado === "nuevo")
-                              .length > 0
-                              ? ` · ${
-                                  regEvento.filter((a) => a.estado === "nuevo")
-                                    .length
-                                } 🆕`
-                              : ""}
-                          </div>
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontWeight: 700,
-                              color: colorPct(p),
-                              fontSize: 14,
-                            }}
-                          >
-                            {p}%
-                          </span>
-                          <span style={{ color: C.gray, fontSize: 12 }}>
-                            {isOpen ? "▲" : "▼"}
-                          </span>
-                        </div>
-                      </div>
-                      {isOpen && (
-                        <div
-                          style={{
-                            padding: "8px 18px 16px",
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: 8,
-                          }}
-                        >
-                          {members.map((m) => {
-                            const reg = regEvento.find(
-                              (a) => a.member_id === m.id
-                            );
-                            const estado = reg?.estado || "sin registro";
-                            const color =
-                              estado === "presente"
-                                ? C.primary
-                                : estado === "justificado"
-                                ? "#f59e0b"
-                                : estado === "ausente"
-                                ? "#ef4444"
-                                : estado === "excluido"
-                                ? "#2d7dd2"
-                                : estado === "nuevo"
-                                ? "#06b6d4"
-                                : C.gray;
-                            const icono =
-                              estado === "presente"
-                                ? "✅"
-                                : estado === "justificado"
-                                ? "🟡"
-                                : estado === "ausente"
-                                ? "❌"
-                                : estado === "excluido"
-                                ? "🔵"
-                                : estado === "nuevo"
-                                ? "🆕"
-                                : "⬜";
-                            return (
-                              <div
-                                key={m.id}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                  background: color + "15",
-                                  border: `1px solid ${color}30`,
-                                  borderRadius: 20,
-                                  padding: "4px 10px",
-                                  fontSize: 12,
-                                }}
-                              >
-                                <span>{icono}</span>
-                                <span
-                                  style={{ color: C.dark, fontWeight: 500 }}
-                                >
-                                  {m.nombre.split(" ")[0]}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+            </div>
+          ))}
+        </div>
+      )}
+      {isAdmin && vista === "resumen" && <AsResumen integrantes={integrantes} misas={misas} onAbrir={setDetalle} rachaDe={desbloqueos ? rachaDe : null} />}
+      {isAdmin && vista === "lista" && <AsPasarLista integrantes={integrantes} misas={misas} opciones={opciones} members={members} onGuardado={recargar} />}
+      {isAdmin && vista === "resumen" && <AsReinicio asistencia={asistencia} mapa={mapa} onReload={onReload} />}
+
+      {vista === "mia" && (
+        <>
+          <div className="as-card" style={{ padding: 20, display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap", marginBottom: 14 }}>
+            <AsAnillo pct={mio.pct} />
+            <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <AsAvatar m={yo} size={40} />
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 16 }}>{(yo.nombre || "").split(" ")[0]}</div>
+                  <div style={{ fontSize: 12, color: "#8a96a8" }}>{yo.cuerda}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: mjColorPct(mio.pct), marginTop: 10 }}>{msgPct}</div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(84px,1fr))", gap: 8, flex: "1 1 280px" }}>
+              {[
+                ["Presente", mio.presentes, "presente"],
+                ["Ausente", mio.ausentes, "ausente"],
+                ["Justificado", mio.justificados, "justificado"],
+              ].map(([l, v, k]) => (
+                <div key={k} style={{ background: MJ_ESTADOS[k].bg, borderRadius: 14, padding: "12px 6px", textAlign: "center" }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: MJ_ESTADOS[k].color }}>{v}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: MJ_ESTADOS[k].color, opacity: 0.85 }}>{l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="as-card" style={{ overflow: "hidden" }}>
+            <div style={{ padding: "13px 16px", fontSize: 10.5, fontWeight: 800, letterSpacing: ".18em", textTransform: "uppercase", color: "#8a96a8", borderBottom: "1px solid #eef2f7" }}>Mis misas</div>
+            {conFecha.filter((x) => x.porMiembro[String(user?.id)]).length === 0 && <div style={{ padding: 18, fontSize: 13, color: "#6b7a90" }}>Todavía no tienes registros.</div>}
+            {conFecha
+              .filter((x) => x.porMiembro[String(user?.id)])
+              .map((x) => {
+                const est = x.porMiembro[String(user?.id)].estado;
+                const e = MJ_ESTADOS[est] || {};
+                return (
+                  <div key={x.key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: "1px solid #f1f4f8" }}>
+                    <AsDot estado={est} size={28} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700 }}>{mjCap(mjFechaLarga(x.fecha))}</div>
+                      <div style={{ fontSize: 11.5, color: "#8a96a8" }}>{x.grupo === "ensayo" ? "Ensayo" : x.titulo || "Misa"}</div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: e.color || "#6b7a90" }}>{e.label || est}</span>
+                  </div>
+                );
+              })}
+          </div>
         </>
       )}
+
+      {detalle && <AsDetalleIntegrante m={detalle} misas={misas} esAdmin={isAdmin} members={members} onCerrar={() => setDetalle(null)} onGuardado={recargar} racha={desbloqueos ? rachaDe(detalle) : 0} onDesbloquear={() => desbloquear(detalle)} />}
     </div>
   );
 }
@@ -43400,6 +43439,63 @@ function PushTestBar() {
   );
 }
 
+const ADM_CSS = `
+.adm-wrap{width:100%;max-width:1320px;font-family:var(--font-sans);color:#0f1b2d}
+.adm-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.adm-eyebrow{font-size:10.5px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#8a96a8}
+.adm-title{font-size:28px;font-weight:800;letter-spacing:-.03em;line-height:1.1;margin-top:4px}
+.adm-sub{font-size:13px;color:#6b7a90;margin-top:5px}
+.adm-stats{display:flex;gap:8px;flex-wrap:wrap}
+.adm-stat{display:flex;align-items:baseline;gap:7px;background:#fff;border:1px solid #e6ecf4;border-radius:12px;padding:8px 13px;font:inherit;color:#0f1b2d;box-shadow:0 1px 2px rgba(15,39,68,.04)}
+button.adm-stat{cursor:pointer}
+.adm-stat b{font-size:17px;font-weight:800;letter-spacing:-.02em}
+.adm-stat span{font-size:11.5px;color:#6b7a90;font-weight:600}
+.adm-stat.alerta{background:#fff7e6;border-color:#f2d59a}
+.adm-stat.alerta b{color:#a15c07}
+.adm-nav{background:#fff;border:1px solid #e6ecf4;border-radius:18px;box-shadow:0 1px 2px rgba(15,39,68,.04),0 10px 30px rgba(15,39,68,.05);margin-bottom:16px;overflow:hidden}
+.adm-grupos{display:flex;gap:4px;padding:8px;border-bottom:1px solid #eef2f7;overflow-x:auto;scrollbar-width:none;background:#fbfcfe}
+.adm-grupos::-webkit-scrollbar,.adm-tabs::-webkit-scrollbar{display:none}
+.adm-grupos button{border:none;background:transparent;border-radius:10px;padding:8px 14px;font:inherit;font-size:13px;font-weight:700;color:#6b7a90;cursor:pointer;white-space:nowrap}
+.adm-grupos button.on{background:#0f2744;color:#fff}
+.adm-tabs{display:flex;gap:6px;padding:10px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.adm-tabs button{border:1px solid #e3e9f2;background:#fff;border-radius:999px;padding:8px 14px;font:inherit;font-size:13px;font-weight:700;color:#3d4a5c;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:7px}
+.adm-tabs button.on{background:#e8eef7;border-color:#c9d6ea;color:#0f2744}
+.adm-badge{min-width:18px;height:18px;border-radius:9px;background:#d0473b;color:#fff;font-size:10.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+@media(max-width:640px){.adm-title{font-size:23px}.adm-stat span{font-size:11px}}
+`;
+function AdminNavegacion({ tab, setTab, pendientes }) {
+  const byId = Object.fromEntries(ADMIN_TABS.map((t) => [t.id, t]));
+  const [grupo, setGrupo] = useState(() => (ADMIN_GRUPOS.find((g) => g.ids.includes(tab)) || ADMIN_GRUPOS[0]).grupo);
+  useEffect(() => {
+    const g = ADMIN_GRUPOS.find((x) => x.ids.includes(tab));
+    if (g) setGrupo(g.grupo);
+  }, [tab]);
+  const activo = ADMIN_GRUPOS.find((g) => g.grupo === grupo) || ADMIN_GRUPOS[0];
+  return (
+    <nav className="adm-nav" aria-label="Secciones de administración">
+      <div className="adm-grupos">
+        {ADMIN_GRUPOS.map((g) => (
+          <button key={g.grupo} className={g.grupo === grupo ? "on" : ""} onClick={() => setGrupo(g.grupo)}>
+            {g.grupo}
+          </button>
+        ))}
+      </div>
+      <div className="adm-tabs">
+        {activo.ids.map((id) => {
+          const t = byId[id];
+          if (!t) return null;
+          return (
+            <button key={id} className={tab === id ? "on" : ""} onClick={() => setTab(id)}>
+              {t.label}
+              {id === "preguntas" && pendientes > 0 && <span className="adm-badge">{pendientes}</span>}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
 function Admin({
   members,
   eventos,
@@ -43417,6 +43513,8 @@ function Admin({
   materialCoro,
   onReload,
   user,
+  eventosDb,
+  pautasAdmin,
 }) {
   const [tab, setTabRaw] = useState("integrantes");
   const adminContentRef = useRef(null);
@@ -43433,177 +43531,37 @@ function Admin({
     });
   };
   const pendientes = preguntas.filter((p) => !p.respuesta).length;
-
+  const tabActual = ADMIN_TABS.find((t) => t.id === tab) || ADMIN_TABS[0];
+  const metaActual = ADMIN_TAB_META[tab] || {};
+  const grupoActual = (ADMIN_GRUPOS.find((g) => g.ids.includes(tab)) || ADMIN_GRUPOS[0]).grupo;
+  const sinMarco = tab === "asistencia";
   return (
-    <div style={{ maxWidth: 1000 }}>
-      <div
-        style={{
-          position: "relative",
-          overflow: "hidden",
-          background: `linear-gradient(150deg, ${C.primary}0f 0%, rgba(255,255,255,0.96) 44%, #ffffff 100%)`,
-          borderRadius: 22,
-          padding: "18px 22px",
-          marginBottom: 20,
-          display: "flex",
-          alignItems: "center",
-          gap: 15,
-          flexWrap: "wrap",
-          boxShadow: `0 1px 2px rgba(0,0,0,0.04), 0 10px 30px ${C.primary}1a, 0 2px 8px rgba(0,0,0,0.04)`,
-          border: "1px solid rgba(255,255,255,0.8)",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: -60,
-            right: -40,
-            width: 170,
-            height: 170,
-            borderRadius: "50%",
-            background: `radial-gradient(circle, ${C.primary}1f 0%, transparent 70%)`,
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          style={{
-            width: 50,
-            height: 50,
-            background: `linear-gradient(145deg, ${C.primary}, ${C.primaryDark})`,
-            borderRadius: 15,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 24,
-            color: "white",
-            flexShrink: 0,
-            boxShadow: `0 6px 18px ${C.primary}50, inset 0 1px 0 rgba(255,255,255,0.3)`,
-          }}
-        >
-          ⚙
-        </div>
+    <div className="adm-wrap">
+      <style>{ADM_CSS}</style>
+      <div className="adm-head">
         <div style={{ minWidth: 0 }}>
-          <div
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: 18,
-              fontWeight: 800,
-              color: "#1c1c1e",
-              letterSpacing: "-0.03em",
-            }}
-          >
-            Panel de Administración
-          </div>
-          <div
-            style={{
-              fontSize: 12,
-              color: "#8a8a90",
-              fontWeight: 500,
-              marginTop: 1,
-            }}
-          >
-            Gestiona toda la información del Coro MJ · {user?.nombre}
-          </div>
+          <div className="adm-eyebrow">Administración · {grupoActual}</div>
+          <div className="adm-title">{tabActual.label}</div>
+          {metaActual.desc && <div className="adm-sub">{metaActual.desc}</div>}
         </div>
-        <div
-          style={{
-            marginLeft: "auto",
-            display: "flex",
-            gap: 8,
-            flexWrap: "wrap",
-          }}
-        >
-          {[
-            { label: "Integrantes", val: members.length },
-            { label: "Sin responder", val: pendientes, alert: pendientes > 0 },
-          ].map((s, i) => (
-            <div
-              key={i}
-              style={{
-                background: s.alert
-                  ? "linear-gradient(145deg, #f5b945, #e09b1f)"
-                  : "rgba(255,255,255,0.85)",
-                borderRadius: 14,
-                padding: "9px 16px",
-                textAlign: "center",
-                border: s.alert
-                  ? "1px solid rgba(224,155,31,0.3)"
-                  : `1px solid ${C.primary}1a`,
-                boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-                minWidth: 62,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 21,
-                  fontWeight: 800,
-                  color: s.alert ? "white" : C.primary,
-                  lineHeight: 1,
-                  letterSpacing: "-0.03em",
-                }}
-              >
-                {s.val}
-              </div>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: s.alert ? "rgba(255,255,255,0.95)" : "#8a8a90",
-                  marginTop: 3,
-                  fontWeight: 600,
-                }}
-              >
-                {s.label}
-              </div>
-            </div>
-          ))}
+        <div className="adm-stats">
+          <div className="adm-stat">
+            <b>{members.length}</b>
+            <span>Integrantes</span>
+          </div>
+          <button type="button" className={"adm-stat" + (pendientes > 0 ? " alerta" : "")} onClick={() => setTab("preguntas")}>
+            <b>{pendientes}</b>
+            <span>Preguntas sin responder</span>
+          </button>
         </div>
       </div>
-
-      <PushTestBar />
-
-      {/* Etiqueta del tab activo (label legible para encabezado móvil) */}
-      <div
-        className="admin-layout"
-        style={{ display: "flex", gap: 18, alignItems: "flex-start" }}
-      >
-        {/* Menú lateral (desktop) */}
-        <aside
-          className="admin-sidebar hide-mobile"
-          style={{
-            width: 230,
-            flexShrink: 0,
-            position: "sticky",
-            top: 12,
-            background: "var(--surface,#fff)",
-            border: `1px solid ${C.border}`,
-            borderRadius: 16,
-            padding: "12px 10px",
-            boxShadow: "0 1px 3px rgba(16,24,40,0.04)",
-          }}
-        >
-          <AdminSideMenu
-            tabs={ADMIN_TABS}
-            tab={tab}
-            setTab={setTab}
-            pendientes={pendientes}
-          />
-        </aside>
-
-        {/* Navegación premium móvil */}
-        <div className="admin-menu-btn" style={{ width: "100%" }}>
-          <AdminMobileNav
-            tabs={ADMIN_TABS}
-            tab={tab}
-            setTab={setTab}
-            pendientes={pendientes}
-          />
-        </div>
-
-        {/* Columna de contenido */}
+      <AdminNavegacion tab={tab} setTab={setTab} pendientes={pendientes} />
+      <div>
         <div
           ref={adminContentRef}
-          style={{ flex: 1, minWidth: 0, scrollMarginTop: 12 }}
+          style={{ minWidth: 0, scrollMarginTop: 12 }}
         >
-          <Card>
+          <Card style={sinMarco ? { background: "transparent", border: "none", boxShadow: "none", padding: 0, backdropFilter: "none", WebkitBackdropFilter: "none" } : { padding: "22px 24px", borderRadius: 20 }}>
             {tab === "integrantes" && (
               <AdminIntegrantes members={members} onReload={onReload} />
             )}
@@ -43721,10 +43679,12 @@ function Admin({
             {tab === "pautas" && <AdminPautasMisa onReload={onReload} />}
             {tab === "checkin_config" && <AdminCheckIn />}
             {tab === "asistencia" && (
-              <AdminAsistencia
-                members={members}
-                eventos={eventos}
+              <Asistencia
                 asistencia={asistencia}
+                members={members}
+                eventosDb={eventosDb}
+                pautas={pautasAdmin}
+                user={user}
                 onReload={onReload}
               />
             )}
@@ -43737,19 +43697,26 @@ function Admin({
             {tab === "cuentas" && (
               <AdminCuentas members={members} onReload={onReload} />
             )}
-            {tab === "codigo_invitado" && <AdminCodigoInvitado />}
             {tab === "historial" && (
               <AdminHistorialAsistencia members={members} />
             )}
             {tab === "cuenta_bancaria" && <AdminCuentaBancaria />}
             {tab === "visitas" && <AdminVisitas />}
-            {tab === "notificaciones" && <AdminNotificaciones />}
-            {tab === "api_config" && <AdminApiConfig />}
+            {tab === "notificaciones" && (
+              <>
+                <PushTestBar />
+                <AdminNotificaciones />
+              </>
+            )}
+            {tab === "api_config" && (
+              <>
+                <AdminApiConfig />
+                <SqlSetupBlock />
+              </>
+            )}
           </Card>
         </div>
       </div>
-
-      <SqlSetupBlock />
     </div>
   );
 }

@@ -77,7 +77,7 @@ export default async function handler(req, res) {
       const objetivo = integrantes.filter((m) => !permitidos || permitidos.has(String(m.id)));
 
       // Evento de misa de ese día (el que usa el admin para pasar lista); si no existe, se crea
-      const evs = (await sb(`eventos?select=id,tipo&fecha=eq.${p.fecha}`)) || [];
+      const evs = (await sb(`eventos?select=id,tipo&fecha=eq.${p.fecha}&order=id.asc`)) || [];
       let ev = evs.find((e) => e.tipo === "misa");
       if (!ev && !dry) {
         const nv = await sb("eventos", {
