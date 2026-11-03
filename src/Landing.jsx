@@ -803,8 +803,10 @@ export default function Landing({ onPortal }) {
         @media(max-width:900px){.hero-bg{background-position:60% center}}
         .hero-ov{position:absolute;inset:0;z-index:1;background:linear-gradient(160deg,rgba(6,14,36,0.6) 0%,rgba(6,14,36,0.2) 40%,rgba(6,14,36,0.7) 70%,rgba(6,14,36,0.97) 100%)}
         .hero-c{position:relative;z-index:2;padding:0 60px 68px;width:100%;display:flex;justify-content:space-between;align-items:flex-end}
-        .hero-kicker{font-size:11px;font-weight:700;letter-spacing:0.32em;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-bottom:18px;display:flex;align-items:center;gap:12px}
-        .hero-kicker::before{content:'';width:28px;height:1px;background:rgba(255,255,255,0.4)}
+        .hero-coro{display:inline-flex;align-items:center;gap:14px;font-size:clamp(15px,1.7vw,20px);font-weight:800;letter-spacing:0.5em;text-transform:uppercase;color:#fff;margin-bottom:14px;text-shadow:0 2px 16px rgba(6,14,36,0.6)}
+        .hero-coro::before{content:'';width:clamp(28px,3vw,44px);height:2px;border-radius:2px;background:linear-gradient(90deg,rgba(245,185,66,0),#f5b942);box-shadow:0 0 12px rgba(245,185,66,0.5)}
+        .hero-kicker{font-size:14px;font-weight:800;letter-spacing:0.42em;text-transform:uppercase;color:#fff;margin-bottom:18px;display:flex;align-items:center;gap:14px;text-shadow:0 2px 14px rgba(6,14,36,0.55)}
+        .hero-kicker::before{content:'';width:38px;height:2px;border-radius:2px;background:linear-gradient(90deg,rgba(245,185,66,0),#f5b942);box-shadow:0 0 10px rgba(245,185,66,0.45)}
         .hero-h1{font-size:clamp(70px,9.5vw,124px);font-weight:900;line-height:0.88;color:#fff;letter-spacing:-0.03em}
         .hero-h1 .it{font-family:'Fraunces',serif;font-style:italic;font-weight:400;display:block;line-height:0.92;font-size:clamp(66px,9vw,118px)}
         @keyframes heroUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
@@ -1082,7 +1084,7 @@ export default function Landing({ onPortal }) {
         </div>
         <div className="hero-c">
           <div>
-            <div style={{fontSize:"clamp(11px,1.2vw,14px)",fontWeight:700,letterSpacing:"0.45em",textTransform:"uppercase",color:"rgba(255,255,255,0.85)",marginBottom:12,display:"block"}}>CORO</div>
+            <div className="hero-coro">Coro</div>
             <h1 className="hero-h1">{C.hero_titulo}<br/><span className="it">{C.hero_titulo2}</span></h1>
           </div>
           <div className="hero-right">
