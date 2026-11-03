@@ -204,6 +204,8 @@ function AdminPanel({ onClose, C, editing, setEditing, saving, saveF, upKey, han
                 {saving.pm_modo ? "..." : "Guardar"}
               </button>
             </div>
+            <AdminField {...fp} label="Celebración (opcional, ej: Mes de María, Navidad)" k="pm_celebracion" />
+            <div style={{ fontSize: 11, color: "#888", margin: "-6px 0 12px", lineHeight: 1.4 }}>Si lo dejas vacío y está en automático, se usa el título litúrgico de la pauta.</div>
             <AdminField {...fp} label="Fecha (modo manual)" k="evento_fecha" type="date" />
             <AdminField {...fp} label="Hora (modo manual)" k="evento_hora" type="time" />
             <AdminField {...fp} label="Lugar (modo manual)" k="evento_lugar" />
@@ -352,13 +354,27 @@ function IgStats({ C }) {
 
 function ProximaMisa({ C }) {
   const [m, setM] = useState(null);
+  const [lit, setLit] = useState("");
   const modo = C.pm_modo || "auto";
   useEffect(() => {
     if (modo !== "auto") return;
     const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Santiago" });
     fetch(`${SUPABASE_URL}/rest/v1/pautas_misa?publicada=eq.true&fecha=gte.${hoy}&order=fecha.asc&limit=1`, {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-    }).then(r => r.json()).then(rows => { if (Array.isArray(rows) && rows[0]) setM(rows[0]); }).catch(() => {});
+    }).then(r => r.json()).then(rows => {
+      if (!Array.isArray(rows) || !rows[0]) return;
+      const p = rows[0];
+      setM(p);
+      // Título litúrgico de la pauta (ej. "Solemnidad de Todos los Santos")
+      fetch(`${SUPABASE_URL}/rest/v1/config?select=value&key=eq.pauta_liturgia_${p.id}&limit=1`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+      }).then(r => r.json()).then(c => {
+        let v = c && c[0] && c[0].value;
+        try { if (typeof v === "string") v = JSON.parse(v); } catch (e) {}
+        const t = typeof v === "string" ? v : v && v.t;
+        if (t) setLit(t);
+      }).catch(() => {});
+    }).catch(() => {});
   }, [modo]);
   if (modo === "oculto") return null;
   const src = modo === "manual" ? { fecha: C.evento_fecha, hora: C.evento_hora, lugar: C.evento_lugar } : (m || proximaMisaRegular());
@@ -373,6 +389,7 @@ function ProximaMisa({ C }) {
   return (
     <div className="pm">
       <div className="pm-k"><b />Próxima misa</div>
+      {(C.pm_celebracion || (modo === "auto" && m ? lit : "")) && <div className="pm-cel">{C.pm_celebracion || lit}</div>}
       <div className="pm-top">
         <span className="pm-day">{String(d.getDate()).padStart(2, "0")}</span>
         <span className="pm-bar" />
@@ -801,6 +818,7 @@ export default function Landing({ onPortal }) {
         .pm-k{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:rgba(255,255,255,0.8)}
         .pm-k b{width:6px;height:6px;border-radius:50%;background:#f5b942;box-shadow:0 0 0 3px rgba(245,185,66,0.25)}
         .pm-top{display:flex;align-items:center;gap:14px}
+        .pm-cel{font-size:19px;font-weight:700;letter-spacing:-0.01em;line-height:1.2;color:#fff;max-width:300px;margin-top:-4px}
         .pm-day{font-size:62px;font-weight:700;line-height:0.88;letter-spacing:-0.045em;font-variant-numeric:tabular-nums}
         .pm-bar{display:none}
         .pm-mw{display:flex;flex-direction:column;gap:5px}
