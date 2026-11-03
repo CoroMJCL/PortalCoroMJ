@@ -1461,73 +1461,54 @@ function MobileMenu({
 // ══════════════════════════════════════════
 //  APP PRINCIPAL
 // ══════════════════════════════════════════
+const TOPBAR_CSS = `
+.tb{background:#fff;border-bottom:1px solid #e9eef5;padding:0 22px;height:62px;display:flex;align-items:center;gap:12px;flex-shrink:0;position:relative;z-index:10;font-family:var(--font-sans);box-shadow:0 1px 0 rgba(15,39,68,.02),0 6px 18px rgba(15,39,68,.035)}
+.tb-menu{height:36px;padding:0 13px;border-radius:11px;border:1px solid #e3e9f2;background:#fff;color:#0f2744;display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.tb-menu:hover{background:#f5f7fb}
+.tb-menu-m{width:38px;padding:0;justify-content:center}
+.tb-logo{width:30px;height:30px;border-radius:9px;object-fit:cover;flex-shrink:0}
+.tb-titulo{display:flex;flex-direction:column;min-width:0;line-height:1.15;margin-left:4px}
+.tb-eyebrow{font-size:9.5px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#98a3b3;white-space:nowrap}
+.tb-seccion{font-size:17px;font-weight:800;letter-spacing:-.02em;color:#0f1b2d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-der{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.tb-fecha{display:flex;align-items:center;gap:9px;height:38px;padding:0 12px 0 5px;border:1px solid #e3e9f2;border-radius:12px;background:#fff}
+.tb-dia{width:28px;height:28px;border-radius:8px;background:#0f2744;color:#fff;font-size:13.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
+.tb-fecha-t{display:flex;flex-direction:column;line-height:1.15}
+.tb-fecha-t b{font-size:12px;font-weight:800;color:#0f1b2d;text-transform:capitalize}
+.tb-fecha-t span{font-size:10.5px;color:#8a96a8}
+.tb-clima{display:flex;align-items:center;gap:5px;height:38px;padding:0 11px;border:1px solid #e3e9f2;border-radius:12px;font-size:14px}
+.tb-clima b{font-size:13px;font-weight:800;color:#0f1b2d}
+.tb-salir{height:38px;padding:0 13px;border-radius:12px;border:1px solid #e3e9f2;background:#fff;color:#5b6779;display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.tb-salir:hover{background:#fdf1f0;color:#a32a1f;border-color:#f3cfcb}
+.tb-spot{height:38px;display:inline-flex;align-items:center;gap:8px;padding:0 12px 0 6px;border-radius:12px;border:1px solid #e3e9f2;background:#fff;color:#0f1b2d;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap}
+.tb-spot:hover,.tb-spot.on{background:#f5f7fb}
+.tb-spot i{width:26px;height:26px;border-radius:8px;background:#0f2744;display:inline-flex;align-items:center;justify-content:center}
+@media(max-width:768px){
+  .tb{padding:0 12px !important;height:56px;gap:8px}
+  .tb-eyebrow{display:none}
+  .tb-seccion{font-size:16px}
+  .tb-salir span,.tb-spot .tb-spot-t{display:none}
+  .tb-salir{width:38px;padding:0;justify-content:center}
+  .tb-spot{padding:0 6px}
+  .tb-spot-pop{position:fixed !important;top:62px !important;left:12px !important;right:12px !important;width:auto !important;max-width:none !important}
+}
+`;
 function SpotifyBarWidget() {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: "relative", flexShrink: 0 }}>
-      <button
-        onClick={() => setOpen((p) => !p)}
-        title="Música del Coro"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          background: open
-            ? "#1DB954"
-            : "linear-gradient(135deg,#1DB954,#159c44)",
-          border: "none",
-          borderRadius: 11,
-          padding: "7px 13px",
-          cursor: "pointer",
-          transition: "all 0.18s",
-          boxShadow: "0 2px 10px rgba(29,185,84,0.35)",
-        }}
-      >
-        <span
-          style={{
-            width: 22,
-            height: 22,
-            borderRadius: "50%",
-            background: "white",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="#1DB954">
+      <button className={"tb-spot" + (open ? " on" : "")} onClick={() => setOpen((p) => !p)} title="Playlist del Coro en Spotify" aria-label="Playlist del Coro">
+        <i>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="#1ed760">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm4.59 14.42a.62.62 0 0 1-.86.21c-2.35-1.44-5.3-1.76-8.79-.96a.62.62 0 1 1-.28-1.21c3.81-.87 7.08-.5 9.71 1.11.3.18.39.57.22.85Zm1.23-2.73a.78.78 0 0 1-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.17a.78.78 0 1 1-.45-1.49c3.63-1.1 8.15-.56 11.23 1.33.37.22.49.71.26 1.07Zm.11-2.85C14.81 8.94 9.4 8.76 6.3 9.7a.93.93 0 1 1-.54-1.78c3.56-1.08 9.53-.87 13.29 1.36a.93.93 0 0 1-.96 1.6Z" />
           </svg>
-        </span>
-        <div style={{ textAlign: "left" }}>
-          <div
-            style={{
-              fontSize: 11.5,
-              fontWeight: 800,
-              color: "white",
-              lineHeight: 1.1,
-            }}
-          >
-            Playlist del Coro
-          </div>
-          <div
-            style={{
-              fontSize: 9,
-              color: "rgba(255,255,255,0.85)",
-              lineHeight: 1.2,
-            }}
-          >
-            Escúchanos en Spotify
-          </div>
-        </div>
-        <span
-          style={{ fontSize: 9, color: "rgba(255,255,255,0.9)", marginLeft: 2 }}
-        >
-          {open ? "▲" : "▼"}
-        </span>
+        </i>
+        <span className="tb-spot-t">Playlist del Coro</span>
+        <svg className="tb-spot-t" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8a96a8" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}><path d="m6 9 6 6 6-6" /></svg>
       </button>
       {open && (
         <div
+          className="tb-spot-pop"
           style={{
             position: "absolute",
             top: "calc(100% + 8px)",
@@ -1548,7 +1529,7 @@ function SpotifyBarWidget() {
               alignItems: "center",
               gap: 9,
               padding: "12px 14px",
-              background: "linear-gradient(135deg,#1DB954,#159c44)",
+              background: "linear-gradient(135deg,#17345c,#2a5a9c)",
             }}
           >
             <span
@@ -3862,382 +3843,40 @@ function AppInner() {
         }}
       >
         {/* Topbar */}
-        <header
-          className="topbar"
-          style={{
-            background: "rgba(255,255,255,0.85)",
-            backdropFilter: "saturate(180%) blur(20px)",
-            WebkitBackdropFilter: "saturate(180%) blur(20px)",
-            borderBottom: "1px solid rgba(60,60,67,0.12)",
-            padding: "0 20px",
-            height: 58,
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            flexShrink: 0,
-            position: "relative",
-            zIndex: 10,
-          }}
-        >
-          <button
-            className="hide-mobile"
-            onClick={() => setSideOpen((p) => !p)}
-            aria-label="Menú"
-            style={{
-              background: "rgba(60,60,67,0.06)",
-              border: "1px solid rgba(60,60,67,0.12)",
-              cursor: "pointer",
-              color: "var(--text-secondary)",
-              height: 34,
-              padding: "0 11px",
-              borderRadius: 999,
-              flexShrink: 0,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 7,
-              fontSize: 12.5,
-              fontWeight: 600,
-              fontFamily: "inherit",
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
-            Menú
+        <style>{TOPBAR_CSS}</style>
+        <header className="topbar tb">
+          <button className="hide-mobile tb-menu" onClick={() => setSideOpen((p) => !p)} aria-label="Menú">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h16M4 12h11M4 17h16" /></svg>
+            <span>Menú</span>
           </button>
-          <button
-            className="show-mobile"
-            onClick={() => setMobileMenu(true)}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: C.gray,
-              fontSize: 22,
-              padding: 4,
-              borderRadius: 9,
-              flexShrink: 0,
-              zIndex: 20,
-              touchAction: "manipulation",
-              WebkitTapHighlightColor: "transparent",
-            }}
-          >
-            ☰
+          <button className="show-mobile tb-menu tb-menu-m" onClick={() => setMobileMenu(true)} aria-label="Menú">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h16M4 12h11M4 17h16" /></svg>
           </button>
-          <img
-            className="show-mobile"
-            src={LOGO}
-            alt="Logo"
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: 9,
-              objectFit: "cover",
-              flexShrink: 0,
-            }}
-          />
-
-          <div style={{ flex: 1, maxWidth: 440, position: "relative" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                background: "var(--bg-base, #f2f2f7)",
-                borderRadius: 12,
-                padding: "7px 12px",
-                border: "1px solid rgba(60,60,67,0.18)",
-                opacity: esVisita(user) ? 0.55 : 1,
-                cursor: esVisita(user) ? "not-allowed" : "text",
-              }}
-              title={
-                esVisita(user)
-                  ? "El buscador no está disponible para usuarios Invitado"
-                  : undefined
-              }
-            >
-              <span style={{ color: C.gray, fontSize: 14 }}>🔍</span>
-              <input
-                value={esVisita(user) ? "" : searchQ}
-                onChange={(e) => {
-                  if (esVisita(user)) return;
-                  setSearchQ(e.target.value);
-                  setShowSearch(true);
-                }}
-                onFocus={() => {
-                  if (!esVisita(user)) setShowSearch(true);
-                }}
-                onBlur={() => setTimeout(() => setShowSearch(false), 150)}
-                placeholder={
-                  esVisita(user)
-                    ? "Búsqueda no disponible"
-                    : "Buscar integrantes, descargas..."
-                }
-                disabled={esVisita(user)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  outline: "none",
-                  fontSize: 13,
-                  width: "100%",
-                  color: C.dark,
-                  cursor: esVisita(user) ? "not-allowed" : "text",
-                }}
-              />
-            </div>
-            {showSearch && searchRes.length > 0 && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "110%",
-                  left: 0,
-                  right: 0,
-                  background: C.white,
-                  borderRadius: 12,
-                  boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
-                  zIndex: 200,
-                  border: `1px solid ${C.border}`,
-                  overflow: "hidden",
-                }}
-              >
-                {searchRes.map((r, i) => (
-                  <div
-                    key={i}
-                    onClick={() => {
-                      setSearchQ("");
-                      setShowSearch(false);
-                      if (r.section) setSection(r.section);
-                    }}
-                    style={{
-                      padding: "10px 14px",
-                      borderBottom: `1px solid ${C.border}`,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                    }}
-                  >
-                    <Badge color={r.color}>{r.type}</Badge>
-                    <span
-                      style={{
-                        fontSize: 13,
-                        color: C.dark,
-                        flex: 1,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {r.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+          <img className="show-mobile tb-logo" src={LOGO} alt="Coro MJ" />
+          <div className="tb-titulo">
+            <span className="tb-eyebrow">Coro Misioneros de Jesús</span>
+            <span className="tb-seccion">{section === "dashboard" ? "Inicio" : (NAV.find((n) => n.id === section) || {}).label || "Portal"}</span>
           </div>
-
-          <SpotifyBarWidget />
-
-          {/* Clima + Fecha + Saludo — solo desktop */}
-          <style>{`.topbar-extras { display: flex; } @media(max-width:640px){ .topbar-extras { display: none !important; } }`}</style>
-          <div
-            className="topbar-extras"
-            style={{ marginLeft: 8, alignItems: "center", gap: 8 }}
-          >
-            {/* Clima */}
+          <div className="tb-der">
+            <SpotifyBarWidget />
+            <div className="tb-fecha hide-mobile" title={new Date().toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}>
+              <span className="tb-dia">{new Date().getDate()}</span>
+              <span className="tb-fecha-t">
+                <b>{new Date().toLocaleDateString("es-CL", { weekday: "long" })}</b>
+                <span>{new Date().toLocaleDateString("es-CL", { month: "long", year: "numeric" })}</span>
+              </span>
+            </div>
             {clima && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  background: C.primaryLight,
-                  borderRadius: 12,
-                  padding: "5px 12px",
-                  border: `1px solid ${C.primary}25`,
-                }}
-              >
-                <span style={{ fontSize: 20, lineHeight: 1 }}>
-                  {clima.desc.split(" ")[0]}
-                </span>
-                <div>
-                  <div
-                    style={{
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: C.primaryDark,
-                      lineHeight: 1,
-                    }}
-                  >
-                    {clima.temp}°C
-                  </div>
-                  <div style={{ fontSize: 10, color: C.gray, lineHeight: 1 }}>
-                    {clima.ciudad}, {clima.pais}
-                  </div>
-                </div>
+              <div className="tb-clima hide-mobile" title={`${clima.ciudad}, ${clima.pais}`}>
+                <span>{clima.desc.split(" ")[0]}</span>
+                <b>{clima.temp}°</b>
               </div>
             )}
-            {/* Fecha */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                borderRadius: 14,
-                overflow: "hidden",
-                border: `1px solid ${C.border}`,
-                boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-                background: C.white,
-              }}
-            >
-              <div
-                style={{
-                  background: `linear-gradient(160deg,${C.primary},${C.primaryDark})`,
-                  padding: "8px 10px",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minWidth: 44,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 22,
-                    fontWeight: 800,
-                    color: "white",
-                    lineHeight: 1,
-                    fontFamily: "var(--font-display)",
-                  }}
-                >
-                  {new Date().getDate()}
-                </div>
-                <div
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    color: "rgba(255,255,255,0.85)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    marginTop: 1,
-                  }}
-                >
-                  {new Date().toLocaleDateString("es-CL", { month: "short" })}
-                </div>
-              </div>
-              <div
-                style={{
-                  padding: "0 10px",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "center",
-                  gap: 1,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: C.dark,
-                    textTransform: "capitalize",
-                    fontFamily: "var(--font-display)",
-                  }}
-                >
-                  {new Date().toLocaleDateString("es-CL", { weekday: "long" })}
-                </div>
-                <div style={{ fontSize: 10, color: C.gray }}>
-                  {new Date().toLocaleDateString("es-CL", {
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </div>
-              </div>
-            </div>
-            {/* Saludo */}
-            {user?.nombre && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  background: `linear-gradient(135deg, ${C.primaryLight}, #f0fdf4)`,
-                  border: `1px solid ${C.primary}30`,
-                  borderRadius: 14,
-                  padding: "6px 14px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-                }}
-              >
-                {user.foto_url ? (
-                  <img
-                    src={user.foto_url}
-                    alt=""
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: "50%",
-                      objectFit: "cover",
-                      border: `2px solid ${C.primary}40`,
-                      flexShrink: 0,
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: "50%",
-                      background: `linear-gradient(135deg,${C.primary},${C.primaryDark})`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: "white",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {user.nombre.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <div>
-                  <div
-                    style={{
-                      fontSize: 9,
-                      color: C.primary,
-                      lineHeight: 1.1,
-                      fontWeight: 500,
-                    }}
-                  >
-                    Hola,
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: C.dark,
-                      lineHeight: 1.2,
-                      fontFamily: "var(--font-display)",
-                    }}
-                  >
-                    {user.nombre.split(" ")[0]}
-                  </div>
-                </div>
-              </div>
-            )}
+            <button className="tb-salir" onClick={handleSignOut} title="Cerrar sesión" aria-label="Cerrar sesión">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="M10 17l-5-5 5-5" /><path d="M5 12h11" /></svg>
+              <span>Salir</span>
+            </button>
           </div>
-          <button
-            onClick={handleSignOut}
-            style={{
-              background: C.light,
-              border: `1px solid ${C.border}`,
-              borderRadius: 10,
-              padding: "7px 10px",
-              cursor: "pointer",
-              color: C.gray,
-              fontSize: 13,
-              whiteSpace: "nowrap",
-              marginLeft: "auto",
-            }}
-          >
-            Salir
-          </button>
         </header>
 
         <main
