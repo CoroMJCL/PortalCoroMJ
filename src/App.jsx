@@ -604,6 +604,10 @@ async function authUpdatePassword(newPassword) {
 // La primera vez se entra con contraseña; luego el teléfono guarda una llave (WebAuthn) y la
 // sesión de esa persona. Face ID desbloquea esa sesión guardada en este equipo.
 const MJ_BIO_KEY = "mj_bio";
+// Face ID retirado del portal: se borra lo que haya quedado guardado
+try {
+  localStorage.removeItem("mj_bio");
+} catch (e) {}
 function mjBioLeer() {
   try {
     return JSON.parse(localStorage.getItem(MJ_BIO_KEY) || "null");
@@ -3286,17 +3290,6 @@ function AppInner() {
     try {
       localStorage.setItem("mj_sesion", "1");
     } catch (e) {}
-    if (ofrecer && !esVisita(p)) {
-      const uidBio = data.user && data.user.id;
-      mjBioDisponible().then((ok) => {
-        const b = mjBioLeer();
-        let rechazo = false;
-        try {
-          rechazo = Date.now() - Number(localStorage.getItem("mj_bio_no_" + uidBio) || 0) < 30 * 86400000;
-        } catch (e) {}
-        if (ok && uidBio && !(b && String(b.uid) === String(uidBio)) && !rechazo) setOfrecerBio({ perfil: p, uid: uidBio, rt: data.refresh_token });
-      });
-    }
     // (La clave de Anthropic ya NO se carga en el navegador: vive en Vercel como
     // ANTHROPIC_API_KEY y solo la usa /api/claude.js del lado del servidor.)
     // Mostrar modal solo si no tiene permiso aún y no es usuario Visita
@@ -3693,17 +3686,6 @@ function AppInner() {
       <CheckInObligatorio pautas={pautas} user={user} />
       <SinCuerdaAsignada user={user} onSalir={handleSignOut} />
       <TutorialPortal user={user} listo={firstLoadDone && view === "app"} setSection={setSection} setMobileMenu={setMobileMenu} forzar={tutoForzar} onFin={() => setTutoForzar(false)} onActivo={setTutoActivo} />
-      {ofrecerBio && (
-        <OfertaBiometria
-          info={ofrecerBio}
-          onCerrar={() => {
-            setOfrecerBio(null);
-            setTimeout(() => {
-              if (typeof Notification !== "undefined" && Notification.permission !== "granted") setShowPushModal(true);
-            }, 700);
-          }}
-        />
-      )}
       <ControlAccesoAsistencia user={user} members={members} asistencia={asistencia} eventosDb={eventos} listo={firstLoadDone} onSalir={handleSignOut} />
 
       {/* ── Modal explicativo notificaciones push ── */}
@@ -4638,9 +4620,7 @@ function AuthScreen({
 
   const [bio, setBio] = useState(null);
   useEffect(() => {
-    const b = mjBioLeer();
-    if (!b) return;
-    mjBioDisponible().then((ok) => setBio(ok ? b : null));
+    // Face ID retirado: no se ofrece en la pantalla de ingreso
   }, [view]);
   async function doBio(automatico) {
     setError("");
@@ -4941,40 +4921,6 @@ function AuthScreen({
             )}
 
             {/* ── LOGIN ── */}
-            {view === "login" && bio && (
-              <div style={{ marginBottom: 18 }}>
-                <button
-                  type="button"
-                  onClick={() => doBio(false)}
-                  disabled={loading}
-                  style={{ width: "100%", height: 56, border: "none", borderRadius: 14, background: "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 11, fontSize: 15.5, fontWeight: 800, fontFamily: "inherit", cursor: "pointer", boxShadow: "0 8px 22px rgba(23,52,92,.28)", opacity: loading ? 0.7 : 1 }}
-                >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M7 3H5a2 2 0 0 0-2 2v2M17 3h2a2 2 0 0 1 2 2v2M7 21H5a2 2 0 0 1-2-2v-2M17 21h2a2 2 0 0 0 2-2v-2" />
-                    <path d="M9 9v1.5M15 9v1.5M12 9v4.5h-1M9.5 16.5c1.4 1 3.6 1 5 0" />
-                  </svg>
-                  {loading ? "Verificando…" : `Entrar con ${mjBioNombre()}`}
-                </button>
-                <div style={{ textAlign: "center", fontSize: 12.5, color: "#6b7a90", marginTop: 8 }}>
-                  {bio.nombre ? `Como ${String(bio.nombre).split(" ")[0]} · ` : ""}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (window.confirm(`¿Quitar el acceso con ${mjBioNombre()} de este equipo?`)) {
-                        mjBioGuardar(null);
-                        setBio(null);
-                      }
-                    }}
-                    style={{ background: "none", border: "none", padding: 0, color: "#2a5a9c", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-                  >
-                    Quitar de este equipo
-                  </button>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0 0", color: "#98a3b3", fontSize: 11.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase" }}>
-                  <span style={{ flex: 1, height: 1, background: "#e6ecf4" }} />o con tu contraseña<span style={{ flex: 1, height: 1, background: "#e6ecf4" }} />
-                </div>
-              </div>
-            )}
             {view === "login" && (
               <form onSubmit={doLogin}>
                 <div style={{ marginBottom: 12 }}>
