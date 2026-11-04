@@ -18698,7 +18698,8 @@ function EnlacesCoro({ links }) {
   ).map((l) => {
     const label = String(l.label || l.nombre || "Enlace").replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]+/, "").trim();
     return { label, url: l.url || "#", tipo: mjTipoEnlace(l.label || l.nombre, l.url) };
-  });
+  }).filter((l) => ["instagram", "tiktok", "whatsapp", "telegram", "youtube", "facebook", "spotify"].includes(l.tipo));
+  if (!lista.length) return null;
   return (
     <div style={{ marginTop: 6, background: "#fff", border: "1px solid #e6ecf4", borderRadius: 18, padding: "14px 14px 16px", boxShadow: "0 1px 2px rgba(15,39,68,.04),0 10px 30px rgba(15,39,68,.05)", fontFamily: "var(--font-sans)" }}>
       <style>{`.enl-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px}.enl-a{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid #e9eef5;border-radius:13px;background:#fbfcfe;color:#0f1b2d;text-decoration:none;font-size:13px;font-weight:700;transition:transform .15s,box-shadow .15s,background .15s}.enl-a:hover{background:#fff;transform:translateY(-1px);box-shadow:0 6px 16px rgba(30,58,95,.1)}.enl-i{width:32px;height:32px;border-radius:10px;background:linear-gradient(145deg,#17345c,#2a5a9c);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}`}</style>
