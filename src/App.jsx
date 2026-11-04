@@ -1117,6 +1117,7 @@ const NAV = [
   { id: "cancioneros", icon: "📄", label: "Descargas" },
   { id: "cantos_pdf", icon: "📄", label: "Cantos PDF" },
   { id: "audios", icon: "🎧", label: "Audios" },
+  { id: "guia", icon: "?", label: "Guía de uso" },
 ];
 
 // Secciones que no se muestran en el menú del portal (para todos los perfiles).
@@ -1410,11 +1411,12 @@ const NAV_ICONOS = {
   podcast: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></>,
   escuela_canto: <><path d="M3 9l9-5 9 5-9 5z" /><path d="M7 11.5V16c1.5 1.5 3 2 5 2s3.5-.5 5-2v-4.5" /></>,
   sala_ensayo: <><path d="M9 18V5l11-2v13" /><circle cx="6" cy="18" r="3" /></>,
+  guia: <><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" /></>,
 };
 const NAV_GRUPOS_MENU = [
   { t: "Principal", ids: ["dashboard", "agenda", "pauta_misa", "asistencia"] },
   { t: "Música", ids: ["cancionero_digital", "documentos", "curso_guitarra", "escuela_canto", "sala_ensayo", "biblioteca", "podcast"] },
-  { t: "Comunidad", ids: ["oraciones", "cumpleanos", "reglamento", "perfil"] },
+  { t: "Comunidad", ids: ["oraciones", "cumpleanos", "reglamento", "guia", "perfil"] },
   { t: "Administración", ids: ["admin", "solicitudes", "subir_material", "finanzas", "info_gastos"] },
 ];
 function mjNavVisible(item, user) {
@@ -1460,7 +1462,7 @@ function MenuNav({ user, section, onPick, compacto }) {
         <div key={g.t} style={{ display: "contents" }}>
           {compacto ? gi > 0 && <div className="mn-sep" /> : <div className="mn-g">{g.t}</div>}
           {g.items.map((item) => (
-            <button key={item.id} className={"mn-i" + (section === item.id ? " on" : "")} onClick={() => onPick(item.id)} title={compacto ? item.label : undefined} aria-label={item.label}>
+            <button key={item.id} data-tour={`nav-${item.id}`} className={"mn-i" + (section === item.id ? " on" : "")} onClick={() => onPick(item.id)} title={compacto ? item.label : undefined} aria-label={item.label}>
               <span className="mn-ic">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   {NAV_ICONOS[item.id] || <circle cx="12" cy="12" r="7" />}
@@ -1472,6 +1474,292 @@ function MenuNav({ user, section, onPick, compacto }) {
         </div>
       ))}
     </nav>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  TUTORIAL GUIADO (obligatorio la primera vez, como en los juegos)
+//  Resalta botones reales del portal: hay que tocarlos para avanzar.
+// ══════════════════════════════════════════════════════════════════════
+function mjVisibleEl(sel) {
+  const lista = Array.isArray(sel) ? sel : [sel];
+  for (const s of lista) {
+    const els = document.querySelectorAll(s);
+    for (const el of els) {
+      const r = el.getBoundingClientRect();
+      if (r.width > 4 && r.height > 4 && el.offsetParent !== null) return el;
+    }
+  }
+  return null;
+}
+const MJ_TUTO_ICONO = {
+  hola: <><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z" /></>,
+  pauta: <><path d="M8 3h9a2 2 0 0 1 2 2v16l-3.5-2-3.5 2-3.5-2L5 21V6a3 3 0 0 1 3-3z" /><path d="M9 9h6M9 13h4" /></>,
+  misa: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" /><path d="M4 21.5V5.5" /></>,
+  check: <><path d="M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11z" /><path d="m9.5 10 2 2 3.5-3.5" /></>,
+  canto: <><path d="M9 18V5l11-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="17" cy="16" r="3" /></>,
+  ensayo: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></>,
+  agenda: <><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></>,
+  asis: <><rect x="4" y="4" width="16" height="17" rx="2.5" /><path d="M9 3v3h6V3" /><path d="m8.5 13.5 2.5 2.5 4.5-5" /></>,
+  fin: <><circle cx="12" cy="9" r="6" /><path d="M8.5 14 7 22l5-3 5 3-1.5-8" /></>,
+};
+function mjPasosTutorial({ setSection, setMobileMenu }) {
+  const inicio = () => {
+    setMobileMenu(false);
+    setSection("dashboard");
+  };
+  return [
+    { tipo: "info", ico: "hola", t: "¡Bienvenido/a al portal del coro!", d: "Te mostraremos en 2 minutos lo más importante: la pauta de la misa, el cancionero, el material de ensayo, la agenda y tu asistencia. Toca los botones que se iluminan para avanzar.", btn: "Comenzar" },
+    { tipo: "tap", antes: inicio, sel: ['[data-tour="tile-pauta_misa"]'], t: "La pauta de la misa", d: "Aquí encuentras los cantos de cada misa. Toca «Pauta de Misa».", accion: () => setSection("pauta_misa") },
+    { tipo: "info", ico: "pauta", t: "Cómo leer la pauta", d: "Cada misa muestra sus cantos en orden: Entrada, Perdón, Gloria, Salmo… Toca el ícono rojo PDF para ver la letra y el botón ▶ para escuchar el audio de referencia, sin salir del portal." },
+    { tipo: "info", ico: "misa", t: "Modo Misa", d: "Durante la misa usa el botón «Modo Misa»: muestra los cantos en grande, uno tras otro, y funciona sin internet si abriste la pauta antes con conexión. Ideal para la capilla." },
+    { tipo: "info", ico: "check", t: "Check in = tu asistencia", d: "El día de la misa aparece el botón «Check in». Márcalo al llegar a la capilla y antes de que empiece la misa: solo funciona estando ahí. Si no lo marcas, quedas ausente." },
+    { tipo: "tap", antes: inicio, sel: ['[data-tour="tile-cancionero_digital"]'], t: "Cancionero Digital", d: "Todos los cantos del coro con letra y acordes. Toca «Cancionero Digital».", accion: () => setSection("cancionero_digital") },
+    { tipo: "info", ico: "canto", t: "Busca y transpone", d: "Escribe el nombre del canto para encontrarlo. Puedes subir o bajar el tono de los acordes para que te acomode." },
+    { tipo: "tap", antes: inicio, sel: ['[data-tour="tile-material_ensayo"]'], t: "Material de ensayo", d: "Aquí están los audios por voz para practicar en casa. Toca «Material de ensayo».", accion: () => setSection("material_ensayo") },
+    { tipo: "info", ico: "ensayo", t: "Practica tu voz", d: "Elige el canto y escucha la pista de tu cuerda (Soprano, Contralto, Tenor o Bajo). Repasa antes de cada misa." },
+    { tipo: "tap", antes: inicio, sel: ['[data-tour="bnav-agenda"]', '[data-tour="nav-agenda"]'], t: "La agenda", d: "Para saber cuándo y dónde cantamos, toca «Agenda».", accion: () => setSection("agenda") },
+    { tipo: "info", ico: "agenda", t: "Misas y ensayos", d: "En la agenda ves las próximas misas, ensayos y actividades con fecha, hora y lugar. Revísala cada semana." },
+    { tipo: "tap", movil: true, antes: inicio, sel: ['[data-tour="bnav-__menu__"]'], t: "El menú", d: "Todas las secciones están en el menú. Toca «Más».", accion: () => setMobileMenu(true) },
+    { tipo: "tap", sel: ['[data-tour="nav-asistencia"]'], t: "Tu asistencia", d: "Toca «Asistencia» para ver tu porcentaje.", accion: () => {
+      setMobileMenu(false);
+      setSection("asistencia");
+    } },
+    { tipo: "info", ico: "asis", t: "Tu participación cuenta", d: "Aquí ves tu porcentaje y cada misa como presente, ausente o justificado. Recuerda: con 2 ausencias seguidas recibirás un aviso, y con 3 tu acceso se bloquea hasta conversar con el Encargado del Coro." },
+    { tipo: "info", ico: "fin", t: "¡Tutorial completado!", d: "Ya conoces lo esencial. Si olvidas algo, en el menú está la «Guía de uso» para repasar cuando quieras.", btn: "Terminar", fin: true },
+  ];
+}
+const TUTO_CSS = `
+@keyframes tutoPulso{0%{box-shadow:0 0 0 0 rgba(245,185,66,.75),0 0 0 9999px rgba(10,20,40,.72)}70%{box-shadow:0 0 0 14px rgba(245,185,66,0),0 0 0 9999px rgba(10,20,40,.72)}100%{box-shadow:0 0 0 0 rgba(245,185,66,0),0 0 0 9999px rgba(10,20,40,.72)}}
+@keyframes tutoIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.tuto-card{background:#fff;border-radius:22px;box-shadow:0 30px 80px rgba(0,0,0,.35);font-family:var(--font-sans);color:#0f1b2d;animation:tutoIn .3s ease both}
+.tuto-k{font-size:10.5px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#8a96a8}
+.tuto-bar{height:4px;border-radius:99px;background:#edf1f6;overflow:hidden;margin-top:8px}
+.tuto-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#2a5a9c,#f5b942);transition:width .3s}
+.tuto-btn{width:100%;height:50px;border:none;border-radius:14px;background:linear-gradient(135deg,#17345c,#2a5a9c);color:#fff;font:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-top:18px}
+`;
+function TutorialPortal({ user, listo, setSection, setMobileMenu, forzar, onFin, onActivo }) {
+  const [activo, setActivo] = useState(false);
+  const [i, setI] = useState(0);
+  const [rect, setRect] = useState(null);
+  const pasosRef = useRef(null);
+  if (!pasosRef.current) pasosRef.current = mjPasosTutorial({ setSection, setMobileMenu });
+  const pasos = pasosRef.current;
+  const clave = user && user.id ? `tutorial_ok_${user.id}` : null;
+
+  // ¿Debe mostrarse? Integrantes que no lo han completado (el admin lo abre desde la Guía de uso)
+  useEffect(() => {
+    if (forzar) {
+      setI(0);
+      setActivo(true);
+      return;
+    }
+    if (!listo || !clave || esCuerdaAdmin(user) || esVisita(user)) return;
+    let local = false;
+    try {
+      local = !!localStorage.getItem(clave);
+    } catch (e) {}
+    if (local) return;
+    let vivo = true;
+    const t = setTimeout(async () => {
+      let hecho = false;
+      try {
+        const v = await getConfig(clave);
+        hecho = !!v;
+      } catch (e) {}
+      if (!vivo || hecho) {
+        if (hecho) {
+          try {
+            localStorage.setItem(clave, "1");
+          } catch (e) {}
+        }
+        return;
+      }
+      // No sobre una pantalla de bloqueo
+      if (document.querySelector("[data-bloqueo]")) return;
+      setI(0);
+      setActivo(true);
+    }, 1800);
+    return () => {
+      vivo = false;
+      clearTimeout(t);
+    };
+  }, [listo, clave, forzar]);
+
+  useEffect(() => {
+    if (onActivo) onActivo(activo);
+  }, [activo]);
+  const paso = activo ? pasos[i] : null;
+  const esMovil = typeof window !== "undefined" && window.innerWidth <= 768;
+
+  // Prepara cada paso: navega, busca el botón y lo sigue si se mueve
+  useEffect(() => {
+    if (!paso) return;
+    if (paso.movil && !esMovil) {
+      setI((x) => x + 1);
+      return;
+    }
+    if (paso.antes) paso.antes();
+    setRect(null);
+    if (paso.tipo !== "tap") return;
+    let intentos = 0;
+    let el = null;
+    const buscar = () => {
+      el = mjVisibleEl(paso.sel);
+      if (el) {
+        if (intentos < 2) el.scrollIntoView({ block: "center", behavior: "smooth" });
+        const r = el.getBoundingClientRect();
+        setRect({ x: r.left, y: r.top, w: r.width, h: r.height });
+      } else if (intentos > 12) {
+        // El botón no está en esta pantalla: se explica sin resaltarlo
+        setRect("nada");
+      }
+      intentos++;
+    };
+    const t0 = setTimeout(buscar, 350);
+    const iv = setInterval(buscar, 400);
+    return () => {
+      clearTimeout(t0);
+      clearInterval(iv);
+    };
+  }, [i, activo]);
+
+  if (!paso || (paso.movil && !esMovil)) return null;
+  const total = pasos.length;
+  const avanzar = () => {
+    if (paso.fin) {
+      try {
+        localStorage.setItem(clave || "tutorial_ok", "1");
+      } catch (e) {}
+      if (clave) setConfig(clave, JSON.stringify({ en: new Date().toISOString() })).catch(() => {});
+      setActivo(false);
+      setMobileMenu(false);
+      setSection("dashboard");
+      if (onFin) onFin();
+      return;
+    }
+    setI((x) => Math.min(x + 1, total - 1));
+  };
+  const progreso = (
+    <>
+      <div className="tuto-k">
+        Tutorial · paso {i + 1} de {total}
+      </div>
+      <div className="tuto-bar">
+        <i style={{ width: `${((i + 1) / total) * 100}%` }} />
+      </div>
+    </>
+  );
+
+  // Paso de información (o botón que no se encontró)
+  if (paso.tipo === "info" || rect === "nada") {
+    return createPortal(
+      <div style={{ position: "fixed", inset: 0, zIndex: 12000, background: "rgba(10,20,40,.72)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <style>{TUTO_CSS}</style>
+        <div key={i} className="tuto-card" style={{ width: "min(420px,100%)", padding: "24px 22px 20px" }}>
+          {progreso}
+          <div style={{ width: 58, height: 58, borderRadius: 18, margin: "20px auto 0", background: paso.fin ? "linear-gradient(135deg,#e8c76a,#b8901f)" : "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 10px 24px rgba(23,52,92,.3)" }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              {MJ_TUTO_ICONO[paso.ico || "pauta"]}
+            </svg>
+          </div>
+          <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em", textAlign: "center", marginTop: 14, lineHeight: 1.25 }}>{paso.t}</div>
+          <div style={{ fontSize: 14.5, color: "#4b5869", lineHeight: 1.6, textAlign: "center", marginTop: 8 }}>{paso.d}</div>
+          <button className="tuto-btn" onClick={rect === "nada" && paso.accion ? () => { paso.accion(); avanzar(); } : avanzar}>
+            {paso.btn || "Siguiente"}
+          </button>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  // Paso "toca el botón": se ilumina el botón real y solo ese toque avanza
+  if (!rect) return createPortal(<div style={{ position: "fixed", inset: 0, zIndex: 12000, background: "rgba(10,20,40,.72)" }} />, document.body);
+  const pad = 6;
+  const hx = rect.x - pad,
+    hy = rect.y - pad,
+    hw = rect.w + pad * 2,
+    hh = rect.h + pad * 2;
+  const vw = window.innerWidth,
+    vh = window.innerHeight;
+  const abajo = hy + hh + 190 < vh;
+  const cardW = Math.min(340, vw - 32);
+  const cardX = Math.max(16, Math.min(vw - cardW - 16, hx + hw / 2 - cardW / 2));
+  const tocar = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (paso.accion) paso.accion();
+    avanzar();
+  };
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, zIndex: 12000 }}>
+      <style>{TUTO_CSS}</style>
+      {/* bloquea todo lo demás */}
+      <div style={{ position: "absolute", inset: 0 }} onClick={(e) => e.stopPropagation()} />
+      {/* foco sobre el botón real */}
+      <div onClick={tocar} style={{ position: "absolute", left: hx, top: hy, width: hw, height: hh, borderRadius: 16, cursor: "pointer", animation: "tutoPulso 1.6s ease-out infinite", border: "2px solid #f5b942" }} />
+      <div key={i} className="tuto-card" style={{ position: "absolute", left: cardX, width: cardW, top: abajo ? hy + hh + 14 : undefined, bottom: abajo ? undefined : vh - hy + 14, padding: "16px 18px 16px" }}>
+        {progreso}
+        <div style={{ fontSize: 17.5, fontWeight: 800, letterSpacing: "-0.02em", marginTop: 12 }}>{paso.t}</div>
+        <div style={{ fontSize: 14, color: "#4b5869", lineHeight: 1.55, marginTop: 5 }}>{paso.d}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 10, fontSize: 12.5, fontWeight: 800, color: "#a9780a" }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11" /><path d="M12 10.5V9a1.5 1.5 0 0 1 3 0v2" /><path d="M15 10.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-.5a6 6 0 0 1-4.9-2.6L4 14.5a1.6 1.6 0 0 1 2.5-2L9 15" /></svg>
+          Toca el botón iluminado
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// Guía de uso: para repasar cuando se quiera
+function GuiaUso({ setSection, onTutorial }) {
+  const temas = [
+    { ico: "pauta", t: "Pauta de Misa", ir: "pauta_misa", pasos: ["En Inicio toca «Pauta de Misa» (o búscala en el menú).", "Verás los cantos en orden. El ícono rojo PDF abre la letra y ▶ reproduce el audio.", "«Descargar cantos (PDF único)» te deja todas las letras en el teléfono."] },
+    { ico: "misa", t: "Modo Misa", ir: "pauta_misa", pasos: ["Dentro de la pauta toca «Modo Misa».", "Muestra los cantos en grande para leer durante la misa.", "Ábrelo una vez con internet antes de llegar: después funciona sin conexión."] },
+    { ico: "check", t: "Check in y asistencia", ir: "asistencia", pasos: ["El día de la misa aparece «Check in» en la pauta.", "Márcalo estando en la capilla y antes de que empiece la misa.", "Si no lo marcas quedas ausente. Con 2 ausencias seguidas recibes un aviso y con 3 se bloquea tu acceso hasta hablar con el Encargado del Coro.", "En «Asistencia» ves tu porcentaje y cada misa."] },
+    { ico: "canto", t: "Cancionero Digital", ir: "cancionero_digital", pasos: ["En Inicio o en el menú toca «Cancionero Digital».", "Busca el canto por su nombre.", "Sube o baja el tono de los acordes a tu medida."] },
+    { ico: "ensayo", t: "Material de ensayo", ir: "material_ensayo", pasos: ["En Inicio toca «Material de ensayo».", "Elige el canto y escucha la pista de tu voz.", "Practica en casa antes de cada misa."] },
+    { ico: "agenda", t: "Agenda", ir: "agenda", pasos: ["Toca «Agenda» abajo en el teléfono o en el menú.", "Ahí están las próximas misas y ensayos con fecha, hora y lugar."] },
+  ];
+  return (
+    <div style={{ maxWidth: 980, fontFamily: "var(--font-sans)", color: "#0f1b2d" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", textTransform: "uppercase", color: "#8a96a8" }}>Ayuda</div>
+          <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", marginTop: 4 }}>Guía de uso</div>
+          <div style={{ fontSize: 13, color: "#6b7a90", marginTop: 5 }}>Todo lo que necesitas para usar el portal del coro.</div>
+        </div>
+        <button onClick={onTutorial} style={{ height: 42, padding: "0 16px", border: "none", borderRadius: 12, background: "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", fontFamily: "inherit", fontSize: 13.5, fontWeight: 800, cursor: "pointer", boxShadow: "0 6px 16px rgba(23,52,92,.25)" }}>
+          ▶ Repetir tutorial
+        </button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))", gap: 12 }}>
+        {temas.map((x) => (
+          <div key={x.t} style={{ background: "#fff", border: "1px solid #e6ecf4", borderRadius: 18, padding: 16, boxShadow: "0 1px 2px rgba(15,39,68,.04),0 10px 30px rgba(15,39,68,.05)", display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+              <span style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(145deg,#17345c,#2a5a9c)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  {MJ_TUTO_ICONO[x.ico]}
+                </svg>
+              </span>
+              <div style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: "-0.02em" }}>{x.t}</div>
+            </div>
+            <ol style={{ margin: "12px 0 0", paddingLeft: 20, fontSize: 13.5, color: "#4b5869", lineHeight: 1.6, flex: 1 }}>
+              {x.pasos.map((p, k) => (
+                <li key={k} style={{ marginBottom: 4 }}>
+                  {p}
+                </li>
+              ))}
+            </ol>
+            <button onClick={() => setSection(x.ir)} style={{ marginTop: 12, alignSelf: "flex-start", height: 36, padding: "0 14px", border: "1px solid #e3e9f2", borderRadius: 10, background: "#fff", color: "#0f2744", fontFamily: "inherit", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+              Ir ahí →
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1994,6 +2282,8 @@ function AppInner() {
   })();
   const [view, setView] = useState(_initialView);
   const [ofrecerBio, setOfrecerBio] = useState(null);
+  const [tutoForzar, setTutoForzar] = useState(false);
+  const [tutoActivo, setTutoActivo] = useState(false);
   useEffect(() => {
     if (view !== "restaurando") return;
     let vivo = true;
@@ -3402,6 +3692,7 @@ function AppInner() {
 
       <CheckInObligatorio pautas={pautas} user={user} />
       <SinCuerdaAsignada user={user} onSalir={handleSignOut} />
+      <TutorialPortal user={user} listo={firstLoadDone && view === "app"} setSection={setSection} setMobileMenu={setMobileMenu} forzar={tutoForzar} onFin={() => setTutoForzar(false)} onActivo={setTutoActivo} />
       {ofrecerBio && (
         <OfertaBiometria
           info={ofrecerBio}
@@ -3416,7 +3707,7 @@ function AppInner() {
       <ControlAccesoAsistencia user={user} members={members} asistencia={asistencia} eventosDb={eventos} listo={firstLoadDone} onSalir={handleSignOut} />
 
       {/* ── Modal explicativo notificaciones push ── */}
-      {showPushModal &&
+      {showPushModal && !tutoActivo &&
         (() => {
           const disp = detectarDispositivo();
           const instalada = estaInstalada();
@@ -4022,6 +4313,7 @@ function AppInner() {
               )}
               {section === "videos" && <Videos />}
               {section === "cancionero" && <Cancionero user={user} />}
+              {section === "guia" && <GuiaUso setSection={setSection} onTutorial={() => setTutoForzar(true)} />}
               {section === "cancionero_digital" && <CancioneroDigital onSalir={() => setSection("dashboard")} />}
               {section === "reconoceme" && (
                 <Reconoceme
@@ -4163,6 +4455,7 @@ function AppInner() {
           {BOTTOM_NAV.map((item) => (
             <button
               key={item.id}
+              data-tour={`bnav-${item.id}`}
               onClick={() => handleBottomNav(item.id)}
               style={{
                 flex: 1,
@@ -16752,6 +17045,7 @@ function HerramientasCoro({ setSection, pautas, isAdmin, user, pautaBloqueada })
         {HERRAMIENTAS_CORO.map((h) => (
           <button
             key={h.id}
+            data-tour={`tile-${h.id}`}
             className={"hc-t" + (h.id === "pauta_misa" && visible ? " on" : "")}
             onClick={() => (h.id === "pauta_misa" ? alternar() : setSection(h.id))}
             title={h.desc}
@@ -36731,7 +37025,7 @@ function SinCuerdaAsignada({ user, onSalir }) {
   if (!user || esCuerdaAdmin(user) || !esVisita(user)) return null;
   const nombre = String(user.nombre || "").split(" ")[0];
   return createPortal(
-    <div style={{ position: "fixed", inset: 0, zIndex: 9500, background: "linear-gradient(160deg,#0f2744,#1e3a5f 55%,#2a5a9c)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "var(--font-sans)" }}>
+    <div data-bloqueo="1" style={{ position: "fixed", inset: 0, zIndex: 9500, background: "linear-gradient(160deg,#0f2744,#1e3a5f 55%,#2a5a9c)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "var(--font-sans)" }}>
       <div style={{ width: "min(440px,100%)", background: "#fff", borderRadius: 24, padding: "30px 26px 24px", textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.35)" }}>
         <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", textTransform: "uppercase", color: "#8a96a8" }}>Portal de integrantes</div>
         <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", color: "#0f1b2d", marginTop: 8, lineHeight: 1.2 }}>{nombre ? `${nombre}, tu cuenta` : "Tu cuenta"} aún no tiene cuerda asignada</div>
@@ -36815,7 +37109,7 @@ function ControlAccesoAsistencia({ user, members, asistencia, eventosDb, listo, 
   const nombre = String((yo && yo.nombre) || "").split(" ")[0];
   if (racha >= MJ_BLOQUEO_AUSENCIAS) {
     return createPortal(
-      <div style={{ position: "fixed", inset: 0, zIndex: 9500, background: "linear-gradient(160deg,#0f2744,#1e3a5f 55%,#2a5a9c)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "var(--font-sans)" }}>
+      <div data-bloqueo="1" style={{ position: "fixed", inset: 0, zIndex: 9500, background: "linear-gradient(160deg,#0f2744,#1e3a5f 55%,#2a5a9c)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "var(--font-sans)" }}>
         <div style={{ width: "min(440px,100%)", background: "#fff", borderRadius: 24, padding: "30px 26px 24px", textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.35)" }}>
           <div style={{ width: 58, height: 58, borderRadius: 18, margin: "0 auto", background: "#fcebea", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#c0392b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
