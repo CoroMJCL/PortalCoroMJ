@@ -2021,10 +2021,37 @@ function AppInner() {
       }
     } catch (e) {}
 
+    // Sesión iniciada: entra directo al portal sin pedir nada (hasta que la persona toque "Salir")
+    try {
+      if (localStorage.getItem("mj_sesion") === "1" && localStorage.getItem("sb_refresh_token")) return "restaurando";
+    } catch (e) {}
     return "landing";
   })();
   const [view, setView] = useState(_initialView);
   const [ofrecerBio, setOfrecerBio] = useState(null);
+  useEffect(() => {
+    if (view !== "restaurando") return;
+    let vivo = true;
+    (async () => {
+      try {
+        const data = await authConRefresh(localStorage.getItem("sb_refresh_token"));
+        if (!vivo) return;
+        await entrarConSesion(data, (data.user && data.user.email) || "", false);
+      } catch (e) {
+        if (!vivo) return;
+        // Sin internet se conserva la sesión para el próximo intento; si venció, se pide ingresar
+        if (!(e instanceof TypeError)) {
+          try {
+            localStorage.removeItem("mj_sesion");
+          } catch (x) {}
+        }
+        setView("landing");
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [view]);
   // Service worker: deja la app guardada para abrirla sin internet (capilla)
   useEffect(() => {
     if ("serviceWorker" in navigator && (window.location.protocol === "https:" || window.location.hostname === "localhost")) {
@@ -3001,6 +3028,9 @@ function AppInner() {
     setView("app");
     if (esVisita(p)) setSection("dashboard");
     registrarVisita(p, data.access_token);
+    try {
+      localStorage.setItem("mj_sesion", "1");
+    } catch (e) {}
     if (ofrecer && !esVisita(p)) {
       const uidBio = data.user && data.user.id;
       mjBioDisponible().then((ok) => {
@@ -3100,6 +3130,9 @@ function AppInner() {
         /* silencioso */
       }
     }
+    try {
+      localStorage.removeItem("mj_sesion");
+    } catch (e) {}
     await authSignOut();
     setUser(null);
     setAuthToken(null);
@@ -3226,11 +3259,23 @@ function AppInner() {
     );
   }
 
+  if (view === "restaurando")
+    return (
+      <div style={{ position: "fixed", inset: 0, background: "linear-gradient(160deg,#0f2744,#1e3a5f 55%,#2a5a9c)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, fontFamily: "var(--font-sans)" }}>
+        <img src={LOGO} alt="Coro MJ" style={{ width: 72, height: 72, borderRadius: 20, objectFit: "cover", boxShadow: "0 12px 30px rgba(0,0,0,.35)" }} />
+        <div style={{ width: 26, height: 26, borderRadius: "50%", border: "3px solid rgba(255,255,255,.25)", borderTopColor: "#fff", animation: "mjgira .8s linear infinite" }} />
+        <style>{`@keyframes mjgira{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    );
   if (view === "landing")
     return (
       <>
         <Landing
           onPortal={() => {
+            if (localStorage.getItem("mj_sesion") === "1" && localStorage.getItem("sb_refresh_token")) {
+              setView("restaurando");
+              return;
+            }
             localStorage.removeItem("sb_access_token");
             localStorage.removeItem("sb_refresh_token");
             setView("login");

@@ -203,7 +203,7 @@ export default function ActualizacionApp() {
             <div style={{ height: "100%", width: pct + "%", background: "linear-gradient(90deg,#2a5a9c,#1e3a5f)", transition: "width .5s linear" }} />
           </div>
           <div style={{ fontSize: 12, color: "#8a94a6", margin: "12px 8px 0", lineHeight: 1.45 }}>
-            Al reiniciar tendrás que volver a ingresar. Termina lo que estés haciendo antes de actualizar.
+            Termina lo que estés haciendo antes de actualizar; volverás a entrar solo.
           </div>
         </div>
         <div style={{ padding: "18px 22px 22px", display: "flex", flexDirection: "column", gap: 8 }}>
