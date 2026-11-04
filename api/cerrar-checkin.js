@@ -56,7 +56,7 @@ export default async function handler(req, res) {
     if (!cerradas.length) return res.status(200).json({ ok: true, dry, nota: "Nada que cerrar todavía", hoy, ahora, hasta: cfg.hasta });
 
     const integrantes = ((await sb("integrantes?select=id,nombre,cuerda,acceso,asistencia_especial&acceso=eq.aprobado")) || []).filter(
-      (m) => m.cuerda && m.cuerda.trim() !== "" && m.cuerda !== "Admin" && !m.asistencia_especial
+      (m) => m.cuerda && m.cuerda.trim() !== "" && m.cuerda !== "Admin" && m.cuerda !== "Músico" && !m.asistencia_especial
     );
 
     const resumen = [];

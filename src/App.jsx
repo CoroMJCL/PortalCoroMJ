@@ -117,6 +117,9 @@ const esCuerdaContador = (u) => {
   );
 };
 const esCuerdaAdmin = (u) => (u?.cuerda || "").trim().toLowerCase() === "admin";
+// Músico invitado: no es integrante; solo crea sus pautas y usa el cancionero y el material de ensayo
+const esMusico = (u) => ["músico", "musico"].includes((u?.cuerda || "").trim().toLowerCase());
+const MJ_SECCIONES_MUSICO = ["dashboard", "pauta_misa", "cancionero_digital", "material_ensayo", "perfil"];
 
 // URL pública del banner (imagen de Jesús) — se sube una vez al bucket "publico"
 // Para subir: ve a Supabase > Storage > publico > Upload > sube canalymj.jpg
@@ -1117,7 +1120,7 @@ const NAV = [
   { id: "pauta_misa", icon: "🎼", label: "Pauta de Misa" },
   { id: "podcast", icon: "◉", label: "Podcast" },
   { id: "qanda", icon: "?", label: "Preguntas" },
-  { id: "material_ensayo", icon: "📥", label: "Ensayos Coro" },
+  { id: "material_ensayo", icon: "📥", label: "Material de ensayo" },
   { id: "cancioneros", icon: "📄", label: "Descargas" },
   { id: "cantos_pdf", icon: "📄", label: "Cantos PDF" },
   { id: "audios", icon: "🎧", label: "Audios" },
@@ -1147,12 +1150,14 @@ const CUERDAS = {
   Admin: "#6b7280",
   "Contador/a Coro": "#f59e0b",
   Visita: "#0ea5e9",
+  "Músico": "#475569",
 };
 const rolLabel = (r, genero) => {
   if (r === "Admin")
     return genero === "F" ? "Encargada de Coro" : "Encargado de Coro";
   if (r === "Contador/a Coro")
     return genero === "F" ? "Contadora Coro" : "Contador Coro";
+  if (r === "Músico") return "Músico invitado";
   return r || "";
 };
 // Detecta usuario Invitado por cargo (no toca la cuerda vocal)
@@ -1415,15 +1420,17 @@ const NAV_ICONOS = {
   podcast: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></>,
   escuela_canto: <><path d="M3 9l9-5 9 5-9 5z" /><path d="M7 11.5V16c1.5 1.5 3 2 5 2s3.5-.5 5-2v-4.5" /></>,
   sala_ensayo: <><path d="M9 18V5l11-2v13" /><circle cx="6" cy="18" r="3" /></>,
+  material_ensayo: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></>,
   guia: <><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" /></>,
 };
 const NAV_GRUPOS_MENU = [
   { t: "Principal", ids: ["dashboard", "agenda", "pauta_misa", "asistencia"] },
-  { t: "Música", ids: ["cancionero_digital", "documentos", "curso_guitarra", "escuela_canto", "sala_ensayo", "biblioteca", "podcast"] },
+  { t: "Música", ids: ["cancionero_digital", "material_ensayo", "documentos", "curso_guitarra", "escuela_canto", "sala_ensayo", "biblioteca", "podcast"] },
   { t: "Comunidad", ids: ["oraciones", "cumpleanos", "reglamento", "guia", "perfil"] },
   { t: "Administración", ids: ["admin", "solicitudes", "subir_material", "finanzas", "info_gastos"] },
 ];
 function mjNavVisible(item, user) {
+  if (esMusico(user)) return MJ_SECCIONES_MUSICO.includes(item.id);
   if (NAV_OCULTOS.has(item.id)) return false;
   if (item.id === "material_ensayo" || item.id === "cancioneros" || item.id === "cancionero" || item.id === "musica") return false;
   if (item.id === "cantos_pdf" || item.id === "audios" || item.id === "vista_invitado") return false;
@@ -1558,7 +1565,7 @@ function TutorialPortal({ user, listo, setSection, setMobileMenu, forzar, onFin,
       setActivo(true);
       return;
     }
-    if (!listo || !clave || (esVisita(user) && !esCuerdaAdmin(user))) return;
+    if (!listo || !clave || (esVisita(user) && !esCuerdaAdmin(user)) || esMusico(user)) return;
     let local = false;
     try {
       local = !!localStorage.getItem(clave);
@@ -1714,6 +1721,64 @@ function TutorialPortal({ user, listo, setSection, setMobileMenu, forzar, onFin,
       </div>
     </div>,
     document.body
+  );
+}
+
+// Inicio del músico invitado: solo sus herramientas
+function InicioMusico({ user, pautas, setSection }) {
+  const hoy = mjHoyISO();
+  const proximas = (pautas || []).filter((p) => p.fecha && p.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(0, 4);
+  const tiles = [
+    { id: "pauta_misa", t: "Mis pautas", d: "Crea, edita y descarga tus pautas de misa", ico: <><path d="M8 3h9a2 2 0 0 1 2 2v16l-3.5-2-3.5 2-3.5-2L5 21V6a3 3 0 0 1 3-3z" /><path d="M9 9h6M9 13h4" /></> },
+    { id: "cancionero_digital", t: "Cancionero Digital", d: "Letras y acordes transponibles", ico: <><path d="M9 18V5l11-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="17" cy="16" r="3" /></> },
+    { id: "material_ensayo", t: "Material de ensayo", d: "Audios y partituras por voz", ico: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></> },
+  ];
+  return (
+    <div style={{ maxWidth: 980, fontFamily: "var(--font-sans)", color: "#0f1b2d" }}>
+      <div style={{ background: "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", borderRadius: 22, padding: "22px 22px 20px", marginBottom: 14, boxShadow: "0 14px 34px rgba(23,52,92,.25)" }}>
+        <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", textTransform: "uppercase", opacity: 0.75 }}>Espacio de músicos</div>
+        <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.03em", marginTop: 6 }}>Hola, {String(user?.nombre || "").split(" ")[0]}</div>
+        <div style={{ fontSize: 14, opacity: 0.85, marginTop: 4 }}>Aquí tienes tus pautas, el cancionero y el material musical del coro.</div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 10 }}>
+        {tiles.map((x) => (
+          <button key={x.id} onClick={() => setSection(x.id)} style={{ display: "flex", alignItems: "center", gap: 13, textAlign: "left", padding: "16px 16px", border: "1px solid #e6ecf4", borderRadius: 18, background: "#fff", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 1px 2px rgba(15,39,68,.04),0 10px 30px rgba(15,39,68,.05)" }}>
+            <span style={{ width: 46, height: 46, borderRadius: 14, background: "#eaf0f8", color: "#16335a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{x.ico}</svg>
+            </span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: 15.5, fontWeight: 800, color: "#0f1b2d", letterSpacing: "-0.01em" }}>{x.t}</span>
+              <span style={{ display: "block", fontSize: 12.5, color: "#6b7a90", marginTop: 2 }}>{x.d}</span>
+            </span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa5b5" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+          </button>
+        ))}
+      </div>
+      <div style={{ marginTop: 14, background: "#fff", border: "1px solid #e6ecf4", borderRadius: 18, padding: 16 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".18em", textTransform: "uppercase", color: "#8a96a8" }}>Mis próximas pautas</div>
+        {proximas.length === 0 ? (
+          <div style={{ fontSize: 13.5, color: "#6b7a90", marginTop: 8 }}>
+            Aún no tienes pautas próximas.{" "}
+            <button onClick={() => setSection("pauta_misa")} style={{ background: "none", border: "none", padding: 0, color: "#2a5a9c", fontWeight: 800, cursor: "pointer", fontFamily: "inherit", fontSize: 13.5 }}>
+              Crear una pauta →
+            </button>
+          </div>
+        ) : (
+          proximas.map((p) => (
+            <button key={p.id} onClick={() => setSection("pauta_misa")} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left", padding: "10px 0", border: "none", borderBottom: "1px solid #f1f4f8", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}>
+              <span style={{ width: 44, textAlign: "center", flexShrink: 0 }}>
+                <span style={{ display: "block", fontSize: 18, fontWeight: 800, color: "#0f1b2d", lineHeight: 1 }}>{new Date(p.fecha + "T12:00:00").getDate()}</span>
+                <span style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#8a96a8", textTransform: "uppercase", letterSpacing: ".08em" }}>{new Date(p.fecha + "T12:00:00").toLocaleDateString("es-CL", { month: "short" }).replace(".", "")}</span>
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 14.5, fontWeight: 700, color: "#0f1b2d" }}>{p.titulo || "Misa"}</span>
+                <span style={{ display: "block", fontSize: 12, color: "#8a96a8" }}>{p.publicada ? "Publicada" : "Borrador"}{p.hora ? ` · ${p.hora}` : ""}</span>
+              </span>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -3683,7 +3748,7 @@ function AppInner() {
         </div>
       )}
 
-      <CheckInObligatorio pautas={pautas} user={user} />
+      {!esMusico(user) && <CheckInObligatorio pautas={pautas} user={user} />}
       <SinCuerdaAsignada user={user} onSalir={handleSignOut} />
       <TutorialPortal user={user} listo={firstLoadDone && view === "app"} setSection={setSection} setMobileMenu={setMobileMenu} forzar={tutoForzar} onFin={() => setTutoForzar(false)} onActivo={setTutoActivo} />
       <ControlAccesoAsistencia user={user} members={members} asistencia={asistencia} eventosDb={eventos} listo={firstLoadDone} onSalir={handleSignOut} />
@@ -4198,7 +4263,9 @@ function AppInner() {
           ) : (
             <>
 
-              {section === "dashboard" && !esVisita(user) && (
+              {section === "dashboard" && esMusico(user) && <InicioMusico user={user} pautas={pautas} setSection={setSection} />}
+              {!esMusico(user) || MJ_SECCIONES_MUSICO.includes(section) ? null : <InicioMusico user={user} pautas={pautas} setSection={setSection} />}
+              {section === "dashboard" && !esVisita(user) && !esMusico(user) && (
                 <Dashboard
                   pautaBloqueada={pautaBloqueada}
                   cumple={cumple}
@@ -4434,7 +4501,7 @@ function AppInner() {
             paddingBottom: "env(safe-area-inset-bottom)",
           }}
         >
-          {BOTTOM_NAV.map((item) => (
+          {BOTTOM_NAV.filter((item) => !esMusico(user) || item.id === "dashboard" || item.id === "__menu__").map((item) => (
             <button
               key={item.id}
               data-tour={`bnav-${item.id}`}
@@ -13920,7 +13987,7 @@ function SalaEnsayoMiembro({ docs, user, isAdmin, podcasts, onReload }) {
 }
 
 function SolicitudRow({ s, onReload }) {
-  const cuerdas = ["Soprano", "Contralto", "Tenor", "Bajo", "Instrumentos"];
+  const cuerdas = ["Soprano", "Contralto", "Tenor", "Bajo", "Instrumentos", "Músico"];
   const [cuerdaSel, setCuerdaSel] = useState(
     s.cuerda_solicitada && cuerdas.includes(s.cuerda_solicitada)
       ? s.cuerda_solicitada
@@ -15357,8 +15424,26 @@ async function mjCargarAccesosPauta() {
   }
   return {};
 }
+const mjPushTodos = (...args) => sendPushToAll(...args);
+// Marca una pauta como del músico: privada (el coro no la ve, no cuenta para Check in ni asistencia)
+async function mjMarcarPautaMusico(pauta, user) {
+  const ok = await setConfig(`pauta_acceso_${pauta.id}`, JSON.stringify({ restringida: true, ids: [], musico: String(user.id) }));
+  if (!ok) {
+    // Si no se pudo marcar, se deja como borrador para que no la vea el coro
+    try {
+      await updateRecord("pautas_misa", pauta.id, { publicada: false });
+    } catch (e) {}
+    alert("La pauta se guardó como borrador porque no se pudo dejar privada. Avísale al encargado del coro.");
+  }
+  try {
+    await mjCargarAccesosPauta();
+  } catch (e) {}
+  return ok;
+}
 function mjFiltrarPautasPorAcceso(pautas, accesos, user) {
   if (!user || user.cuerda === "Admin") return pautas;
+  // El músico ve solo las pautas que él creó
+  if (esMusico(user)) return (pautas || []).filter((p) => accesos && accesos[p.id] && String(accesos[p.id].musico) === String(user.id));
   return (pautas || []).filter((p) => {
     const ac = accesos && accesos[p.id];
     if (!ac || !ac.restringida) return true;
@@ -26965,6 +27050,7 @@ function AdminIntegrantes({ members, onReload }) {
                 "Bajo",
                 "Admin",
                 "Contador/a Coro",
+                "Músico",
               ].map((c) => (
                 <option key={c}>{c}</option>
               ))}
@@ -27249,6 +27335,7 @@ function AdminIntegrantes({ members, onReload }) {
                             "Bajo",
                             "Admin",
                             "Contador/a Coro",
+                            "Músico",
                           ].map((c) => (
                             <option key={c} value={c}>
                               {c}
@@ -33194,8 +33281,11 @@ function DirectorioLetrasModal({ initialQuery = "", onSelect, onClose }) {
 }
 
 function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
-  const isAdmin = user?.cuerda === "Admin";
+  const esMus = esMusico(user);
+  const isAdmin = user?.cuerda === "Admin" || esMus;
   const isVisita = esVisita(user);
+  // Las pautas del músico son privadas: no se avisa al coro
+  const sendPushToAll = esMus ? async () => ({ ok: true, recipients: 0 }) : mjPushTodos;
   // Usuario Visita solo ve pautas que el Admin marcó explícitamente como visibles
   const pautasFiltradas = isVisita
     ? (pautas || []).filter((p) => p.publicada && p.visible_visita)
@@ -33401,13 +33491,14 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       });
       if (!res.ok) throw new Error(await res.text());
       const [created] = await res.json();
+      if (esMus && created && created.id) await mjMarcarPautaMusico(created, user);
       if (created && created.id && (form.liturgia || "").trim()) await mjGuardarLiturgia(created.id, form.liturgia);
       await onReload();
       setMode(publish ? "view" : null);
       setForm(emptyPauta);
       setCanciones([]);
       setMsg("");
-      if (form.acceso_solo && created && created.id) {
+      if (form.acceso_solo && !esMus && created && created.id) {
         await setConfig(`pauta_acceso_${created.id}`, JSON.stringify({ restringida: true, ids: [] }));
         mjCargarAccesosPauta().catch(() => {});
       }
@@ -33591,6 +33682,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       });
       if (!res.ok) throw new Error(await res.text());
       const [created] = await res.json();
+      if (esMus && created && created.id) await mjMarcarPautaMusico(created, user);
       await onReload();
       setSelected(created);
       setMode("view");
@@ -33602,6 +33694,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
 
   // Genera link de WhatsApp para notificar integrantes
   async function notificarIntegrantes(pauta, memberList) {
+    if (esMus) return;
     const fechaFmt = new Date(pauta.fecha + "T00:00:00").toLocaleDateString(
       "es-CL",
       { weekday: "long", day: "numeric", month: "long", year: "numeric" }
@@ -34546,7 +34639,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
           </Btn>
           <PautaWhatsappBoton
             compacto
-            respaldar={isAdmin}
+            respaldar={isAdmin && !esMus}
             pauta={{
               titulo: form.titulo,
               fecha: form.fecha || selected?.fecha,
@@ -34923,8 +35016,8 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     📖 Ver guion de la misa
                   </button>
                 )}
-                <PautaWhatsappBoton pauta={selected} canciones={cancionesData} respaldar={isAdmin} />
-                {isAdmin && selected.id && (
+                <PautaWhatsappBoton pauta={selected} canciones={cancionesData} respaldar={isAdmin && !esMus} />
+                {isAdmin && !esMus && selected.id && (
                   <AccesoPautaBoton key={selected.id} pauta={selected} abrirInicial={abrirAccesoId === selected.id} estilo={{ background: "#eef4fb", color: "#1e3a5f", border: "1px solid #dbe4f0", borderRadius: 10, padding: "9px 16px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }} />
                 )}
               </div>
@@ -36283,7 +36376,7 @@ const mjFechaLarga = (f) => (f ? new Date(f + "T12:00:00").toLocaleDateString("e
 const mjCap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 function mjIntegrantesAsistencia(members) {
   return (members || [])
-    .filter((m) => m && m.cuerda && m.cuerda.trim() !== "" && m.cuerda !== "Admin" && m.cuerda !== "Visita" && (!m.acceso || m.acceso === "aprobado"))
+    .filter((m) => m && m.cuerda && m.cuerda.trim() !== "" && m.cuerda !== "Admin" && m.cuerda !== "Visita" && !esMusico(m) && (!m.acceso || m.acceso === "aprobado"))
     .sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"));
 }
 
@@ -36975,7 +37068,7 @@ async function mjCargarDesbloqueos() {
   return null; // no se pudo leer: no se bloquea a nadie
 }
 function mjExentoBloqueo(m) {
-  return !m || esCuerdaAdmin(m) || m.cuerda === "Visita" || !m.cuerda || !!m.asistencia_especial;
+  return !m || esCuerdaAdmin(m) || esMusico(m) || m.cuerda === "Visita" || !m.cuerda || !!m.asistencia_especial;
 }
 function useDesbloqueos() {
   const [d, setD] = useState(null);

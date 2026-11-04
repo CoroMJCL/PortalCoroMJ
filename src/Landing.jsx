@@ -359,11 +359,18 @@ function ProximaMisa({ C }) {
   useEffect(() => {
     if (modo !== "auto") return;
     const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Santiago" });
-    fetch(`${SUPABASE_URL}/rest/v1/pautas_misa?publicada=eq.true&fecha=gte.${hoy}&order=fecha.asc&limit=1`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-    }).then(r => r.json()).then(rows => {
-      if (!Array.isArray(rows) || !rows[0]) return;
-      const p = rows[0];
+    const H = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
+    Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/pautas_misa?publicada=eq.true&fecha=gte.${hoy}&order=fecha.asc&limit=8`, { headers: H }).then(r => r.json()),
+      fetch(`${SUPABASE_URL}/rest/v1/config?select=key,value&key=like.pauta_acceso_*`, { headers: H }).then(r => r.ok ? r.json() : []).catch(() => []),
+    ]).then(([rows, acc]) => {
+      if (!Array.isArray(rows)) return;
+      // Las pautas privadas del músico invitado no son misas del coro
+      const deMusico = new Set((Array.isArray(acc) ? acc : []).filter((x) => {
+        try { const v = typeof x.value === "string" ? JSON.parse(x.value) : x.value; return v && v.musico; } catch (e) { return false; }
+      }).map((x) => x.key.slice("pauta_acceso_".length)));
+      const p = rows.find((r) => !deMusico.has(String(r.id)));
+      if (!p) return;
       setM(p);
       // Título litúrgico de la pauta (ej. "Solemnidad de Todos los Santos")
       fetch(`${SUPABASE_URL}/rest/v1/config?select=value&key=eq.pauta_liturgia_${p.id}&limit=1`, {

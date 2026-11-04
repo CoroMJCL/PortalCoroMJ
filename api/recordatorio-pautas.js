@@ -46,7 +46,7 @@ export default async function handler(req, res) {
     if (!pautas.length) return res.status(200).json({ ok: true, enviados: 0, nota: "Sin pautas vigentes" });
 
     const miembros = (await sb("integrantes?select=id,nombre,cuerda,acceso&acceso=eq.aprobado"))
-      .filter((m) => m.cuerda && m.cuerda.trim() !== "" && m.cuerda !== "Admin");
+      .filter((m) => m.cuerda && m.cuerda.trim() !== "" && m.cuerda !== "Admin" && m.cuerda !== "Músico");
 
     // Revisiones registradas por pauta
     const vistas = {};
