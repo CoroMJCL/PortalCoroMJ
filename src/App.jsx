@@ -1388,6 +1388,93 @@ function SectionTitle({ title, subtitle, action }) {
   );
 }
 
+// ── Menú principal: íconos de línea, agrupado por temas ─────────────────
+const NAV_ICONOS = {
+  dashboard: <><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V20h14V9.5" /><path d="M10 20v-6h4v6" /></>,
+  perfil: <><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></>,
+  reglamento: <><path d="M7 3h8l4 4v14H7z" /><path d="M15 3v4h4" /><path d="M10 12h6M10 16h6" /></>,
+  curso_guitarra: <><path d="M14 4l6 6" /><path d="M17 7l-5.5 5.5" /><path d="M11.5 12.5a3.5 3.5 0 1 0-1.4 4.6A3 3 0 1 1 6.9 13.9a3.5 3.5 0 0 0 4.6-1.4z" /></>,
+  admin: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></>,
+  subir_material: <><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></>,
+  solicitudes: <><circle cx="9" cy="8" r="3.5" /><path d="M3 20c.8-3.5 3.2-5.5 6-5.5s5.2 2 6 5.5" /><path d="M18 8v6M15 11h6" /></>,
+  finanzas: <><rect x="3" y="6" width="18" height="13" rx="2.5" /><path d="M3 10h18" /><path d="M16 15h2" /></>,
+  info_gastos: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
+  agenda: <><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></>,
+  asistencia: <><rect x="4" y="4" width="16" height="17" rx="2.5" /><path d="M9 3v3h6V3" /><path d="m8.5 13.5 2.5 2.5 4.5-5" /></>,
+  biblioteca: <><path d="M4 19.5V5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2z" /><path d="M6 21h13v-3" /></>,
+  cancionero_digital: <><path d="M9 18V5l11-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="17" cy="16" r="3" /></>,
+  documentos: <><path d="M12 4v11" /><path d="m7 10 5 5 5-5" /><path d="M5 20h14" /></>,
+  cumpleanos: <><path d="M4 21h16v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z" /><path d="M4 16c2 1.5 4 1.5 5.3 0s3.4-1.5 5.4 0 4.3 1.5 5.3 0" /><path d="M12 11V8M12 5.5c.8-.8.8-1.7 0-2.5-.8.8-.8 1.7 0 2.5z" /></>,
+  oraciones: <><path d="M12 3v18M8 8h8" /></>,
+  pauta_misa: <><path d="M8 3h9a2 2 0 0 1 2 2v16l-3.5-2-3.5 2-3.5-2L5 21V6a3 3 0 0 1 3-3z" /><path d="M9 9h6M9 13h4" /></>,
+  podcast: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></>,
+  escuela_canto: <><path d="M3 9l9-5 9 5-9 5z" /><path d="M7 11.5V16c1.5 1.5 3 2 5 2s3.5-.5 5-2v-4.5" /></>,
+  sala_ensayo: <><path d="M9 18V5l11-2v13" /><circle cx="6" cy="18" r="3" /></>,
+};
+const NAV_GRUPOS_MENU = [
+  { t: "Principal", ids: ["dashboard", "agenda", "pauta_misa", "asistencia"] },
+  { t: "Música", ids: ["cancionero_digital", "documentos", "curso_guitarra", "escuela_canto", "sala_ensayo", "biblioteca", "podcast"] },
+  { t: "Comunidad", ids: ["oraciones", "cumpleanos", "reglamento", "perfil"] },
+  { t: "Administración", ids: ["admin", "solicitudes", "subir_material", "finanzas", "info_gastos"] },
+];
+function mjNavVisible(item, user) {
+  if (NAV_OCULTOS.has(item.id)) return false;
+  if (item.id === "material_ensayo" || item.id === "cancioneros" || item.id === "cancionero" || item.id === "musica") return false;
+  if (item.id === "cantos_pdf" || item.id === "audios" || item.id === "vista_invitado") return false;
+  if (item.id === "info_gastos" && !verFinanzas(user)) return false;
+  if ((item.id === "solicitudes" || item.id === "subir_material" || item.id === "admin") && !esCuerdaAdmin(user)) return false;
+  if (item.id === "finanzas" && !esCuerdaAdmin(user) && !esCuerdaContador(user)) return false;
+  return true;
+}
+function mjNavGrupos(user) {
+  const vis = NAV.filter((n) => mjNavVisible(n, user));
+  const usados = new Set();
+  const grupos = NAV_GRUPOS_MENU.map((g) => {
+    const items = g.ids.map((id) => vis.find((n) => n.id === id)).filter(Boolean);
+    items.forEach((n) => usados.add(n.id));
+    return { t: g.t, items };
+  });
+  const resto = vis.filter((n) => !usados.has(n.id));
+  if (resto.length) grupos[1].items = grupos[1].items.concat(resto);
+  return grupos.filter((g) => g.items.length);
+}
+const MENU_CSS = `
+.mn{display:flex;flex-direction:column;gap:2px;font-family:var(--font-sans)}
+.mn-g{font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#9aa5b5;padding:14px 12px 6px}
+.mn-g:first-child{padding-top:4px}
+.mn-sep{height:1px;background:#edf1f6;margin:8px 10px}
+.mn-i{position:relative;width:100%;display:flex;align-items:center;gap:11px;min-height:42px;padding:5px 10px;border:none;border-radius:12px;background:transparent;color:#3d4a5c;font:inherit;font-size:14px;font-weight:600;letter-spacing:-.01em;text-align:left;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:background .15s,color .15s}
+.mn-i:hover{background:#f3f6fa}
+.mn-i .mn-ic{width:32px;height:32px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;color:#5b6779;background:#f2f5f9;transition:background .15s,color .15s}
+.mn-i.on{background:#eaf0f8;color:#0f2744;font-weight:800}
+.mn-i.on .mn-ic{background:linear-gradient(145deg,#17345c,#2a5a9c);color:#fff;box-shadow:0 4px 12px rgba(23,52,92,.28)}
+.mn-c .mn-i{justify-content:center;padding:5px 0}
+.mn-c .mn-i .mn-l{display:none}
+`;
+function MenuNav({ user, section, onPick, compacto }) {
+  const grupos = mjNavGrupos(user);
+  return (
+    <nav className={"mn" + (compacto ? " mn-c" : "")}>
+      <style>{MENU_CSS}</style>
+      {grupos.map((g, gi) => (
+        <div key={g.t} style={{ display: "contents" }}>
+          {compacto ? gi > 0 && <div className="mn-sep" /> : <div className="mn-g">{g.t}</div>}
+          {g.items.map((item) => (
+            <button key={item.id} className={"mn-i" + (section === item.id ? " on" : "")} onClick={() => onPick(item.id)} title={compacto ? item.label : undefined} aria-label={item.label}>
+              <span className="mn-ic">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  {NAV_ICONOS[item.id] || <circle cx="12" cy="12" r="7" />}
+                </svg>
+              </span>
+              <span className="mn-l">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      ))}
+    </nav>
+  );
+}
+
 function MobileMenu({
   section,
   setSection,
@@ -1396,198 +1483,47 @@ function MobileMenu({
   cuotaInscritos = new Set(),
 }) {
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex" }}>
-      <div
-        onClick={onClose}
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: "rgba(0,0,0,0.50)",
-        }}
-      />
-      <div
-        style={{
-          position: "relative",
-          width: 256,
-          background: "rgba(245,246,250,0.98)",
-          backdropFilter: "saturate(180%) blur(24px)",
-          WebkitBackdropFilter: "saturate(180%) blur(24px)",
-          height: "100%",
-          overflowY: "auto",
-          padding: "12px 6px",
-          display: "flex",
-          flexDirection: "column",
-          zIndex: 10000,
-          WebkitOverflowScrolling: "touch",
-          boxShadow: "4px 0 24px rgba(0,0,0,0.18)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 9,
-            padding: "0 6px 12px",
-            borderBottom: "1px solid rgba(60,60,67,0.10)",
-            marginBottom: 6,
-          }}
-        >
-          <img
-            src={LOGO}
-            alt="Logo"
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 10,
-              objectFit: "cover",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.10)",
-            }}
-          />
-          <div style={{ flex: 1 }}>
-            <div
-              style={{
-                fontSize: 13,
-                fontFamily: "var(--font-display)",
-                fontWeight: 700,
-                color: "var(--text-primary)",
-                letterSpacing: "-0.01em",
-              }}
-            >
-              Coro MJ
-            </div>
-            <div style={{ fontSize: 10.5, color: "var(--text-tertiary)" }}>
-              Misioneros de Jesús
-            </div>
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", fontFamily: "var(--font-sans)" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(15,27,45,0.42)", backdropFilter: "blur(2px)" }} />
+      <div style={{ position: "relative", width: "min(304px, 86vw)", background: "#fff", height: "100%", display: "flex", flexDirection: "column", zIndex: 10000, boxShadow: "12px 0 40px rgba(15,39,68,0.22)", borderRadius: "0 22px 22px 0", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "calc(env(safe-area-inset-top, 0px) + 16px) 16px 14px", borderBottom: "1px solid #edf1f6" }}>
+          <img src={LOGO} alt="Coro MJ" style={{ width: 40, height: 40, borderRadius: 12, objectFit: "cover", boxShadow: "0 3px 10px rgba(15,39,68,0.15)" }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15.5, fontWeight: 800, color: "#0f1b2d", letterSpacing: "-0.02em" }}>Coro MJ</div>
+            <div style={{ fontSize: 11.5, color: "#8a96a8", fontWeight: 600 }}>Misioneros de Jesús</div>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              fontSize: 20,
-              cursor: "pointer",
-              color: "var(--text-tertiary)",
-              width: 28,
-              height: 28,
-              borderRadius: 9,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            ×
+          <button onClick={onClose} aria-label="Cerrar menú" style={{ width: 36, height: 36, borderRadius: 11, border: "1px solid #e6ecf4", background: "#fff", color: "#5b6779", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
           </button>
         </div>
-        {NAV.filter((item) => {
-          if (NAV_OCULTOS.has(item.id)) return false;
-          const isVisita = esVisita(user);
-          if (!isVisita && item.id === "material_ensayo") return false;
-          if (isVisita) {
-            return [
-              "dashboard",
-              "material_ensayo",
-              "cancioneros",
-              "pauta_misa",
-            ].includes(item.id);
-          }
-          if (item.id === "cancioneros") return false;
-          if (item.id === "info_gastos" && !verFinanzas(user)) return false;
-          if (item.id === "vista_invitado" && !esCuerdaAdmin(user))
-            return false;
-          if (item.id === "solicitudes" && !esCuerdaAdmin(user)) return false;
-          if (item.id === "subir_material" && !esCuerdaAdmin(user)) return false;
-          if (item.id === "cancionero") return false;
-          if (item.id === "musica") return false;
-          if (item.id === "cantos_pdf" || item.id === "audios") return false;
-          if (item.id === "admin" && !esCuerdaAdmin(user)) return false;
-          if (
-            item.id === "finanzas" &&
-            !esCuerdaAdmin(user) &&
-            !esCuerdaContador(user)
-          )
-            return false;
-          return true;
-        }).map((item) => {
-          const isVisita = esVisita(user);
-          const VISITA_STYLES = {
-            dashboard: { bg: "#0f3d6e", color: "white", icon: "⛪" },
-            material_ensayo: { bg: "#1c4a8a", color: "white", icon: "🎼" },
-            cancioneros: { bg: "#1c4a8a", color: "white", icon: "📄" },
-            pauta_misa: { bg: "#1c4a8a", color: "white", icon: "🎼" },
-          };
-          const vs = isVisita ? VISITA_STYLES[item.id] : null;
-          const isActive = section === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => {
-                setSection(item.id);
-                onClose();
-              }}
-              style={{
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                gap: 9,
-                padding: "7px 9px",
-                borderRadius: 8,
-                background: vs
-                  ? isActive
-                    ? vs.bg
-                    : `${vs.bg}12`
-                  : isActive
-                  ? "var(--accent-light)"
-                  : "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: vs
-                  ? isActive
-                    ? "white"
-                    : vs.bg
-                  : isActive
-                  ? "var(--accent)"
-                  : "var(--text-secondary)",
-                marginBottom: vs ? 5 : 1,
-                fontSize: 13.5,
-                fontWeight: isActive ? 550 : 400,
-                textAlign: "left",
-                transition: "background 0.1s ease, color 0.1s ease",
-                letterSpacing: "-0.01em",
-              }}
-            >
-              {vs ? (
-                <div
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 8,
-                    flexShrink: 0,
-                    background: isActive ? "rgba(255,255,255,0.2)" : vs.bg,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 15,
-                  }}
-                >
-                  {vs.icon}
-                </div>
-              ) : (
-                <span
-                  style={{
-                    fontSize: 15,
-                    width: 20,
-                    textAlign: "center",
-                    flexShrink: 0,
-                    opacity: isActive ? 1 : 0.65,
-                  }}
-                >
-                  {item.icon}
-                </span>
-              )}
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
+        <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "10px 10px 14px" }}>
+          <MenuNav
+            user={user}
+            section={section}
+            onPick={(id) => {
+              setSection(id);
+              onClose();
+            }}
+          />
+        </div>
+        {user && (
+          <button
+            onClick={() => {
+              setSection("perfil");
+              onClose();
+            }}
+            style={{ display: "flex", alignItems: "center", gap: 11, margin: "0 12px calc(env(safe-area-inset-bottom, 0px) + 12px)", padding: "10px 12px", border: "1px solid #e6ecf4", borderRadius: 16, background: "#f8fafd", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}
+          >
+            <span style={{ width: 38, height: 38, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: "linear-gradient(145deg,#1e3a5f,#2a5a9c)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800 }}>
+              {user.foto_url ? <img src={user.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(user.nombre || "U")}
+            </span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: 13.5, fontWeight: 800, color: "#0f1b2d", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user.nombre}</span>
+              <span style={{ display: "block", fontSize: 11.5, color: "#8a96a8", fontWeight: 600 }}>{rolFullLabel(user) || user.cuerda} · Mi perfil</span>
+            </span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa5b5" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -3735,11 +3671,9 @@ function AppInner() {
       <aside
         className="hide-mobile"
         style={{
-          width: sideOpen ? 224 : 56,
-          background: "rgba(248,248,252,0.94)",
-          backdropFilter: "saturate(180%) blur(20px)",
-          WebkitBackdropFilter: "saturate(180%) blur(20px)",
-          borderRight: "1px solid rgba(60,60,67,0.10)",
+          width: sideOpen ? 248 : 64,
+          background: "#fff",
+          borderRight: "1px solid #e9eef5",
           display: "flex",
           flexDirection: "column",
           transition: "width 0.24s cubic-bezier(0.25,0.46,0.45,0.94)",
@@ -3796,129 +3730,9 @@ function AppInner() {
             </div>
           )}
         </div>
-        <nav style={{ flex: 1, overflowY: "auto", padding: "6px 5px" }}>
-          {NAV.filter((item) => {
-          if (NAV_OCULTOS.has(item.id)) return false;
-            const isVisita = esVisita(user);
-            if (!isVisita && item.id === "material_ensayo") return false;
-            if (isVisita) {
-              return [
-                "dashboard",
-                "material_ensayo",
-                "cancioneros",
-                "pauta_misa",
-              ].includes(item.id);
-            }
-            // Sala de Ensayo: visible a TODOS los integrantes (el admin la habilita/deshabilita dentro)
-            // Vista Invitado: solo Admin
-            if (item.id === "cancioneros") return false;
-            if (item.id === "info_gastos" && !verFinanzas(user)) return false;
-            if (item.id === "vista_invitado" && !esCuerdaAdmin(user))
-              return false;
-            if (item.id === "solicitudes" && !esCuerdaAdmin(user)) return false;
-          if (item.id === "subir_material" && !esCuerdaAdmin(user)) return false;
-            // Canto Digital ahora vive dentro de la Sala de Ensayo
-            if (item.id === "cancionero") return false;
-            if (item.id === "musica") return false;
-            if (item.id === "cantos_pdf" || item.id === "audios") return false;
-            if (item.id === "admin" && user?.cuerda !== "Admin") return false;
-            if (
-              item.id === "finanzas" &&
-              !esCuerdaAdmin(user) &&
-              !esCuerdaContador(user)
-            )
-              return false;
-            return true;
-          }).map((item) => {
-            const isVisita = esVisita(user);
-            const VISITA_STYLES = {
-              dashboard: { bg: "#0f3d6e", icon: "⛪" },
-              material_ensayo: { bg: "#1c4a8a", icon: "🎼" },
-            };
-            const vs = isVisita ? VISITA_STYLES[item.id] : null;
-            const isActive = section === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setSection(item.id)}
-                title={sideOpen ? undefined : item.label}
-                aria-label={item.label}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 9,
-                  padding: "6px 9px",
-                  borderRadius: 8,
-                  background: vs
-                    ? isActive
-                      ? vs.bg
-                      : `${vs.bg}12`
-                    : isActive
-                    ? "var(--accent-light)"
-                    : "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: vs
-                    ? isActive
-                      ? "white"
-                      : vs.bg
-                    : isActive
-                    ? "var(--accent)"
-                    : "var(--text-secondary)",
-                  marginBottom: vs ? 5 : 1,
-                  transition: "background 0.1s ease, color 0.1s ease",
-                  fontSize: 13.5,
-                  fontWeight: isActive ? 550 : 400,
-                  whiteSpace: "nowrap",
-                  textAlign: "left",
-                  letterSpacing: "-0.01em",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive)
-                    e.currentTarget.style.background = "var(--bg-hover)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive)
-                    e.currentTarget.style.background = vs
-                      ? `${vs.bg}12`
-                      : "transparent";
-                }}
-              >
-                {vs ? (
-                  <div
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: 7,
-                      flexShrink: 0,
-                      background: isActive ? "rgba(255,255,255,0.2)" : vs.bg,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 14,
-                    }}
-                  >
-                    {vs.icon}
-                  </div>
-                ) : (
-                  <span
-                    style={{
-                      fontSize: 15,
-                      flexShrink: 0,
-                      width: 20,
-                      textAlign: "center",
-                      opacity: isActive ? 1 : 0.7,
-                    }}
-                  >
-                    {item.icon}
-                  </span>
-                )}
-                {sideOpen && item.label}
-              </button>
-            );
-          })}
-        </nav>
+        <div style={{ flex: 1, overflowY: "auto", padding: sideOpen ? "10px 10px" : "10px 8px" }}>
+          <MenuNav user={user} section={section} onPick={(id) => setSection(id)} compacto={!sideOpen} />
+        </div>
         <button
           onClick={() => setSideOpen((p) => !p)}
           title={sideOpen ? "Plegar menú" : "Abrir menú"}
