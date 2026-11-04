@@ -4535,30 +4535,6 @@ function AuthScreen({
     if (!b) return;
     mjBioDisponible().then((ok) => setBio(ok ? b : null));
   }, [view]);
-  // Al tocar el campo del correo, el teclado sugiere la llave guardada: un toque y Face ID
-  useEffect(() => {
-    if (view !== "login" || !bio) return;
-    let vivo = true;
-    mjBioCondicional()
-      .then(async (b) => {
-        if (!vivo || !b) return;
-        setError("");
-        setLoading(true);
-        try {
-          await onSignInBio(b);
-        } catch (err) {
-          setError((err && err.message) || "No se pudo ingresar");
-        }
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (vivo && err && err.name !== "AbortError" && err.name !== "NotAllowedError") setError(err.message || "No se pudo ingresar");
-      });
-    return () => {
-      vivo = false;
-      mjBioCancelarCondicional();
-    };
-  }, [view, bio]);
   async function doBio(automatico) {
     setError("");
     setLoading(true);
@@ -4887,11 +4863,6 @@ function AuthScreen({
                     Quitar de este equipo
                   </button>
                 </div>
-                {/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && (
-                  <div style={{ textAlign: "center", fontSize: 12, color: "#8a96a8", marginTop: 6, lineHeight: 1.45 }}>
-                    Más rápido: toca el campo del correo y elige tu nombre 🔑 sobre el teclado.
-                  </div>
-                )}
                 <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0 0", color: "#98a3b3", fontSize: 11.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase" }}>
                   <span style={{ flex: 1, height: 1, background: "#e6ecf4" }} />o con tu contraseña<span style={{ flex: 1, height: 1, background: "#e6ecf4" }} />
                 </div>
@@ -4907,7 +4878,7 @@ function AuthScreen({
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     placeholder="tu@correo.cl"
-                    autoComplete="username webauthn"
+                    autoComplete="username"
                     style={inp}
                   />
                 </div>
