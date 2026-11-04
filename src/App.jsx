@@ -440,6 +440,7 @@ async function refreshSession() {
     // Persistir en localStorage para sobrevivir recargas
     localStorage.setItem("sb_access_token", data.access_token);
     localStorage.setItem("sb_refresh_token", data.refresh_token);
+    mjBioSincronizar(data);
     return true;
   } catch {
     return false;
@@ -562,6 +563,7 @@ async function authSignIn(email, password) {
   _refreshToken = data.refresh_token;
   localStorage.setItem("sb_access_token", data.access_token);
   localStorage.setItem("sb_refresh_token", data.refresh_token);
+  mjBioSincronizar(data);
   return data;
 }
 
@@ -598,8 +600,112 @@ async function authUpdatePassword(newPassword) {
   }
 }
 
+// ── Entrar con Face ID / huella ──────────────────────────────────────────
+// La primera vez se entra con contraseña; luego el teléfono guarda una llave (WebAuthn) y la
+// sesión de esa persona. Face ID desbloquea esa sesión guardada en este equipo.
+const MJ_BIO_KEY = "mj_bio";
+function mjBioLeer() {
+  try {
+    return JSON.parse(localStorage.getItem(MJ_BIO_KEY) || "null");
+  } catch (e) {
+    return null;
+  }
+}
+function mjBioGuardar(v) {
+  try {
+    if (v) localStorage.setItem(MJ_BIO_KEY, JSON.stringify(v));
+    else localStorage.removeItem(MJ_BIO_KEY);
+  } catch (e) {}
+}
+async function mjBioDisponible() {
+  try {
+    return !!(window.PublicKeyCredential && navigator.credentials && (await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()));
+  } catch (e) {
+    return false;
+  }
+}
+function mjBioNombre() {
+  const ua = navigator.userAgent || "";
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "Face ID";
+  if (/Macintosh/.test(ua)) return "Touch ID";
+  if (/Android/.test(ua)) return "tu huella";
+  if (/Windows/.test(ua)) return "Windows Hello";
+  return "Face ID";
+}
+const mjB64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const mjDeB64 = (str) => {
+  let t = String(str).replace(/-/g, "+").replace(/_/g, "/");
+  while (t.length % 4) t += "=";
+  return Uint8Array.from(atob(t), (c) => c.charCodeAt(0));
+};
+async function mjBioActivar(perfil, uid, refreshToken) {
+  const cred = await navigator.credentials.create({
+    publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      rp: { name: "Coro Misioneros de Jesús", id: window.location.hostname },
+      user: { id: new TextEncoder().encode(String(uid || perfil.email)).slice(0, 64), name: perfil.email || "integrante", displayName: perfil.nombre || perfil.email || "Integrante" },
+      pubKeyCredParams: [
+        { type: "public-key", alg: -7 },
+        { type: "public-key", alg: -257 },
+      ],
+      authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "preferred" },
+      timeout: 60000,
+      attestation: "none",
+    },
+  });
+  if (!cred) throw new Error("No se pudo activar");
+  mjBioGuardar({ cred: mjB64(cred.rawId), uid: String(uid || ""), email: perfil.email || "", nombre: perfil.nombre || "", rt: refreshToken || _refreshToken, en: Date.now() });
+}
+async function mjBioVerificar() {
+  const b = mjBioLeer();
+  if (!b || !b.cred) throw new Error("Face ID no está activado en este equipo.");
+  const a = await navigator.credentials.get({
+    publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials: [{ type: "public-key", id: mjDeB64(b.cred) }],
+      userVerification: "required",
+      rpId: window.location.hostname,
+      timeout: 60000,
+    },
+  });
+  if (!a) throw new Error("No se pudo verificar");
+  return b;
+}
+// Mantiene al día la sesión guardada para Face ID (Supabase cambia el token en cada renovación)
+function mjBioSincronizar(data) {
+  const b = mjBioLeer();
+  if (b && data && data.user && data.refresh_token && String(b.uid) === String(data.user.id)) {
+    b.rt = data.refresh_token;
+    mjBioGuardar(b);
+  }
+}
+async function authConRefresh(rt) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: rt }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.access_token) throw new Error("Sesión vencida");
+  _authToken = data.access_token;
+  _refreshToken = data.refresh_token;
+  localStorage.setItem("sb_access_token", data.access_token);
+  localStorage.setItem("sb_refresh_token", data.refresh_token);
+  mjBioSincronizar(data);
+  return data;
+}
+
 async function authSignOut() {
   if (!_authToken) return;
+  const bio = mjBioLeer();
+  if (bio && bio.rt && bio.rt === _refreshToken) {
+    // Con Face ID activo la sesión queda guardada en este equipo: solo se cierra aquí
+    _authToken = null;
+    _refreshToken = null;
+    localStorage.removeItem("sb_access_token");
+    localStorage.removeItem("sb_refresh_token");
+    return;
+  }
   await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
     method: "POST",
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken}` },
@@ -1915,9 +2021,37 @@ function AppInner() {
       }
     } catch (e) {}
 
+    // Sesión iniciada: entra directo al portal sin pedir nada (hasta que la persona toque "Salir")
+    try {
+      if (localStorage.getItem("mj_sesion") === "1" && localStorage.getItem("sb_refresh_token")) return "restaurando";
+    } catch (e) {}
     return "landing";
   })();
   const [view, setView] = useState(_initialView);
+  const [ofrecerBio, setOfrecerBio] = useState(null);
+  useEffect(() => {
+    if (view !== "restaurando") return;
+    let vivo = true;
+    (async () => {
+      try {
+        const data = await authConRefresh(localStorage.getItem("sb_refresh_token"));
+        if (!vivo) return;
+        await entrarConSesion(data, (data.user && data.user.email) || "", false);
+      } catch (e) {
+        if (!vivo) return;
+        // Sin internet se conserva la sesión para el próximo intento; si venció, se pide ingresar
+        if (!(e instanceof TypeError)) {
+          try {
+            localStorage.removeItem("mj_sesion");
+          } catch (x) {}
+        }
+        setView("landing");
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [view]);
   // Service worker: deja la app guardada para abrirla sin internet (capilla)
   useEffect(() => {
     if ("serviceWorker" in navigator && (window.location.protocol === "https:" || window.location.hostname === "localhost")) {
@@ -2813,6 +2947,20 @@ function AppInner() {
 
   async function handleSignIn(email, password) {
     const data = await authSignIn(email, password);
+    await entrarConSesion(data, email, true);
+  }
+  async function handleSignInBio() {
+    const b = await mjBioVerificar();
+    let data;
+    try {
+      data = await authConRefresh(b.rt);
+    } catch (e) {
+      mjBioGuardar(null);
+      throw new Error(`Tu acceso con ${mjBioNombre()} venció. Ingresa con tu correo y contraseña, y vuelve a activarlo.`);
+    }
+    await entrarConSesion(data, (data.user && data.user.email) || b.email, false);
+  }
+  async function entrarConSesion(data, email, ofrecer) {
     const emailNorm = (email || "").trim().toLowerCase();
     // Buscar sin distinguir mayúsculas/minúsculas ni espacios (ilike) para no crear duplicados
     let perfil = await supabase("integrantes", {
@@ -2880,11 +3028,25 @@ function AppInner() {
     setView("app");
     if (esVisita(p)) setSection("dashboard");
     registrarVisita(p, data.access_token);
+    try {
+      localStorage.setItem("mj_sesion", "1");
+    } catch (e) {}
+    if (ofrecer && !esVisita(p)) {
+      const uidBio = data.user && data.user.id;
+      mjBioDisponible().then((ok) => {
+        const b = mjBioLeer();
+        let rechazo = false;
+        try {
+          rechazo = Date.now() - Number(localStorage.getItem("mj_bio_no_" + uidBio) || 0) < 30 * 86400000;
+        } catch (e) {}
+        if (ok && uidBio && !(b && String(b.uid) === String(uidBio)) && !rechazo) setOfrecerBio({ perfil: p, uid: uidBio, rt: data.refresh_token });
+      });
+    }
     // (La clave de Anthropic ya NO se carga en el navegador: vive en Vercel como
     // ANTHROPIC_API_KEY y solo la usa /api/claude.js del lado del servidor.)
     // Mostrar modal solo si no tiene permiso aún y no es usuario Visita
     setTimeout(() => {
-      if (Notification.permission !== "granted" && !esVisita(p))
+      if (typeof Notification !== "undefined" && Notification.permission !== "granted" && !esVisita(p) && !document.querySelector("[data-bio-oferta]"))
         setShowPushModal(true);
     }, 2500);
   }
@@ -2968,6 +3130,9 @@ function AppInner() {
         /* silencioso */
       }
     }
+    try {
+      localStorage.removeItem("mj_sesion");
+    } catch (e) {}
     await authSignOut();
     setUser(null);
     setAuthToken(null);
@@ -3094,11 +3259,23 @@ function AppInner() {
     );
   }
 
+  if (view === "restaurando")
+    return (
+      <div style={{ position: "fixed", inset: 0, background: "linear-gradient(160deg,#0f2744,#1e3a5f 55%,#2a5a9c)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, fontFamily: "var(--font-sans)" }}>
+        <img src={LOGO} alt="Coro MJ" style={{ width: 72, height: 72, borderRadius: 20, objectFit: "cover", boxShadow: "0 12px 30px rgba(0,0,0,.35)" }} />
+        <div style={{ width: 26, height: 26, borderRadius: "50%", border: "3px solid rgba(255,255,255,.25)", borderTopColor: "#fff", animation: "mjgira .8s linear infinite" }} />
+        <style>{`@keyframes mjgira{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    );
   if (view === "landing")
     return (
       <>
         <Landing
           onPortal={() => {
+            if (localStorage.getItem("mj_sesion") === "1" && localStorage.getItem("sb_refresh_token")) {
+              setView("restaurando");
+              return;
+            }
             localStorage.removeItem("sb_access_token");
             localStorage.removeItem("sb_refresh_token");
             setView("login");
@@ -3114,6 +3291,7 @@ function AppInner() {
         view={view}
         setView={setView}
         onSignIn={handleSignIn}
+        onSignInBio={handleSignInBio}
         onSignUp={handleSignUp}
         onGuestEnter={handleGuestEnter}
         onBack={() => setView("landing")}
@@ -3259,6 +3437,17 @@ function AppInner() {
 
       <CheckInObligatorio pautas={pautas} user={user} />
       <SinCuerdaAsignada user={user} onSalir={handleSignOut} />
+      {ofrecerBio && (
+        <OfertaBiometria
+          info={ofrecerBio}
+          onCerrar={() => {
+            setOfrecerBio(null);
+            setTimeout(() => {
+              if (typeof Notification !== "undefined" && Notification.permission !== "granted") setShowPushModal(true);
+            }, 700);
+          }}
+        />
+      )}
       <ControlAccesoAsistencia user={user} members={members} asistencia={asistencia} eventosDb={eventos} listo={firstLoadDone} onSalir={handleSignOut} />
 
       {/* ── Modal explicativo notificaciones push ── */}
@@ -4215,6 +4404,7 @@ function AuthScreen({
   view,
   setView,
   onSignIn,
+  onSignInBio,
   onSignUp,
   onGuestEnter,
   onBack,
@@ -4310,6 +4500,24 @@ function AuthScreen({
     textTransform: "uppercase",
   };
 
+  const [bio, setBio] = useState(null);
+  useEffect(() => {
+    const b = mjBioLeer();
+    if (!b) return;
+    mjBioDisponible().then((ok) => setBio(ok ? b : null));
+  }, [view]);
+  async function doBio() {
+    setError("");
+    setLoading(true);
+    try {
+      await onSignInBio();
+    } catch (err) {
+      if (err && err.name === "NotAllowedError") setError(`No se completó ${mjBioNombre()}. Intenta de nuevo o ingresa con tu contraseña.`);
+      else setError((err && err.message) || "No se pudo ingresar");
+      if (!mjBioLeer()) setBio(null);
+    }
+    setLoading(false);
+  }
   async function doLogin(e) {
     e.preventDefault();
     setError("");
@@ -4595,6 +4803,40 @@ function AuthScreen({
             )}
 
             {/* ── LOGIN ── */}
+            {view === "login" && bio && (
+              <div style={{ marginBottom: 18 }}>
+                <button
+                  type="button"
+                  onClick={doBio}
+                  disabled={loading}
+                  style={{ width: "100%", height: 56, border: "none", borderRadius: 14, background: "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 11, fontSize: 15.5, fontWeight: 800, fontFamily: "inherit", cursor: "pointer", boxShadow: "0 8px 22px rgba(23,52,92,.28)", opacity: loading ? 0.7 : 1 }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M7 3H5a2 2 0 0 0-2 2v2M17 3h2a2 2 0 0 1 2 2v2M7 21H5a2 2 0 0 1-2-2v-2M17 21h2a2 2 0 0 0 2-2v-2" />
+                    <path d="M9 9v1.5M15 9v1.5M12 9v4.5h-1M9.5 16.5c1.4 1 3.6 1 5 0" />
+                  </svg>
+                  {loading ? "Verificando…" : `Entrar con ${mjBioNombre()}`}
+                </button>
+                <div style={{ textAlign: "center", fontSize: 12.5, color: "#6b7a90", marginTop: 8 }}>
+                  {bio.nombre ? `Como ${String(bio.nombre).split(" ")[0]} · ` : ""}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`¿Quitar el acceso con ${mjBioNombre()} de este equipo?`)) {
+                        mjBioGuardar(null);
+                        setBio(null);
+                      }
+                    }}
+                    style={{ background: "none", border: "none", padding: 0, color: "#2a5a9c", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                  >
+                    Quitar de este equipo
+                  </button>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0 0", color: "#98a3b3", fontSize: 11.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase" }}>
+                  <span style={{ flex: 1, height: 1, background: "#e6ecf4" }} />o con tu contraseña<span style={{ flex: 1, height: 1, background: "#e6ecf4" }} />
+                </div>
+              </div>
+            )}
             {view === "login" && (
               <form onSubmit={doLogin}>
                 <div style={{ marginBottom: 12 }}>
@@ -36664,6 +36906,60 @@ function AsReinicio({ asistencia, mapa, onReload }) {
         </>
       )}
     </div>
+  );
+}
+
+// Ofrece activar Face ID después de entrar con contraseña
+function OfertaBiometria({ info, onCerrar }) {
+  const [estado, setEstado] = useState("");
+  const nombreBio = mjBioNombre();
+  const activar = async () => {
+    setEstado("activando");
+    try {
+      await mjBioActivar(info.perfil, info.uid, info.rt);
+      setEstado("listo");
+      setTimeout(onCerrar, 1400);
+    } catch (e) {
+      setEstado(e && e.name === "NotAllowedError" ? "" : "error");
+    }
+  };
+  const ahoraNo = () => {
+    try {
+      localStorage.setItem("mj_bio_no_" + info.uid, String(Date.now()));
+    } catch (e) {}
+    onCerrar();
+  };
+  return createPortal(
+    <div data-bio-oferta="1" style={{ position: "fixed", inset: 0, zIndex: 9300, background: "rgba(15,27,45,.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "var(--font-sans)" }}>
+      <div style={{ width: "min(420px,100%)", background: "#fff", borderRadius: 24, padding: "28px 24px 20px", textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.3)" }}>
+        <div style={{ width: 62, height: 62, borderRadius: 20, margin: "0 auto", background: "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 10px 24px rgba(23,52,92,.3)" }}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7 3H5a2 2 0 0 0-2 2v2M17 3h2a2 2 0 0 1 2 2v2M7 21H5a2 2 0 0 1-2-2v-2M17 21h2a2 2 0 0 0 2-2v-2" />
+            <path d="M9 9v1.5M15 9v1.5M12 9v4.5h-1M9.5 16.5c1.4 1 3.6 1 5 0" />
+          </svg>
+        </div>
+        {estado === "listo" ? (
+          <>
+            <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em", color: "#0f1b2d", marginTop: 16 }}>¡Listo!</div>
+            <div style={{ fontSize: 14.5, color: "#4b5869", lineHeight: 1.55, marginTop: 8 }}>La próxima vez entra con {nombreBio}, sin escribir tu contraseña.</div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", textTransform: "uppercase", color: "#8a96a8", marginTop: 16 }}>Entrada rápida</div>
+            <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em", color: "#0f1b2d", marginTop: 6, lineHeight: 1.25 }}>¿Entrar con {nombreBio} la próxima vez?</div>
+            <div style={{ fontSize: 14.5, color: "#4b5869", lineHeight: 1.55, marginTop: 10 }}>Así no tendrás que escribir tu contraseña en este {/(iPad|Tablet)/i.test(navigator.userAgent) ? "dispositivo" : "teléfono"}. Puedes quitarlo cuando quieras.</div>
+            {estado === "error" && <div style={{ fontSize: 13, color: "#a32a1f", marginTop: 10 }}>No se pudo activar en este equipo. Puedes seguir entrando con tu contraseña.</div>}
+            <button onClick={activar} disabled={estado === "activando"} style={{ marginTop: 20, width: "100%", height: 50, border: "none", borderRadius: 14, background: "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+              {estado === "activando" ? "Activando…" : `Activar ${nombreBio}`}
+            </button>
+            <button onClick={ahoraNo} style={{ marginTop: 8, width: "100%", height: 44, border: "none", borderRadius: 14, background: "transparent", color: "#6b7a90", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+              Ahora no
+            </button>
+          </>
+        )}
+      </div>
+    </div>,
+    document.body
   );
 }
 
