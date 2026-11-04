@@ -6426,279 +6426,200 @@ function VideoDestacadoWidget({ isAdmin }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  WIDGET VOCALIZACIÓN (igual a VideoDestacado)
+//  WIDGET CANTO SUGERIDO — carrusel de cantos (videos de YouTube) que propone el admin
 // ═══════════════════════════════════════════════════════════════
 const VOC_STORAGE_KEY = "coro_vocalizacion_url";
-
+const CANTOS_SUG_KEY = "cantos_sugeridos";
+const CS_CSS = `
+.cs{background:#fff;border-radius:18px;overflow:hidden;border:1px solid #e6ecf4;box-shadow:0 1px 2px rgba(15,39,68,.04),0 10px 30px rgba(15,39,68,.05);margin-bottom:14px;font-family:var(--font-sans);color:#0f1b2d}
+.cs-h{display:flex;align-items:center;gap:11px;padding:13px 14px}
+.cs-ic{width:34px;height:34px;border-radius:11px;background:linear-gradient(145deg,#17345c,#2a5a9c);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 12px rgba(23,52,92,.25)}
+.cs-k{font-size:9.5px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#8a96a8}
+.cs-t{font-size:15px;font-weight:800;letter-spacing:-.02em}
+.cs-ed{border:1px solid #e3e9f2;background:#fff;border-radius:999px;padding:6px 12px;font:inherit;font-size:12px;font-weight:800;color:#0f2744;cursor:pointer}
+.cs-v{position:relative;padding-top:56.25%;background:#0b1424}
+.cs-v iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.cs-nav{position:absolute;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,.92);color:#0f2744;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:2}
+.cs-b{padding:12px 14px 14px}
+.cs-n{font-size:15px;font-weight:800;letter-spacing:-.01em;line-height:1.3}
+.cs-nota{font-size:13px;color:#5b6779;line-height:1.5;margin-top:4px}
+.cs-dots{display:flex;gap:6px;justify-content:center;margin-top:12px}
+.cs-dots button{width:7px;height:7px;border-radius:99px;border:none;background:#d5dde8;padding:0;cursor:pointer;transition:width .2s,background .2s}
+.cs-dots button.on{width:20px;background:#1e3a5f}
+.cs-in{width:100%;height:38px;border:1px solid #e3e9f2;border-radius:10px;padding:0 11px;font:inherit;font-size:13.5px;color:#0f1b2d;background:#fff;box-sizing:border-box}
+.cs-row{display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #f1f4f8}
+.cs-mini{width:30px;height:30px;border-radius:8px;border:1px solid #e3e9f2;background:#fff;color:#5b6779;cursor:pointer;font:inherit;font-size:13px;font-weight:800;flex-shrink:0}
+.cs-pri{height:38px;border:none;border-radius:11px;background:linear-gradient(135deg,#17345c,#2a5a9c);color:#fff;font:inherit;font-size:13px;font-weight:800;padding:0 16px;cursor:pointer}
+`;
 function VocalizacionWidget({ isAdmin }) {
-  const [savedUrl, setSavedUrl] = useState("");
+  const [lista, setLista] = useState([]);
+  const [i, setI] = useState(0);
   const [editing, setEditing] = useState(false);
-  const [inputVal, setInputVal] = useState("");
-  const [saved, setSaved] = useState(false);
+  const [borrador, setBorrador] = useState([]);
+  const [nuevo, setNuevo] = useState({ url: "", titulo: "", nota: "" });
+  const [guardando, setGuardando] = useState(false);
+  const [msg, setMsg] = useState("");
+  const toque = useRef(null);
 
   useEffect(() => {
-    getConfig(VOC_STORAGE_KEY).then((val) => {
-      if (val !== null) setSavedUrl(val);
-    });
+    (async () => {
+      let l = [];
+      try {
+        const v = await getConfig(CANTOS_SUG_KEY);
+        const x = typeof v === "string" ? JSON.parse(v) : v;
+        if (Array.isArray(x)) l = x;
+      } catch (e) {}
+      if (!l.length) {
+        // Video que estaba en el widget anterior
+        try {
+          const viejo = await getConfig(VOC_STORAGE_KEY);
+          if (viejo && extractYTId(viejo)) l = [{ url: viejo, titulo: "", nota: "" }];
+        } catch (e) {}
+      }
+      setLista(l.filter((c) => c && extractYTId(c.url)));
+    })();
   }, []);
 
-  const videoId = extractYTId(savedUrl);
-  function openEdit() {
-    setInputVal(savedUrl);
+  const total = lista.length;
+  const idx = total ? Math.min(i, total - 1) : 0;
+  const actual = total ? lista[idx] : null;
+  const vid = actual ? extractYTId(actual.url) : null;
+  const ir = (d) => total && setI((x) => (x + d + total) % total);
+
+  if (!total && !isAdmin) return null;
+
+  const abrirEdicion = () => {
+    setBorrador(lista.map((c) => ({ ...c })));
+    setNuevo({ url: "", titulo: "", nota: "" });
+    setMsg("");
     setEditing(true);
-    setSaved(false);
-  }
-  function cancelEdit() {
-    setEditing(false);
-    setSaved(false);
-  }
-  async function saveUrl() {
-    const v = inputVal.trim();
-    const esNuevo = !!extractYTId(v) && v !== savedUrl;
-    setSavedUrl(v);
-    await setConfig(VOC_STORAGE_KEY, v);
-    setEditing(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-    // Notificación push al cambiar video de vocalización
-    if (esNuevo) {
-      sendPushToAll(
-        "🙏 Nueva Oración",
-        "El encargado publicó un nuevo video de vocalización para el ensayo",
-        "/"
-      );
+  };
+  const agregar = () => {
+    if (!extractYTId(nuevo.url)) {
+      setMsg("Pega un enlace válido de YouTube.");
+      return;
     }
-  }
-  if (!videoId && !isAdmin) return null;
+    setBorrador((b) => [...b, { url: nuevo.url.trim(), titulo: nuevo.titulo.trim(), nota: nuevo.nota.trim() }]);
+    setNuevo({ url: "", titulo: "", nota: "" });
+    setMsg("");
+  };
+  const mover = (k, d) =>
+    setBorrador((b) => {
+      const c = [...b];
+      const j = k + d;
+      if (j < 0 || j >= c.length) return c;
+      [c[k], c[j]] = [c[j], c[k]];
+      return c;
+    });
+  const guardar = async () => {
+    setGuardando(true);
+    const antes = new Set(lista.map((c) => extractYTId(c.url)));
+    const hayNuevos = borrador.some((c) => !antes.has(extractYTId(c.url)));
+    const ok = await setConfig(CANTOS_SUG_KEY, JSON.stringify(borrador));
+    setGuardando(false);
+    if (!ok) {
+      setMsg("No se pudo guardar. Intenta de nuevo.");
+      return;
+    }
+    setLista(borrador);
+    setI(0);
+    setEditing(false);
+    if (hayNuevos) sendPushToAll("🎵 Nuevo canto sugerido", "Hay un canto nuevo sugerido en el portal del coro. ¡Escúchalo!", "/");
+  };
+
   return (
-    <div
-      style={{
-        background: "white",
-        borderRadius: 14,
-        overflow: "hidden",
-        border: "1px solid rgba(60,60,67,0.1)",
-        boxShadow: "0 1px 6px rgba(0,0,0,0.05)",
-        marginBottom: 14,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "12px 14px",
-          borderBottom: videoId ? "1px solid rgba(60,60,67,0.08)" : "none",
-        }}
-      >
-        <div
-          style={{
-            width: 30,
-            height: 30,
-            background: "linear-gradient(145deg,#152d4a,#1e6ab0)",
-            borderRadius: 8,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-            fontSize: 15,
-          }}
-        >
-          🙏
+    <div className="cs">
+      <style>{CS_CSS}</style>
+      <div className="cs-h">
+        <span className="cs-ic">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l11-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="17" cy="16" r="3" /></svg>
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="cs-k">Para escuchar</div>
+          <div className="cs-t">Canto Sugerido</div>
         </div>
-        <div style={{ flex: 1 }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#1c1c1e",
-              letterSpacing: "-0.016em",
-            }}
-          >
-            Reflexiones
-          </div>
-          <div style={{ fontSize: 11, color: "#8e8e93" }}>
-            {videoId ? "YouTube" : "Sin video asignado"}
-          </div>
-        </div>
-        {isAdmin && (
-          <button
-            onClick={editing ? cancelEdit : openEdit}
-            style={{
-              background: editing ? "rgba(0,0,0,0.04)" : "rgba(30,58,95,0.08)",
-              border: "none",
-              borderRadius: 20,
-              padding: "5px 12px",
-              fontSize: 12,
-              fontWeight: 500,
-              color: editing ? "#8e8e93" : "#1e3a5f",
-              cursor: "pointer",
-            }}
-          >
-            {editing ? "Cancelar" : videoId ? "Cambiar" : "Asignar"}
-          </button>
-        )}
-        {saved && !editing && (
-          <span
-            style={{
-              fontSize: 11,
-              color: "#34c759",
-              fontWeight: 600,
-              marginLeft: 4,
-            }}
-          >
-            Guardado
+        {total > 1 && !editing && (
+          <span style={{ fontSize: 12, fontWeight: 800, color: "#8a96a8" }}>
+            {idx + 1}/{total}
           </span>
         )}
+        {isAdmin && (
+          <button className="cs-ed" onClick={editing ? () => setEditing(false) : abrirEdicion}>
+            {editing ? "Cerrar" : "Editar"}
+          </button>
+        )}
       </div>
-      {editing && (
-        <div
-          style={{
-            padding: "12px 14px",
-            background: "rgba(29,111,199,0.05)",
-            borderBottom: "1px solid rgba(60,60,67,0.08)",
-          }}
-        >
-          <input
-            value={inputVal}
-            onChange={(e) => setInputVal(e.target.value)}
-            placeholder="https://youtube.com/watch?v=..."
-            onKeyDown={(e) => {
-              if (e.key === "Enter") saveUrl();
-              if (e.key === "Escape") cancelEdit();
-            }}
-            autoFocus
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              padding: "9px 12px",
-              borderRadius: 10,
-              border: "1px solid rgba(60,60,67,0.18)",
-              fontSize: 13,
-              outline: "none",
-              marginBottom: 8,
-              background: "white",
-              color: "#1c1c1e",
-              letterSpacing: "-0.016em",
-            }}
-          />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={saveUrl}
-              style={{
-                background: "#1e3a5f",
-                border: "none",
-                borderRadius: 10,
-                padding: "7px 16px",
-                fontSize: 13,
-                fontWeight: 500,
-                color: "white",
-                cursor: "pointer",
-              }}
-            >
-              Guardar
-            </button>
-            {videoId && (
-              <button
-                onClick={async () => {
-                  setSavedUrl("");
-                  await setConfig(VOC_STORAGE_KEY, "");
-                  setEditing(false);
-                }}
-                style={{
-                  background: "rgba(255,59,48,0.08)",
-                  border: "none",
-                  borderRadius: 10,
-                  padding: "7px 16px",
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: "#ff3b30",
-                  cursor: "pointer",
-                }}
-              >
-                Quitar
-              </button>
-            )}
+
+      {editing ? (
+        <div style={{ padding: "0 14px 14px" }}>
+          <div style={{ fontSize: 12, color: "#6b7a90", marginBottom: 8 }}>Los cantos se muestran en este orden. Usa ↑ ↓ para ordenarlos.</div>
+          {borrador.length === 0 && <div style={{ fontSize: 13, color: "#8a96a8", padding: "8px 0" }}>Aún no hay cantos.</div>}
+          {borrador.map((c, k) => (
+            <div key={k} className="cs-row">
+              <img src={`https://img.youtube.com/vi/${extractYTId(c.url)}/default.jpg`} alt="" style={{ width: 52, height: 39, objectFit: "cover", borderRadius: 7, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <input className="cs-in" style={{ height: 32, fontSize: 13 }} value={c.titulo} placeholder="Nombre del canto" onChange={(e) => setBorrador((b) => b.map((x, n) => (n === k ? { ...x, titulo: e.target.value } : x)))} />
+              </div>
+              <button className="cs-mini" onClick={() => mover(k, -1)} title="Subir">↑</button>
+              <button className="cs-mini" onClick={() => mover(k, 1)} title="Bajar">↓</button>
+              <button className="cs-mini" style={{ color: "#a32a1f", borderColor: "#f3cfcb" }} onClick={() => setBorrador((b) => b.filter((_, n) => n !== k))} title="Quitar">✕</button>
+            </div>
+          ))}
+          <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+            <div className="cs-k">Agregar canto</div>
+            <input className="cs-in" value={nuevo.url} placeholder="Enlace de YouTube" onChange={(e) => setNuevo((n) => ({ ...n, url: e.target.value }))} />
+            <input className="cs-in" value={nuevo.titulo} placeholder="Nombre del canto (opcional)" onChange={(e) => setNuevo((n) => ({ ...n, titulo: e.target.value }))} />
+            <input className="cs-in" value={nuevo.nota} placeholder="Por qué lo sugieres (opcional)" onChange={(e) => setNuevo((n) => ({ ...n, nota: e.target.value }))} />
+            <button className="cs-mini" style={{ width: "100%", height: 36 }} onClick={agregar}>+ Agregar a la lista</button>
+          </div>
+          {msg && <div style={{ fontSize: 12.5, color: "#a32a1f", marginTop: 8 }}>{msg}</div>}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+            <button className="cs-pri" onClick={guardar} disabled={guardando}>{guardando ? "Guardando…" : "Guardar cantos"}</button>
           </div>
         </div>
-      )}
-      {videoId ? (
-        <div
-          style={{
-            position: "relative",
-            paddingTop: "56.25%",
-            background: "#000",
-          }}
-        >
-          <iframe
-            key={videoId}
-            src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`}
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              border: "none",
-            }}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            title="Reflexiones"
-          />
-        </div>
-      ) : isAdmin ? (
-        <div
-          style={{
-            padding: "32px 20px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            background: "rgba(242,242,247,0.5)",
-          }}
-        >
+      ) : vid ? (
+        <>
           <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 10,
-              background: "rgba(29,111,199,0.07)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+            className="cs-v"
+            onTouchStart={(e) => (toque.current = e.touches[0].clientX)}
+            onTouchEnd={(e) => {
+              if (toque.current == null) return;
+              const dx = e.changedTouches[0].clientX - toque.current;
+              toque.current = null;
+              if (Math.abs(dx) > 50) ir(dx < 0 ? 1 : -1);
             }}
           >
-            <svg width="14" height="16" viewBox="0 0 14 16" fill="none">
-              <rect
-                x="4"
-                y="0"
-                width="6"
-                height="9"
-                rx="3"
-                fill="rgba(29,111,199,0.35)"
-              />
-              <path
-                d="M1 9c0 3.3 12 3.3 12 0"
-                stroke="rgba(29,111,199,0.35)"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                fill="none"
-              />
-              <line
-                x1="7"
-                y1="12"
-                x2="7"
-                y2="15.5"
-                stroke="rgba(29,111,199,0.35)"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
+            <iframe key={vid} src={`https://www.youtube.com/embed/${vid}?rel=0&modestbranding=1`} allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title={actual.titulo || "Canto sugerido"} />
+            {total > 1 && (
+              <>
+                <button className="cs-nav" style={{ left: 8 }} onClick={() => ir(-1)} aria-label="Anterior">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6" /></svg>
+                </button>
+                <button className="cs-nav" style={{ right: 8 }} onClick={() => ir(1)} aria-label="Siguiente">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+                </button>
+              </>
+            )}
           </div>
-          <div style={{ fontSize: 12, color: "#8e8e93" }}>
-            Sin video asignado
-          </div>
+          {(actual.titulo || actual.nota || total > 1) && (
+            <div className="cs-b">
+              {actual.titulo && <div className="cs-n">{actual.titulo}</div>}
+              {actual.nota && <div className="cs-nota">{actual.nota}</div>}
+              {total > 1 && (
+                <div className="cs-dots">
+                  {lista.map((_, k) => (
+                    <button key={k} className={k === idx ? "on" : ""} onClick={() => setI(k)} aria-label={`Canto ${k + 1}`} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        <div style={{ padding: "22px 16px", textAlign: "center", fontSize: 13, color: "#8a96a8" }}>
+          Aún no hay cantos sugeridos. Toca «Editar» para agregar el primero.
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
@@ -18729,48 +18650,75 @@ function Dashboard({
           </div>
 
 
-          <div
-            className="links-bar"
-            style={{ display: "flex", gap: 10, flexWrap: "wrap" }}
-          >
-            {(links.length > 0
-              ? links
-              : [
-                  { label: "📚 Cancionero Digital", url: "#" },
-                  {
-                    label: "📄 Cancionero PDF",
-                    url: "https://drive.google.com/file/d/1reZwCTC6mMJM2Rb1gEnUtYFkmNxijO0e/view?usp=drive_link",
-                  },
-                  { label: "📸 Instagram", url: "#" },
-                  { label: "🎵 TikTok", url: "#" },
-                  { label: "💬 WhatsApp", url: "#" },
-                  { label: "✈️ Telegram", url: "#" },
-                ]
-            ).map((l, i) => (
-              <a
-                key={i}
-                href={l.url || "#"}
-                target="_blank"
-                rel="noopener"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  padding: "8px 14px",
-                  background: C.white,
-                  borderRadius: 10,
-                  border: `1px solid ${C.border}`,
-                  color: C.dark,
-                  fontSize: 12,
-                  fontWeight: 500,
-                }}
-              >
-                {l.label || l.nombre}
-              </a>
-            ))}
-          </div>
+          <EnlacesCoro links={links} />
 
         </>
       )}
+    </div>
+  );
+}
+
+// Enlaces del coro (redes sociales y cancioneros) al final del inicio
+const ENL_ICONOS = {
+  instagram: <><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" /></>,
+  tiktok: <><path d="M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5" /><path d="M14 3c.5 2.6 2.4 4.4 5 4.6" /></>,
+  whatsapp: <><path d="M4 20l1.3-4A8 8 0 1 1 8.5 19z" /><path d="M9 9.5c.3 2 2.2 4.2 4.5 4.8l1.2-1.1 1.8.8c-.2 1.2-1.1 1.8-2.2 1.8-3 0-6.6-3.4-6.6-6.4 0-1.1.6-2 1.8-2.2l.8 1.8z" /></>,
+  telegram: <><path d="M21 4 3 11l6 2 2 6 3-4 5 4z" /><path d="m9 13 8-6" /></>,
+  youtube: <><rect x="2.5" y="5.5" width="19" height="13" rx="4" /><path d="m10 9.5 5 2.5-5 2.5z" /></>,
+  facebook: <><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v3H7v4h3v6h4v-6h3l1-4h-4V8z" /></>,
+  spotify: <><circle cx="12" cy="12" r="9" /><path d="M7.5 10c3-1 6.5-.7 9 .8M8 13.2c2.4-.7 5-.5 7 .7M8.6 16c1.8-.4 3.6-.3 5.2.5" /></>,
+  cancionero: <><path d="M9 18V5l11-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="17" cy="16" r="3" /></>,
+  pdf: <><path d="M7 3h8l4 4v14H7z" /><path d="M15 3v4h4" /><path d="M10 13h6M10 17h4" /></>,
+  link: <><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></>,
+};
+function mjTipoEnlace(label, url) {
+  const t = (String(label || "") + " " + String(url || "")).toLowerCase();
+  if (t.includes("instagram")) return "instagram";
+  if (t.includes("tiktok")) return "tiktok";
+  if (t.includes("whatsapp") || t.includes("wa.me")) return "whatsapp";
+  if (t.includes("telegram") || t.includes("t.me")) return "telegram";
+  if (t.includes("youtube") || t.includes("youtu.be")) return "youtube";
+  if (t.includes("facebook")) return "facebook";
+  if (t.includes("spotify")) return "spotify";
+  if (t.includes("pdf")) return "pdf";
+  if (t.includes("cancionero") || t.includes("canto")) return "cancionero";
+  return "link";
+}
+function EnlacesCoro({ links }) {
+  const lista = (links && links.length > 0
+    ? links
+    : [
+        { label: "Cancionero Digital", url: "#" },
+        { label: "Cancionero PDF", url: "https://drive.google.com/file/d/1reZwCTC6mMJM2Rb1gEnUtYFkmNxijO0e/view?usp=drive_link" },
+        { label: "Instagram", url: "#" },
+        { label: "TikTok", url: "#" },
+        { label: "WhatsApp", url: "#" },
+        { label: "Telegram", url: "#" },
+      ]
+  ).map((l) => {
+    const label = String(l.label || l.nombre || "Enlace").replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]+/, "").trim();
+    return { label, url: l.url || "#", tipo: mjTipoEnlace(l.label || l.nombre, l.url) };
+  });
+  return (
+    <div style={{ marginTop: 6, background: "#fff", border: "1px solid #e6ecf4", borderRadius: 18, padding: "14px 14px 16px", boxShadow: "0 1px 2px rgba(15,39,68,.04),0 10px 30px rgba(15,39,68,.05)", fontFamily: "var(--font-sans)" }}>
+      <style>{`.enl-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px}.enl-a{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid #e9eef5;border-radius:13px;background:#fbfcfe;color:#0f1b2d;text-decoration:none;font-size:13px;font-weight:700;transition:transform .15s,box-shadow .15s,background .15s}.enl-a:hover{background:#fff;transform:translateY(-1px);box-shadow:0 6px 16px rgba(30,58,95,.1)}.enl-i{width:32px;height:32px;border-radius:10px;background:linear-gradient(145deg,#17345c,#2a5a9c);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}`}</style>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".2em", textTransform: "uppercase", color: "#8a96a8" }}>Coro Misioneros de Jesús</div>
+          <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-.02em", color: "#0f1b2d", marginTop: 2 }}>Síguenos y comparte</div>
+        </div>
+      </div>
+      <div className="enl-g">
+        {lista.map((l, k) => (
+          <a key={k} className="enl-a" href={l.url} target="_blank" rel="noopener noreferrer">
+            <span className="enl-i">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{ENL_ICONOS[l.tipo]}</svg>
+            </span>
+            <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.label}</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9aa5b5" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M7 17 17 7M9 7h8v8" /></svg>
+          </a>
+        ))}
+      </div>
     </div>
   );
 }
@@ -37183,7 +37131,10 @@ function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) 
           <div className="as-title">Asistencia</div>
           <div className="as-sub">
             {conFecha.length} misa{conFecha.length === 1 ? "" : "s"} registrada{conFecha.length === 1 ? "" : "s"}
-            {primera ? ` · cuenta desde el ${new Date(primera + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "long" })}` : ""}
+          </div>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 7, marginTop: 9, fontSize: 12.5, fontWeight: 700, color: "#16335a", background: "#e7eef8", borderRadius: 999, padding: "6px 12px" }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>
+            La asistencia se registra desde octubre de 2026
           </div>
         </div>
         {isAdmin && (
