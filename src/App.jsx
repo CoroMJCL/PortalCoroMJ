@@ -26613,121 +26613,93 @@ function AdminIntegrantes({ members, onReload }) {
 
   const admins = members.filter((m) => m.cuerda === "Admin");
   const integrantes = members.filter((m) => m.cuerda !== "Admin");
+  const [qInt, setQInt] = useState("");
+  const [filtroCuerda, setFiltroCuerda] = useState("Todas");
+  const cuerdasInt = ["Todas", ...Array.from(new Set(integrantes.map((m) => m.cuerda).filter(Boolean)))];
+  const integrantesVis = integrantes.filter((m) => (filtroCuerda === "Todas" || m.cuerda === filtroCuerda) && (!qInt || String(m.nombre || "").toLowerCase().includes(qInt.toLowerCase())));
 
   return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 14,
-        }}
-      >
-        <span style={{ fontSize: 13, color: C.gray }}>
-          {members.length} integrantes registrados · {admins.length} admin
-          {admins.length !== 1 ? "s" : ""}
-        </span>
-        <Btn onClick={() => setShowForm((p) => !p)}>+ Nuevo integrante</Btn>
+    <div className="ai">
+      <style>{`
+        .ai{font-family:var(--font-sans);color:#0f1b2d}
+        .ai-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+        .ai-cnt{flex:1 1 160px;font-size:13px;color:#6b7a90;font-weight:600}
+        .ai-cnt b{color:#0f1b2d;font-size:15px}
+        .ai-new{height:40px;padding:0 16px;border:none;border-radius:12px;background:linear-gradient(135deg,#17345c,#2a5a9c);color:#fff;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer;box-shadow:0 6px 16px rgba(23,52,92,.25);white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+        .ai-h{font-size:10.5px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#8a96a8;margin:4px 0 8px}
+        .ai-adm{border:1px solid #dfe7f2;background:linear-gradient(180deg,#f7f9fd,#fff);border-radius:16px;padding:14px;margin-bottom:8px}
+        .ai-adm-top{display:flex;align-items:center;gap:12px}
+        .ai-av{width:42px;height:42px;border-radius:50%;flex-shrink:0;background:linear-gradient(145deg,#1e3a5f,#2a5a9c) center/cover;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800}
+        .ai-n{font-size:15px;font-weight:800;letter-spacing:-.01em;line-height:1.25}
+        .ai-s{font-size:12px;color:#8a96a8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .ai-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:#16335a;background:#e7eef8;border-radius:999px;padding:3px 9px;margin-top:6px}
+        .ai-adm-ctl{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid #edf1f6}
+        .ai-sel{height:36px;border:1px solid #e3e9f2;border-radius:10px;background:#fff;font:inherit;font-size:13px;font-weight:600;color:#0f1b2d;padding:0 10px;flex:1 1 150px}
+        .ai-quitar{height:36px;border:1px solid #f3cfcb;border-radius:10px;background:#fff;color:#a32a1f;font:inherit;font-size:12.5px;font-weight:800;padding:0 12px;cursor:pointer}
+        .ai-tools{display:flex;flex-direction:column;gap:8px;margin:18px 0 10px}
+        .ai-search{display:flex;align-items:center;gap:8px;height:40px;border:1px solid #e3e9f2;border-radius:12px;background:#f7f9fc;padding:0 12px}
+        .ai-search input{border:none;outline:none;background:transparent;font:inherit;font-size:14px;width:100%;color:#0f1b2d}
+        .ai-chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+        .ai-chips::-webkit-scrollbar{display:none}
+        .ai-chip{flex-shrink:0;border:1px solid #e3e9f2;background:#fff;border-radius:999px;padding:7px 13px;font:inherit;font-size:12.5px;font-weight:700;color:#5b6779;cursor:pointer}
+        .ai-chip.on{background:#0f2744;border-color:#0f2744;color:#fff}
+        .ai-list{border:1px solid #e6ecf4;border-radius:16px;overflow:hidden;background:#fff}
+        .ai-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:11px 14px;border:none;border-bottom:1px solid #f1f4f8;background:#fff;cursor:pointer;font:inherit}
+        .ai-row:last-child{border-bottom:none}
+        .ai-row:hover{background:#f8fafd}
+        .ai-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:1px}
+      `}</style>
+      <div className="ai-top">
+        <div className="ai-cnt">
+          <b>{members.length}</b> integrantes · {admins.length} admin{admins.length !== 1 ? "s" : ""}
+        </div>
+        <button className="ai-new" onClick={() => setShowForm((p) => !p)}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+          Nuevo integrante
+        </button>
       </div>
 
-      {/* Sección Administradores */}
       {admins.length > 0 && (
-        <div style={{ marginBottom: 18 }}>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: C.gray,
-              letterSpacing: "0.05em",
-              marginBottom: 8,
-              textTransform: "uppercase",
-            }}
-          >
-            ⚙ Administradores ({admins.length})
-          </div>
+        <div style={{ marginBottom: 6 }}>
+          <div className="ai-h">Administradores · {admins.length}</div>
           {admins.map((m) => (
-            <div
-              key={m.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "10px 14px",
-                background: "#f0fdf4",
-                borderRadius: 12,
-                border: `1px solid ${C.primary}30`,
-                marginBottom: 6,
-                flexWrap: "wrap",
-              }}
-            >
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  background: CUERDAS["Admin"],
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "white",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  flexShrink: 0,
-                }}
-              >
-                {ini(m.nombre || "A")}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>
-                  {m.nombre}
+            <div key={m.id} className="ai-adm">
+              <div className="ai-adm-top">
+                <span className="ai-av" style={m.foto_url ? { backgroundImage: `url(${m.foto_url})` } : null}>
+                  {!m.foto_url && ini(m.nombre || "A")}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="ai-n">{m.nombre}</div>
+                  <div className="ai-s">{m.email}</div>
+                  <span className="ai-badge">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z" /></svg>
+                    {rolFullLabel(m)}
+                  </span>
                 </div>
-                <div style={{ fontSize: 11, color: C.gray }}>{m.email}</div>
               </div>
-              <Chip label={rolFullLabel(m)} color={CUERDAS["Admin"]} />
-              <select
-                value={m.cuerda_vocal || ""}
-                onChange={async (e) => {
-                  try {
-                    await updateRecord("integrantes", m.id, {
-                      cuerda_vocal: e.target.value,
-                    });
-                    onReload();
-                  } catch (err) {
-                    alert("Error: " + err.message);
-                  }
-                }}
-                style={{
-                  padding: "4px 8px",
-                  fontSize: 11,
-                  borderRadius: 9,
-                  border: `1px solid ${C.border}`,
-                  cursor: "pointer",
-                }}
-                title="Cuerda vocal de este admin"
-              >
-                <option value="">Cuerda vocal...</option>
-                {["Soprano", "Contralto", "Tenor", "Bajo"].map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-              <button
-                onClick={() => toggleAdmin(m)}
-                disabled={roleLoading === m.id}
-                style={{
-                  padding: "4px 10px",
-                  fontSize: 11,
-                  background: "#fee2e2",
-                  color: "#b91c1c",
-                  border: "1px solid #fca5a5",
-                  borderRadius: 9,
-                  cursor: "pointer",
-                  fontWeight: 500,
-                  flexShrink: 0,
-                }}
-              >
-                {roleLoading === m.id ? "..." : "↓ Quitar Admin"}
-              </button>
+              <div className="ai-adm-ctl">
+                <select
+                  className="ai-sel"
+                  value={m.cuerda_vocal || ""}
+                  onChange={async (e) => {
+                    try {
+                      await updateRecord("integrantes", m.id, { cuerda_vocal: e.target.value });
+                      onReload();
+                    } catch (err) {
+                      alert("Error: " + err.message);
+                    }
+                  }}
+                  title="Cuerda vocal de este admin"
+                >
+                  <option value="">Cuerda vocal…</option>
+                  {["Soprano", "Contralto", "Tenor", "Bajo"].map((c) => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </select>
+                <button className="ai-quitar" onClick={() => toggleAdmin(m)} disabled={roleLoading === m.id}>
+                  {roleLoading === m.id ? "…" : "Quitar admin"}
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -26844,99 +26816,44 @@ function AdminIntegrantes({ members, onReload }) {
         </Card>
       )}
 
-      {/* Tabla integrantes normales */}
-      <div
-        style={{
-          fontSize: 12,
-          fontWeight: 700,
-          color: C.gray,
-          letterSpacing: "0.05em",
-          marginBottom: 8,
-          textTransform: "uppercase",
-        }}
-      >
-        ◎ Integrantes ({integrantes.length})
+      {/* Integrantes */}
+      <div className="ai-tools">
+        <div className="ai-h" style={{ margin: 0 }}>Integrantes · {integrantes.length}</div>
+        <label className="ai-search">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a96a8" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+          <input value={qInt} onChange={(e) => setQInt(e.target.value)} placeholder="Buscar integrante" />
+        </label>
+        <div className="ai-chips">
+          {cuerdasInt.map((c) => (
+            <button key={c} className={"ai-chip" + (filtroCuerda === c ? " on" : "")} onClick={() => setFiltroCuerda(c)}>
+              {c}
+              {c !== "Todas" ? ` · ${integrantes.filter((m) => m.cuerda === c).length}` : ""}
+            </button>
+          ))}
+        </div>
       </div>
-      <div style={{ overflowX: "auto" }}>
-        {/* Lista limpia: solo nombre + cuerda. Al tocar abre popup con todos los datos */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-          {integrantes.map((m) => {
+      <div>
+        <div className="ai-list">
+          {integrantesVis.length === 0 && <div style={{ padding: 18, fontSize: 13, color: "#6b7a90", textAlign: "center" }}>No hay integrantes con ese filtro.</div>}
+          {integrantesVis.map((m) => {
             const mcc = CUERDAS[m.cuerda] || C.primary;
-            const fotoUrl = m.foto_url;
             return (
-              <button
-                key={m.id}
-                onClick={() => setVerIntegrante(m)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "11px 12px",
-                  border: "none",
-                  borderBottom: `1px solid ${C.border}`,
-                  background: "transparent",
-                  cursor: "pointer",
-                  transition: "background 0.12s",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = C.bg)}
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "transparent")
-                }
-              >
-                <div
-                  style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: "50%",
-                    flexShrink: 0,
-                    background: fotoUrl
-                      ? `url(${fotoUrl}) center/cover`
-                      : `linear-gradient(135deg, ${mcc}, ${mcc}bb)`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "white",
-                    fontWeight: 700,
-                    fontSize: 15,
-                  }}
-                >
-                  {!fotoUrl && (m.nombre || "?").charAt(0).toUpperCase()}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: C.dark,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {m.nombre}
-                    {m.asistencia_especial && (
-                      <span
-                        title="Caso especial"
-                        style={{
-                          marginLeft: 6,
-                          fontSize: 10,
-                          color: "#6d28d9",
-                        }}
-                      >
-                        ★
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 12, color: mcc, fontWeight: 500 }}>
-                    {m.cuerda}
-                    {m.cargo ? ` · ${m.cargo}` : ""}
-                  </div>
-                </div>
-                <span style={{ fontSize: 16, color: "#c7c7cc", flexShrink: 0 }}>
-                  ›
+              <button key={m.id} className="ai-row" onClick={() => setVerIntegrante(m)}>
+                <span className="ai-av" style={m.foto_url ? { backgroundImage: `url(${m.foto_url})` } : null}>
+                  {!m.foto_url && ini(m.nombre || "?")}
                 </span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span className="ai-n" style={{ display: "block", fontSize: 14.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {m.nombre}
+                    {m.asistencia_especial && <span title="Asistencia especial" style={{ marginLeft: 6, fontSize: 10.5, color: "#c98a12" }}>★</span>}
+                  </span>
+                  <span className="ai-s" style={{ display: "block" }}>
+                    <span className="ai-dot" style={{ background: mcc }} />
+                    {m.cuerda || "Sin cuerda"}
+                    {m.cargo ? ` · ${m.cargo}` : ""}
+                  </span>
+                </span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b6c0cd" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
               </button>
             );
           })}
