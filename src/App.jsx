@@ -4501,18 +4501,10 @@ function AuthScreen({
   };
 
   const [bio, setBio] = useState(null);
-  const bioAuto = useRef(false);
   useEffect(() => {
     const b = mjBioLeer();
     if (!b) return;
-    mjBioDisponible().then((ok) => {
-      setBio(ok ? b : null);
-      // Pide Face ID solo, apenas aparece la pantalla (una vez); si el teléfono no lo permite sin tocar, queda el botón
-      if (ok && view === "login" && !bioAuto.current) {
-        bioAuto.current = true;
-        doBio(true);
-      }
-    });
+    mjBioDisponible().then((ok) => setBio(ok ? b : null));
   }, [view]);
   async function doBio(automatico) {
     setError("");
