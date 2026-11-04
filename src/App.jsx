@@ -4501,18 +4501,28 @@ function AuthScreen({
   };
 
   const [bio, setBio] = useState(null);
+  const bioAuto = useRef(false);
   useEffect(() => {
     const b = mjBioLeer();
     if (!b) return;
-    mjBioDisponible().then((ok) => setBio(ok ? b : null));
+    mjBioDisponible().then((ok) => {
+      setBio(ok ? b : null);
+      // Pide Face ID solo, apenas aparece la pantalla (una vez); si el teléfono no lo permite sin tocar, queda el botón
+      if (ok && view === "login" && !bioAuto.current) {
+        bioAuto.current = true;
+        doBio(true);
+      }
+    });
   }, [view]);
-  async function doBio() {
+  async function doBio(automatico) {
     setError("");
     setLoading(true);
     try {
       await onSignInBio();
     } catch (err) {
-      if (err && err.name === "NotAllowedError") setError(`No se completó ${mjBioNombre()}. Intenta de nuevo o ingresa con tu contraseña.`);
+      if (err && err.name === "NotAllowedError") {
+        if (automatico !== true) setError(`No se completó ${mjBioNombre()}. Intenta de nuevo o ingresa con tu contraseña.`);
+      }
       else setError((err && err.message) || "No se pudo ingresar");
       if (!mjBioLeer()) setBio(null);
     }
@@ -4807,7 +4817,7 @@ function AuthScreen({
               <div style={{ marginBottom: 18 }}>
                 <button
                   type="button"
-                  onClick={doBio}
+                  onClick={() => doBio(false)}
                   disabled={loading}
                   style={{ width: "100%", height: 56, border: "none", borderRadius: 14, background: "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 11, fontSize: 15.5, fontWeight: 800, fontFamily: "inherit", cursor: "pointer", boxShadow: "0 8px 22px rgba(23,52,92,.28)", opacity: loading ? 0.7 : 1 }}
                 >
