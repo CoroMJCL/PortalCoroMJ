@@ -1547,14 +1547,14 @@ function TutorialPortal({ user, listo, setSection, setMobileMenu, forzar, onFin,
   const pasos = pasosRef.current;
   const clave = user && user.id ? `tutorial_ok_${user.id}` : null;
 
-  // ¿Debe mostrarse? Integrantes que no lo han completado (el admin lo abre desde la Guía de uso)
+  // ¿Debe mostrarse? Todos los que no lo han completado (también administradores)
   useEffect(() => {
     if (forzar) {
       setI(0);
       setActivo(true);
       return;
     }
-    if (!listo || !clave || esCuerdaAdmin(user) || esVisita(user)) return;
+    if (!listo || !clave || (esVisita(user) && !esCuerdaAdmin(user))) return;
     let local = false;
     try {
       local = !!localStorage.getItem(clave);
