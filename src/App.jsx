@@ -1593,8 +1593,8 @@ const TOPBAR_CSS = `
   .tb{padding:0 12px !important;height:56px;gap:8px}
   .tb-eyebrow{display:none}
   .tb-seccion{font-size:16px}
-  .tb-salir span,.tb-spot .tb-spot-t{display:none}
-  .tb-salir{width:38px;padding:0;justify-content:center}
+  .tb-spot .tb-spot-t{display:none}
+  .tb-salir{height:38px;padding:0 12px;gap:6px;font-size:13.5px;color:#0f2744}
   .tb-spot{padding:0 6px}
   .tb-spot-pop{position:fixed !important;top:62px !important;left:12px !important;right:12px !important;width:auto !important;max-width:none !important}
 }
