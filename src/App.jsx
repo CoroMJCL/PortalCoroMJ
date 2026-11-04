@@ -657,6 +657,10 @@ async function mjBioActivar(perfil, uid, refreshToken) {
   mjBioGuardar({ cred: mjB64(cred.rawId), uid: String(uid || ""), email: perfil.email || "", nombre: perfil.nombre || "", rt: refreshToken || _refreshToken, en: Date.now() });
 }
 async function mjBioVerificar() {
+  if (_mjBioCondCtrl) {
+    mjBioCancelarCondicional();
+    await new Promise((r) => setTimeout(r, 80));
+  }
   const b = mjBioLeer();
   if (!b || !b.cred) throw new Error("Face ID no está activado en este equipo.");
   const a = await navigator.credentials.get({
@@ -669,6 +673,31 @@ async function mjBioVerificar() {
     },
   });
   if (!a) throw new Error("No se pudo verificar");
+  return b;
+}
+// Face ID desde la sugerencia del teclado (autocompletar): sin la ventana grande de iOS
+let _mjBioCondCtrl = null;
+function mjBioCancelarCondicional() {
+  try {
+    if (_mjBioCondCtrl) _mjBioCondCtrl.abort();
+  } catch (e) {}
+  _mjBioCondCtrl = null;
+}
+async function mjBioCondicional() {
+  const b = mjBioLeer();
+  if (!b || !b.cred || !window.PublicKeyCredential || !window.PublicKeyCredential.isConditionalMediationAvailable) return null;
+  if (!(await window.PublicKeyCredential.isConditionalMediationAvailable())) return null;
+  mjBioCancelarCondicional();
+  const ctrl = new AbortController();
+  _mjBioCondCtrl = ctrl;
+  const a = await navigator.credentials.get({
+    mediation: "conditional",
+    signal: ctrl.signal,
+    publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), rpId: window.location.hostname, userVerification: "required", allowCredentials: [] },
+  });
+  if (_mjBioCondCtrl === ctrl) _mjBioCondCtrl = null;
+  if (!a) return null;
+  if (mjB64(a.rawId) !== b.cred) throw new Error("Esa llave no corresponde a la cuenta guardada en este equipo.");
   return b;
 }
 // Mantiene al día la sesión guardada para Face ID (Supabase cambia el token en cada renovación)
@@ -2949,8 +2978,8 @@ function AppInner() {
     const data = await authSignIn(email, password);
     await entrarConSesion(data, email, true);
   }
-  async function handleSignInBio() {
-    const b = await mjBioVerificar();
+  async function handleSignInBio(yaVerificado) {
+    const b = yaVerificado || (await mjBioVerificar());
     let data;
     try {
       data = await authConRefresh(b.rt);
@@ -4506,6 +4535,30 @@ function AuthScreen({
     if (!b) return;
     mjBioDisponible().then((ok) => setBio(ok ? b : null));
   }, [view]);
+  // Al tocar el campo del correo, el teclado sugiere la llave guardada: un toque y Face ID
+  useEffect(() => {
+    if (view !== "login" || !bio) return;
+    let vivo = true;
+    mjBioCondicional()
+      .then(async (b) => {
+        if (!vivo || !b) return;
+        setError("");
+        setLoading(true);
+        try {
+          await onSignInBio(b);
+        } catch (err) {
+          setError((err && err.message) || "No se pudo ingresar");
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (vivo && err && err.name !== "AbortError" && err.name !== "NotAllowedError") setError(err.message || "No se pudo ingresar");
+      });
+    return () => {
+      vivo = false;
+      mjBioCancelarCondicional();
+    };
+  }, [view, bio]);
   async function doBio(automatico) {
     setError("");
     setLoading(true);
@@ -4834,6 +4887,11 @@ function AuthScreen({
                     Quitar de este equipo
                   </button>
                 </div>
+                {/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && (
+                  <div style={{ textAlign: "center", fontSize: 12, color: "#8a96a8", marginTop: 6, lineHeight: 1.45 }}>
+                    Más rápido: toca el campo del correo y elige tu nombre 🔑 sobre el teclado.
+                  </div>
+                )}
                 <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0 0", color: "#98a3b3", fontSize: 11.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase" }}>
                   <span style={{ flex: 1, height: 1, background: "#e6ecf4" }} />o con tu contraseña<span style={{ flex: 1, height: 1, background: "#e6ecf4" }} />
                 </div>
@@ -4849,6 +4907,7 @@ function AuthScreen({
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     placeholder="tu@correo.cl"
+                    autoComplete="username webauthn"
                     style={inp}
                   />
                 </div>
