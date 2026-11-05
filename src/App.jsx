@@ -11109,6 +11109,7 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
             }
             if (!vivo) return;
             const gain = c.createGain();
+            gain.gain.value = 0; // empieza en silencio; la mezcla elegida se aplica enseguida
             gain.connect(c.destination);
             nodos.current[i] = { buffer, gain, src: null };
             durRef.current = Math.max(durRef.current, buffer.duration);
@@ -11148,10 +11149,20 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
       const p = ps[i];
       if (!p || !n || !n.gain) return;
       const g = p.on ? p.vol / 100 : 0;
+      const ag = n.gain.gain;
       try {
-        n.gain.gain.setTargetAtTime(g, c.currentTime, 0.015);
+        // Valor fijo e inmediato: en iPhone/iPad las transiciones programadas con el audio
+        // en pausa a veces no se aplican y todas las voces quedaban sonando al 100 %
+        ag.cancelScheduledValues(0);
+        if (c && c.state === "running" && reloj.current.sonando) {
+          ag.setValueAtTime(ag.value, c.currentTime);
+          ag.linearRampToValueAtTime(g, c.currentTime + 0.03);
+        } else {
+          ag.value = g;
+          if (c) ag.setValueAtTime(g, c.currentTime);
+        }
       } catch (e) {
-        n.gain.gain.value = g;
+        ag.value = g;
       }
     });
   };
@@ -11198,6 +11209,18 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
       n.src = src;
     });
     reloj.current = { inicio: t0, offset: desde, sonando: true };
+    // Se vuelve a fijar la mezcla justo al arrancar
+    const ps = pistasRef.current;
+    nodos.current.forEach((n, i) => {
+      if (!n || !n.gain || !ps[i]) return;
+      const g = ps[i].on ? ps[i].vol / 100 : 0;
+      try {
+        n.gain.gain.cancelScheduledValues(0);
+        n.gain.gain.setValueAtTime(g, c.currentTime);
+      } catch (e) {
+        n.gain.gain.value = g;
+      }
+    });
   };
 
   const reproducir = async () => {
@@ -11248,7 +11271,7 @@ function MultipistaEnsayo({ tracks, miCuerda, onFirstPlay, visor, fallback }) {
   const [foco, setFoco] = useState(() =>
     !hayStems ? "mezcla" : miCuerda && vocesDisp.includes(miCuerda) ? miCuerda : "todas"
   );
-  const [fondo, setFondo] = useState(30);
+  const [fondo, setFondo] = useState(0); // por defecto suena solo la voz elegida
   const [avanzado, setAvanzado] = useState(false);
   useEffect(() => {
     setPistas((p) =>
