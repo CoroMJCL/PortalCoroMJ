@@ -1789,6 +1789,106 @@ function InicioMusico({ user, pautas, setSection }) {
   );
 }
 
+// ── Tutorial "Cómo crear una pauta" (admin y músico) ─────────────────────
+function mjPasosPauta(esMus) {
+  return [
+    { t: "Cómo crear una pauta", d: "Te mostramos cada parte del formulario. Pon especial atención a las canciones y a los enlaces de letra y audio: es lo que el coro usará en la misa." },
+    { sel: '[data-tour="pf-titulo"]', t: "1. La celebración", d: "Elige el tipo de misa de la lista (Misa Dominical, Vigilia…). Si no está, elige la primera opción y escríbela a mano." },
+    { sel: '[data-tour="pf-liturgia"]', t: "2. Título litúrgico (opcional)", d: "Por ejemplo «Solemnidad de Todos los Santos». Se muestra bajo el nombre de la misa y en Modo Misa." },
+    { sel: '[data-tour="pf-fecha"]', t: "3. Fecha y hora", d: "La fecha es obligatoria: con ella se ordena la pauta y se habilita el Check in de ese día." },
+    { sel: '[data-tour="pf-canciones"]', antes: "fila", t: "4. Las canciones", d: "Aquí armas el repertorio. Cada fila es un canto. Usa «+ Agregar fila» para sumar cantos; se numeran solos." },
+    { sel: '[data-tour="pf-orden"]', t: "5. Momento de la misa", d: "Elige en qué parte va el canto: Entrada, Perdón, Gloria, Salmo, Aclamación, Ofertorio, Santo, Comunión, Salida…" },
+    { sel: '[data-tour="pf-cancion"]', t: "6. Elige la canción", d: "Empieza a escribir el nombre y elige de la lista desplegable del directorio. Si eliges un canto del directorio, su letra en PDF se carga sola. Si no está, escribe el título igual." },
+    { sel: '[data-tour="pf-interprete"]', t: "7. Quién la canta", d: "Todos, Salmista, Solista o el nombre de la persona. Ayuda a que cada uno sepa cuándo le toca." },
+    { sel: '[data-tour="pf-col"]', antes: "letra", t: "8. Mostrar las columnas de enlaces", d: "Con estos botones activas las columnas «URL Letra (PDF)» y «URL Audio». Ya las dejamos activadas para que las veas." },
+    { sel: '[data-tour="pf-letra"]', t: "9. Letra (PDF)", d: "Toca «📂 Directorio» para buscar la letra entre las que ya tiene el coro; es lo recomendado. También puedes pegar un enlace de Google Drive: el archivo debe estar compartido como «Cualquier persona con el enlace», o el coro no lo podrá abrir." },
+    { sel: '[data-tour="pf-audio"]', t: "10. Audio de referencia", d: "Pega el enlace del canto en YouTube, Spotify o un audio de Google Drive (compartido con «Cualquier persona con el enlace»). YouTube y Drive se escuchan dentro del portal con el botón ▶." },
+    { sel: '[data-tour="pf-estado"]', t: "11. Por confirmar", d: "Si un canto todavía puede cambiar, márcalo «Por confirmar»: la fila queda en amarillo para que todos lo sepan." },
+    { sel: '[data-tour="pf-guardar"]', t: "12. Guardar o publicar", d: esMus ? "«Guardar Borrador» la deja guardada para seguir después. «Publicar» la deja lista. Tus pautas son privadas: solo las ves tú y el encargado del coro." : "«Guardar Borrador» la guarda sin que nadie la vea. «Publicar y Notificar» la muestra al coro y avisa a todos por notificación. Si la pauta es reservada, primero elige quiénes la ven." },
+    { t: "¡Listo!", d: "Ya sabes crear una pauta. Puedes repetir esta guía cuando quieras con el botón «¿Cómo crear una pauta?».", fin: true },
+  ];
+}
+function TutorialPauta({ esMus, onCerrar, asegurarColumnas }) {
+  const pasos = useMemo(() => mjPasosPauta(esMus), [esMus]);
+  const [i, setI] = useState(0);
+  const [rect, setRect] = useState(null);
+  const paso = pasos[i];
+  useEffect(() => {
+    if (paso.antes && asegurarColumnas) asegurarColumnas(paso.antes);
+    setRect(null);
+    if (!paso.sel) return;
+    let n = 0;
+    const buscar = () => {
+      const el = mjVisibleEl(paso.sel);
+      if (el) {
+        if (n < 2) el.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+        const r = el.getBoundingClientRect();
+        setRect({ x: r.left, y: r.top, w: r.width, h: r.height });
+      } else if (n > 8) setRect("nada");
+      n++;
+    };
+    const t0 = setTimeout(buscar, 250);
+    const iv = setInterval(buscar, 350);
+    return () => {
+      clearTimeout(t0);
+      clearInterval(iv);
+    };
+  }, [i]);
+  const total = pasos.length;
+  const sig = () => (paso.fin ? onCerrar() : setI((x) => Math.min(total - 1, x + 1)));
+  const ant = () => setI((x) => Math.max(0, x - 1));
+  const vw = window.innerWidth,
+    vh = window.innerHeight;
+  const centrado = !paso.sel || rect === "nada" || !rect;
+  const pad = 6;
+  const hx = rect && rect !== "nada" ? rect.x - pad : 0,
+    hy = rect && rect !== "nada" ? rect.y - pad : 0,
+    hw = rect && rect !== "nada" ? rect.w + pad * 2 : 0,
+    hh = rect && rect !== "nada" ? rect.h + pad * 2 : 0;
+  const cardW = Math.min(360, vw - 32);
+  const abajo = hy + hh + 230 < vh;
+  const tarjeta = (
+    <div key={i} className="tuto-card" style={centrado ? { width: "min(420px,100%)", padding: "22px 20px 18px" } : { position: "absolute", left: Math.max(16, Math.min(vw - cardW - 16, hx + hw / 2 - cardW / 2)), width: cardW, top: abajo ? hy + hh + 14 : undefined, bottom: abajo ? undefined : Math.max(16, vh - hy + 14), padding: "16px 18px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="tuto-k">Crear pauta · {i + 1} de {total}</div>
+        <button onClick={onCerrar} aria-label="Cerrar" style={{ background: "none", border: "none", color: "#8a96a8", fontSize: 18, cursor: "pointer", lineHeight: 1 }}>
+          ×
+        </button>
+      </div>
+      <div className="tuto-bar">
+        <i style={{ width: `${((i + 1) / total) * 100}%` }} />
+      </div>
+      <div style={{ fontSize: centrado ? 20 : 17, fontWeight: 800, letterSpacing: "-0.02em", marginTop: 12, lineHeight: 1.25 }}>{paso.t}</div>
+      <div style={{ fontSize: 14, color: "#4b5869", lineHeight: 1.6, marginTop: 6 }}>{paso.d}</div>
+      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+        {i > 0 && (
+          <button onClick={ant} style={{ height: 42, padding: "0 14px", border: "1px solid #e3e9f2", borderRadius: 12, background: "#fff", color: "#0f2744", fontFamily: "inherit", fontSize: 13.5, fontWeight: 800, cursor: "pointer" }}>
+            Anterior
+          </button>
+        )}
+        <button onClick={sig} style={{ flex: 1, height: 42, border: "none", borderRadius: 12, background: "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", fontFamily: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+          {paso.fin ? "Terminar" : i === 0 ? "Comenzar" : "Siguiente"}
+        </button>
+      </div>
+    </div>
+  );
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, zIndex: 12000, fontFamily: "var(--font-sans)" }}>
+      <style>{TUTO_CSS}</style>
+      {centrado ? (
+        <div style={{ position: "absolute", inset: 0, background: "rgba(10,20,40,.66)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>{tarjeta}</div>
+      ) : (
+        <>
+          <div style={{ position: "absolute", inset: 0 }} />
+          <div style={{ position: "absolute", left: hx, top: hy, width: hw, height: hh, borderRadius: 14, border: "2px solid #f5b942", boxShadow: "0 0 0 9999px rgba(10,20,40,.66)", pointerEvents: "none", transition: "all .25s" }} />
+          {tarjeta}
+        </>
+      )}
+    </div>,
+    document.body
+  );
+}
+
 // Guía de uso: para repasar cuando se quiera
 function GuiaUso({ setSection, onTutorial }) {
   const temas = [
@@ -33305,6 +33405,15 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const [selected, setSelected] = useState(null); // pauta activa
   const [aniosAbiertos, setAniosAbiertos] = useState({});
   const [mode, setMode] = useState(null); // null=lista | "new" | "edit" | "view"
+  const [tutoPauta, setTutoPauta] = useState(false);
+  useEffect(() => {
+    if (mode !== "new" || !isAdmin) return;
+    let visto = false;
+    try {
+      visto = !!localStorage.getItem("mj_tuto_pauta_" + (user?.id || ""));
+    } catch (e) {}
+    if (!visto) setTutoPauta(true);
+  }, [mode]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [notifStatus, setNotifStatus] = useState("");
@@ -33798,6 +33907,25 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     const pautaEdit = mode === "edit" ? selected : null;
     return (
       <div style={{ maxWidth: 1100 }}>
+        {tutoPauta && (
+          <TutorialPauta
+            esMus={esMus}
+            asegurarColumnas={(que) => {
+              // Para mostrar el ejemplo: al menos una fila y las columnas de enlaces visibles
+              if (canciones.length === 0) addFila(-1);
+              if (que === "letra") {
+                setShowColLetra(true);
+                setShowColAudio(true);
+              }
+            }}
+            onCerrar={() => {
+              setTutoPauta(false);
+              try {
+                localStorage.setItem("mj_tuto_pauta_" + (user?.id || ""), "1");
+              } catch (e) {}
+            }}
+          />
+        )}
         <datalist id="pauta-interpretes">
           {INTERPRETE_OPTIONS.map((o) => (
             <option key={o} value={o} />
@@ -33854,6 +33982,14 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
           >
             {mode === "edit" ? "✏️ Editar Pauta" : "🎼 Nueva Pauta de Misa"}
           </h2>
+          <button
+            type="button"
+            onClick={() => setTutoPauta(true)}
+            style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 7, height: 34, padding: "0 13px", border: "1px solid #e3e9f2", borderRadius: 999, background: "#fff", color: "#0f2744", fontFamily: "inherit", fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" /></svg>
+            ¿Cómo crear una pauta?
+          </button>
         </div>
         {msg && (
           <div
@@ -33934,6 +34070,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                 </div>
               ) : (
                 <select
+                  data-tour="pf-titulo"
                   value={form.titulo}
                   onChange={(e) => {
                     const v = e.target.value;
@@ -33961,6 +34098,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                 type="text"
                 value={form.liturgia || ""}
                 placeholder="Ej: Solemnidad de Todos los Santos"
+                data-tour="pf-liturgia"
                 onChange={(e) => setForm((p) => ({ ...p, liturgia: e.target.value }))}
                 style={inp}
               />
@@ -33979,6 +34117,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
               </label>
               <input
                 type="date"
+                data-tour="pf-fecha"
                 value={form.fecha}
                 onChange={(e) =>
                   setForm((p) => ({ ...p, fecha: e.target.value }))
@@ -34276,6 +34415,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
         {/* Tabla de canciones */}
         <Card style={{ marginBottom: 16, padding: 0, overflow: "hidden" }}>
           <div
+            data-tour="pf-canciones"
             style={{
               padding: "14px 16px",
               borderBottom: `1px solid ${C.border}`,
@@ -34336,7 +34476,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       {h}
                     </th>
                   ))}
-                  <th
+                  <th data-tour="pf-col"
                     style={{
                       ...thStyle,
                       padding: "4px 4px",
@@ -34440,6 +34580,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     </td>
                     <td style={tdEditStyle}>
                       <select
+                        data-tour={i === 0 ? "pf-orden" : undefined}
                         value={c.orden}
                         onChange={(e) => updateFila(i, "orden", e.target.value)}
                         style={{ ...inpTd, minWidth: 160 }}
@@ -34452,6 +34593,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     <td style={tdEditStyle}>
                       <input
                         list="pauta-dir-canciones"
+                        data-tour={i === 0 ? "pf-cancion" : undefined}
                         value={c.cancion}
                         onChange={(e) => {
                           const v = e.target.value;
@@ -34479,6 +34621,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     <td style={tdEditStyle}>
                       <input
                         list="pauta-interpretes"
+                        data-tour={i === 0 ? "pf-interprete" : undefined}
                         value={c.salmista || ""}
                         onChange={(e) =>
                           updateFila(i, "salmista", e.target.value)
@@ -34492,6 +34635,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     {showColLetra && (
                       <td style={tdEditStyle}>
                         <div
+                          data-tour={i === 0 ? "pf-letra" : undefined}
                           style={{ display: "flex", alignItems: "center", gap: 6 }}
                         >
                           <button
@@ -34527,6 +34671,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     {showColAudio && (
                       <td style={tdEditStyle}>
                         <input
+                          data-tour={i === 0 ? "pf-audio" : undefined}
                           value={c.url_audio}
                           onChange={(e) =>
                             updateFila(i, "url_audio", e.target.value)
@@ -34539,6 +34684,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                     <td style={{ ...tdEditStyle, textAlign: "center" }}>
                       <button
                         type="button"
+                        data-tour={i === 0 ? "pf-estado" : undefined}
                         onClick={() => updateFila(i, "pendiente", !c.pendiente)}
                         title={
                           c.pendiente
@@ -34616,7 +34762,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             </span>
           </div>
         </Card>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div data-tour="pf-guardar" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {mode === "edit" ? (
             <>
               <Btn onClick={() => saveEditPauta(selected)} disabled={saving}>
