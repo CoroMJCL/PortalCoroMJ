@@ -483,13 +483,20 @@ async function supabase(table, options = {}) {
   // Si JWT expiró, intentar renovar y reintentar una vez
   if (res.status === 401) {
     const refreshed = await refreshSession();
-    if (refreshed) {
-      res = await fetch(url, {
-        method,
-        headers: makeHeaders(),
-        body: body ? JSON.stringify(body) : undefined,
-      });
+    if (!refreshed && _authToken) {
+      // Sesión vieja guardada en el equipo (ya vencida): se descarta y se reintenta como visitante
+      _authToken = null;
+      _refreshToken = null;
+      try {
+        localStorage.removeItem("sb_access_token");
+        localStorage.removeItem("sb_refresh_token");
+      } catch (e) {}
     }
+    res = await fetch(url, {
+      method,
+      headers: makeHeaders(),
+      body: body ? JSON.stringify(body) : undefined,
+    });
   }
   if (!res.ok) throw new Error(await res.text());
   return res.status === 204 ? null : res.json();
@@ -3374,6 +3381,11 @@ function AppInner() {
     genero,
     rut
   ) {
+    // Quien se registra no tiene sesión: se descarta cualquier sesión vieja guardada en el equipo
+    if (!user) {
+      _authToken = null;
+      _refreshToken = null;
+    }
     // Verificar que el RUT no exista ya (evita duplicados con correo distinto)
     if (rut) {
       const existentes = await supabase("integrantes", {
