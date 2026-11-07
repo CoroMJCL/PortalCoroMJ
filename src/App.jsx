@@ -3690,28 +3690,35 @@ function AppInner() {
         <style>{`
           .spl{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans','Inter',-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif;color:#fff;overflow:hidden;
             background:radial-gradient(120% 80% at 50% 30%,#24477a 0%,#142b4d 48%,#0a1830 100%)}
-          .spl::before{content:"";position:absolute;width:520px;height:520px;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-62%);
+          .spl::before{content:"";position:absolute;width:520px;height:520px;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);
             background:radial-gradient(circle,rgba(245,185,66,.16) 0%,rgba(245,185,66,0) 62%);animation:splGlow 3.2s ease-in-out infinite}
           .spl-logo{position:relative;width:96px;height:96px;border-radius:28px;overflow:hidden;background:#fff;
             box-shadow:0 24px 60px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.12);animation:splIn .7s cubic-bezier(.2,.8,.2,1) both}
           .spl-logo img{width:100%;height:100%;object-fit:cover}
           .spl-ring{position:absolute;width:128px;height:128px;border-radius:38px;border:1px solid rgba(245,185,66,.35);top:50%;left:50%;
             transform:translate(-50%,calc(-50% - 52px));animation:splRing 2.4s ease-out infinite}
-          .spl-k{margin-top:30px;font-size:10.5px;font-weight:800;letter-spacing:.42em;text-transform:uppercase;color:rgba(255,255,255,.62);animation:splIn .7s .15s both}
-          .spl-t{margin-top:8px;font-size:22px;font-weight:800;letter-spacing:-.02em;animation:splIn .7s .25s both}
+          .spl-k{display:flex;align-items:center;gap:14px;font-size:13px;font-weight:800;letter-spacing:.5em;text-transform:uppercase;color:rgba(255,255,255,.75);animation:splIn .7s .1s both}
+          .spl-k::before,.spl-k::after{content:"";width:28px;height:1.5px;border-radius:2px;background:linear-gradient(90deg,rgba(245,185,66,0),#f5b942)}
+          .spl-k::after{transform:scaleX(-1)}
+          .spl-t{margin-top:10px;font-size:32px;font-weight:800;letter-spacing:-.035em;line-height:1.1;text-align:center;animation:splIn .7s .2s both}
           .spl-bar{margin-top:26px;width:132px;height:3px;border-radius:99px;background:rgba(255,255,255,.14);overflow:hidden;animation:splIn .7s .35s both}
           .spl-bar i{display:block;width:40%;height:100%;border-radius:99px;background:linear-gradient(90deg,rgba(245,185,66,0),#f5b942,rgba(245,185,66,0));animation:splBar 1.2s ease-in-out infinite}
           .spl-s{margin-top:14px;font-size:12.5px;color:rgba(255,255,255,.55);font-weight:600;animation:splIn .7s .45s both}
           .spl-pie{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:rgba(255,255,255,.35);font-weight:700}
+          .spl-wave{display:flex;align-items:center;gap:7px;height:64px;margin-bottom:30px;animation:splIn .7s both}
+          .spl-wave i{display:block;width:5px;height:64px;border-radius:99px;transform-origin:center;transform:scaleY(calc(var(--h) * .35));
+            background:linear-gradient(180deg,#ffe3a3,#f5b942 55%,#c98a12);box-shadow:0 0 14px rgba(245,185,66,.35);animation:splOnda 1.1s ease-in-out infinite alternate}
+          @keyframes splOnda{0%{transform:scaleY(calc(var(--h) * .28))}100%{transform:scaleY(var(--h))}}
           @keyframes splIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
           @keyframes splBar{0%{transform:translateX(-110%)}100%{transform:translateX(260%)}}
           @keyframes splRing{0%{opacity:.9;transform:translate(-50%,calc(-50% - 52px)) scale(.86)}100%{opacity:0;transform:translate(-50%,calc(-50% - 52px)) scale(1.25)}}
           @keyframes splGlow{0%,100%{opacity:.7}50%{opacity:1}}
         `}</style>
         <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <span className="spl-ring" />
-          <div className="spl-logo">
-            <img src={LOGO} alt="Coro Misioneros de Jesús" />
+          <div className="spl-wave" aria-hidden="true">
+            {[0.35, 0.6, 0.85, 1, 0.75, 1, 0.85, 0.6, 0.35].map((h, k) => (
+              <i key={k} style={{ "--h": h, animationDelay: `${(k % 5) * 0.12 + (k > 4 ? 0.06 : 0)}s` }} />
+            ))}
           </div>
           <div className="spl-k">Coro</div>
           <div className="spl-t">Misioneros de Jesús</div>
