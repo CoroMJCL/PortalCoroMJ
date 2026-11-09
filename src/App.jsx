@@ -33765,11 +33765,30 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     try {
       let cuerpo = lineas.slice(0, 4).join(" · ");
       if (lineas.length > 4) cuerpo += ` · y ${lineas.length - 4} cambio(s) más`;
-      const r = await sendPushToAll("✏️ Cambios en la pauta de misa", `${pauta.titulo || "Misa"}: ${cuerpo}`.slice(0, 220), "/");
+      // Se envía por integrante (external_id), igual que los recordatorios, porque el envío
+      // "a todos" depende de un endpoint antiguo de OneSignal que ya no responde.
+      const titulo = "✏️ Cambios en la pauta de misa";
+      const texto = `${pauta.titulo || "Misa"}: ${cuerpo}`.slice(0, 220);
+      const ids = [...new Set((members || []).filter((m) => m && m.id != null && m.activo !== false).map((m) => String(m.id)))];
+      let r = ids.length ? await sendPushToUsers(ids, titulo, texto, "/", true) : { ok: false };
+      if (!r.ok) {
+        const r2 = await sendPushToAll(titulo, texto, "/");
+        if (r2.ok) r = r2;
+        else r = { ok: false, data: r.data || r2.data };
+      }
+      let motivo = "";
+      const d = r.data || {};
+      if (!r.ok) {
+        if (d.detalle?.dispositivos_suscritos === 0) motivo = "no hay dispositivos suscritos";
+        else if (d.detalle?.dispositivos_suscritos != null) motivo = `${d.detalle.dispositivos_suscritos} dispositivo(s) suscritos, ${d.detalle.identificados_con_integrante} identificados con su integrante`;
+        else if (d.detalle?.error) motivo = d.detalle.error;
+        else if (d.error) motivo = d.error;
+        else if (d.onesignal?.errors) motivo = JSON.stringify(d.onesignal.errors).slice(0, 160);
+      }
       setAvisoRes(
         r.ok
           ? `✅ Se notificó a todos los integrantes (${r.recipients || 0} dispositivo(s)).`
-          : "⚠️ Los cambios se guardaron, pero no se pudo enviar la notificación."
+          : `⚠️ Los cambios se guardaron, pero no se pudo enviar la notificación${motivo ? ` (${motivo})` : ""}.`
       );
     } catch (e) {
       setAvisoRes("⚠️ Los cambios se guardaron, pero no se pudo enviar la notificación.");
