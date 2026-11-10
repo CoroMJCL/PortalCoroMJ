@@ -37591,7 +37591,8 @@ function ControlAccesoAsistencia({ user, members, asistencia, eventosDb, listo, 
 // ── Confirmación de participación en una misa (link por WhatsApp o al entrar) ──
 // Sí voy → recibe la pauta. No puedo → solo "Gracias por avisar", salvo que lleve 2+ ausencias seguidas: ahí ve la advertencia.
 function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, onCambio }) {
-  const activo = !!(user && user.id) && !esCuerdaAdmin(user) && !esMusico(user) && !esVisita(user);
+  const soyAdmin = esCuerdaAdmin(user);
+  const activo = !!(user && user.id) && !esMusico(user) && (soyAdmin || !esVisita(user));
   const [fechaLink] = useState(() => {
     try {
       const f = new URLSearchParams(window.location.search).get("confirmar");
@@ -37627,7 +37628,7 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
   const hoy = mjHoyISO();
   const convs = conv.conv;
   let fecha = forzada && convs[forzada] ? forzada : null;
-  if (!fecha && !forzada) {
+  if (!fecha && !forzada && !soyAdmin) {
     fecha =
       Object.keys(convs)
         .sort()
@@ -44189,7 +44190,7 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
       .catch(() => {});
   }, []);
   const hoy = mjHoyISO();
-  const integrantes = useMemo(() => mjIntegrantesAsistencia(members).filter((m) => m.activo !== false), [members]);
+  const integrantes = useMemo(() => mjIntegrantesConvocatoria(members), [members]);
   if (!data) return <div style={{ padding: 20, color: "#64748b", fontSize: 14 }}>Cargando convocatorias…</div>;
 
   const convs = Object.values(data.conv || {})
@@ -44506,6 +44507,12 @@ function mjNombreApellido(nombre) {
   // 3 partes: "Nombre1 Nombre2 Apellido" o "Nombre Apellido1 Apellido2"
   return MJ_NOMBRES_COMUNES.has(t[1].toLowerCase()) ? `${t[0]} ${t[2]}` : `${t[0]} ${t[1]}`;
 }
+// Convocatorias: integrantes del coro + cuentas Admin (el director también confirma). El Admin no se bloquea ni cuenta para asistencia.
+function mjIntegrantesConvocatoria(members) {
+  const base = mjIntegrantesAsistencia(members);
+  const admins = (members || []).filter((m) => m && esCuerdaAdmin(m) && (!m.acceso || m.acceso === "aprobado"));
+  return [...base, ...admins].filter((m) => m.activo !== false).sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"));
+}
 function ListaPublicaConvocatoria() {
   const [estado, setEstado] = useState({ cargando: true });
   const cargar = async () => {
@@ -44543,7 +44550,7 @@ function ListaPublicaConvocatoria() {
   if (!fecha) return pagina(<div style={{ background: "#fff", borderRadius: 18, padding: 22, textAlign: "center", color: "#4b5869", fontSize: 14.5, border: "1px solid #e1e9f4" }}>Aún no hay una próxima misa convocada.</div>);
   const c = d.conv[fecha];
   const resp = (d.resp || {})[fecha] || {};
-  const integrantes = mjIntegrantesAsistencia(ms).filter((m) => m.activo !== false);
+  const integrantes = mjIntegrantesConvocatoria(ms);
   const nom = (m) => mjNombreApellido(m.nombre);
   const si = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "si");
   const no = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "no");
