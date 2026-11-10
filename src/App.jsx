@@ -44380,9 +44380,10 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
         {convs.map((c) => {
           const resp = (data.resp || {})[c.fecha] || {};
           const abiertaC = mjConvAbierta(c);
-          const si = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "si");
-          const no = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "no");
-          const pend = integrantes.filter((m) => !resp[String(m.id)]);
+          const encC = mjEncargadoConv(c, integrantes);
+          const si = mjEncargadoPrimero(integrantes.filter((m) => (resp[String(m.id)] || {}).r === "si"), encC);
+          const no = mjEncargadoPrimero(integrantes.filter((m) => (resp[String(m.id)] || {}).r === "no"), encC);
+          const pend = mjEncargadoPrimero(integrantes.filter((m) => !resp[String(m.id)]), encC);
           const pauta = (pautas || []).find((p) => p.fecha === c.fecha);
           const fl = mjFechaLargaCorta(c.fecha);
           return (
@@ -44430,6 +44431,7 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
                     ) : (
                       lista.map((m) => (
                         <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid #f3f5f9" }}>
+                          <MjIconoRespuesta r={(resp[String(m.id)] || {}).r} />
                           <div style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 600, color: "#0f1b2d" }}>
                             {m.nombre}
                             {String(m.id) === mjEncargadoConv(c, integrantes) ? <MjEtiquetaEncargado /> : null}
@@ -44555,6 +44557,17 @@ function mjEncargadoConv(c, integrantes) {
   const adm = (integrantes || []).find((m) => esCuerdaAdmin(m));
   return adm ? String(adm.id) : null;
 }
+function mjEncargadoPrimero(lista, encId) {
+  const l = [...(lista || [])];
+  const i = l.findIndex((m) => String(m.id) === String(encId));
+  if (i > 0) l.unshift(l.splice(i, 1)[0]);
+  return l;
+}
+function MjIconoRespuesta({ r }) {
+  if (r === "si") return <span aria-label="Confirmado" style={{ color: "#d4a017", fontSize: 16, lineHeight: 1, width: 18, textAlign: "center", flexShrink: 0 }}>★</span>;
+  if (r === "no") return <span aria-label="No va" style={{ color: "#c0392b", fontSize: 15, fontWeight: 800, lineHeight: 1, width: 18, textAlign: "center", flexShrink: 0 }}>✕</span>;
+  return null;
+}
 function MjEtiquetaEncargado() {
   return <span style={{ display: "inline-block", marginLeft: 8, padding: "2px 8px", borderRadius: 999, background: "#1e3a5f", color: "#fff", fontSize: 10.5, fontWeight: 800, letterSpacing: ".02em", verticalAlign: "middle", whiteSpace: "nowrap" }}>Encargado Coro</span>;
 }
@@ -44598,9 +44611,9 @@ function ListaPublicaConvocatoria() {
   const integrantes = mjOrdenarPorCuerda(mjIntegrantesConvocatoria(ms));
   const nom = (m) => mjNombreApellido(m.nombre);
   const encargadoId = mjEncargadoConv(d.conv[fecha], integrantes);
-  const si = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "si");
-  const no = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "no");
-  const pend = integrantes.filter((m) => !resp[String(m.id)]);
+  const si = mjEncargadoPrimero(integrantes.filter((m) => (resp[String(m.id)] || {}).r === "si"), encargadoId);
+  const no = mjEncargadoPrimero(integrantes.filter((m) => (resp[String(m.id)] || {}).r === "no"), encargadoId);
+  const pend = mjEncargadoPrimero(integrantes.filter((m) => !resp[String(m.id)]), encargadoId);
   const abierta = mjConvAbierta(c);
   const fl = mjFechaLargaCorta(fecha);
   const bloque = (titulo, lista, col, bg, vacio) => (
@@ -44614,6 +44627,7 @@ function ListaPublicaConvocatoria() {
       ) : (
         lista.map((m) => (
           <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", borderTop: "1px solid #f1f4f8" }}>
+            <MjIconoRespuesta r={(resp[String(m.id)] || {}).r} />
             <div style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 600 }}>
               {nom(m)}
               {String(m.id) === encargadoId ? <MjEtiquetaEncargado /> : null}
