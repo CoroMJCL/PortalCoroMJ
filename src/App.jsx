@@ -44172,7 +44172,7 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
   const [form, setForm] = useState(null); // { fecha, titulo, hora, lugar, limite, editar }
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState("");
-  const [abierta, setAbierta] = useState(null);
+  const [abierta, setAbierta] = useState(null); // { fecha, tipo: "si" | "no" | "pend" }
   const [copiado, setCopiado] = useState("");
   const recargar = async () => {
     const [d, dc] = await Promise.all([mjCargarConvocatorias().catch(() => null), mjCargarDesbloqueosConv().catch(() => null)]);
@@ -44216,7 +44216,6 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
       setMsg("No se pudo guardar. Intenta de nuevo.");
       return;
     }
-    setAbierta(form.fecha);
     setForm(null);
     await recargar();
   };
@@ -44361,23 +44360,8 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
           const si = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "si");
           const no = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "no");
           const pend = integrantes.filter((m) => !resp[String(m.id)]);
-          const cuerdas = [...new Set(integrantes.map((m) => m.cuerda))].sort((a, b) => String(a).localeCompare(String(b), "es"));
           const pauta = (pautas || []).find((p) => p.fecha === c.fecha);
-          const exp = abierta === c.fecha;
           const fl = mjFechaLargaCorta(c.fecha);
-          const chip = (m, bg, color, conBoton) => (
-            <span key={m.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 6px 4px 10px", borderRadius: 999, background: bg, color, fontSize: 12.5, fontWeight: 600, margin: "0 6px 6px 0" }}>
-              {String(m.nombre || "").split(" ").slice(0, 2).join(" ")}
-              {(resp[String(m.id)] || {}).porAdmin ? <span style={{ fontSize: 10.5, opacity: 0.7 }}>(agregado)</span> : null}
-              {conBoton ? (
-                <button onClick={() => agregar(c, m)} title="Agregar como confirmado" style={{ border: "none", background: "#fff", color: NAVY, borderRadius: 999, height: 22, padding: "0 8px", fontSize: 11.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-                  Agregar
-                </button>
-              ) : (
-                <span style={{ width: 4 }} />
-              )}
-            </span>
-          );
           return (
             <div key={c.fecha} style={card}>
               <div style={{ padding: "14px 16px", background: "linear-gradient(135deg,#17345c 0%,#2a5a9c 100%)", color: "#fff" }}>
@@ -44396,25 +44380,54 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", borderBottom: "1px solid #eef2f7" }}>
                 {[
-                  ["Sí van", si.length, NAVY],
-                  ["No van", no.length, "#64748b"],
-                  ["Sin responder", pend.length, "#b45309"],
-                ].map(([t, n, col]) => (
-                  <div key={t} style={{ padding: "12px 8px", textAlign: "center" }}>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: col, letterSpacing: "-0.02em" }}>{n}</div>
-                    <div style={{ fontSize: 11.5, color: "#64748b", fontWeight: 600 }}>{t}</div>
-                  </div>
-                ))}
+                  ["si", "Sí van", si.length, NAVY],
+                  ["no", "No van", no.length, "#64748b"],
+                  ["pend", "Sin responder", pend.length, "#b45309"],
+                ].map(([k, t, n, col]) => {
+                  const act = abierta && abierta.fecha === c.fecha && abierta.tipo === k;
+                  return (
+                    <button
+                      key={k}
+                      onClick={() => setAbierta(act ? null : { fecha: c.fecha, tipo: k })}
+                      style={{ padding: "12px 8px", textAlign: "center", border: "none", borderBottom: `3px solid ${act ? col : "transparent"}`, background: act ? "#f5f8fd" : "#fff", cursor: "pointer", fontFamily: "inherit" }}
+                    >
+                      <div style={{ fontSize: 22, fontWeight: 800, color: col, letterSpacing: "-0.02em" }}>{n}</div>
+                      <div style={{ fontSize: 11.5, color: "#64748b", fontWeight: 600 }}>{t} {act ? "▴" : "▾"}</div>
+                    </button>
+                  );
+                })}
               </div>
+              {abierta && abierta.fecha === c.fecha && (() => {
+                const lista = abierta.tipo === "si" ? si : abierta.tipo === "no" ? no : pend;
+                const vacio = abierta.tipo === "si" ? "Nadie ha confirmado todavía." : abierta.tipo === "no" ? "Nadie ha dicho que no." : "Todos respondieron.";
+                return (
+                  <div style={{ padding: "6px 16px 10px", borderBottom: "1px solid #eef2f7" }}>
+                    {lista.length === 0 ? (
+                      <div style={{ padding: "10px 0", fontSize: 13.5, color: "#64748b" }}>{vacio}</div>
+                    ) : (
+                      lista.map((m) => (
+                        <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid #f3f5f9" }}>
+                          <div style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 600, color: "#0f1b2d" }}>
+                            {m.nombre}
+                            {(resp[String(m.id)] || {}).porAdmin ? <span style={{ fontSize: 11.5, color: "#8a96a8", fontWeight: 600 }}> · agregado por ti</span> : null}
+                          </div>
+                          {abierta.tipo !== "si" ? (
+                            <button onClick={() => agregar(c, m)} style={btn("#e8f0fb", NAVY, { height: 32, padding: "0 12px", fontSize: 12.5 })}>
+                              Agregar
+                            </button>
+                          ) : null}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                );
+              })()}
               <div style={{ padding: "12px 16px", display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <a href={`https://wa.me/?text=${encodeURIComponent(mjTextoWhatsappConv(c))}`} target="_blank" rel="noopener" style={{ ...btn(NAVY, "#fff"), textDecoration: "none" }}>
                   Enviar por WhatsApp
                 </a>
                 <button onClick={() => copiar(c)} style={btn("#e8f0fb", NAVY)}>
                   {copiado === c.fecha ? "Copiado ✓" : "Copiar mensaje"}
-                </button>
-                <button onClick={() => setAbierta(exp ? null : c.fecha)} style={btn("#eef2f7", "#334155")}>
-                  {exp ? "Ocultar detalle" : "Ver por cuerda"}
                 </button>
                 <button onClick={() => setForm({ fecha: c.fecha, titulo: c.titulo || "", hora: c.hora || "", lugar: c.lugar || "", limite: c.limite || "", editar: true })} style={btn("#eef2f7", "#334155")}>
                   Editar plazo
@@ -44426,32 +44439,6 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
               {!pauta ? (
                 <div style={{ padding: "0 16px 12px", fontSize: 12.5, color: "#64748b" }}>Aún no hay pauta para esta fecha. Cuando la crees, los confirmados la verán automáticamente.</div>
               ) : null}
-              {exp && (
-                <div style={{ padding: "4px 16px 14px" }}>
-                  {cuerdas.map((cu) => {
-                    const delC = integrantes.filter((m) => m.cuerda === cu);
-                    const siC = delC.filter((m) => (resp[String(m.id)] || {}).r === "si");
-                    const noC = delC.filter((m) => (resp[String(m.id)] || {}).r === "no");
-                    const peC = delC.filter((m) => !resp[String(m.id)]);
-                    return (
-                      <div key={cu} style={{ padding: "10px 0", borderTop: "1px solid #f0f3f8" }}>
-                        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
-                          <div style={{ fontSize: 14, fontWeight: 800, color: NAVY }}>{cu}</div>
-                          <div style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>
-                            {siC.length} sí · {noC.length} no · {peC.length} sin responder
-                          </div>
-                        </div>
-                        <div>
-                          {siC.map((m) => chip(m, "#e8f0fb", NAVY, false))}
-                          {peC.map((m) => chip(m, "#fbf1de", "#7a4d06", true))}
-                          {noC.map((m) => chip(m, "#eef2f7", "#64748b", true))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div style={{ fontSize: 12, color: "#8a96a8", marginTop: 6 }}>Azul: confirmados · Amarillo: sin responder · Gris: no van. "Agregar" lo deja confirmado aunque el plazo haya cerrado.</div>
-                </div>
-              )}
             </div>
           );
         })}
