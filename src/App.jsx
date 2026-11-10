@@ -15657,6 +15657,12 @@ function mjFechaConfirmarURL() {
 // config "misaresp_<YYYY-MM-DD>_<idInt>" = { r: "si" | "no", en, porAdmin? }
 // Quien confirma "Sí" ve la pauta de esa fecha; sin confirmar no recibe las canciones.
 // Para asistencia: se convoca a quienes dijeron Sí o no respondieron; quien avisó "No" no cuenta como ausente.
+const MJ_GRUPO_WSP = "https://chat.whatsapp.com/I4B6PZ2Cqov3qFd7SrQNLZ";
+// Link del grupo de WhatsApp de la misa: el de la convocatoria o el grupo por defecto
+function mjGrupoConv(c) {
+  const g = String((c && c.grupo) || "").trim();
+  return /^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+/.test(g) ? g : MJ_GRUPO_WSP;
+}
 const MJ_CONV = "misaconv_";
 const MJ_RESP = "misaresp_";
 async function mjConfigPorPrefijo(prefijo) {
@@ -37696,7 +37702,8 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
         const fd = mjFechaLargaCorta(fecha);
         const tituloP = r === "si" ? `★ ${quien} confirmó` : `✕ ${quien} no podrá ir`;
         const cuerpoP = `${c.titulo || "Misa"} · ${fd.charAt(0).toUpperCase() + fd.slice(1)}\nVan ${van} · No van ${noVan} · Faltan ${faltan}`;
-        sendPushToUsers(admins, tituloP, cuerpoP, "/?lista=misa").catch(() => {});
+        // se espera (máx. 3 s) para que el aviso no se corte al abrir WhatsApp
+        await Promise.race([sendPushToUsers(admins, tituloP, cuerpoP, "/?lista=misa").catch(() => {}), new Promise((ok) => setTimeout(ok, 3000))]);
       }
     } catch (e) {}
     let racha = 0;
@@ -37715,6 +37722,12 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
     } catch (e) {}
     setEnviando(false);
     setResultado({ r, racha });
+    // Confirmó: se abre solo el grupo de WhatsApp de la misa (WhatsApp pide tocar "Unirse")
+    if (r === "si" && !soyAdmin) {
+      try {
+        window.location.href = mjGrupoConv(c);
+      } catch (e) {}
+    }
   };
 
   const fondo = { position: "fixed", inset: 0, zIndex: 9300, background: "rgba(15,27,45,.55)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, fontFamily: "var(--font-sans)" };
@@ -37750,6 +37763,11 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
         <div style={eyebrow}>Participación confirmada</div>
         <div style={titulo}>¡Gracias{nombre ? `, ${nombre}` : ""}!</div>
         <div style={texto}>Quedaste confirmado/a. Tendrás la pauta y los cantos de esta misa apenas se publiquen.</div>
+        {!soyAdmin ? (
+          <a href={mjGrupoConv(c)} style={{ ...btnSec, marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", boxSizing: "border-box" }}>
+            Unirme al grupo de WhatsApp
+          </a>
+        ) : null}
         {datosMisa}
         <button onClick={cerrar} style={{ ...btnPri, marginTop: 18 }}>
           Listo
@@ -44232,6 +44250,10 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
       setMsg("Falta la fecha de la misa o el plazo para confirmar.");
       return;
     }
+    if (form.grupo && !/^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+/.test(form.grupo.trim())) {
+      setMsg("El link del grupo debe empezar con https://chat.whatsapp.com/");
+      return;
+    }
     if (new Date(form.limite) > new Date(form.fecha + "T23:59")) {
       setMsg("El plazo para confirmar debe ser antes de la misa.");
       return;
@@ -44241,7 +44263,7 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
     const previa = (data.conv || {})[form.fecha] || {};
     const ok = await setConfig(
       `${MJ_CONV}${form.fecha}`,
-      JSON.stringify({ titulo: form.titulo || "Misa", hora: form.hora || "", lugar: form.lugar || "", limite: form.limite, creada: previa.creada || new Date().toISOString(), encargado: previa.encargado || "" })
+      JSON.stringify({ titulo: form.titulo || "Misa", hora: form.hora || "", lugar: form.lugar || "", limite: form.limite, creada: previa.creada || new Date().toISOString(), encargado: previa.encargado || "", grupo: (form.grupo || "").trim().split("?")[0] })
     );
     setGuardando(false);
     if (!ok) {
@@ -44309,6 +44331,10 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
           <span style={label}>Confirmar hasta</span>
           <input type="datetime-local" style={input} value={form.limite} onChange={(e) => setForm({ ...form, limite: e.target.value })} />
         </div>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <span style={label}>Grupo de WhatsApp (se abre al confirmar)</span>
+          <input style={input} value={form.grupo || ""} onChange={(e) => setForm({ ...form, grupo: e.target.value })} placeholder={MJ_GRUPO_WSP} />
+        </div>
       </div>
       {msg ? <div style={{ marginTop: 10, fontSize: 13, color: "#b42318", fontWeight: 600 }}>{msg}</div> : null}
       <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
@@ -44357,7 +44383,7 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
 
       {!form && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-          <button onClick={() => setForm({ fecha: "", titulo: "Misa", hora: "", lugar: "", limite: "" })} style={btn(NAVY, "#fff")}>
+          <button onClick={() => setForm({ fecha: "", titulo: "Misa", hora: "", lugar: "", limite: "", grupo: MJ_GRUPO_WSP })} style={btn(NAVY, "#fff")}>
             + Nueva convocatoria
           </button>
           <button
@@ -44389,7 +44415,7 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
                   {e.hora ? ` · ${e.hora}` : ""}
                 </div>
               </div>
-              <button onClick={() => setForm({ fecha: e.fecha, titulo: e.titulo, hora: e.hora || "", lugar: e.lugar || "", limite: mjLimitePorDefecto(e.fecha) })} style={btn("#e8f0fb", NAVY)}>
+              <button onClick={() => setForm({ fecha: e.fecha, titulo: e.titulo, hora: e.hora || "", lugar: e.lugar || "", limite: mjLimitePorDefecto(e.fecha), grupo: MJ_GRUPO_WSP })} style={btn("#e8f0fb", NAVY)}>
                 Convocar
               </button>
             </div>
@@ -44488,8 +44514,8 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
                 </select>
               </div>
               <div style={{ padding: "12px 16px", display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button onClick={() => setForm({ fecha: c.fecha, titulo: c.titulo || "", hora: c.hora || "", lugar: c.lugar || "", limite: c.limite || "", editar: true })} style={btn("#eef2f7", "#334155")}>
-                  Editar plazo
+                <button onClick={() => setForm({ fecha: c.fecha, titulo: c.titulo || "", hora: c.hora || "", lugar: c.lugar || "", limite: c.limite || "", grupo: c.grupo || MJ_GRUPO_WSP, editar: true })} style={btn("#eef2f7", "#334155")}>
+                  Editar
                 </button>
                 <button onClick={() => eliminar(c)} style={btn("#fdecec", "#b42318")}>
                   Eliminar
