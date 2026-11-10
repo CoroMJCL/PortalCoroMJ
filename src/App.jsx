@@ -3907,7 +3907,7 @@ function AppInner() {
       {!esMusico(user) && <CheckInObligatorio pautas={pautas} user={user} />}
       <SinCuerdaAsignada user={user} onSalir={handleSignOut} />
       <TutorialPortal user={user} listo={firstLoadDone && view === "app"} setSection={setSection} setMobileMenu={setMobileMenu} forzar={tutoForzar} onFin={() => setTutoForzar(false)} onActivo={setTutoActivo} />
-      <ControlAccesoAsistencia user={user} members={members} asistencia={asistencia} eventosDb={eventos} listo={firstLoadDone} onSalir={handleSignOut} />
+      <ControlAccesoAsistencia user={user} members={members} asistencia={asistencia} eventosDb={eventos} listo={firstLoadDone} onSalir={handleSignOut} conv={convData} />
       <ConfirmacionMisa user={user} members={members} asistencia={asistencia} eventosDb={eventos} listo={firstLoadDone} conv={convData} onCambio={recargarConv} />
 
       {/* ── Modal explicativo notificaciones push ── */}
@@ -37410,6 +37410,32 @@ function mjRachaAusencias(misas, memberId, desde) {
   }
   return n;
 }
+// Convocatorias sin responder: se bloquea con 2 seguidas (cerradas y con la misa ya pasada).
+// Si no respondió pero igual asistió (presente), se perdona y corta la racha. Solo el admin desbloquea.
+const MJ_BLOQUEO_SIN_RESPUESTA = 2;
+function mjRachaSinResponder(conv, misas, memberId, desde) {
+  if (!conv || !conv.conv) return 0;
+  const mid = String(memberId);
+  const hoy = mjHoyISO();
+  const fechas = Object.keys(conv.conv)
+    .filter((f) => f < hoy && !mjConvAbierta(conv.conv[f]) && (!desde || f > desde))
+    .sort((a, b) => b.localeCompare(a));
+  let n = 0;
+  for (const f of fechas) {
+    if (mjRespuestaConv(conv, f, mid)) break; // respondió
+    const asistio = (misas || []).some((m) => m.fecha === f && m.porMiembro && m.porMiembro[mid] && m.porMiembro[mid].estado === "presente");
+    if (asistio) break; // se perdona porque asistió
+    n++;
+  }
+  return n;
+}
+async function mjCargarDesbloqueosConv() {
+  const rows = await mjConfigPorPrefijo("conv_desbloqueo_");
+  if (!rows) return null;
+  const mapa = {};
+  rows.forEach((x) => (mapa[x.key.slice("conv_desbloqueo_".length)] = x.value || {}));
+  return mapa;
+}
 async function mjCargarDesbloqueos() {
   const url = `${SUPABASE_URL}/rest/v1/config?select=key,value&key=like.${encodeURIComponent("acceso_desbloqueo_")}*`;
   for (const t of [_authToken, SUPABASE_KEY, SUPABASE_SERVICE_KEY].filter((v, i, ar) => v && ar.indexOf(v) === i)) {
@@ -37441,9 +37467,10 @@ function useDesbloqueos() {
   return [d, recargar];
 }
 // Se muestra a cada integrante al entrar: aviso con 2 ausencias seguidas, bloqueo con 3
-function ControlAccesoAsistencia({ user, members, asistencia, eventosDb, listo, onSalir }) {
+function ControlAccesoAsistencia({ user, members, asistencia, eventosDb, listo, onSalir, conv }) {
   const [gcalListo, setGcalListo] = useState(false);
   const [desb, setDesb] = useState(undefined);
+  const [desbConv, setDesbConv] = useState(undefined);
   const [avisoCerrado, setAvisoCerrado] = useState(false);
   const yo = (members || []).find((m) => String(m.id) === String(user?.id)) || user;
   const exento = !user || !user.id || mjExentoBloqueo(yo);
@@ -37451,12 +37478,37 @@ function ControlAccesoAsistencia({ user, members, asistencia, eventosDb, listo, 
     if (exento) return;
     mjGcalHistorial().then(() => setGcalListo(true));
     mjCargarDesbloqueos().then((x) => setDesb(x));
+    mjCargarDesbloqueosConv().then((x) => setDesbConv(x));
   }, [exento, user && user.id]);
   const mapa = useMemo(() => mjMapaEventos(eventosDb), [eventosDb, gcalListo]);
   if (exento || !listo || !gcalListo || desb === undefined || desb === null) return null;
   const misas = mjConsolidarAsistencia(asistencia, mapa);
   const racha = mjRachaAusencias(misas, user.id, (desb[String(user.id)] || {}).hasta);
   const nombre = String((yo && yo.nombre) || "").split(" ")[0];
+  const rachaConv = desbConv ? mjRachaSinResponder(conv, misas, user.id, (desbConv[String(user.id)] || {}).hasta) : 0;
+  if (rachaConv >= MJ_BLOQUEO_SIN_RESPUESTA) {
+    return createPortal(
+      <div data-bloqueo="1" style={{ position: "fixed", inset: 0, zIndex: 9500, background: "linear-gradient(160deg,#0f2744,#1e3a5f 55%,#2a5a9c)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "var(--font-sans)" }}>
+        <div style={{ width: "min(440px,100%)", background: "#fff", borderRadius: 24, padding: "30px 26px 24px", textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.35)" }}>
+          <div style={{ width: 58, height: 58, borderRadius: 18, margin: "0 auto", background: "#fcebea", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#c0392b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="4" y="11" width="16" height="10" rx="2.5" />
+              <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+            </svg>
+          </div>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", textTransform: "uppercase", color: "#8a96a8", marginTop: 16 }}>Acceso suspendido</div>
+          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", color: "#0f1b2d", marginTop: 6, lineHeight: 1.2 }}>{nombre ? `${nombre}, tu acceso` : "Tu acceso"} está bloqueado</div>
+          <div style={{ fontSize: 14.5, color: "#4b5869", lineHeight: 1.55, marginTop: 10 }}>
+            Tu acceso está bloqueado por <b>no responder a las convocatorias</b> de las últimas {rachaConv} misas. Para volver a entrar al portal, conversa con el <b>Encargado del Coro</b>.
+          </div>
+          <button onClick={onSalir} style={{ marginTop: 22, width: "100%", height: 48, border: "none", borderRadius: 14, background: "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+            Cerrar sesión
+          </button>
+        </div>
+      </div>,
+      document.body
+    );
+  }
   if (racha >= MJ_BLOQUEO_AUSENCIAS) {
     return createPortal(
       <div data-bloqueo="1" style={{ position: "fixed", inset: 0, zIndex: 9500, background: "linear-gradient(160deg,#0f2744,#1e3a5f 55%,#2a5a9c)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "var(--font-sans)" }}>
@@ -37717,7 +37769,7 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
         <div style={titulo}>{nombre ? `${nombre}, ¿participas` : "¿Participas"} en esta misa?</div>
         {datosMisa}
         <div style={{ ...texto, fontSize: 13 }}>
-          Plazo para responder: <b>{mjLimiteTexto(c.limite)}</b>. Solo quienes confirmen recibirán la pauta y los cantos.
+          Plazo para responder: <b>{mjLimiteTexto(c.limite)}</b>. Solo quienes confirmen recibirán la pauta y los cantos. Si no respondes 2 convocatorias seguidas, tu acceso al portal se bloquea.
           {actual ? <div style={{ marginTop: 6 }}>Tu respuesta actual: <b>{actual === "si" ? "Sí voy" : "No puedo"}</b>. Puedes cambiarla hasta el plazo.</div> : null}
         </div>
         {error ? <div style={{ marginTop: 10, fontSize: 13, color: "#b42318", fontWeight: 600 }}>{error}</div> : null}
@@ -44093,8 +44145,12 @@ function mjLimitePorDefecto(fecha) {
   }
 }
 
-function AdminConvocatorias({ members, pautas }) {
+function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
   const [data, setData] = useState(null);
+  const [desbConv, setDesbConv] = useState(null);
+  const [gcalHist, setGcalHist] = useState(false);
+  const mapaAs = useMemo(() => mjMapaEventos(eventosDb), [eventosDb, gcalHist]);
+  const misasAs = useMemo(() => mjConsolidarAsistencia(asistencia, mapaAs), [asistencia, mapaAs]);
   const [gcal, setGcal] = useState([]);
   const [form, setForm] = useState(null); // { fecha, titulo, hora, lugar, limite, editar }
   const [guardando, setGuardando] = useState(false);
@@ -44102,11 +44158,13 @@ function AdminConvocatorias({ members, pautas }) {
   const [abierta, setAbierta] = useState(null);
   const [copiado, setCopiado] = useState("");
   const recargar = async () => {
-    const d = await mjCargarConvocatorias().catch(() => null);
+    const [d, dc] = await Promise.all([mjCargarConvocatorias().catch(() => null), mjCargarDesbloqueosConv().catch(() => null)]);
     setData(d || { conv: {}, resp: {} });
+    setDesbConv(dc || {});
   };
   useEffect(() => {
     recargar();
+    mjGcalHistorial().then(() => setGcalHist(true)).catch(() => {});
     fetchGoogleCalendarEvents()
       .then((ev) => setGcal((ev || []).filter((e) => e.tipo === "misa")))
       .catch(() => {});
@@ -44149,6 +44207,13 @@ function AdminConvocatorias({ members, pautas }) {
     if (!window.confirm(`¿Eliminar la convocatoria de ${c.titulo || "la misa"} (${c.fecha})? Las respuestas ya no se usarán para dar acceso a la pauta.`)) return;
     const ok = await setConfig(`${MJ_CONV}${c.fecha}`, JSON.stringify({ ...c, borrada: true }));
     if (!ok) alert("No se pudo eliminar. Intenta de nuevo.");
+    await recargar();
+  };
+  const rachaConvDe = (m) => (desbConv ? mjRachaSinResponder(data, misasAs, m.id, (desbConv[String(m.id)] || {}).hasta) : 0);
+  const bloqueadosConv = integrantes.filter((m) => !mjExentoBloqueo(m) && rachaConvDe(m) >= MJ_BLOQUEO_SIN_RESPUESTA);
+  const desbloquearConv = async (m) => {
+    const ok = await setConfig(`conv_desbloqueo_${m.id}`, JSON.stringify({ hasta: mjHoyISO(), en: new Date().toISOString() }));
+    if (!ok) alert("No se pudo desbloquear. Intenta de nuevo.");
     await recargar();
   };
   const agregar = async (c, m) => {
@@ -44218,10 +44283,29 @@ function AdminConvocatorias({ members, pautas }) {
   return (
     <div style={{ fontFamily: "var(--font-sans)", color: "#0f1b2d" }}>
       <div style={{ fontSize: 13.5, color: "#4b5869", lineHeight: 1.55, marginBottom: 14 }}>
-        Crea la convocatoria de cada misa con su plazo y comparte el link en el grupo de WhatsApp. Quien confirma <b>Sí</b> recibe la pauta automáticamente; quien no responde a tiempo no recibe los cantos y, si no llega, cuenta como ausencia. Quien avisa <b>No</b> no cuenta como ausente.
+        Crea la convocatoria de cada misa con su plazo y comparte el link en el grupo de WhatsApp. Quien confirma <b>Sí</b> recibe la pauta automáticamente; quien no responde a tiempo no recibe los cantos y, si no llega, cuenta como ausencia. Quien avisa <b>No</b> no cuenta como ausente. Con <b>2 convocatorias seguidas sin responder</b> (y sin haber asistido) el acceso al portal se bloquea hasta que tú lo desbloquees.
       </div>
 
       {formulario}
+
+      {!form && bloqueadosConv.length > 0 && (
+        <div style={{ ...card, marginBottom: 16, borderColor: "#f3d2cf" }}>
+          <div style={{ padding: "12px 16px", fontSize: 11, fontWeight: 800, letterSpacing: ".16em", textTransform: "uppercase", color: "#a32a1f", borderBottom: "1px solid #f8e4e2" }}>Bloqueados por no responder</div>
+          {bloqueadosConv.map((m) => (
+            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", borderBottom: "1px solid #f3f5f9", flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 160px", minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#0f1b2d" }}>{m.nombre}</div>
+                <div style={{ fontSize: 12, color: "#a32a1f", fontWeight: 600 }}>
+                  {m.cuerda} · {rachaConvDe(m)} convocatorias seguidas sin responder
+                </div>
+              </div>
+              <button onClick={() => desbloquearConv(m)} style={btn("#eef2f7", "#334155")}>
+                Desbloquear
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {!form && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
@@ -44541,7 +44625,7 @@ function Admin({
             )}
             {tab === "pautas" && <AdminPautasMisa onReload={onReload} />}
             {tab === "checkin_config" && <AdminCheckIn />}
-            {tab === "convocatorias" && <AdminConvocatorias members={members} pautas={pautasAdmin} />}
+            {tab === "convocatorias" && <AdminConvocatorias members={members} pautas={pautasAdmin} asistencia={asistencia} eventosDb={eventosDb} />}
             {tab === "asistencia" && (
               <Asistencia
                 asistencia={asistencia}
