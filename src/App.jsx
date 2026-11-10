@@ -2454,6 +2454,8 @@ function AppInner() {
     try {
       if (localStorage.getItem("mj_sesion") === "1" && localStorage.getItem("sb_refresh_token")) return "restaurando";
     } catch (e) {}
+    // Link de convocatoria (?confirmar=fecha) sin sesión: directo al login
+    if (mjFechaConfirmarURL()) return "login";
     return "landing";
   })();
   const [view, setView] = useState(_initialView);
@@ -5074,6 +5076,13 @@ function AuthScreen({
               TEMPVS7®
             </p>
           </div>
+
+          {view === "login" && mjFechaConfirmarURL() && (
+            <div style={{ marginBottom: 16, padding: "13px 15px", borderRadius: 14, background: "#eef3fa", border: "1px solid #cfdcef", color: "#1e3a5f", fontSize: 14, lineHeight: 1.45, textAlign: "left" }}>
+              <div style={{ fontWeight: 800, marginBottom: 2 }}>Confirma tu participación</div>
+              Ingresa con tu cuenta para confirmar tu participación en la misa del <b>{mjFechaLargaCorta(mjFechaConfirmarURL())}</b>.
+            </div>
+          )}
 
           {/* Tabs */}
           {view !== "guest_code" && (
@@ -15633,6 +15642,14 @@ function mjFiltrarPautasPorAcceso(pautas, accesos, user, conv) {
   });
 }
 
+function mjFechaConfirmarURL() {
+  try {
+    const f = new URLSearchParams(window.location.search).get("confirmar");
+    return f && /^\d{4}-\d{2}-\d{2}$/.test(f) ? f : null;
+  } catch (e) {
+    return null;
+  }
+}
 // ── Convocatorias de misa ─────────────────────────────────────────────
 // config "misaconv_<YYYY-MM-DD>"        = { titulo, hora, lugar, limite: "YYYY-MM-DDTHH:mm", creada }
 // config "misaresp_<YYYY-MM-DD>_<idInt>" = { r: "si" | "no", en, porAdmin? }
