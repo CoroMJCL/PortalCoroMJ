@@ -88,6 +88,11 @@ export default async function handler(req, res) {
       headings: { en: title, es: title },
       contents: { en: body || title, es: body || title },
       url: destinoUrl,
+      // Diseño: logo del coro (navy) como ícono y silueta blanca en la barra de estado (Android)
+      chrome_web_icon: `${SITE_URL}/push-icon.png`,
+      firefox_icon: `${SITE_URL}/push-icon.png`,
+      chrome_web_badge: `${SITE_URL}/push-badge.png`,
+      priority: 10,
     };
 
     // 0) Integrantes concretos (external_id = id del integrante): solo a ellos.

@@ -37676,6 +37676,29 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
       setError("No se pudo guardar tu respuesta. Revisa tu conexión e intenta de nuevo.");
       return;
     }
+    // Aviso push al Admin con cada respuesta
+    try {
+      const todos = mjIntegrantesConvocatoria(members);
+      const admins = todos.filter((m) => esCuerdaAdmin(m) && String(m.id) !== uid).map((m) => String(m.id));
+      if (admins.length) {
+        const previas = { ...((conv.resp || {})[fecha] || {}), [uid]: { r } };
+        const ids = new Set(todos.map((m) => String(m.id)));
+        let van = 0,
+          noVan = 0;
+        Object.entries(previas).forEach(([k, v]) => {
+          if (!ids.has(k)) return;
+          if (v && v.r === "si") van++;
+          else if (v && v.r === "no") noVan++;
+        });
+        const faltan = Math.max(0, todos.length - van - noVan);
+        const yo = todos.find((m) => String(m.id) === uid) || user;
+        const quien = mjNombreApellido(yo.nombre || user.nombre || "Un integrante");
+        const fd = mjFechaLargaCorta(fecha);
+        const tituloP = r === "si" ? `★ ${quien} confirmó` : `✕ ${quien} no podrá ir`;
+        const cuerpoP = `${c.titulo || "Misa"} · ${fd.charAt(0).toUpperCase() + fd.slice(1)}\nVan ${van} · No van ${noVan} · Faltan ${faltan}`;
+        sendPushToUsers(admins, tituloP, cuerpoP, "/?lista=misa").catch(() => {});
+      }
+    } catch (e) {}
     let racha = 0;
     if (r === "no") {
       try {
