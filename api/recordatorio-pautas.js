@@ -65,9 +65,32 @@ export default async function handler(req, res) {
         } catch (e) {}
       }
     } catch (e) {}
+    // Confirmaciones "Sí voy" de las convocatorias: también dan acceso a la pauta de esa fecha
+    const confirmados = {};
+    try {
+      const vigentes = new Set();
+      for (const c of await sb(`config?select=key,value&key=like.${encodeURIComponent("misaconv_")}*`)) {
+        try {
+          const v = typeof c.value === "string" ? JSON.parse(c.value) : c.value;
+          if (c.key.startsWith("misaconv_") && v && !v.borrada) vigentes.add(c.key.slice("misaconv_".length));
+        } catch (e) {}
+      }
+      const rows = await sb(`config?select=key,value&key=like.${encodeURIComponent("misaresp_")}*`);
+      for (const r of rows) {
+        if (!r.key.startsWith("misaresp_")) continue;
+        try {
+          const v = typeof r.value === "string" ? JSON.parse(r.value) : r.value;
+          if (!v || v.r !== "si") continue;
+          const resto = r.key.slice("misaresp_".length);
+          if (!vigentes.has(resto.slice(0, 10))) continue;
+          (confirmados[resto.slice(0, 10)] = confirmados[resto.slice(0, 10)] || new Set()).add(resto.slice(11));
+        } catch (e) {}
+      }
+    } catch (e) {}
     const puede = (p, m) => {
       const ac = acceso[p.id];
-      return !ac || !ac.restringida || (ac.ids || []).map(String).includes(String(m.id));
+      if (!ac || !ac.restringida || (ac.ids || []).map(String).includes(String(m.id))) return true;
+      return !!(confirmados[p.fecha] && confirmados[p.fecha].has(String(m.id)));
     };
 
     // Pendientes por integrante → agrupa para mandar un solo mensaje por persona

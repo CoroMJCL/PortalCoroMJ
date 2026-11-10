@@ -74,7 +74,31 @@ export default async function handler(req, res) {
           if (v && v.restringida) permitidos = new Set((v.ids || []).map(String));
         }
       } catch (e) {}
-      const objetivo = integrantes.filter((m) => !permitidos || permitidos.has(String(m.id)));
+      // Convocatoria de esa misa: quedan convocados quienes dijeron Sí o no respondieron; quien avisó "No" no cuenta como ausente
+      let conv = null;
+      const resp = {};
+      try {
+        const cv = await sb(`config?select=value&key=eq.${encodeURIComponent("misaconv_" + p.fecha)}&limit=1`);
+        if (cv && cv[0] && cv[0].value) {
+          const v = typeof cv[0].value === "string" ? JSON.parse(cv[0].value) : cv[0].value;
+          if (v && !v.borrada) conv = v;
+        }
+        if (conv) {
+          const pre = "misaresp_" + p.fecha + "_";
+          const rs = (await sb(`config?select=key,value&key=like.${encodeURIComponent(pre)}*`)) || [];
+          for (const r of rs) {
+            if (!r.key.startsWith(pre)) continue;
+            try {
+              const v = typeof r.value === "string" ? JSON.parse(r.value) : r.value;
+              if (v && v.r) resp[r.key.slice(pre.length)] = v.r;
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+      const objetivo = integrantes.filter((m) => {
+        if (conv) return resp[String(m.id)] !== "no";
+        return !permitidos || permitidos.has(String(m.id));
+      });
 
       // Evento de misa de ese día (el que usa el admin para pasar lista); si no existe, se crea
       const evs = (await sb(`eventos?select=id,tipo&fecha=eq.${p.fecha}&order=id.asc`)) || [];

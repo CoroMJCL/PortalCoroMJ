@@ -2528,14 +2528,19 @@ function AppInner() {
   const [comunidades, setComunidades] = useState([]);
   const [pautasRaw, setPautas] = useState([]);
   const [accesosPauta, setAccesosPauta] = useState({});
+  const [convData, setConvData] = useState({ conv: {}, resp: {} });
+  const recargarConv = useCallback(() => mjCargarConvocatorias().then(setConvData).catch(() => {}), []);
   // Cada pauta puede mostrarse solo a los integrantes que elige el admin
-  const pautas = useMemo(() => mjFiltrarPautasPorAcceso(pautasRaw, accesosPauta, user), [pautasRaw, accesosPauta, user && user.id, user && user.cuerda]);
+  const pautas = useMemo(() => mjFiltrarPautasPorAcceso(pautasRaw, accesosPauta, user, convData), [pautasRaw, accesosPauta, convData, user && user.id, user && user.cuerda]);
   // Próxima pauta publicada que el administrador reservó y a la que este integrante NO fue incluido
   const pautaBloqueada = useMemo(() => {
     if (!user || user.cuerda === "Admin" || esVisita(user)) return null;
     const visibles = new Set((pautas || []).map((p) => String(p.id)));
-    return proximasPautas(pautasRaw).find((p) => !visibles.has(String(p.id))) || null;
-  }, [pautasRaw, pautas, user && user.id, user && user.cuerda]);
+    const p = proximasPautas(pautasRaw).find((x) => !visibles.has(String(x.id))) || null;
+    if (!p) return null;
+    const c = convData && convData.conv ? convData.conv[p.fecha] : null;
+    return c ? { ...p, _conv: c, _resp: mjRespuestaConv(convData, p.fecha, user.id) } : p;
+  }, [pautasRaw, pautas, convData, user && user.id, user && user.cuerda]);
   // Recuerda quién es en este teléfono (solo nombre e id) para poder marcar asistencia aunque no haya internet para iniciar sesión
   useEffect(() => {
     if (user && user.id && !esVisita(user)) {
@@ -2718,6 +2723,7 @@ function AppInner() {
       setPodcasts(pod || []);
       setPautas(pau || []);
       mjCargarAccesosPauta().then(setAccesosPauta).catch(() => {});
+      mjCargarConvocatorias().then(setConvData).catch(() => {});
       setAsistencia(asis || []);
       setFotos(gal || []);
       setComunidades(com || []);
@@ -3902,6 +3908,7 @@ function AppInner() {
       <SinCuerdaAsignada user={user} onSalir={handleSignOut} />
       <TutorialPortal user={user} listo={firstLoadDone && view === "app"} setSection={setSection} setMobileMenu={setMobileMenu} forzar={tutoForzar} onFin={() => setTutoForzar(false)} onActivo={setTutoActivo} />
       <ControlAccesoAsistencia user={user} members={members} asistencia={asistencia} eventosDb={eventos} listo={firstLoadDone} onSalir={handleSignOut} />
+      <ConfirmacionMisa user={user} members={members} asistencia={asistencia} eventosDb={eventos} listo={firstLoadDone} conv={convData} onCambio={recargarConv} />
 
       {/* ── Modal explicativo notificaciones push ── */}
       {showPushModal && !tutoActivo &&
@@ -15613,15 +15620,104 @@ async function mjMarcarPautaMusico(pauta, user) {
   } catch (e) {}
   return ok;
 }
-function mjFiltrarPautasPorAcceso(pautas, accesos, user) {
+function mjFiltrarPautasPorAcceso(pautas, accesos, user, conv) {
   if (!user || user.cuerda === "Admin") return pautas;
   // El músico ve solo las pautas que él creó
   if (esMusico(user)) return (pautas || []).filter((p) => accesos && accesos[p.id] && String(accesos[p.id].musico) === String(user.id));
   return (pautas || []).filter((p) => {
     const ac = accesos && accesos[p.id];
     if (!ac || !ac.restringida) return true;
-    return (ac.ids || []).map(String).includes(String(user.id));
+    if ((ac.ids || []).map(String).includes(String(user.id))) return true;
+    // Confirmó "Sí voy" en la convocatoria de esa misa → ve la pauta
+    return mjRespuestaConv(conv, p.fecha, user.id) === "si";
   });
+}
+
+// ── Convocatorias de misa ─────────────────────────────────────────────
+// config "misaconv_<YYYY-MM-DD>"        = { titulo, hora, lugar, limite: "YYYY-MM-DDTHH:mm", creada }
+// config "misaresp_<YYYY-MM-DD>_<idInt>" = { r: "si" | "no", en, porAdmin? }
+// Quien confirma "Sí" ve la pauta de esa fecha; sin confirmar no recibe las canciones.
+// Para asistencia: se convoca a quienes dijeron Sí o no respondieron; quien avisó "No" no cuenta como ausente.
+const MJ_CONV = "misaconv_";
+const MJ_RESP = "misaresp_";
+async function mjConfigPorPrefijo(prefijo) {
+  const url = `${SUPABASE_URL}/rest/v1/config?select=key,value&key=like.${encodeURIComponent(prefijo)}*`;
+  const tokens = [_authToken, SUPABASE_KEY, SUPABASE_SERVICE_KEY].filter((v, i, ar) => v && ar.indexOf(v) === i);
+  for (const t of tokens) {
+    try {
+      const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${t}` } });
+      if (!r.ok) continue;
+      const rows = await r.json();
+      return (Array.isArray(rows) ? rows : [])
+        .filter((x) => x && typeof x.key === "string" && x.key.startsWith(prefijo))
+        .map((x) => {
+          let v = x.value;
+          try {
+            v = typeof v === "string" ? JSON.parse(v) : v;
+          } catch (e) {}
+          return { key: x.key, value: v };
+        });
+    } catch (e) {}
+  }
+  return null;
+}
+async function mjCargarConvocatorias() {
+  const [convs, resps] = await Promise.all([mjConfigPorPrefijo(MJ_CONV), mjConfigPorPrefijo(MJ_RESP)]);
+  const out = { conv: {}, resp: {} };
+  (convs || []).forEach((x) => {
+    const fecha = x.key.slice(MJ_CONV.length);
+    if (x.value && !x.value.borrada) out.conv[fecha] = { ...x.value, fecha };
+  });
+  (resps || []).forEach((x) => {
+    const resto = x.key.slice(MJ_RESP.length);
+    const fecha = resto.slice(0, 10);
+    const mid = resto.slice(11);
+    if (!mid || !x.value || !x.value.r) return;
+    (out.resp[fecha] = out.resp[fecha] || {})[mid] = x.value;
+  });
+  // Respuestas de convocatorias eliminadas no cuentan
+  Object.keys(out.resp).forEach((f) => {
+    if (!out.conv[f]) delete out.resp[f];
+  });
+  return out;
+}
+function mjRespuestaConv(conv, fecha, mid) {
+  const r = conv && conv.resp && conv.resp[fecha] && conv.resp[fecha][String(mid)];
+  return r ? r.r : null;
+}
+function mjConvAbierta(c) {
+  if (!c || !c.limite) return false;
+  const t = new Date(c.limite).getTime();
+  return !isNaN(t) && Date.now() < t;
+}
+async function mjResponderConv(fecha, mid, r, porAdmin = false) {
+  return setConfig(`${MJ_RESP}${fecha}_${mid}`, JSON.stringify({ r, en: new Date().toISOString(), ...(porAdmin ? { porAdmin: true } : {}) }));
+}
+// ¿Quién queda convocado (cuenta para asistencia) en la misa de esa fecha?
+// Sin convocatoria: solo los permitidos de la pauta (o todos). Con convocatoria: permitidos + Sí + sin respuesta; quien dijo "No" queda fuera.
+function mjEsConvocado(m, fecha, permitidos, conv) {
+  const mid = String(m.id);
+  const c = conv && conv.conv && conv.conv[fecha];
+  if (!c) return !permitidos || permitidos.has(mid);
+  const r = mjRespuestaConv(conv, fecha, mid);
+  if (r === "no") return false;
+  if (r === "si") return true;
+  return true; // no respondió: si no llega, cuenta como ausencia
+}
+function mjFechaLargaCorta(f) {
+  try {
+    return new Date(f + "T12:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
+  } catch (e) {
+    return f;
+  }
+}
+function mjLimiteTexto(lim) {
+  try {
+    const d = new Date(lim);
+    return d.toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" }) + " a las " + d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
+  } catch (e) {
+    return lim;
+  }
 }
 function AccesoPautaBoton({ pauta, abrirInicial, onGuardado, estilo }) {
   const [abierto, setAbierto] = useState(!!abrirInicial);
@@ -17129,9 +17225,31 @@ function PautaReservadaAviso({ pauta }) {
         </div>
       </div>
       <div style={{ padding: "16px 18px 18px" }}>
-        <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.55 }}>
-          La pauta de esta misa está disponible solo para quienes participan en ella. Como no estás considerado/a en esta celebración, por ahora no tienes acceso a sus cantos.
-        </div>
+        {pauta._conv && mjConvAbierta(pauta._conv) ? (
+          <>
+            <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.55 }}>
+              Los cantos de esta misa son para quienes confirmen su participación. Tienes plazo hasta el <b>{mjLimiteTexto(pauta._conv.limite)}</b>.
+            </div>
+            <button
+              onClick={() => {
+                try {
+                  window.dispatchEvent(new CustomEvent("mj-confirmar-misa", { detail: pauta.fecha }));
+                } catch (e) {}
+              }}
+              style={{ marginTop: 12, width: "100%", height: 46, border: "none", borderRadius: 14, background: "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              Confirmar participación
+            </button>
+          </>
+        ) : pauta._conv ? (
+          <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.55 }}>
+            {pauta._resp === "no" ? "Avisaste que no participas en esta misa, por eso no tienes acceso a sus cantos." : <>No confirmaste tu participación antes del plazo (<b>{mjLimiteTexto(pauta._conv.limite)}</b>), por eso no tienes acceso a los cantos. Si quieres cantar, conversa con el <b>Encargado del Coro</b>.</>}
+          </div>
+        ) : (
+          <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.55 }}>
+            La pauta de esta misa está disponible solo para quienes participan en ella. Como no estás considerado/a en esta celebración, por ahora no tienes acceso a sus cantos.
+          </div>
+        )}
         <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 14, background: "#f5f8fd", border: "1px solid #dbe4f0", display: "flex", gap: 10, alignItems: "flex-start" }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b8901f" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M12 20.5s-7.5-4.6-7.5-10A4.5 4.5 0 0 1 12 7.6a4.5 4.5 0 0 1 7.5 2.9c0 5.4-7.5 10-7.5 10z" /></svg>
           <div style={{ fontSize: 13.5, color: "#1e3a5f", lineHeight: 1.5, fontWeight: 600 }}>
@@ -26382,6 +26500,7 @@ const ADMIN_TABS = [
   { id: "integrantes", label: "Integrantes", icon: "👥" },
   { id: "asistencia", label: "Asistencia", icon: "✅" },
   { id: "checkin_config", label: "Check in", icon: "📍" },
+  { id: "convocatorias", label: "Convocatorias", icon: "🙋" },
   { id: "documentos", label: "Descargas Misas", icon: "📄" },
   { id: "material_coro_admin", label: "Material Coro", icon: "🎵" },
   { id: "descargas_admin", label: "Descargas libres", icon: "📄" },
@@ -26407,6 +26526,7 @@ const ADMIN_TAB_META = {
   asistencia: { color: "#0d7a4e", bg: "#e6f7f0", desc: "Marcar presente" },
   historial: { color: "#0d7a4e", bg: "#e6f7f0", desc: "Ver registros" },
   checkin_config: { color: "#0d7a4e", bg: "#e6f7f0", desc: "Horario y fecha" },
+  convocatorias: { color: "#1e3a5f", bg: "#eef2f9", desc: "Quién confirma cada misa" },
   material_coro_admin: {
     color: "#6d28d9",
     bg: "#f3e8ff",
@@ -26441,6 +26561,7 @@ const ADMIN_GRUPOS = [
     emoji: "👥",
     ids: [
       "integrantes",
+      "convocatorias",
       "asistencia",
       "checkin_config",
       "historial",
@@ -36964,9 +37085,11 @@ function AsPasarLista({ integrantes, misas, opciones, members, onGuardado }) {
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState("");
   const [accesos, setAccesos] = useState({});
+  const [convAs, setConvAs] = useState(null);
   const [verNoConv, setVerNoConv] = useState(false);
   useEffect(() => {
     mjCargarAccesosPauta().then(setAccesos).catch(() => {});
+    mjCargarConvocatorias().then(setConvAs).catch(() => {});
   }, []);
   useEffect(() => {
     setCambios({});
@@ -36981,7 +37104,8 @@ function AsPasarLista({ integrantes, misas, opciones, members, onGuardado }) {
   };
   const acc = op && op.pautaId ? accesos[op.pautaId] : null;
   const permitidos = acc && acc.restringida ? new Set((acc.ids || []).map(String)) : null;
-  const convocados = integrantes.filter((m) => !permitidos || permitidos.has(String(m.id)) || (misa && misa.porMiembro[String(m.id)]));
+  // Con convocatoria: Sí + sin respuesta quedan convocados; quien avisó "No" queda fuera
+  const convocados = integrantes.filter((m) => (op && op.fecha && op.grupo === "misa" ? mjEsConvocado(m, op.fecha, permitidos, convAs) : !permitidos || permitidos.has(String(m.id))) || (misa && misa.porMiembro[String(m.id)]));
   const noConv = integrantes.filter((m) => !convocados.includes(m));
   const cuenta = { presente: 0, ausente: 0, justificado: 0, excluido: 0, nuevo: 0, sin: 0 };
   convocados.forEach((m) => {
@@ -37391,6 +37515,232 @@ function ControlAccesoAsistencia({ user, members, asistencia, eventosDb, listo, 
     );
   }
   return null;
+}
+
+// ── Confirmación de participación en una misa (link por WhatsApp o al entrar) ──
+// Sí voy → recibe la pauta. No puedo → solo "Gracias por avisar", salvo que lleve 2+ ausencias seguidas: ahí ve la advertencia.
+function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, onCambio }) {
+  const activo = !!(user && user.id) && !esCuerdaAdmin(user) && !esMusico(user) && !esVisita(user);
+  const [fechaLink] = useState(() => {
+    try {
+      const f = new URLSearchParams(window.location.search).get("confirmar");
+      return f && /^\d{4}-\d{2}-\d{2}$/.test(f) ? f : null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const [forzada, setForzada] = useState(fechaLink);
+  const [omitidas, setOmitidas] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("mj_conv_omitidas") || "[]");
+    } catch (e) {
+      return [];
+    }
+  });
+  const [enviando, setEnviando] = useState(false);
+  const [resultado, setResultado] = useState(null); // { r, racha }
+  const [error, setError] = useState("");
+  useEffect(() => {
+    const h = (e) => {
+      if (e && e.detail) {
+        setResultado(null);
+        setError("");
+        setForzada(String(e.detail));
+      }
+    };
+    window.addEventListener("mj-confirmar-misa", h);
+    return () => window.removeEventListener("mj-confirmar-misa", h);
+  }, []);
+  if (!activo || !listo || !conv || !conv.conv) return null;
+  const uid = String(user.id);
+  const hoy = mjHoyISO();
+  const convs = conv.conv;
+  let fecha = forzada && convs[forzada] ? forzada : null;
+  if (!fecha && !forzada) {
+    fecha =
+      Object.keys(convs)
+        .sort()
+        .find((f) => f >= hoy && mjConvAbierta(convs[f]) && !mjRespuestaConv(conv, f, uid) && !omitidas.includes(f)) || null;
+  }
+  if (forzada && !convs[forzada] && !resultado) {
+    // Link de una misa que ya no tiene convocatoria
+    return null;
+  }
+  if (!fecha) return null;
+  const c = convs[fecha];
+  const abierta = mjConvAbierta(c);
+  const actual = mjRespuestaConv(conv, fecha, uid);
+  const nombre = String((user && user.nombre) || "").split(" ")[0];
+  const fl = mjFechaLargaCorta(fecha);
+  const fechaTxt = fl.charAt(0).toUpperCase() + fl.slice(1);
+
+  const cerrar = () => {
+    if (!forzada) {
+      const n = [...omitidas, fecha];
+      setOmitidas(n);
+      try {
+        sessionStorage.setItem("mj_conv_omitidas", JSON.stringify(n));
+      } catch (e) {}
+    }
+    setForzada(null);
+    setResultado(null);
+    setError("");
+    if (fechaLink) {
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.delete("confirmar");
+        window.history.replaceState(null, "", u.toString());
+      } catch (e) {}
+    }
+  };
+
+  const responder = async (r) => {
+    setForzada(fecha); // mantener esta misa en pantalla mientras se recarga
+    setEnviando(true);
+    setError("");
+    const ok = await mjResponderConv(fecha, uid, r);
+    if (!ok) {
+      setEnviando(false);
+      setError("No se pudo guardar tu respuesta. Revisa tu conexión e intenta de nuevo.");
+      return;
+    }
+    let racha = 0;
+    if (r === "no") {
+      try {
+        const yo = (members || []).find((m) => String(m.id) === uid) || user;
+        if (!mjExentoBloqueo(yo)) {
+          const [, desb] = await Promise.all([mjGcalHistorial(), mjCargarDesbloqueos()]);
+          const misas = mjConsolidarAsistencia(asistencia, mjMapaEventos(eventosDb));
+          racha = mjRachaAusencias(misas, uid, ((desb || {})[uid] || {}).hasta);
+        }
+      } catch (e) {}
+    }
+    try {
+      if (onCambio) await onCambio();
+    } catch (e) {}
+    setEnviando(false);
+    setResultado({ r, racha });
+  };
+
+  const fondo = { position: "fixed", inset: 0, zIndex: 9300, background: "rgba(15,27,45,.55)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, fontFamily: "var(--font-sans)" };
+  const caja = { width: "min(420px,100%)", background: "#fff", borderRadius: 24, padding: "26px 22px 20px", textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.3)" };
+  const eyebrow = { fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", textTransform: "uppercase", color: "#8a96a8" };
+  const titulo = { fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em", color: "#0f1b2d", marginTop: 6, lineHeight: 1.25 };
+  const texto = { fontSize: 14.5, color: "#4b5869", lineHeight: 1.55, marginTop: 10 };
+  const btnPri = { width: "100%", height: 50, border: "none", borderRadius: 14, background: "linear-gradient(135deg,#17345c,#2a5a9c)", color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" };
+  const btnSec = { width: "100%", height: 50, border: "1px solid #d5deea", borderRadius: 14, background: "#fff", color: "#1e3a5f", fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" };
+  const icono = (bg, stroke, path) => (
+    <div style={{ width: 56, height: 56, borderRadius: 18, margin: "0 auto 14px", background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        {path}
+      </svg>
+    </div>
+  );
+  const datosMisa = (
+    <div style={{ marginTop: 14, padding: "12px 14px", borderRadius: 14, background: "#f5f8fd", border: "1px solid #dbe4f0", textAlign: "left", fontSize: 13.5, color: "#1e3a5f", lineHeight: 1.5 }}>
+      <div style={{ fontWeight: 800 }}>{c.titulo || "Misa"}</div>
+      <div>
+        {fechaTxt}
+        {c.hora ? ` · ${c.hora} hrs` : ""}
+      </div>
+      {c.lugar ? <div style={{ color: "#4b5869" }}>{c.lugar}</div> : null}
+    </div>
+  );
+
+  let contenido;
+  if (resultado && resultado.r === "si") {
+    contenido = (
+      <>
+        {icono("#e8f0fb", "#1e3a5f", <path d="M5 12.5l4.5 4.5L19 7.5" />)}
+        <div style={eyebrow}>Participación confirmada</div>
+        <div style={titulo}>¡Gracias{nombre ? `, ${nombre}` : ""}!</div>
+        <div style={texto}>Quedaste confirmado/a. Tendrás la pauta y los cantos de esta misa apenas se publiquen.</div>
+        {datosMisa}
+        <button onClick={cerrar} style={{ ...btnPri, marginTop: 18 }}>
+          Listo
+        </button>
+      </>
+    );
+  } else if (resultado && resultado.r === "no") {
+    const advertir = resultado.racha >= MJ_AVISO_AUSENCIAS;
+    contenido = advertir ? (
+      <>
+        {icono("#fbf1de", "#c98a12", <><path d="M12 3 2.5 20h19L12 3z" /><path d="M12 10v4.5M12 17.5v.01" /></>)}
+        <div style={eyebrow}>Aviso de asistencia</div>
+        <div style={titulo}>{nombre ? `${nombre}, llevas` : "Llevas"} {resultado.racha} ausencias seguidas</div>
+        <div style={texto}>
+          Tu participación en el coro está baja. Si faltas a <b>una misa más</b> sin justificar, tu acceso al portal quedará <b>bloqueado</b> y tendrás que conversar con el Encargado del Coro.
+        </div>
+        <button onClick={cerrar} style={{ ...btnPri, marginTop: 18 }}>
+          Entendido
+        </button>
+      </>
+    ) : (
+      <>
+        {icono("#eef2f7", "#4b5869", <path d="M5 12.5l4.5 4.5L19 7.5" />)}
+        <div style={eyebrow}>Respuesta registrada</div>
+        <div style={titulo}>Gracias por avisar</div>
+        <div style={texto}>Quedó registrado que no participas en esta misa.</div>
+        <button onClick={cerrar} style={{ ...btnPri, marginTop: 18 }}>
+          Listo
+        </button>
+      </>
+    );
+  } else if (!abierta) {
+    contenido = (
+      <>
+        {icono("#fcebea", "#c0392b", <><rect x="4" y="11" width="16" height="10" rx="2.5" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>)}
+        <div style={eyebrow}>Confirmación cerrada</div>
+        <div style={titulo}>{actual === "si" ? "Ya estás confirmado/a" : "El plazo para confirmar terminó"}</div>
+        <div style={texto}>
+          {actual === "si" ? (
+            "Tienes acceso a la pauta y los cantos de esta misa."
+          ) : actual === "no" ? (
+            "Avisaste que no participas en esta misa."
+          ) : (
+            <>
+              El plazo cerró el <b>{mjLimiteTexto(c.limite)}</b> y no confirmaste, por eso no tienes acceso a los cantos. Si quieres cantar, conversa con el <b>Encargado del Coro</b>.
+            </>
+          )}
+        </div>
+        {datosMisa}
+        <button onClick={cerrar} style={{ ...btnPri, marginTop: 18 }}>
+          Entendido
+        </button>
+      </>
+    );
+  } else {
+    contenido = (
+      <>
+        {icono("#e8f0fb", "#1e3a5f", <><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></>)}
+        <div style={eyebrow}>Confirma tu participación</div>
+        <div style={titulo}>{nombre ? `${nombre}, ¿participas` : "¿Participas"} en esta misa?</div>
+        {datosMisa}
+        <div style={{ ...texto, fontSize: 13 }}>
+          Plazo para responder: <b>{mjLimiteTexto(c.limite)}</b>. Solo quienes confirmen recibirán la pauta y los cantos.
+          {actual ? <div style={{ marginTop: 6 }}>Tu respuesta actual: <b>{actual === "si" ? "Sí voy" : "No puedo"}</b>. Puedes cambiarla hasta el plazo.</div> : null}
+        </div>
+        {error ? <div style={{ marginTop: 10, fontSize: 13, color: "#b42318", fontWeight: 600 }}>{error}</div> : null}
+        <div style={{ display: "grid", gap: 10, marginTop: 16 }}>
+          <button disabled={enviando} onClick={() => responder("si")} style={{ ...btnPri, opacity: enviando ? 0.6 : 1 }}>
+            {enviando ? "Guardando…" : "Sí voy"}
+          </button>
+          <button disabled={enviando} onClick={() => responder("no")} style={{ ...btnSec, opacity: enviando ? 0.6 : 1 }}>
+            No puedo
+          </button>
+        </div>
+        <button onClick={cerrar} style={{ marginTop: 12, background: "none", border: "none", color: "#8a96a8", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+          Responder después
+        </button>
+      </>
+    );
+  }
+  return createPortal(
+    <div style={fondo}>
+      <div style={caja}>{contenido}</div>
+    </div>,
+    document.body
+  );
 }
 
 function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) {
@@ -43717,6 +44067,298 @@ function AdminNavegacion({ tab, setTab, pendientes }) {
   );
 }
 
+// ── Admin: convocatorias de misa (confirmación de participación) ─────────────
+const MJ_SITE = "https://coromisionerosdejesus.cl";
+function mjLinkConfirmar(fecha) {
+  return `${MJ_SITE}/?confirmar=${fecha}`;
+}
+function mjTextoWhatsappConv(c) {
+  const f = mjFechaLargaCorta(c.fecha);
+  return (
+    `🎶 *${c.titulo || "Misa"}*\n` +
+    `${f.charAt(0).toUpperCase() + f.slice(1)}${c.hora ? ` · ${c.hora} hrs` : ""}${c.lugar ? `\n${c.lugar}` : ""}\n\n` +
+    `Confirma tu participación aquí (un toque):\n${mjLinkConfirmar(c.fecha)}\n\n` +
+    `Plazo: ${mjLimiteTexto(c.limite)}. Solo quienes confirmen recibirán la pauta y los cantos.`
+  );
+}
+function mjLimitePorDefecto(fecha) {
+  // 2 días antes a las 21:00 (el admin lo cambia en cada misa)
+  try {
+    const d = new Date(fecha + "T12:00:00");
+    d.setDate(d.getDate() - 2);
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T21:00`;
+  } catch (e) {
+    return "";
+  }
+}
+
+function AdminConvocatorias({ members, pautas }) {
+  const [data, setData] = useState(null);
+  const [gcal, setGcal] = useState([]);
+  const [form, setForm] = useState(null); // { fecha, titulo, hora, lugar, limite, editar }
+  const [guardando, setGuardando] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [abierta, setAbierta] = useState(null);
+  const [copiado, setCopiado] = useState("");
+  const recargar = async () => {
+    const d = await mjCargarConvocatorias().catch(() => null);
+    setData(d || { conv: {}, resp: {} });
+  };
+  useEffect(() => {
+    recargar();
+    fetchGoogleCalendarEvents()
+      .then((ev) => setGcal((ev || []).filter((e) => e.tipo === "misa")))
+      .catch(() => {});
+  }, []);
+  const hoy = mjHoyISO();
+  const integrantes = useMemo(() => mjIntegrantesAsistencia(members).filter((m) => m.activo !== false), [members]);
+  if (!data) return <div style={{ padding: 20, color: "#64748b", fontSize: 14 }}>Cargando convocatorias…</div>;
+
+  const convs = Object.values(data.conv || {})
+    .filter((c) => c.fecha >= hoy)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const sinConv = gcal.filter((e) => e.fecha >= hoy && !(data.conv || {})[e.fecha]).slice(0, 8);
+
+  const guardar = async () => {
+    if (!form || !form.fecha || !form.limite) {
+      setMsg("Falta la fecha de la misa o el plazo para confirmar.");
+      return;
+    }
+    if (new Date(form.limite) > new Date(form.fecha + "T23:59")) {
+      setMsg("El plazo para confirmar debe ser antes de la misa.");
+      return;
+    }
+    setGuardando(true);
+    setMsg("");
+    const previa = (data.conv || {})[form.fecha] || {};
+    const ok = await setConfig(
+      `${MJ_CONV}${form.fecha}`,
+      JSON.stringify({ titulo: form.titulo || "Misa", hora: form.hora || "", lugar: form.lugar || "", limite: form.limite, creada: previa.creada || new Date().toISOString() })
+    );
+    setGuardando(false);
+    if (!ok) {
+      setMsg("No se pudo guardar. Intenta de nuevo.");
+      return;
+    }
+    setAbierta(form.fecha);
+    setForm(null);
+    await recargar();
+  };
+  const eliminar = async (c) => {
+    if (!window.confirm(`¿Eliminar la convocatoria de ${c.titulo || "la misa"} (${c.fecha})? Las respuestas ya no se usarán para dar acceso a la pauta.`)) return;
+    const ok = await setConfig(`${MJ_CONV}${c.fecha}`, JSON.stringify({ ...c, borrada: true }));
+    if (!ok) alert("No se pudo eliminar. Intenta de nuevo.");
+    await recargar();
+  };
+  const agregar = async (c, m) => {
+    const ok = await mjResponderConv(c.fecha, m.id, "si", true);
+    if (!ok) alert("No se pudo agregar. Intenta de nuevo.");
+    await recargar();
+  };
+  const copiar = async (c) => {
+    try {
+      await navigator.clipboard.writeText(mjTextoWhatsappConv(c));
+      setCopiado(c.fecha);
+      setTimeout(() => setCopiado(""), 2000);
+    } catch (e) {
+      window.prompt("Copia el mensaje:", mjTextoWhatsappConv(c));
+    }
+  };
+
+  const NAVY = "#1e3a5f";
+  const card = { background: "#fff", border: "1px solid #e1e9f4", borderRadius: 18, boxShadow: "0 1px 2px rgba(15,39,68,.05), 0 10px 28px rgba(30,58,95,.07)", overflow: "hidden" };
+  const btn = (bg, color, extra = {}) => ({ height: 38, padding: "0 14px", borderRadius: 11, border: "none", background: bg, color, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, ...extra });
+  const input = { width: "100%", height: 42, borderRadius: 11, border: "1px solid #d5deea", padding: "0 12px", fontSize: 14.5, fontFamily: "inherit", color: "#0f1b2d", boxSizing: "border-box", background: "#fff" };
+  const label = { fontSize: 11.5, fontWeight: 700, color: "#64748b", marginBottom: 4, display: "block" };
+
+  const formulario = form && (
+    <div style={{ ...card, padding: 16, marginBottom: 14 }}>
+      <div style={{ fontSize: 15, fontWeight: 800, color: NAVY, marginBottom: 12 }}>{form.editar ? "Editar convocatoria" : "Nueva convocatoria"}</div>
+      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))" }}>
+        <div>
+          <span style={label}>Misa</span>
+          <input style={input} value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} placeholder="Misa Dominical" />
+        </div>
+        <div>
+          <span style={label}>Fecha de la misa</span>
+          <input type="date" style={input} value={form.fecha} disabled={!!form.editar} onChange={(e) => setForm({ ...form, fecha: e.target.value, limite: form.limite || mjLimitePorDefecto(e.target.value) })} />
+        </div>
+        <div>
+          <span style={label}>Hora</span>
+          <input style={input} value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} placeholder="20:00" />
+        </div>
+        <div>
+          <span style={label}>Lugar</span>
+          <input style={input} value={form.lugar} onChange={(e) => setForm({ ...form, lugar: e.target.value })} placeholder="Capilla Sagrada Familia" />
+        </div>
+        <div>
+          <span style={label}>Confirmar hasta</span>
+          <input type="datetime-local" style={input} value={form.limite} onChange={(e) => setForm({ ...form, limite: e.target.value })} />
+        </div>
+      </div>
+      {msg ? <div style={{ marginTop: 10, fontSize: 13, color: "#b42318", fontWeight: 600 }}>{msg}</div> : null}
+      <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+        <button disabled={guardando} onClick={guardar} style={btn(NAVY, "#fff", { opacity: guardando ? 0.6 : 1 })}>
+          {guardando ? "Guardando…" : form.editar ? "Guardar cambios" : "Crear convocatoria"}
+        </button>
+        <button
+          onClick={() => {
+            setForm(null);
+            setMsg("");
+          }}
+          style={btn("#eef2f7", "#334155")}
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ fontFamily: "var(--font-sans)", color: "#0f1b2d" }}>
+      <div style={{ fontSize: 13.5, color: "#4b5869", lineHeight: 1.55, marginBottom: 14 }}>
+        Crea la convocatoria de cada misa con su plazo y comparte el link en el grupo de WhatsApp. Quien confirma <b>Sí</b> recibe la pauta automáticamente; quien no responde a tiempo no recibe los cantos y, si no llega, cuenta como ausencia. Quien avisa <b>No</b> no cuenta como ausente.
+      </div>
+
+      {formulario}
+
+      {!form && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+          <button onClick={() => setForm({ fecha: "", titulo: "Misa", hora: "", lugar: "", limite: "" })} style={btn(NAVY, "#fff")}>
+            + Nueva convocatoria
+          </button>
+        </div>
+      )}
+
+      {!form && sinConv.length > 0 && (
+        <div style={{ ...card, marginBottom: 16 }}>
+          <div style={{ padding: "12px 16px", fontSize: 11, fontWeight: 800, letterSpacing: ".16em", textTransform: "uppercase", color: "#8a96a8", borderBottom: "1px solid #eef2f7" }}>Misas del calendario sin convocar</div>
+          {sinConv.map((e) => (
+            <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", borderBottom: "1px solid #f3f5f9" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.titulo}</div>
+                <div style={{ fontSize: 12.5, color: "#64748b" }}>
+                  {mjFechaLargaCorta(e.fecha)}
+                  {e.hora ? ` · ${e.hora}` : ""}
+                </div>
+              </div>
+              <button onClick={() => setForm({ fecha: e.fecha, titulo: e.titulo, hora: e.hora || "", lugar: e.lugar || "", limite: mjLimitePorDefecto(e.fecha) })} style={btn("#e8f0fb", NAVY)}>
+                Convocar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {convs.length === 0 && !form && <div style={{ ...card, padding: 18, fontSize: 14, color: "#64748b" }}>No hay convocatorias activas.</div>}
+
+      <div style={{ display: "grid", gap: 14 }}>
+        {convs.map((c) => {
+          const resp = (data.resp || {})[c.fecha] || {};
+          const abiertaC = mjConvAbierta(c);
+          const si = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "si");
+          const no = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "no");
+          const pend = integrantes.filter((m) => !resp[String(m.id)]);
+          const cuerdas = [...new Set(integrantes.map((m) => m.cuerda))].sort((a, b) => String(a).localeCompare(String(b), "es"));
+          const pauta = (pautas || []).find((p) => p.fecha === c.fecha);
+          const exp = abierta === c.fecha;
+          const fl = mjFechaLargaCorta(c.fecha);
+          const chip = (m, bg, color, conBoton) => (
+            <span key={m.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 6px 4px 10px", borderRadius: 999, background: bg, color, fontSize: 12.5, fontWeight: 600, margin: "0 6px 6px 0" }}>
+              {String(m.nombre || "").split(" ").slice(0, 2).join(" ")}
+              {(resp[String(m.id)] || {}).porAdmin ? <span style={{ fontSize: 10.5, opacity: 0.7 }}>(agregado)</span> : null}
+              {conBoton ? (
+                <button onClick={() => agregar(c, m)} title="Agregar como confirmado" style={{ border: "none", background: "#fff", color: NAVY, borderRadius: 999, height: 22, padding: "0 8px", fontSize: 11.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                  Agregar
+                </button>
+              ) : (
+                <span style={{ width: 4 }} />
+              )}
+            </span>
+          );
+          return (
+            <div key={c.fecha} style={card}>
+              <div style={{ padding: "14px 16px", background: "linear-gradient(135deg,#17345c 0%,#2a5a9c 100%)", color: "#fff" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: "-0.01em" }}>{c.titulo || "Misa"}</div>
+                    <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: 2 }}>
+                      {fl.charAt(0).toUpperCase() + fl.slice(1)}
+                      {c.hora ? ` · ${c.hora} hrs` : ""}
+                      {c.lugar ? ` · ${c.lugar}` : ""}
+                    </div>
+                  </div>
+                  <span style={{ flexShrink: 0, padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 800, background: abiertaC ? "rgba(255,255,255,.18)" : "#e8c76a", color: abiertaC ? "#fff" : "#3b2a05" }}>{abiertaC ? "Abierta" : "Cerrada"}</span>
+                </div>
+                <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: 8 }}>Confirmar hasta: {mjLimiteTexto(c.limite)}</div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", borderBottom: "1px solid #eef2f7" }}>
+                {[
+                  ["Sí van", si.length, NAVY],
+                  ["No van", no.length, "#64748b"],
+                  ["Sin responder", pend.length, "#b45309"],
+                ].map(([t, n, col]) => (
+                  <div key={t} style={{ padding: "12px 8px", textAlign: "center" }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: col, letterSpacing: "-0.02em" }}>{n}</div>
+                    <div style={{ fontSize: 11.5, color: "#64748b", fontWeight: 600 }}>{t}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding: "12px 16px", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <a href={`https://wa.me/?text=${encodeURIComponent(mjTextoWhatsappConv(c))}`} target="_blank" rel="noopener" style={{ ...btn(NAVY, "#fff"), textDecoration: "none" }}>
+                  Enviar por WhatsApp
+                </a>
+                <button onClick={() => copiar(c)} style={btn("#e8f0fb", NAVY)}>
+                  {copiado === c.fecha ? "Copiado ✓" : "Copiar mensaje"}
+                </button>
+                <button onClick={() => setAbierta(exp ? null : c.fecha)} style={btn("#eef2f7", "#334155")}>
+                  {exp ? "Ocultar detalle" : "Ver por cuerda"}
+                </button>
+                <button onClick={() => setForm({ fecha: c.fecha, titulo: c.titulo || "", hora: c.hora || "", lugar: c.lugar || "", limite: c.limite || "", editar: true })} style={btn("#eef2f7", "#334155")}>
+                  Editar plazo
+                </button>
+                <button onClick={() => eliminar(c)} style={btn("#fdecec", "#b42318")}>
+                  Eliminar
+                </button>
+              </div>
+              {!pauta ? (
+                <div style={{ padding: "0 16px 12px", fontSize: 12.5, color: "#64748b" }}>Aún no hay pauta para esta fecha. Cuando la crees, los confirmados la verán automáticamente.</div>
+              ) : null}
+              {exp && (
+                <div style={{ padding: "4px 16px 14px" }}>
+                  {cuerdas.map((cu) => {
+                    const delC = integrantes.filter((m) => m.cuerda === cu);
+                    const siC = delC.filter((m) => (resp[String(m.id)] || {}).r === "si");
+                    const noC = delC.filter((m) => (resp[String(m.id)] || {}).r === "no");
+                    const peC = delC.filter((m) => !resp[String(m.id)]);
+                    return (
+                      <div key={cu} style={{ padding: "10px 0", borderTop: "1px solid #f0f3f8" }}>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: NAVY }}>{cu}</div>
+                          <div style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>
+                            {siC.length} sí · {noC.length} no · {peC.length} sin responder
+                          </div>
+                        </div>
+                        <div>
+                          {siC.map((m) => chip(m, "#e8f0fb", NAVY, false))}
+                          {peC.map((m) => chip(m, "#fbf1de", "#7a4d06", true))}
+                          {noC.map((m) => chip(m, "#eef2f7", "#64748b", true))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div style={{ fontSize: 12, color: "#8a96a8", marginTop: 6 }}>Azul: confirmados · Amarillo: sin responder · Gris: no van. "Agregar" lo deja confirmado aunque el plazo haya cerrado.</div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function Admin({
   members,
   eventos,
@@ -43899,6 +44541,7 @@ function Admin({
             )}
             {tab === "pautas" && <AdminPautasMisa onReload={onReload} />}
             {tab === "checkin_config" && <AdminCheckIn />}
+            {tab === "convocatorias" && <AdminConvocatorias members={members} pautas={pautasAdmin} />}
             {tab === "asistencia" && (
               <Asistencia
                 asistencia={asistencia}
