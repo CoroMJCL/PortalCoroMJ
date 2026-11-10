@@ -44478,6 +44478,34 @@ async function mjIntegrantesPublico() {
   }
   return null;
 }
+// "Nombre Apellido": primer nombre + primer apellido (nombre guardado como "Nombre1 [Nombre2] Apellido1 [Apellido2]")
+const MJ_NOMBRES_COMUNES = new Set(
+  "maria maría jose josé ana luis juan carlos francisco francisca alejandra alejandro andrea andres andrés antonio antonia ignacio ignacia isabel belen belén javiera javier valentina paola carolina fernanda fernando constanza alberto eduardo paz soledad pilar victoria cristina cristian cristián patricia margarita rosa gabriela gabriel daniela daniel camila camilo sofia sofía paula pablo pedro manuel manuela miguel angel ángel angelica angélica beatriz teresa eugenia elena luisa del carmen jesus jesús mercedes ines inés lucia lucía marcela marcelo rodrigo esteban felipe tomas tomás vicente sebastian sebastián nicolas nicolás enrique ricardo raul raúl sergio hugo jorge mario julio cesar césar rafael ramon ramón catalina macarena josefa trinidad emilia florencia martina agustina".split(" ")
+);
+function mjNombreApellido(nombre) {
+  const w = String(nombre || "").trim().split(/\s+/).filter(Boolean);
+  if (w.length <= 2) return w.join(" ");
+  // une partículas ("de", "del", "de la") con la palabra siguiente
+  const t = [];
+  for (let i = 0; i < w.length; i++) {
+    const x = w[i].toLowerCase();
+    if ((x === "de" || x === "del" || x === "la" || x === "los" || x === "las") && i + 1 < w.length) {
+      let j = i;
+      let g = w[i];
+      while (j + 1 < w.length && ["de", "del", "la", "los", "las"].includes(w[j + 1].toLowerCase()) && j + 2 < w.length) {
+        j++;
+        g += " " + w[j];
+      }
+      g += " " + w[j + 1];
+      t.push(g);
+      i = j + 1;
+    } else t.push(w[i]);
+  }
+  if (t.length <= 2) return t.join(" ");
+  if (t.length >= 4) return `${t[0]} ${t[2]}`;
+  // 3 partes: "Nombre1 Nombre2 Apellido" o "Nombre Apellido1 Apellido2"
+  return MJ_NOMBRES_COMUNES.has(t[1].toLowerCase()) ? `${t[0]} ${t[2]}` : `${t[0]} ${t[1]}`;
+}
 function ListaPublicaConvocatoria() {
   const [estado, setEstado] = useState({ cargando: true });
   const cargar = async () => {
@@ -44516,7 +44544,7 @@ function ListaPublicaConvocatoria() {
   const c = d.conv[fecha];
   const resp = (d.resp || {})[fecha] || {};
   const integrantes = mjIntegrantesAsistencia(ms).filter((m) => m.activo !== false);
-  const nom = (m) => String(m.nombre || "").split(" ").filter(Boolean).slice(0, 2).join(" ");
+  const nom = (m) => mjNombreApellido(m.nombre);
   const si = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "si");
   const no = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "no");
   const pend = integrantes.filter((m) => !resp[String(m.id)]);
