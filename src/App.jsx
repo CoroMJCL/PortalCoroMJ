@@ -44190,7 +44190,13 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
       .catch(() => {});
   }, []);
   const hoy = mjHoyISO();
-  const integrantes = useMemo(() => mjIntegrantesConvocatoria(members), [members]);
+  const integrantes = useMemo(() => mjOrdenarPorCuerda(mjIntegrantesConvocatoria(members)), [members]);
+  const cambiarEncargado = async (c, id) => {
+    const { fecha, ...resto } = c;
+    const ok = await setConfig(`${MJ_CONV}${fecha}`, JSON.stringify({ ...resto, encargado: id || "" }));
+    if (!ok) alert("No se pudo cambiar el encargado. Intenta de nuevo.");
+    await recargar();
+  };
   if (!data) return <div style={{ padding: 20, color: "#64748b", fontSize: 14 }}>Cargando convocatorias…</div>;
 
   const convs = Object.values(data.conv || {})
@@ -44212,7 +44218,7 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
     const previa = (data.conv || {})[form.fecha] || {};
     const ok = await setConfig(
       `${MJ_CONV}${form.fecha}`,
-      JSON.stringify({ titulo: form.titulo || "Misa", hora: form.hora || "", lugar: form.lugar || "", limite: form.limite, creada: previa.creada || new Date().toISOString() })
+      JSON.stringify({ titulo: form.titulo || "Misa", hora: form.hora || "", lugar: form.lugar || "", limite: form.limite, creada: previa.creada || new Date().toISOString(), encargado: previa.encargado || "" })
     );
     setGuardando(false);
     if (!ok) {
@@ -44426,8 +44432,10 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
                         <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid #f3f5f9" }}>
                           <div style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 600, color: "#0f1b2d" }}>
                             {m.nombre}
+                            {String(m.id) === mjEncargadoConv(c, integrantes) ? <MjEtiquetaEncargado /> : null}
                             {(resp[String(m.id)] || {}).porAdmin ? <span style={{ fontSize: 11.5, color: "#8a96a8", fontWeight: 600 }}> · agregado por ti</span> : null}
                           </div>
+                          <div style={{ fontSize: 12.5, color: "#8a96a8", fontWeight: 600, flexShrink: 0 }}>{mjCuerdaMostrar(m)}</div>
                           {abierta.tipo !== "si" ? (
                             <button onClick={() => agregar(c, m)} style={btn("#e8f0fb", NAVY, { height: 32, padding: "0 12px", fontSize: 12.5 })}>
                               Agregar
@@ -44439,6 +44447,21 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
                   </div>
                 );
               })()}
+              <div style={{ padding: "12px 16px 0", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#64748b" }}>Encargado Coro:</span>
+                <select
+                  value={mjEncargadoConv(c, integrantes) || ""}
+                  onChange={(e) => cambiarEncargado(c, e.target.value)}
+                  style={{ flex: "1 1 200px", height: 38, borderRadius: 11, border: "1px solid #d5deea", padding: "0 10px", fontSize: 14, fontFamily: "inherit", color: "#0f1b2d", background: "#fff" }}
+                >
+                  {integrantes.map((m) => (
+                    <option key={m.id} value={String(m.id)}>
+                      {m.nombre}
+                      {mjCuerdaMostrar(m) ? ` · ${mjCuerdaMostrar(m)}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div style={{ padding: "12px 16px", display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button onClick={() => setForm({ fecha: c.fecha, titulo: c.titulo || "", hora: c.hora || "", lugar: c.lugar || "", limite: c.limite || "", editar: true })} style={btn("#eef2f7", "#334155")}>
                   Editar plazo
@@ -44468,7 +44491,7 @@ function mjEsListaPublica() {
   }
 }
 async function mjIntegrantesPublico() {
-  const url = `${SUPABASE_URL}/rest/v1/integrantes?select=id,nombre,cuerda,activo,acceso&order=nombre.asc`;
+  const url = `${SUPABASE_URL}/rest/v1/integrantes?select=id,nombre,cuerda,cuerda_vocal,activo,acceso&order=nombre.asc`;
   for (const t of [_authToken, SUPABASE_SERVICE_KEY, SUPABASE_KEY].filter((v, i, ar) => v && ar.indexOf(v) === i)) {
     try {
       const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${t}` } });
@@ -44513,6 +44536,28 @@ function mjIntegrantesConvocatoria(members) {
   const admins = (members || []).filter((m) => m && esCuerdaAdmin(m) && (!m.acceso || m.acceso === "aprobado"));
   return [...base, ...admins].filter((m) => m.activo !== false).sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"));
 }
+const MJ_ORDEN_CUERDA = ["Soprano", "Contralto", "Tenor", "Bajo", "Instrumentos"];
+function mjCuerdaMostrar(m) {
+  if (esCuerdaAdmin(m)) return (m.cuerda_vocal || "").trim();
+  return (m.cuerda || "").trim();
+}
+function mjOrdenarPorCuerda(lista) {
+  const pos = (m) => {
+    const c = mjCuerdaMostrar(m);
+    const i = MJ_ORDEN_CUERDA.indexOf(c);
+    return i === -1 ? 99 : i;
+  };
+  return [...(lista || [])].sort((a, b) => pos(a) - pos(b) || String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"));
+}
+// Encargado Coro de la misa: el elegido en la convocatoria; si no hay, la cuenta Admin
+function mjEncargadoConv(c, integrantes) {
+  if (c && c.encargado && (integrantes || []).some((m) => String(m.id) === String(c.encargado))) return String(c.encargado);
+  const adm = (integrantes || []).find((m) => esCuerdaAdmin(m));
+  return adm ? String(adm.id) : null;
+}
+function MjEtiquetaEncargado() {
+  return <span style={{ display: "inline-block", marginLeft: 8, padding: "2px 8px", borderRadius: 999, background: "#1e3a5f", color: "#fff", fontSize: 10.5, fontWeight: 800, letterSpacing: ".02em", verticalAlign: "middle", whiteSpace: "nowrap" }}>Encargado Coro</span>;
+}
 function ListaPublicaConvocatoria() {
   const [estado, setEstado] = useState({ cargando: true });
   const cargar = async () => {
@@ -44550,8 +44595,9 @@ function ListaPublicaConvocatoria() {
   if (!fecha) return pagina(<div style={{ background: "#fff", borderRadius: 18, padding: 22, textAlign: "center", color: "#4b5869", fontSize: 14.5, border: "1px solid #e1e9f4" }}>Aún no hay una próxima misa convocada.</div>);
   const c = d.conv[fecha];
   const resp = (d.resp || {})[fecha] || {};
-  const integrantes = mjIntegrantesConvocatoria(ms);
+  const integrantes = mjOrdenarPorCuerda(mjIntegrantesConvocatoria(ms));
   const nom = (m) => mjNombreApellido(m.nombre);
+  const encargadoId = mjEncargadoConv(d.conv[fecha], integrantes);
   const si = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "si");
   const no = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "no");
   const pend = integrantes.filter((m) => !resp[String(m.id)]);
@@ -44567,8 +44613,12 @@ function ListaPublicaConvocatoria() {
         <div style={{ padding: "12px 16px", fontSize: 13.5, color: "#8a96a8" }}>{vacio}</div>
       ) : (
         lista.map((m) => (
-          <div key={m.id} style={{ padding: "10px 16px", fontSize: 14.5, fontWeight: 600, borderTop: "1px solid #f1f4f8" }}>
-            {nom(m)}
+          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", borderTop: "1px solid #f1f4f8" }}>
+            <div style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 600 }}>
+              {nom(m)}
+              {String(m.id) === encargadoId ? <MjEtiquetaEncargado /> : null}
+            </div>
+            <div style={{ fontSize: 12.5, color: "#8a96a8", fontWeight: 600, flexShrink: 0 }}>{mjCuerdaMostrar(m)}</div>
           </div>
         ))
       )}
