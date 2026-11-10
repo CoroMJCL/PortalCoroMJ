@@ -3738,6 +3738,8 @@ function AppInner() {
         <div className="spl-pie">Portal de integrantes</div>
       </div>
     );
+  if (mjEsListaPublica()) return <ListaPublicaConvocatoria />;
+
   if (view === "landing")
     return (
       <>
@@ -44328,6 +44330,20 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
           <button onClick={() => setForm({ fecha: "", titulo: "Misa", hora: "", lugar: "", limite: "" })} style={btn(NAVY, "#fff")}>
             + Nueva convocatoria
           </button>
+          <button
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(MJ_LINK_LISTA);
+                setCopiado("lista");
+                setTimeout(() => setCopiado(""), 2000);
+              } catch (e) {
+                window.prompt("Copia el link:", MJ_LINK_LISTA);
+              }
+            }}
+            style={btn("#e8f0fb", NAVY)}
+          >
+            {copiado === "lista" ? "Link copiado ✓" : "Copiar link de lista pública"}
+          </button>
         </div>
       )}
 
@@ -44444,6 +44460,112 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
         })}
       </div>
     </div>
+  );
+}
+
+// ── Lista pública de la próxima misa convocada (link fijo: /?lista=misa, sin login) ──
+const MJ_LINK_LISTA = "https://coromisionerosdejesus.cl/?lista=misa";
+function mjEsListaPublica() {
+  try {
+    return new URLSearchParams(window.location.search).get("lista") === "misa";
+  } catch (e) {
+    return false;
+  }
+}
+async function mjIntegrantesPublico() {
+  const url = `${SUPABASE_URL}/rest/v1/integrantes?select=id,nombre,cuerda,activo,acceso&order=nombre.asc`;
+  for (const t of [_authToken, SUPABASE_SERVICE_KEY, SUPABASE_KEY].filter((v, i, ar) => v && ar.indexOf(v) === i)) {
+    try {
+      const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${t}` } });
+      if (!r.ok) continue;
+      const rows = await r.json();
+      if (Array.isArray(rows)) return rows;
+    } catch (e) {}
+  }
+  return null;
+}
+function ListaPublicaConvocatoria() {
+  const [estado, setEstado] = useState({ cargando: true });
+  const cargar = async () => {
+    const [d, ms] = await Promise.all([mjCargarConvocatorias().catch(() => null), mjIntegrantesPublico()]);
+    if (!d || !ms) {
+      setEstado({ error: true });
+      return;
+    }
+    const hoy = mjHoyISO();
+    const fecha = Object.keys(d.conv || {})
+      .filter((f) => f >= hoy)
+      .sort()[0];
+    setEstado({ d, ms, fecha, en: new Date() });
+  };
+  useEffect(() => {
+    cargar();
+    const t = setInterval(cargar, 60000);
+    return () => clearInterval(t);
+  }, []);
+  const NAVY = "#1e3a5f";
+  const pagina = (contenido) => (
+    <div style={{ minHeight: "100vh", background: "#f3f6fa", fontFamily: "var(--font-sans, Inter, system-ui, sans-serif)", color: "#0f1b2d", padding: "24px 16px 40px", boxSizing: "border-box" }}>
+      <div style={{ maxWidth: 560, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 18 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", textTransform: "uppercase", color: "#8a96a8" }}>Coro Misioneros de Jesús</div>
+          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", color: NAVY, marginTop: 4 }}>Asistencia a la próxima misa</div>
+        </div>
+        {contenido}
+      </div>
+    </div>
+  );
+  if (estado.cargando) return pagina(<div style={{ textAlign: "center", color: "#64748b", fontSize: 14, padding: 30 }}>Cargando…</div>);
+  if (estado.error) return pagina(<div style={{ textAlign: "center", color: "#64748b", fontSize: 14, padding: 30 }}>No se pudo cargar la lista. Revisa tu conexión e intenta de nuevo.</div>);
+  const { d, ms, fecha, en } = estado;
+  if (!fecha) return pagina(<div style={{ background: "#fff", borderRadius: 18, padding: 22, textAlign: "center", color: "#4b5869", fontSize: 14.5, border: "1px solid #e1e9f4" }}>Aún no hay una próxima misa convocada.</div>);
+  const c = d.conv[fecha];
+  const resp = (d.resp || {})[fecha] || {};
+  const integrantes = mjIntegrantesAsistencia(ms).filter((m) => m.activo !== false);
+  const nom = (m) => String(m.nombre || "").split(" ").filter(Boolean).slice(0, 2).join(" ");
+  const si = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "si");
+  const no = integrantes.filter((m) => (resp[String(m.id)] || {}).r === "no");
+  const pend = integrantes.filter((m) => !resp[String(m.id)]);
+  const abierta = mjConvAbierta(c);
+  const fl = mjFechaLargaCorta(fecha);
+  const bloque = (titulo, lista, col, bg, vacio) => (
+    <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #e1e9f4", overflow: "hidden", marginTop: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: bg }}>
+        <div style={{ fontSize: 14.5, fontWeight: 800, color: col }}>{titulo}</div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: col }}>{lista.length}</div>
+      </div>
+      {lista.length === 0 ? (
+        <div style={{ padding: "12px 16px", fontSize: 13.5, color: "#8a96a8" }}>{vacio}</div>
+      ) : (
+        lista.map((m) => (
+          <div key={m.id} style={{ padding: "10px 16px", fontSize: 14.5, fontWeight: 600, borderTop: "1px solid #f1f4f8" }}>
+            {nom(m)}
+          </div>
+        ))
+      )}
+    </div>
+  );
+  return pagina(
+    <>
+      <div style={{ background: "linear-gradient(135deg,#17345c 0%,#2a5a9c 100%)", color: "#fff", borderRadius: 20, padding: "16px 18px" }}>
+        <div style={{ fontSize: 18, fontWeight: 800 }}>{c.titulo || "Misa"}</div>
+        <div style={{ fontSize: 13.5, opacity: 0.9, marginTop: 3 }}>
+          {fl.charAt(0).toUpperCase() + fl.slice(1)}
+          {c.hora ? ` · ${c.hora} hrs` : ""}
+        </div>
+        {c.lugar ? <div style={{ fontSize: 12.5, opacity: 0.8, marginTop: 2 }}>{c.lugar}</div> : null}
+        <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: 8 }}>{abierta ? `Confirmar hasta: ${mjLimiteTexto(c.limite)}` : "Plazo para confirmar cerrado"}</div>
+        {abierta ? (
+          <a href={`/?confirmar=${fecha}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", marginTop: 12, height: 44, borderRadius: 13, background: "#fff", color: NAVY, fontSize: 14.5, fontWeight: 800, textDecoration: "none" }}>
+            Confirmar mi participación
+          </a>
+        ) : null}
+      </div>
+      {bloque("Van", si, NAVY, "#e8f0fb", "Nadie ha confirmado todavía.")}
+      {bloque("No van", no, "#475569", "#eef2f7", "Nadie ha dicho que no.")}
+      {bloque("Sin responder", pend, "#9a4a06", "#fbf1de", "Todos respondieron.")}
+      <div style={{ textAlign: "center", fontSize: 11.5, color: "#8a96a8", marginTop: 14 }}>Actualizado a las {en.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}</div>
+    </>
   );
 }
 
