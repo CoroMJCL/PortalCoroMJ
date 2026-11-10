@@ -44301,7 +44301,7 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
   return (
     <div style={{ fontFamily: "var(--font-sans)", color: "#0f1b2d" }}>
       <div style={{ fontSize: 13.5, color: "#4b5869", lineHeight: 1.55, marginBottom: 14 }}>
-        Crea la convocatoria de cada misa con su plazo y comparte el link en el grupo de WhatsApp. Quien confirma <b>Sí</b> recibe la pauta automáticamente; quien no responde a tiempo no recibe los cantos y, si no llega, cuenta como ausencia. Quien avisa <b>No</b> no cuenta como ausente. Con <b>2 convocatorias seguidas sin responder</b> (y sin haber asistido) el acceso al portal se bloquea hasta que tú lo desbloquees.
+        Crea la convocatoria de cada misa con su plazo. El link de la lista pública es siempre el mismo: déjalo fijo en el grupo de WhatsApp y mostrará sola la próxima misa convocada. Quien confirma <b>Sí</b> recibe la pauta automáticamente; quien no responde a tiempo no recibe los cantos y, si no llega, cuenta como ausencia. Quien avisa <b>No</b> no cuenta como ausente. Con <b>2 convocatorias seguidas sin responder</b> (y sin haber asistido) el acceso al portal se bloquea hasta que tú lo desbloquees.
       </div>
 
       {formulario}
@@ -44439,12 +44439,6 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
                 );
               })()}
               <div style={{ padding: "12px 16px", display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <a href={`https://wa.me/?text=${encodeURIComponent(mjTextoWhatsappConv(c))}`} target="_blank" rel="noopener" style={{ ...btn(NAVY, "#fff"), textDecoration: "none" }}>
-                  Enviar por WhatsApp
-                </a>
-                <button onClick={() => copiar(c)} style={btn("#e8f0fb", NAVY)}>
-                  {copiado === c.fecha ? "Copiado ✓" : "Copiar mensaje"}
-                </button>
                 <button onClick={() => setForm({ fecha: c.fecha, titulo: c.titulo || "", hora: c.hora || "", lugar: c.lugar || "", limite: c.limite || "", editar: true })} style={btn("#eef2f7", "#334155")}>
                   Editar plazo
                 </button>
