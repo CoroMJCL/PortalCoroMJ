@@ -37758,6 +37758,7 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
   };
 
   const responder = async (r) => {
+    if (actual) return; // ya respondió: solo el Encargado puede cambiarla
     setForzada(fecha); // mantener esta misa en pantalla mientras se recarga
     setEnviando(true);
     setError("");
@@ -37884,6 +37885,26 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
         </button>
       </>
     );
+  } else if (actual) {
+    contenido = (
+      <>
+        {actual === "si" ? icono("#e8f0fb", "#1e3a5f", <path d="M5 12.5l4.5 4.5L19 7.5" />) : icono("#eef2f7", "#4b5869", <path d="M5 12.5l4.5 4.5L19 7.5" />)}
+        <div style={eyebrow}>Respuesta registrada</div>
+        <div style={titulo}>{actual === "si" ? "Ya estás confirmado/a" : "Ya avisaste que no vas"}</div>
+        <div style={texto}>
+          {actual === "si" ? "Tu participación en esta misa ya está confirmada." : "Ya registraste que no participas en esta misa."} Si necesitas cambiar tu respuesta, conversa con el <b>Encargado del Coro</b> y él la cambia.
+        </div>
+        {datosMisa}
+        {actual === "si" && !soyAdmin ? (
+          <a href={mjGrupoConv(c)} style={{ ...btnSec, marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", boxSizing: "border-box" }}>
+            Ir al grupo de WhatsApp
+          </a>
+        ) : null}
+        <button onClick={cerrar} style={{ ...btnPri, marginTop: 12 }}>
+          Entendido
+        </button>
+      </>
+    );
   } else if (!abierta) {
     contenido = (
       <>
@@ -37915,8 +37936,7 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
         <div style={titulo}>{nombre ? `${nombre}, ¿participas` : "¿Participas"} en esta misa?</div>
         {datosMisa}
         <div style={{ ...texto, fontSize: 13 }}>
-          Plazo para responder: <b>{mjLimiteTexto(c.limite)}</b>. Solo quienes confirmen recibirán la pauta y los cantos. Si no respondes 2 convocatorias seguidas, tu acceso al portal se bloquea.
-          {actual ? <div style={{ marginTop: 6 }}>Tu respuesta actual: <b>{actual === "si" ? "Sí voy" : "No puedo"}</b>. Puedes cambiarla hasta el plazo.</div> : null}
+          Plazo para responder: <b>{mjLimiteTexto(c.limite)}</b>. Solo quienes confirmen recibirán la pauta y los cantos. Tu respuesta queda registrada y solo el Encargado del Coro puede cambiarla. Si no respondes 2 convocatorias seguidas, tu acceso al portal se bloquea.
         </div>
         {error ? <div style={{ marginTop: 10, fontSize: 13, color: "#b42318", fontWeight: 600 }}>{error}</div> : null}
         <div style={{ display: "grid", gap: 10, marginTop: 16 }}>
@@ -44371,9 +44391,9 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
     if (!ok) alert("No se pudo desbloquear. Intenta de nuevo.");
     await recargar();
   };
-  const agregar = async (c, m) => {
-    const ok = await mjResponderConv(c.fecha, m.id, "si", true);
-    if (!ok) alert("No se pudo agregar. Intenta de nuevo.");
+  const agregar = async (c, m, r = "si") => {
+    const ok = await mjResponderConv(c.fecha, m.id, r, true);
+    if (!ok) alert("No se pudo guardar. Intenta de nuevo.");
     await recargar();
   };
 
@@ -44539,14 +44559,22 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
                           <div style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 600, color: "#0f1b2d" }}>
                             {m.nombre}
                             {String(m.id) === mjEncargadoConv(c, integrantes) ? <MjEtiquetaEncargado /> : null}
-                            {(resp[String(m.id)] || {}).porAdmin ? <span style={{ fontSize: 11.5, color: "#8a96a8", fontWeight: 600 }}> · agregado por ti</span> : null}
+                            {(resp[String(m.id)] || {}).porAdmin ? <span style={{ fontSize: 11.5, color: "#8a96a8", fontWeight: 600 }}> · cambiado por ti</span> : null}
                           </div>
                           <div style={{ fontSize: 12.5, color: "#8a96a8", fontWeight: 600, flexShrink: 0 }}>{mjCuerdaMostrar(m)}</div>
-                          {abierta.tipo !== "si" ? (
-                            <button onClick={() => agregar(c, m)} style={btn("#e8f0fb", NAVY, { height: 32, padding: "0 12px", fontSize: 12.5 })}>
+                          {abierta.tipo === "si" ? (
+                            <button onClick={() => window.confirm(`¿Cambiar a ${m.nombre} a "No va"?`) && agregar(c, m, "no")} style={btn("#eef2f7", "#475569", { height: 32, padding: "0 12px", fontSize: 12.5 })}>
+                              Cambiar a No
+                            </button>
+                          ) : abierta.tipo === "no" ? (
+                            <button onClick={() => window.confirm(`¿Cambiar a ${m.nombre} a "Va"?`) && agregar(c, m, "si")} style={btn("#e8f0fb", NAVY, { height: 32, padding: "0 12px", fontSize: 12.5 })}>
+                              Cambiar a Sí
+                            </button>
+                          ) : (
+                            <button onClick={() => agregar(c, m, "si")} style={btn("#e8f0fb", NAVY, { height: 32, padding: "0 12px", fontSize: 12.5 })}>
                               Agregar
                             </button>
-                          ) : null}
+                          )}
                         </div>
                       ))
                     )}
