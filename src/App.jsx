@@ -2532,6 +2532,26 @@ function AppInner() {
   const [accesosPauta, setAccesosPauta] = useState({});
   const [convData, setConvData] = useState({ conv: {}, resp: {} });
   const recargarConv = useCallback(() => mjCargarConvocatorias().then(setConvData).catch(() => {}), []);
+  // La app suele quedar abierta días: al volver a ella (y cada 2 min) se recargan confirmaciones y accesos,
+  // para que quien confirmó desde el link vea la pauta sin cerrar la app.
+  useEffect(() => {
+    if (!user || !user.id) return;
+    const refrescar = () => {
+      if (document.visibilityState && document.visibilityState !== "visible") return;
+      mjCargarConvocatorias().then((d) => d && setConvData(d)).catch(() => {});
+      mjCargarAccesosPauta().then((m) => m && setAccesosPauta(m)).catch(() => {});
+    };
+    document.addEventListener("visibilitychange", refrescar);
+    window.addEventListener("focus", refrescar);
+    window.addEventListener("pageshow", refrescar);
+    const t = setInterval(refrescar, 120000);
+    return () => {
+      document.removeEventListener("visibilitychange", refrescar);
+      window.removeEventListener("focus", refrescar);
+      window.removeEventListener("pageshow", refrescar);
+      clearInterval(t);
+    };
+  }, [user && user.id]);
   // Cada pauta puede mostrarse solo a los integrantes que elige el admin
   const pautas = useMemo(() => mjFiltrarPautasPorAcceso(pautasRaw, accesosPauta, user, convData), [pautasRaw, accesosPauta, convData, user && user.id, user && user.cuerda]);
   // Próxima pauta publicada que el administrador reservó y a la que este integrante NO fue incluido
@@ -15753,9 +15773,16 @@ function AccesoPautaBoton({ pauta, abrirInicial, onGuardado, estilo }) {
   const [q, setQ] = useState("");
   const [msg, setMsg] = useState("");
   const [estado, setEstado] = useState(null);
+  const [confirmados, setConfirmados] = useState([]); // ids que dijeron "Sí voy" en la convocatoria de esta fecha
   useEffect(() => {
     mjCargarAccesosPauta().then((m) => setEstado(m[pauta.id] || null)).catch(() => {});
-  }, [pauta.id, abierto]);
+    mjCargarConvocatorias()
+      .then((d) => {
+        const r = (d && d.resp && d.resp[pauta.fecha]) || {};
+        setConfirmados(Object.keys(r).filter((k) => r[k] && r[k].r === "si"));
+      })
+      .catch(() => {});
+  }, [pauta.id, pauta.fecha, abierto]);
   useEffect(() => {
     if (!abierto) return;
     setCargando(true);
@@ -15782,7 +15809,10 @@ function AccesoPautaBoton({ pauta, abrirInicial, onGuardado, estilo }) {
   const vis = lista.filter((u) => (u.nombre || "").toLowerCase().includes(q.toLowerCase()));
   const grupos = {};
   vis.forEach((u) => (grupos[u.cuerda] = grupos[u.cuerda] || []).push(u));
-  const etiqueta = estado && estado.restringida ? `Acceso: ${(estado.ids || []).length} elegidos` : "Acceso: todos";
+  const totalAcceso = estado && estado.restringida ? new Set([...(estado.ids || []).map(String), ...confirmados]).size : 0;
+  const etiqueta = estado && estado.restringida ? `Acceso: ${totalAcceso}` : "Acceso: todos";
+  const esConf = (id) => confirmados.includes(String(id));
+  const totalSel = new Set([...sel, ...confirmados.filter((id) => lista.some((u) => String(u.id) === id))]).size;
   const f = "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)";
   return (
     <>
@@ -15806,9 +15836,10 @@ function AccesoPautaBoton({ pauta, abrirInicial, onGuardado, estilo }) {
               </div>
               {restringida && (
                 <div style={{ padding: "0 20px", display: "flex", flexDirection: "column", minHeight: 0, flex: 1 }}>
+                  {confirmados.length > 0 ? <div style={{ fontSize: 12.5, color: "#64748b", lineHeight: 1.45, marginBottom: 8 }}>Los que confirmaron (★) ven la pauta automáticamente.</div> : null}
                   <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar integrante…" style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: "10px 12px", fontSize: 14, fontFamily: "inherit", outline: "none", marginBottom: 8 }} />
                   <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, fontSize: 12.5, color: "#64748b" }}>
-                    <b style={{ color: "#0f1b2d" }}>{sel.length}</b> de {lista.length} podrán verla
+                    <b style={{ color: "#0f1b2d" }}>{totalSel}</b> de {lista.length} podrán verla
                     <span style={{ flex: 1 }} />
                     <button onClick={() => setSel(lista.map((u) => String(u.id)))} style={{ border: "none", background: "none", color: "#2f5d9a", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}>Todos</button>
                     <button onClick={() => setSel([])} style={{ border: "none", background: "none", color: "#2f5d9a", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}>Ninguno</button>
@@ -15819,9 +15850,10 @@ function AccesoPautaBoton({ pauta, abrirInicial, onGuardado, estilo }) {
                       <div key={g}>
                         <div style={{ padding: "6px 12px", fontSize: 10.5, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "#64748b", background: "#f8fafc" }}>{g}</div>
                         {grupos[g].map((u) => (
-                          <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderTop: "1px solid #f1f5f9", fontSize: 14.5, cursor: "pointer" }}>
-                            <input type="checkbox" checked={sel.includes(String(u.id))} onChange={() => alternar(u.id)} style={{ width: 20, height: 20 }} />
-                            {u.nombre}
+                          <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderTop: "1px solid #f1f5f9", fontSize: 14.5, cursor: esConf(u.id) ? "default" : "pointer" }}>
+                            <input type="checkbox" checked={esConf(u.id) || sel.includes(String(u.id))} disabled={esConf(u.id)} onChange={() => alternar(u.id)} style={{ width: 20, height: 20 }} />
+                            <span style={{ flex: 1 }}>{u.nombre}</span>
+                            {esConf(u.id) ? <span style={{ fontSize: 11.5, fontWeight: 700, color: "#d4a017", whiteSpace: "nowrap" }}>★ Confirmó</span> : null}
                           </label>
                         ))}
                       </div>
