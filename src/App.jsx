@@ -2538,7 +2538,13 @@ function AppInner() {
     if (!user || !user.id) return;
     const refrescar = () => {
       if (document.visibilityState && document.visibilityState !== "visible") return;
-      mjCargarConvocatorias().then((d) => d && setConvData(d)).catch(() => {});
+      mjCargarConvocatorias()
+        .then(async (d) => {
+          if (!d) return;
+          setConvData(d);
+          if (await mjAutoConvocar(d)) setConvData(await mjCargarConvocatorias());
+        })
+        .catch(() => {});
       mjCargarAccesosPauta().then((m) => m && setAccesosPauta(m)).catch(() => {});
     };
     document.addEventListener("visibilitychange", refrescar);
@@ -2561,7 +2567,7 @@ function AppInner() {
     const p = proximasPautas(pautasRaw).find((x) => !visibles.has(String(x.id))) || null;
     if (!p) return null;
     const c = convData && convData.conv ? convData.conv[p.fecha] : null;
-    return c ? { ...p, _conv: c, _resp: mjRespuestaConv(convData, p.fecha, user.id) } : p;
+    return c ? { ...p, _conv: c, _resp: mjRespuestaConv(convData, p.fecha, user.id), _confirmable: mjConvConfirmable(convData, p.fecha), _habilita: mjConvSeHabilita(convData, p.fecha) } : p;
   }, [pautasRaw, pautas, convData, user && user.id, user && user.cuerda]);
   // Recuerda quién es en este teléfono (solo nombre e id) para poder marcar asistencia aunque no haya internet para iniciar sesión
   useEffect(() => {
@@ -2745,7 +2751,12 @@ function AppInner() {
       setPodcasts(pod || []);
       setPautas(pau || []);
       mjCargarAccesosPauta().then(setAccesosPauta).catch(() => {});
-      mjCargarConvocatorias().then(setConvData).catch(() => {});
+      mjCargarConvocatorias()
+        .then(async (d) => {
+          setConvData(d);
+          if (await mjAutoConvocar(d)) setConvData(await mjCargarConvocatorias());
+        })
+        .catch(() => {});
       setAsistencia(asis || []);
       setFotos(gal || []);
       setComunidades(com || []);
@@ -15735,6 +15746,59 @@ function mjConvAbierta(c) {
   const t = new Date(c.limite).getTime();
   return !isNaN(t) && Date.now() < t;
 }
+// Solo la próxima misa convocada se puede confirmar; la siguiente se habilita para todos a la vez cuando pasa esa misa.
+function mjConvActiva(conv) {
+  const hoy = mjHoyISO();
+  return (
+    Object.keys((conv && conv.conv) || {})
+      .filter((f) => f >= hoy)
+      .sort()[0] || null
+  );
+}
+function mjConvConfirmable(conv, fecha) {
+  return !!fecha && fecha === mjConvActiva(conv) && mjConvAbierta(conv.conv[fecha]);
+}
+// Día en que se habilita una convocatoria en espera: el día siguiente a la misa anterior convocada
+function mjConvSeHabilita(conv, fecha) {
+  const prev = Object.keys((conv && conv.conv) || {})
+    .filter((f) => f < fecha && f >= mjHoyISO())
+    .sort()
+    .pop();
+  if (!prev) return null;
+  const d = new Date(prev + "T12:00:00");
+  d.setDate(d.getDate() + 1);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+// Si no hay ninguna misa convocada por venir, se crea sola la convocatoria de la próxima misa del calendario
+let _mjAutoConvEnCurso = false;
+async function mjAutoConvocar(conv) {
+  if (_mjAutoConvEnCurso || !conv || mjConvActiva(conv)) return false;
+  _mjAutoConvEnCurso = true;
+  try {
+    const hoy = mjHoyISO();
+    const ev = ((await fetchGoogleCalendarEvents().catch(() => [])) || []).filter((e) => e && e.tipo === "misa" && e.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const prox = ev[0];
+    if (!prox) return false;
+    const previa = (conv.conv || {})[prox.fecha];
+    if (previa) return false; // existe (o fue eliminada a propósito por el admin)
+    const borrada = await mjConfigPorPrefijo(`${MJ_CONV}${prox.fecha}`);
+    if (borrada && borrada.length) return false;
+    let limite = mjLimitePorDefecto(prox.fecha);
+    if (!limite || new Date(limite).getTime() <= Date.now()) {
+      limite = `${prox.fecha}T12:00`;
+      if (new Date(limite).getTime() <= Date.now()) return false;
+    }
+    return await setConfig(
+      `${MJ_CONV}${prox.fecha}`,
+      JSON.stringify({ titulo: prox.titulo || "Misa", hora: prox.hora || "", lugar: prox.lugar || "", limite, creada: new Date().toISOString(), encargado: "", grupo: "", auto: true })
+    );
+  } catch (e) {
+    return false;
+  } finally {
+    _mjAutoConvEnCurso = false;
+  }
+}
 async function mjResponderConv(fecha, mid, r, porAdmin = false) {
   return setConfig(`${MJ_RESP}${fecha}_${mid}`, JSON.stringify({ r, en: new Date().toISOString(), ...(porAdmin ? { porAdmin: true } : {}) }));
 }
@@ -17282,7 +17346,11 @@ function PautaReservadaAviso({ pauta }) {
         </div>
       </div>
       <div style={{ padding: "16px 18px 18px" }}>
-        {pauta._conv && mjConvAbierta(pauta._conv) ? (
+        {pauta._conv && pauta._habilita && mjConvAbierta(pauta._conv) ? (
+          <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.55 }}>
+            Los cantos de esta misa son para quienes confirmen su participación. La confirmación se habilita para todos el <b>{mjFechaLargaCorta(pauta._habilita)}</b>.
+          </div>
+        ) : pauta._conv && pauta._confirmable ? (
           <>
             <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.55 }}>
               Los cantos de esta misa son para quienes confirmen su participación. Tienes plazo hasta el <b>{mjLimiteTexto(pauta._conv.limite)}</b>.
@@ -37670,7 +37738,7 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
     fecha =
       Object.keys(convs)
         .sort()
-        .find((f) => f >= hoy && mjConvAbierta(convs[f]) && !mjRespuestaConv(conv, f, uid) && !omitidas.includes(f)) || null;
+        .find((f) => f >= hoy && mjConvConfirmable(conv, f) && !mjRespuestaConv(conv, f, uid) && !omitidas.includes(f)) || null;
   }
   if (forzada && !convs[forzada] && !resultado) {
     // Link de una misa que ya no tiene convocatoria
@@ -37678,7 +37746,8 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
   }
   if (!fecha) return null;
   const c = convs[fecha];
-  const abierta = mjConvAbierta(c);
+  const habilita = fecha !== mjConvActiva(conv) ? mjConvSeHabilita(conv, fecha) : null;
+  const abierta = mjConvConfirmable(conv, fecha);
   const actual = mjRespuestaConv(conv, fecha, uid);
   const nombre = String((user && user.nombre) || "").split(" ")[0];
   const fl = mjFechaLargaCorta(fecha);
@@ -37828,6 +37897,21 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
         <div style={texto}>Quedó registrado que no participas en esta misa.</div>
         <button onClick={cerrar} style={{ ...btnPri, marginTop: 18 }}>
           Listo
+        </button>
+      </>
+    );
+  } else if (habilita && mjConvAbierta(c)) {
+    contenido = (
+      <>
+        {icono("#e8f0fb", "#1e3a5f", <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>)}
+        <div style={eyebrow}>Aún no disponible</div>
+        <div style={titulo}>Esta misa todavía no se puede confirmar</div>
+        <div style={texto}>
+          La confirmación se habilita para todos el <b>{mjFechaLargaCorta(habilita)}</b>, cuando pase la misa anterior.
+        </div>
+        {datosMisa}
+        <button onClick={cerrar} style={{ ...btnPri, marginTop: 18 }}>
+          Entendido
         </button>
       </>
     );
@@ -44460,7 +44544,8 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
       <div style={{ display: "grid", gap: 14 }}>
         {convs.map((c) => {
           const resp = (data.resp || {})[c.fecha] || {};
-          const abiertaC = mjConvAbierta(c);
+          const abiertaC = mjConvConfirmable(data, c.fecha);
+          const enEspera = !abiertaC && c.fecha !== mjConvActiva(data) && mjConvAbierta(c);
           const encC = mjEncargadoConv(c, integrantes);
           const si = mjEncargadoPrimero(integrantes.filter((m) => (resp[String(m.id)] || {}).r === "si"), encC);
           const no = mjEncargadoPrimero(integrantes.filter((m) => (resp[String(m.id)] || {}).r === "no"), encC);
@@ -44479,9 +44564,12 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
                       {c.lugar ? ` · ${c.lugar}` : ""}
                     </div>
                   </div>
-                  <span style={{ flexShrink: 0, padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 800, background: abiertaC ? "rgba(255,255,255,.18)" : "#e8c76a", color: abiertaC ? "#fff" : "#3b2a05" }}>{abiertaC ? "Abierta" : "Cerrada"}</span>
+                  <span style={{ flexShrink: 0, padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 800, background: abiertaC ? "rgba(255,255,255,.18)" : enEspera ? "rgba(255,255,255,.10)" : "#e8c76a", color: abiertaC || enEspera ? "#fff" : "#3b2a05", border: enEspera ? "1px dashed rgba(255,255,255,.5)" : "none" }}>{abiertaC ? "Abierta" : enEspera ? "En espera" : "Cerrada"}</span>
                 </div>
-                <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: 8 }}>Confirmar hasta: {mjLimiteTexto(c.limite)}</div>
+                <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: 8 }}>
+                  {enEspera && mjConvSeHabilita(data, c.fecha) ? `Se abre para todos el ${mjFechaLargaCorta(mjConvSeHabilita(data, c.fecha))} · ` : ""}Confirmar hasta: {mjLimiteTexto(c.limite)}
+                  {c.auto ? " · creada automáticamente" : ""}
+                </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", borderBottom: "1px solid #eef2f7" }}>
                 {[
@@ -44655,7 +44743,8 @@ function MjEtiquetaEncargado() {
 function ListaPublicaConvocatoria() {
   const [estado, setEstado] = useState({ cargando: true });
   const cargar = async () => {
-    const [d, ms] = await Promise.all([mjCargarConvocatorias().catch(() => null), mjIntegrantesPublico()]);
+    let [d, ms] = await Promise.all([mjCargarConvocatorias().catch(() => null), mjIntegrantesPublico()]);
+    if (d && (await mjAutoConvocar(d))) d = (await mjCargarConvocatorias().catch(() => null)) || d;
     if (!d || !ms) {
       setEstado({ error: true });
       return;
