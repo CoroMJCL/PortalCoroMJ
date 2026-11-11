@@ -2567,7 +2567,7 @@ function AppInner() {
     const p = proximasPautas(pautasRaw).find((x) => !visibles.has(String(x.id))) || null;
     if (!p) return null;
     const c = convData && convData.conv ? convData.conv[p.fecha] : null;
-    return c ? { ...p, _conv: c, _resp: mjRespuestaConv(convData, p.fecha, user.id), _confirmable: mjConvConfirmable(convData, p.fecha), _habilita: mjConvSeHabilita(convData, p.fecha) } : p;
+    return c && p.fecha === mjConvActiva(convData) ? { ...p, _conv: c, _resp: mjRespuestaConv(convData, p.fecha, user.id), _confirmable: mjConvConfirmable(convData, p.fecha) } : p;
   }, [pautasRaw, pautas, convData, user && user.id, user && user.cuerda]);
   // Recuerda quién es en este teléfono (solo nombre e id) para poder marcar asistencia aunque no haya internet para iniciar sesión
   useEffect(() => {
@@ -15758,18 +15758,6 @@ function mjConvActiva(conv) {
 function mjConvConfirmable(conv, fecha) {
   return !!fecha && fecha === mjConvActiva(conv) && mjConvAbierta(conv.conv[fecha]);
 }
-// Día en que se habilita una convocatoria en espera: el día siguiente a la misa anterior convocada
-function mjConvSeHabilita(conv, fecha) {
-  const prev = Object.keys((conv && conv.conv) || {})
-    .filter((f) => f < fecha && f >= mjHoyISO())
-    .sort()
-    .pop();
-  if (!prev) return null;
-  const d = new Date(prev + "T12:00:00");
-  d.setDate(d.getDate() + 1);
-  const p = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
 // Si no hay ninguna misa convocada por venir, se crea sola la convocatoria de la próxima misa del calendario
 let _mjAutoConvEnCurso = false;
 async function mjAutoConvocar(conv) {
@@ -17346,11 +17334,7 @@ function PautaReservadaAviso({ pauta }) {
         </div>
       </div>
       <div style={{ padding: "16px 18px 18px" }}>
-        {pauta._conv && pauta._habilita && mjConvAbierta(pauta._conv) ? (
-          <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.55 }}>
-            Los cantos de esta misa son para quienes confirmen su participación. La confirmación se habilita para todos el <b>{mjFechaLargaCorta(pauta._habilita)}</b>.
-          </div>
-        ) : pauta._conv && pauta._confirmable ? (
+        {pauta._conv && pauta._confirmable ? (
           <>
             <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.55 }}>
               Los cantos de esta misa son para quienes confirmen su participación. Tienes plazo hasta el <b>{mjLimiteTexto(pauta._conv.limite)}</b>.
@@ -37745,8 +37729,8 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
     return null;
   }
   if (!fecha) return null;
+  if (fecha > (mjConvActiva(conv) || "")) return null; // aún no se convoca
   const c = convs[fecha];
-  const habilita = fecha !== mjConvActiva(conv) ? mjConvSeHabilita(conv, fecha) : null;
   const abierta = mjConvConfirmable(conv, fecha);
   const actual = mjRespuestaConv(conv, fecha, uid);
   const nombre = String((user && user.nombre) || "").split(" ")[0];
@@ -37897,21 +37881,6 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
         <div style={texto}>Quedó registrado que no participas en esta misa.</div>
         <button onClick={cerrar} style={{ ...btnPri, marginTop: 18 }}>
           Listo
-        </button>
-      </>
-    );
-  } else if (habilita && mjConvAbierta(c)) {
-    contenido = (
-      <>
-        {icono("#e8f0fb", "#1e3a5f", <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>)}
-        <div style={eyebrow}>Aún no disponible</div>
-        <div style={titulo}>Esta misa todavía no se puede confirmar</div>
-        <div style={texto}>
-          La confirmación se habilita para todos el <b>{mjFechaLargaCorta(habilita)}</b>, cuando pase la misa anterior.
-        </div>
-        {datosMisa}
-        <button onClick={cerrar} style={{ ...btnPri, marginTop: 18 }}>
-          Entendido
         </button>
       </>
     );
@@ -44328,7 +44297,6 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
   const [gcalHist, setGcalHist] = useState(false);
   const mapaAs = useMemo(() => mjMapaEventos(eventosDb), [eventosDb, gcalHist]);
   const misasAs = useMemo(() => mjConsolidarAsistencia(asistencia, mapaAs), [asistencia, mapaAs]);
-  const [gcal, setGcal] = useState([]);
   const [form, setForm] = useState(null); // { fecha, titulo, hora, lugar, limite, editar }
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState("");
@@ -44340,13 +44308,15 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
     setDesbConv(dc || {});
   };
   useEffect(() => {
-    recargar();
+    // Si falta la convocatoria de la próxima misa de la Agenda, se crea sola
+    mjCargarConvocatorias()
+      .then(async (d) => {
+        if (d) await mjAutoConvocar(d);
+      })
+      .catch(() => {})
+      .finally(recargar);
     mjGcalHistorial().then(() => setGcalHist(true)).catch(() => {});
-    fetchGoogleCalendarEvents()
-      .then((ev) => setGcal((ev || []).filter((e) => e.tipo === "misa")))
-      .catch(() => {});
   }, []);
-  const hoy = mjHoyISO();
   const integrantes = useMemo(() => mjOrdenarPorCuerda(mjIntegrantesConvocatoria(members)), [members]);
   const cambiarEncargado = async (c, id) => {
     const { fecha, ...resto } = c;
@@ -44356,10 +44326,9 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
   };
   if (!data) return <div style={{ padding: 20, color: "#64748b", fontSize: 14 }}>Cargando convocatorias…</div>;
 
-  const convs = Object.values(data.conv || {})
-    .filter((c) => c.fecha >= hoy)
-    .sort((a, b) => a.fecha.localeCompare(b.fecha));
-  const sinConv = gcal.filter((e) => e.fecha >= hoy && !(data.conv || {})[e.fecha]).slice(0, 8);
+  // Solo la próxima misa convocada (se crea sola desde la Agenda al día siguiente de la misa anterior)
+  const activa = mjConvActiva(data);
+  const convs = activa ? [{ ...data.conv[activa], fecha: activa }] : [];
 
   const guardar = async () => {
     if (!form || !form.fecha || !form.limite) {
@@ -44406,15 +44375,6 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
     const ok = await mjResponderConv(c.fecha, m.id, "si", true);
     if (!ok) alert("No se pudo agregar. Intenta de nuevo.");
     await recargar();
-  };
-  const copiar = async (c) => {
-    try {
-      await navigator.clipboard.writeText(mjTextoWhatsappConv(c));
-      setCopiado(c.fecha);
-      setTimeout(() => setCopiado(""), 2000);
-    } catch (e) {
-      window.prompt("Copia el mensaje:", mjTextoWhatsappConv(c));
-    }
   };
 
   const NAVY = "#1e3a5f";
@@ -44473,7 +44433,7 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
   return (
     <div style={{ fontFamily: "var(--font-sans)", color: "#0f1b2d" }}>
       <div style={{ fontSize: 13.5, color: "#4b5869", lineHeight: 1.55, marginBottom: 14 }}>
-        Crea la convocatoria de cada misa con su plazo. El link de la lista pública es siempre el mismo: déjalo fijo en el grupo de WhatsApp y mostrará sola la próxima misa convocada. Quien confirma <b>Sí</b> recibe la pauta automáticamente; quien no responde a tiempo no recibe los cantos y, si no llega, cuenta como ausencia. Quien avisa <b>No</b> no cuenta como ausente. Con <b>2 convocatorias seguidas sin responder</b> (y sin haber asistido) el acceso al portal se bloquea hasta que tú lo desbloquees.
+        La convocatoria de la próxima misa de la Agenda se abre sola al día siguiente de la misa anterior, igual para todos. El link de la lista pública es siempre el mismo: déjalo fijo en el grupo de WhatsApp. Quien confirma <b>Sí</b> recibe la pauta automáticamente; quien no responde a tiempo no recibe los cantos y, si no llega, cuenta como ausencia. Quien avisa <b>No</b> no cuenta como ausente. Con <b>2 convocatorias seguidas sin responder</b> (y sin haber asistido) el acceso al portal se bloquea hasta que tú lo desbloquees.
       </div>
 
       {formulario}
@@ -44499,9 +44459,6 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
 
       {!form && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-          <button onClick={() => setForm({ fecha: "", titulo: "Misa", hora: "", lugar: "", limite: "", grupo: MJ_GRUPO_WSP })} style={btn(NAVY, "#fff")}>
-            + Nueva convocatoria
-          </button>
           <button
             onClick={async () => {
               try {
@@ -44519,33 +44476,12 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
         </div>
       )}
 
-      {!form && sinConv.length > 0 && (
-        <div style={{ ...card, marginBottom: 16 }}>
-          <div style={{ padding: "12px 16px", fontSize: 11, fontWeight: 800, letterSpacing: ".16em", textTransform: "uppercase", color: "#8a96a8", borderBottom: "1px solid #eef2f7" }}>Misas del calendario sin convocar</div>
-          {sinConv.map((e) => (
-            <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", borderBottom: "1px solid #f3f5f9" }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.titulo}</div>
-                <div style={{ fontSize: 12.5, color: "#64748b" }}>
-                  {mjFechaLargaCorta(e.fecha)}
-                  {e.hora ? ` · ${e.hora}` : ""}
-                </div>
-              </div>
-              <button onClick={() => setForm({ fecha: e.fecha, titulo: e.titulo, hora: e.hora || "", lugar: e.lugar || "", limite: mjLimitePorDefecto(e.fecha), grupo: MJ_GRUPO_WSP })} style={btn("#e8f0fb", NAVY)}>
-                Convocar
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {convs.length === 0 && !form && <div style={{ ...card, padding: 18, fontSize: 14, color: "#64748b" }}>No hay convocatorias activas.</div>}
+      {convs.length === 0 && !form && <div style={{ ...card, padding: 18, fontSize: 14, color: "#64748b" }}>No hay próxima misa en la Agenda. La convocatoria se crea sola cuando agendes la siguiente misa.</div>}
 
       <div style={{ display: "grid", gap: 14 }}>
         {convs.map((c) => {
           const resp = (data.resp || {})[c.fecha] || {};
           const abiertaC = mjConvConfirmable(data, c.fecha);
-          const enEspera = !abiertaC && c.fecha !== mjConvActiva(data) && mjConvAbierta(c);
           const encC = mjEncargadoConv(c, integrantes);
           const si = mjEncargadoPrimero(integrantes.filter((m) => (resp[String(m.id)] || {}).r === "si"), encC);
           const no = mjEncargadoPrimero(integrantes.filter((m) => (resp[String(m.id)] || {}).r === "no"), encC);
@@ -44564,11 +44500,10 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
                       {c.lugar ? ` · ${c.lugar}` : ""}
                     </div>
                   </div>
-                  <span style={{ flexShrink: 0, padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 800, background: abiertaC ? "rgba(255,255,255,.18)" : enEspera ? "rgba(255,255,255,.10)" : "#e8c76a", color: abiertaC || enEspera ? "#fff" : "#3b2a05", border: enEspera ? "1px dashed rgba(255,255,255,.5)" : "none" }}>{abiertaC ? "Abierta" : enEspera ? "En espera" : "Cerrada"}</span>
+                  <span style={{ flexShrink: 0, padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 800, background: abiertaC ? "rgba(255,255,255,.18)" : "#e8c76a", color: abiertaC ? "#fff" : "#3b2a05" }}>{abiertaC ? "Abierta" : "Cerrada"}</span>
                 </div>
                 <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: 8 }}>
-                  {enEspera && mjConvSeHabilita(data, c.fecha) ? `Se abre para todos el ${mjFechaLargaCorta(mjConvSeHabilita(data, c.fecha))} · ` : ""}Confirmar hasta: {mjLimiteTexto(c.limite)}
-                  {c.auto ? " · creada automáticamente" : ""}
+                  Confirmar hasta: {mjLimiteTexto(c.limite)}
                 </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", borderBottom: "1px solid #eef2f7" }}>
