@@ -6692,7 +6692,7 @@ function VideoDestacadoWidget({ isAdmin }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  WIDGET CANTO SUGERIDO — carrusel de cantos (videos de YouTube) que propone el admin
+//  WIDGET CANTOS A APRENDER — carrusel de cantos (videos de YouTube) que propone el admin
 // ═══════════════════════════════════════════════════════════════
 const VOC_STORAGE_KEY = "coro_vocalizacion_url";
 const CANTOS_SUG_KEY = "cantos_sugeridos";
@@ -6715,8 +6715,34 @@ const CS_CSS = `
 .cs-in{width:100%;height:38px;border:1px solid #e3e9f2;border-radius:10px;padding:0 11px;font:inherit;font-size:13.5px;color:#0f1b2d;background:#fff;box-sizing:border-box}
 .cs-row{display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #f1f4f8}
 .cs-mini{width:30px;height:30px;border-radius:8px;border:1px solid #e3e9f2;background:#fff;color:#5b6779;cursor:pointer;font:inherit;font-size:13px;font-weight:800;flex-shrink:0}
+.cs-new{display:inline-block;margin-left:7px;padding:2px 7px;border-radius:99px;background:#1e3a5f;color:#fff;font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;vertical-align:2px}
+.cs-meta{display:inline-flex;align-items:center;gap:5px;margin-top:6px;padding:4px 9px;border-radius:8px;background:#eef3f9;color:#1e3a5f;font-size:12px;font-weight:700}
+.cs-sel{width:100%;height:32px;border:1px solid #e3e9f2;border-radius:10px;padding:0 9px;font:inherit;font-size:12.5px;color:#0f1b2d;background:#fff;box-sizing:border-box;margin-top:6px}
 .cs-pri{height:38px;border:none;border-radius:11px;background:linear-gradient(135deg,#17345c,#2a5a9c);color:#fff;font:inherit;font-size:13px;font-weight:800;padding:0 16px;cursor:pointer}
 `;
+async function csTituloYT(url) {
+  const id = extractYTId(url);
+  if (!id) return "";
+  const u = encodeURIComponent(`https://www.youtube.com/watch?v=${id}`);
+  for (const src of [`https://www.youtube.com/oembed?url=${u}&format=json`, `https://noembed.com/embed?url=${u}`]) {
+    try {
+      const r = await fetch(src);
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (j && j.title) return String(j.title).trim();
+    } catch (e) {}
+  }
+  return "";
+}
+function csFechaCorta(f) {
+  if (!f) return "";
+  const [y, m, d] = f.split("-");
+  return `${d}/${m}`;
+}
+function csEsNuevo(c) {
+  if (!c || !c.agregado) return false;
+  return Date.now() - new Date(c.agregado).getTime() < 7 * 864e5;
+}
 function VocalizacionWidget({ isAdmin }) {
   const [lista, setLista] = useState([]);
   const [i, setI] = useState(0);
@@ -6725,6 +6751,8 @@ function VocalizacionWidget({ isAdmin }) {
   const [nuevo, setNuevo] = useState({ url: "", titulo: "", nota: "" });
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState("");
+  const [misas, setMisas] = useState([]);
+  const [buscando, setBuscando] = useState(false);
   const toque = useRef(null);
 
   useEffect(() => {
@@ -6742,7 +6770,13 @@ function VocalizacionWidget({ isAdmin }) {
           if (viejo && extractYTId(viejo)) l = [{ url: viejo, titulo: "", nota: "" }];
         } catch (e) {}
       }
-      setLista(l.filter((c) => c && extractYTId(c.url)));
+      l = l.filter((c) => c && extractYTId(c.url));
+      setLista(l);
+      // Completa nombres faltantes desde YouTube (solo para mostrar)
+      if (l.some((c) => !c.titulo)) {
+        const conNombre = await Promise.all(l.map(async (c) => (c.titulo ? c : { ...c, titulo: await csTituloYT(c.url) })));
+        setLista(conNombre);
+      }
     })();
   }, []);
 
@@ -6756,17 +6790,41 @@ function VocalizacionWidget({ isAdmin }) {
 
   const abrirEdicion = () => {
     setBorrador(lista.map((c) => ({ ...c })));
-    setNuevo({ url: "", titulo: "", nota: "" });
+    setNuevo({ url: "", titulo: "", nota: "", meta: "" });
     setMsg("");
     setEditing(true);
+    // Próximas misas de la Agenda para la fecha meta
+    const hoy = mjHoyISO();
+    fetchGoogleCalendarEvents()
+      .then((ev) => setMisas(((ev || []).filter((e) => e && e.tipo === "misa" && e.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha))).slice(0, 12)))
+      .catch(() => setMisas([]));
   };
+  const cambiarUrl = async (url) => {
+    setNuevo((n) => ({ ...n, url }));
+    if (!extractYTId(url)) return;
+    setBuscando(true);
+    const t = await csTituloYT(url);
+    setBuscando(false);
+    if (t) setNuevo((n) => (n.url === url && !n.titulo ? { ...n, titulo: t } : n));
+  };
+  const selectorMisa = (valor, onChange) => (
+    <select className="cs-sel" value={valor || ""} onChange={(e) => onChange(e.target.value)}>
+      <option value="">Sin fecha meta</option>
+      {valor && !misas.some((m) => m.fecha === valor) && <option value={valor}>Misa del {csFechaCorta(valor)}</option>}
+      {misas.map((m) => (
+        <option key={m.fecha + m.titulo} value={m.fecha}>
+          Aprender para: misa del {csFechaCorta(m.fecha)}{m.hora ? ` · ${m.hora}` : ""}
+        </option>
+      ))}
+    </select>
+  );
   const agregar = () => {
     if (!extractYTId(nuevo.url)) {
       setMsg("Pega un enlace válido de YouTube.");
       return;
     }
-    setBorrador((b) => [...b, { url: nuevo.url.trim(), titulo: nuevo.titulo.trim(), nota: nuevo.nota.trim() }]);
-    setNuevo({ url: "", titulo: "", nota: "" });
+    setBorrador((b) => [...b, { url: nuevo.url.trim(), titulo: nuevo.titulo.trim(), nota: nuevo.nota.trim(), meta: nuevo.meta || "", agregado: new Date().toISOString() }]);
+    setNuevo({ url: "", titulo: "", nota: "", meta: "" });
     setMsg("");
   };
   const mover = (k, d) =>
@@ -6780,7 +6838,8 @@ function VocalizacionWidget({ isAdmin }) {
   const guardar = async () => {
     setGuardando(true);
     const antes = new Set(lista.map((c) => extractYTId(c.url)));
-    const hayNuevos = borrador.some((c) => !antes.has(extractYTId(c.url)));
+    const nuevos = borrador.filter((c) => !antes.has(extractYTId(c.url)));
+    const hayNuevos = nuevos.length > 0;
     const ok = await setConfig(CANTOS_SUG_KEY, JSON.stringify(borrador));
     setGuardando(false);
     if (!ok) {
@@ -6790,7 +6849,14 @@ function VocalizacionWidget({ isAdmin }) {
     setLista(borrador);
     setI(0);
     setEditing(false);
-    if (hayNuevos) sendPushToAll("🎵 Nuevo canto sugerido", "Hay un canto nuevo sugerido en el portal del coro. ¡Escúchalo!", "/");
+    if (hayNuevos) {
+      const n0 = nuevos[0];
+      const titulo = nuevos.length > 1 ? `🎵 ${nuevos.length} cantos nuevos a aprender` : `🎵 Nuevo canto a aprender: ${n0.titulo || "revisa el portal"}`;
+      const cuerpo = nuevos.length > 1
+        ? `${nuevos.map((c) => c.titulo).filter(Boolean).join(", ") || "Revisa el portal"}. Escúchalos esta semana.`
+        : n0.meta ? `Para la misa del ${csFechaCorta(n0.meta)}. Escúchalo esta semana.` : "Escúchalo esta semana en el portal del coro.";
+      sendPushToAll(titulo, cuerpo, "/");
+    }
   };
 
   return (
@@ -6801,8 +6867,9 @@ function VocalizacionWidget({ isAdmin }) {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l11-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="17" cy="16" r="3" /></svg>
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="cs-k">Para escuchar</div>
-          <div className="cs-t">Canto Sugerido</div>
+          <div className="cs-k">Repertorio nuevo</div>
+          <div className="cs-t">Cantos a Aprender</div>
+          {!editing && <div style={{ fontSize: 11.5, color: "#6b7a90", marginTop: 1 }}>Cantos que el coro debe preparar.</div>}
         </div>
         {total > 1 && !editing && (
           <span style={{ fontSize: 12, fontWeight: 800, color: "#8a96a8" }}>
@@ -6825,6 +6892,7 @@ function VocalizacionWidget({ isAdmin }) {
               <img src={`https://img.youtube.com/vi/${extractYTId(c.url)}/default.jpg`} alt="" style={{ width: 52, height: 39, objectFit: "cover", borderRadius: 7, flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <input className="cs-in" style={{ height: 32, fontSize: 13 }} value={c.titulo} placeholder="Nombre del canto" onChange={(e) => setBorrador((b) => b.map((x, n) => (n === k ? { ...x, titulo: e.target.value } : x)))} />
+                {selectorMisa(c.meta, (v) => setBorrador((b) => b.map((x, n) => (n === k ? { ...x, meta: v } : x))))}
               </div>
               <button className="cs-mini" onClick={() => mover(k, -1)} title="Subir">↑</button>
               <button className="cs-mini" onClick={() => mover(k, 1)} title="Bajar">↓</button>
@@ -6833,9 +6901,10 @@ function VocalizacionWidget({ isAdmin }) {
           ))}
           <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
             <div className="cs-k">Agregar canto</div>
-            <input className="cs-in" value={nuevo.url} placeholder="Enlace de YouTube" onChange={(e) => setNuevo((n) => ({ ...n, url: e.target.value }))} />
-            <input className="cs-in" value={nuevo.titulo} placeholder="Nombre del canto (opcional)" onChange={(e) => setNuevo((n) => ({ ...n, titulo: e.target.value }))} />
-            <input className="cs-in" value={nuevo.nota} placeholder="Por qué lo sugieres (opcional)" onChange={(e) => setNuevo((n) => ({ ...n, nota: e.target.value }))} />
+            <input className="cs-in" value={nuevo.url} placeholder="Enlace de YouTube" onChange={(e) => cambiarUrl(e.target.value)} />
+            <input className="cs-in" value={nuevo.titulo} placeholder={buscando ? "Buscando nombre…" : "Nombre del canto"} onChange={(e) => setNuevo((n) => ({ ...n, titulo: e.target.value }))} />
+            <input className="cs-in" value={nuevo.nota} placeholder="Indicación para el coro (opcional)" onChange={(e) => setNuevo((n) => ({ ...n, nota: e.target.value }))} />
+            {selectorMisa(nuevo.meta, (v) => setNuevo((n) => ({ ...n, meta: v })))}
             <button className="cs-mini" style={{ width: "100%", height: 36 }} onClick={agregar}>+ Agregar a la lista</button>
           </div>
           {msg && <div style={{ fontSize: 12.5, color: "#a32a1f", marginTop: 8 }}>{msg}</div>}
@@ -6855,7 +6924,7 @@ function VocalizacionWidget({ isAdmin }) {
               if (Math.abs(dx) > 50) ir(dx < 0 ? 1 : -1);
             }}
           >
-            <iframe key={vid} src={`https://www.youtube.com/embed/${vid}?rel=0&modestbranding=1`} allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title={actual.titulo || "Canto sugerido"} />
+            <iframe key={vid} src={`https://www.youtube.com/embed/${vid}?rel=0&modestbranding=1`} allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title={actual.titulo || "Canto a aprender"} />
             {total > 1 && (
               <>
                 <button className="cs-nav" style={{ left: 8 }} onClick={() => ir(-1)} aria-label="Anterior">
@@ -6867,9 +6936,10 @@ function VocalizacionWidget({ isAdmin }) {
               </>
             )}
           </div>
-          {(actual.titulo || actual.nota || total > 1) && (
+          {(actual.titulo || actual.nota || actual.meta || total > 1) && (
             <div className="cs-b">
-              {actual.titulo && <div className="cs-n">{actual.titulo}</div>}
+              {actual.titulo && <div className="cs-n">{actual.titulo}{csEsNuevo(actual) && <span className="cs-new">Nuevo</span>}</div>}
+              {actual.meta && actual.meta >= mjHoyISO() && <div className="cs-meta">🗓 Aprender para la misa del {csFechaCorta(actual.meta)}</div>}
               {actual.nota && <div className="cs-nota">{actual.nota}</div>}
               {total > 1 && (
                 <div className="cs-dots">
@@ -6883,7 +6953,7 @@ function VocalizacionWidget({ isAdmin }) {
         </>
       ) : (
         <div style={{ padding: "22px 16px", textAlign: "center", fontSize: 13, color: "#8a96a8" }}>
-          Aún no hay cantos sugeridos. Toca «Editar» para agregar el primero.
+          Aún no hay cantos a aprender. Toca «Editar» para agregar el primero.
         </div>
       )}
     </div>
@@ -19128,8 +19198,8 @@ function Dashboard({
                 isAdmin={isAdmin}
                 setSection={setSection}
               />
-              <ValoresWidget />
               <VocalizacionWidget isAdmin={isAdmin} />
+              <ValoresWidget />
             </div>
             </div>
           </div>
