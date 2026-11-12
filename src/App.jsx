@@ -16014,7 +16014,7 @@ async function mjResumenAsistencia(user) {
       } catch (e) {}
       await mjGcalHistorial();
       const st = mjStatsAsistencia(mjConsolidarAsistencia(rows, mjMapaEventos(evDb)), user.id, esp);
-      return { pct: st.pct, presentes: st.presentes, ausentes: st.ausentes, justificados: st.justificados, total: st.evaluados };
+      return { pct: st.pct, especial: !!st.especial, presentes: st.presentes, ausentes: st.ausentes, justificados: st.justificados, total: st.evaluados };
     } catch (e) {}
   }
   return null;
@@ -16046,6 +16046,12 @@ function ResumenAsistenciaModal({ user, onCerrar, pendiente }) {
               {r.presentes} presente{r.presentes !== 1 ? "s" : ""} · {r.ausentes} ausente{r.ausentes !== 1 ? "s" : ""}
               {r.justificados ? ` · ${r.justificados} justificada${r.justificados !== 1 ? "s" : ""}` : ""}
             </div>
+          </div>
+        )}
+        {r && r.especial && (
+          <div style={{ background: "#eef3f9", borderRadius: 18, padding: "16px 14px", marginBottom: 14 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#1e3a5f" }}>Participante Ocasional</div>
+            <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.45, marginTop: 6 }}>Gracias por darte el tiempo de venir a servir con el coro.</div>
           </div>
         )}
         {r === null && <div style={{ fontSize: 14, color: "#64748b", marginBottom: 14 }}>Tu asistencia quedó registrada.</div>}
@@ -18696,7 +18702,7 @@ function Dashboard({
                     </span>
                   )}
                   <span style={{ fontSize: 11, fontWeight: 600, color: "#475569" }}>
-                    {pctAsistencia !== null ? `Asistencia ${pctAsistencia}%` : "Sin registros aún"}
+                    {stDash.especial ? "Participante Ocasional" : pctAsistencia !== null ? `Asistencia ${pctAsistencia}%` : "Sin registros aún"}
                     {pctAsistencia !== null && tieneEstrella && (
                       <span title="¡Sin ausencias este año!" style={{ marginLeft: 5 }}>⭐</span>
                     )}
@@ -27593,7 +27599,7 @@ function AdminIntegrantes({ members, onReload }) {
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="ai-n" style={{ display: "block", fontSize: 14.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {m.nombre}
-                    {m.asistencia_especial && <span title="Asistencia especial" style={{ marginLeft: 6, fontSize: 10.5, color: "#c98a12" }}>★</span>}
+                    {m.asistencia_especial && <span title="Participante Ocasional" style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 600, color: "#6b7a90" }}>· Ocasional</span>}
                   </span>
                   <span className="ai-s" style={{ display: "block" }}>
                     <span className="ai-dot" style={{ background: mcc }} />
@@ -27908,8 +27914,8 @@ function AdminIntegrantes({ members, onReload }) {
                         )}
                         {campo("Cumpleaños", m.cumpleanos)}
                         {campo(
-                          "Asistencia especial",
-                          m.asistencia_especial ? "Sí ★" : "No"
+                          "Participante Ocasional",
+                          m.asistencia_especial ? "Sí" : "No"
                         )}
                         {campo("Teléfono", m.telefono)}
 
@@ -27957,9 +27963,9 @@ function AdminIntegrantes({ members, onReload }) {
                               fontWeight: 600,
                               cursor: "pointer",
                             }}
-                            title="Caso especial de asistencia"
+                            title="Participa cuando puede (trabajo, estudios u otra actividad pastoral)"
                           >
-                            ★ Especial
+                            Participante Ocasional
                           </button>
                         </div>
                         <div
@@ -36827,7 +36833,7 @@ function mjStatsAsistencia(misas, memberId, especial) {
     else if (r.estado === "excluido") x++;
     else if (r.estado === "nuevo") n++;
   });
-  if (especial) return { presentes: (misas || []).filter((m) => m.fecha).length, ausentes: 0, justificados: j, excluidos: x, nuevos: n, evaluados: p + a, pct: 100, especial: true };
+  if (especial) return { presentes: (misas || []).filter((m) => m.fecha).length, ausentes: 0, justificados: j, excluidos: x, nuevos: n, evaluados: p + a, pct: null, especial: true };
   return { presentes: p, ausentes: a, justificados: j, excluidos: x, nuevos: n, evaluados: p + a, pct: p + a ? Math.round((p / (p + a)) * 100) : null };
 }
 const mjColorPct = (pct) => (pct == null ? "#94a3b8" : pct >= 75 ? "#1e4f8f" : pct >= 50 ? "#c98a12" : "#d0473b");
@@ -37002,7 +37008,7 @@ function AsDot({ estado, size = 22 }) {
     </span>
   );
 }
-function AsAnillo({ pct, size = 92 }) {
+function AsAnillo({ pct, size = 92, ocasional }) {
   const r = size / 2 - 7;
   const c = 2 * Math.PI * r;
   const col = mjColorPct(pct);
@@ -37014,6 +37020,7 @@ function AsAnillo({ pct, size = 92 }) {
       </svg>
       <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
         <span style={{ fontSize: size * 0.24, fontWeight: 800, color: pct == null ? "#94a3b8" : "#0f1b2d", letterSpacing: "-0.03em" }}>{pct == null ? "—" : pct + "%"}</span>
+        {ocasional && <span style={{ fontSize: Math.max(8.5, size * 0.1), fontWeight: 700, color: "#6b7a90", marginTop: 1 }}>Ocasional</span>}
       </div>
     </div>
   );
@@ -37056,7 +37063,7 @@ function AsDetalleIntegrante({ m, misas, esAdmin, onCerrar, onGuardado, members,
             <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em" }}>{m.nombre}</div>
             <div style={{ fontSize: 12.5, opacity: 0.8, marginTop: 2 }}>
               {m.cuerda}
-              {m.asistencia_especial ? " · Asistencia especial" : ""}
+              {m.asistencia_especial ? " · Participante Ocasional" : ""}
             </div>
           </div>
           <button onClick={onCerrar} aria-label="Cerrar" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.12)", color: "#fff", fontSize: 15, cursor: "pointer" }}>
@@ -37065,7 +37072,7 @@ function AsDetalleIntegrante({ m, misas, esAdmin, onCerrar, onGuardado, members,
         </div>
         <div style={{ padding: 16 }}>
           <div className="as-card" style={{ padding: 16, display: "flex", alignItems: "center", gap: 16, marginBottom: 14 }}>
-            <AsAnillo pct={st.pct} size={84} />
+            <AsAnillo pct={st.pct} size={84} ocasional={st.especial} />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, flex: 1 }}>
               {[
                 ["Presente", st.presentes, "presente"],
@@ -37201,7 +37208,7 @@ function AsResumen({ integrantes, misas, onAbrir, rachaDe }) {
                       </div>
                       <div style={{ fontSize: 11.5, color: "#8a96a8" }}>
                         {m.cuerda}
-                        {m.asistencia_especial ? " · especial" : ""}
+                        {m.asistencia_especial ? " · Participante Ocasional" : ""}
                       </div>
                     </div>
                   </div>
@@ -37233,7 +37240,7 @@ function AsResumen({ integrantes, misas, onAbrir, rachaDe }) {
                   {rachaDe && <AsRachaBadge n={rachaDe(m)} />}
                 </div>
                 <div style={{ fontSize: 11.5, color: "#8a96a8" }}>
-                  {m.cuerda} · {st.presentes} P · {st.ausentes} A · {st.justificados} J
+                  {m.cuerda}{st.especial ? " · Participante Ocasional" : ` · ${st.presentes} P · ${st.ausentes} A · ${st.justificados} J`}
                 </div>
               </div>
               <span style={{ fontSize: 17, fontWeight: 800, color: mjColorPct(st.pct) }}>{st.pct == null ? "—" : st.pct + "%"}</span>
@@ -37334,7 +37341,7 @@ function AsPasarLista({ integrantes, misas, opciones, members, onGuardado }) {
           <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.nombre}</div>
           <div style={{ fontSize: 11.5, color: "#8a96a8" }}>
             {m.cuerda}
-            {m.asistencia_especial ? " · especial" : ""}
+            {m.asistencia_especial ? " · Participante Ocasional" : ""}
             {!est ? " · sin marcar" : ""}
           </div>
         </div>
@@ -38090,7 +38097,7 @@ function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) 
   // Vista personal
   const yo = (members || []).find((m) => String(m.id) === String(user?.id)) || user || {};
   const mio = mjStatsAsistencia(conFecha, user?.id, yo.asistencia_especial);
-  const msgPct = mio.pct == null ? "Aún no hay misas registradas para ti." : mio.pct >= 75 ? "Vas muy bien, sigue así." : mio.pct >= 50 ? "Puedes mejorar tu asistencia." : "Tu asistencia necesita atención.";
+  const msgPct = mio.especial ? "Participante Ocasional: gracias por servir cuando puedes." : mio.pct == null ? "Aún no hay misas registradas para ti." : mio.pct >= 75 ? "Vas muy bien, sigue así." : mio.pct >= 50 ? "Puedes mejorar tu asistencia." : "Tu asistencia necesita atención.";
 
   return (
     <div className="as-wrap">
@@ -38181,7 +38188,7 @@ function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) 
       {vista === "mia" && (
         <>
           <div className="as-card" style={{ padding: 20, display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap", marginBottom: 14 }}>
-            <AsAnillo pct={mio.pct} />
+            <AsAnillo pct={mio.pct} ocasional={mio.especial} />
             <div style={{ flex: "1 1 220px", minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <AsAvatar m={yo} size={40} />
