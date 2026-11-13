@@ -1106,6 +1106,7 @@ const NAV = [
   { id: "dashboard", icon: "⊞", label: "Inicio" },
   { id: "perfil", icon: "◎", label: "Mi Perfil" },
   { id: "reglamento", icon: "📜", label: "Reglamento" },
+  { id: "renovacion", icon: "✍", label: "Renovación de Servicio" },
   { id: "curso_guitarra", icon: "🎸", label: "Curso de Guitarra" },
   { id: "admin", icon: "⚙", label: "Administración" },
   { id: "subir_material", icon: "⬆", label: "Subir Material" },
@@ -1410,6 +1411,7 @@ const NAV_ICONOS = {
   dashboard: <><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V20h14V9.5" /><path d="M10 20v-6h4v6" /></>,
   perfil: <><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></>,
   reglamento: <><path d="M7 3h8l4 4v14H7z" /><path d="M15 3v4h4" /><path d="M10 12h6M10 16h6" /></>,
+  renovacion: <><path d="M6 3h9l4 4v8" /><path d="M6 3v18h7" /><path d="M9 9h6M9 13h4" /><path d="m15 20 1.5 1.5L21 17" /></>,
   curso_guitarra: <><path d="M14 4l6 6" /><path d="M17 7l-5.5 5.5" /><path d="M11.5 12.5a3.5 3.5 0 1 0-1.4 4.6A3 3 0 1 1 6.9 13.9a3.5 3.5 0 0 0 4.6-1.4z" /></>,
   admin: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></>,
   subir_material: <><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></>,
@@ -1433,7 +1435,7 @@ const NAV_ICONOS = {
 const NAV_GRUPOS_MENU = [
   { t: "Principal", ids: ["dashboard", "agenda", "pauta_misa", "asistencia"] },
   { t: "Música", ids: ["cancionero_digital", "material_ensayo", "documentos", "curso_guitarra", "escuela_canto", "sala_ensayo", "biblioteca", "podcast"] },
-  { t: "Comunidad", ids: ["oraciones", "cumpleanos", "reglamento", "guia", "perfil"] },
+  { t: "Comunidad", ids: ["oraciones", "cumpleanos", "reglamento", "renovacion", "guia", "perfil"] },
   { t: "Administración", ids: ["admin", "solicitudes", "subir_material", "finanzas", "info_gastos"] },
 ];
 function mjNavVisible(item, user) {
@@ -1442,7 +1444,7 @@ function mjNavVisible(item, user) {
   if (item.id === "material_ensayo" || item.id === "cancioneros" || item.id === "cancionero" || item.id === "musica") return false;
   if (item.id === "cantos_pdf" || item.id === "audios" || item.id === "vista_invitado") return false;
   if (item.id === "info_gastos" && !verFinanzas(user)) return false;
-  if ((item.id === "solicitudes" || item.id === "subir_material" || item.id === "admin") && !esCuerdaAdmin(user)) return false;
+  if ((item.id === "solicitudes" || item.id === "subir_material" || item.id === "admin" || item.id === "renovacion") && !esCuerdaAdmin(user)) return false;
   if (item.id === "finanzas" && !esCuerdaAdmin(user) && !esCuerdaContador(user)) return false;
   return true;
 }
@@ -4521,6 +4523,7 @@ function AppInner() {
                 <Noticias noticias={avisos} onReload={loadData} />
               )}
               {section === "reglamento" && <Reglamento />}
+              {section === "renovacion" && esCuerdaAdmin(user) && <RenovacionServicio user={user} />}
               {section === "curso_guitarra" && <CursoGuitarra />}
               {section === "qanda" && (
                 <QandA preguntas={preguntas} user={user} onReload={loadData} />
@@ -51150,6 +51153,133 @@ const REGLAMENTO_ARTICULOS = [
     ],
   },
 ];
+
+// ── Renovación de Servicio 2027 (vista previa, solo Administración) ──────
+// Por ahora es solo visual: no guarda nada en Supabase. El nombre se toma del
+// usuario conectado y la fecha/hora del momento en que se firma.
+const RS_CLAUSULAS = [
+  { n: "I", t: "Asistencia", x: "Participaré de manera constante en las celebraciones y ensayos del coro, con un mínimo de dos misas al mes. Sé que mi asistencia se evaluará al término del año." },
+  { n: "II", t: "Compromiso", x: "Me prepararé con dedicación para cada celebración. Estudiaré los cantos y el material entregado, porque servir dignamente a la asamblea depende también de mi preparación." },
+  { n: "III", t: "Responsabilidad", x: "Informaré personalmente y con la debida anticipación al Encargado del Coro cualquier ausencia o impedimento, y responderé oportunamente a cada convocatoria." },
+  { n: "IV", t: "Respeto", x: "Trataré con respeto y caridad fraterna a mis compañeros, al Encargado del Coro y a las comunidades que nos reciben. Cuidaré la puntualidad y el recogimiento propios de la liturgia." },
+  { n: "V", t: "Disponibilidad al llamado", x: "Como miembro de un coro misionero, tendré disposición para servir en las comunidades, celebraciones y vigilias a las que el coro sea convocado." },
+];
+function RenovacionServicio({ user }) {
+  const [acepta, setAcepta] = useState(false);
+  const [firmadoEn, setFirmadoEn] = useState(null);
+  const nombre = String(user?.nombre || "").trim() || "Integrante";
+  const fmt = (d) =>
+    d.toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+    " · " +
+    d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const fecha = firmadoEn ? fmt(firmadoEn) : "Se registra al firmar";
+  return (
+    <div className="rs-wrap">
+      <style>{`
+        .rs-wrap{max-width:680px;margin:0 auto;padding:4px 0 32px;color:#1a2230}
+        .rs-wrap *{box-sizing:border-box}
+        .rs-prev{display:flex;align-items:center;gap:8px;margin:0 0 14px;padding:9px 14px;border-radius:12px;background:#fff7e8;border:1px solid #ecd6a8;color:#7a5a1e;font-size:12.5px;font-weight:600}
+        .rs-hoja{background:#fff;border-radius:4px;overflow:hidden;box-shadow:0 1px 2px rgba(20,40,63,.08),0 14px 36px rgba(20,40,63,.13)}
+        .rs-in{padding:28px 52px 36px}
+        .rs-p{margin:0;font-size:15px;line-height:1.65;text-align:justify;hyphens:auto;-webkit-hyphens:auto}
+        .rs-cl{display:grid;grid-template-columns:44px minmax(0,1fr)}
+        .rs-sig{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+        @media(max-width:600px){
+          .rs-in{padding:22px 22px 28px}
+          .rs-p{font-size:14px;line-height:1.6}
+          .rs-cl{grid-template-columns:30px minmax(0,1fr)}
+          .rs-h1{font-size:21px!important;letter-spacing:.1em!important}
+          .rs-sig{gap:14px}
+        }
+      `}</style>
+
+      <div className="rs-prev">Vista previa · solo tú la ves. Al firmar aquí no se guarda nada.</div>
+
+      <div className="rs-hoja" lang="es">
+        <div style={{ height: 6, background: "#1e3a5f" }} />
+        <div style={{ height: 2, background: "#b08d57" }} />
+        <div className="rs-in">
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.14em", color: "#5b6472" }}>
+            <span>AÑO DE SERVICIO 2027</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", paddingTop: 10 }}>
+            <img src="/logo-coro-mj-oficial.jpg" alt="Coro Misioneros de Jesús" style={{ height: 130, width: "auto", display: "block" }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 9, paddingTop: 22 }}>
+            <h1 className="rs-h1" style={{ margin: 0, fontSize: 28, lineHeight: 1.12, fontWeight: 700, letterSpacing: "0.12em", color: "#1e3a5f" }}>RENOVACIÓN DE SERVICIO</h1>
+            <div style={{ display: "flex", alignItems: "center", gap: 11 }} aria-hidden="true">
+              <span style={{ width: 54, height: 1, background: "#b08d57" }} />
+              <span style={{ width: 6, height: 6, background: "#b08d57", transform: "rotate(45deg)" }} />
+              <span style={{ width: 54, height: 1, background: "#b08d57" }} />
+            </div>
+            <div style={{ fontSize: 15, fontStyle: "italic", color: "#3a4556" }}>«Aquí estoy, Señor, envíame»</div>
+            <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.16em", color: "#5b6472" }}>ISAÍAS 6,8</div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 11, paddingTop: 26 }}>
+            <p className="rs-p">Yo, <strong style={{ color: "#1e3a5f", borderBottom: "1px solid #1e3a5f" }}>{nombre}</strong>, integrante del Coro Misioneros de Jesús, declaro que asumo libre y voluntariamente el servicio de cantar en el coro durante el año 2027.</p>
+            <p className="rs-p">Entiendo que nuestro servicio es parte importante de la celebración de la Santa Misa. El canto ayuda a la asamblea a orar y a vivir con mayor profundidad la liturgia. Por eso reconozco que pertenecer al coro es un <strong style={{ color: "#1e3a5f" }}>compromiso serio</strong>, que asumo con responsabilidad ante Dios, ante mis compañeros y ante la comunidad. Me comprometo a cumplirlo según los siguientes puntos:</p>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "26px 0 16px" }}>
+            <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.22em", color: "#1e3a5f", whiteSpace: "nowrap" }}>CLÁUSULAS DEL COMPROMISO</span>
+            <span style={{ flex: 1, height: 1, background: "#d9dee6" }} />
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            {RS_CLAUSULAS.map((c) => (
+              <div key={c.n} className="rs-cl">
+                <div style={{ fontSize: 22, fontWeight: 300, color: "#b08d57", lineHeight: 1 }}>{c.n}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.18em", color: "#1e3a5f", textTransform: "uppercase" }}>{c.t}</div>
+                  <p className="rs-p">{c.x}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="rs-p" style={{ paddingTop: 22 }}>Al firmar esta renovación, asumo este compromiso con seriedad y lo confío a Dios y a la intercesión de la Santísima Virgen María.</p>
+
+          <div className="rs-sig" style={{ marginTop: 26, paddingTop: 20, borderTop: "1px solid #d9dee6" }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", color: "#5b6472", marginBottom: 5 }}>FIRMADO POR</div>
+              <div style={{ fontSize: 14.5, fontWeight: 600, color: "#1e3a5f" }}>{firmadoEn ? nombre : "—"}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", color: "#5b6472", marginBottom: 5 }}>FECHA Y HORA</div>
+              <div style={{ fontSize: 14.5, fontWeight: 600, color: firmadoEn ? "#1e3a5f" : "#8a93a1" }}>{fecha}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingTop: 24 }}>
+        {firmadoEn ? (
+          <div style={{ padding: "16px 18px", borderRadius: 14, background: "#eaf0f8", border: "1px solid #c9d6e8", color: "#1e3a5f", fontSize: 15, fontWeight: 600, textAlign: "center" }}>
+            Renovación firmada · {fmt(firmadoEn)}
+            <div style={{ fontSize: 12, fontWeight: 500, color: "#5b6472", marginTop: 4 }}>(Vista previa: no quedó registrada)</div>
+          </div>
+        ) : (
+          <>
+            <label style={{ display: "flex", alignItems: "center", gap: 14, padding: "15px 18px", background: "#fff", border: "1px solid #c9d2de", borderRadius: 14, cursor: "pointer" }}>
+              <input type="checkbox" checked={acepta} onChange={(e) => setAcepta(e.target.checked)} style={{ width: 22, height: 22, margin: 0, accentColor: "#1e3a5f", flexShrink: 0 }} />
+              <span style={{ fontSize: 15, fontWeight: 600, color: "#1e3a5f", lineHeight: 1.35 }}>Acepto y renuevo mi compromiso para el año 2027.</span>
+            </label>
+            <button
+              type="button"
+              disabled={!acepta}
+              onClick={() => setFirmadoEn(new Date())}
+              style={{ height: 54, border: "none", borderRadius: 14, background: acepta ? "#1e3a5f" : "#aab6c6", color: "#fff", fontFamily: "inherit", fontSize: 16, fontWeight: 700, cursor: acepta ? "pointer" : "default" }}
+            >
+              Firmar renovación
+            </button>
+            <div style={{ fontSize: 12, color: "#5b6472", textAlign: "center" }}>Al firmar, tu nombre, la fecha y la hora quedan registrados en el portal del coro.</div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function Reglamento() {
   const NAVY = "#0f2d5c";
