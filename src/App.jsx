@@ -2502,6 +2502,7 @@ function AppInner() {
     return () => clearTimeout(t);
   }, [user && user.id]);
   const [pendingUser, setPendingUser] = useState(null);
+  const [compromisoNuevo, setCompromisoNuevo] = useState(null);
   const [pendientes, setPendientes] = useState([]);
   const [authToken, setAuthToken] = useState(null);
   const [section, setSection] = useState("dashboard");
@@ -3492,6 +3493,12 @@ function AppInner() {
     if (acc === "pendiente") {
       setAuthToken(data.access_token);
       setPendingUser(p);
+      // Si todavía no firma su Compromiso de Servicio, primero debe firmarlo
+      if (p.id && !(await rsTieneCompromiso(p).catch(() => true))) {
+        setCompromisoNuevo(p);
+        setView("compromiso");
+        return;
+      }
       setView("pendiente");
       return;
     }
@@ -3551,8 +3558,21 @@ function AppInner() {
       esAdminDirecto,
       rut
     );
-    // Salvo el admin directo, el registro queda PENDIENTE de aprobación: no entra
+    // Salvo el admin directo, el registro queda PENDIENTE de aprobación: no entra.
+    // Antes, firma su Compromiso de Servicio (si no lo acepta, la cuenta se elimina).
     if (!esAdminDirecto) {
+      try {
+        const reg = await supabase("integrantes", {
+          filters: `&email=eq.${encodeURIComponent(email)}`,
+        });
+        const np = reg && reg[0];
+        if (np && np.id) {
+          setPendingUser(np);
+          setCompromisoNuevo(np);
+          setView("compromiso");
+          return { compromiso: true };
+        }
+      } catch (e) {}
       return { pendiente: true };
     }
     const perfil = await supabase("integrantes", {
@@ -3652,6 +3672,23 @@ function AppInner() {
     setSection(id);
   }
 
+  if (view === "compromiso" && compromisoNuevo) {
+    return (
+      <CompromisoNuevo
+        perfil={compromisoNuevo}
+        onAceptado={() => {
+          setCompromisoNuevo(null);
+          setView("pendiente");
+        }}
+        onEliminado={() => {
+          setCompromisoNuevo(null);
+          setPendingUser(null);
+          handleSignOut();
+          setView("login");
+        }}
+      />
+    );
+  }
   if (view === "pendiente" || view === "denegado") {
     const deneg = view === "denegado";
     return (
@@ -3946,6 +3983,7 @@ function AppInner() {
       <TutorialPortal user={user} listo={firstLoadDone && view === "app"} setSection={setSection} setMobileMenu={setMobileMenu} forzar={tutoForzar} onFin={() => setTutoForzar(false)} onActivo={setTutoActivo} />
       <ControlAccesoAsistencia user={user} members={members} asistencia={asistencia} eventosDb={eventos} listo={firstLoadDone} onSalir={handleSignOut} conv={convData} />
       <ConfirmacionMisa user={user} members={members} asistencia={asistencia} eventosDb={eventos} listo={firstLoadDone} conv={convData} onCambio={recargarConv} />
+      <RenovacionServicioIntegrante user={user} members={members} asistencia={asistencia} eventosDb={eventos} listo={firstLoadDone} onSalir={handleSignOut} />
 
       {/* ── Modal explicativo notificaciones push ── */}
       {showPushModal && !tutoActivo &&
@@ -4523,7 +4561,7 @@ function AppInner() {
                 <Noticias noticias={avisos} onReload={loadData} />
               )}
               {section === "reglamento" && <Reglamento />}
-              {section === "renovacion" && esCuerdaAdmin(user) && <RenovacionServicio user={user} />}
+              {section === "renovacion" && esCuerdaAdmin(user) && <AdminRenovaciones members={members} asistencia={asistencia} eventosDb={eventos} />}
               {section === "curso_guitarra" && <CursoGuitarra />}
               {section === "qanda" && (
                 <QandA preguntas={preguntas} user={user} onReload={loadData} />
@@ -51154,9 +51192,23 @@ const REGLAMENTO_ARTICULOS = [
   },
 ];
 
-// ── Renovación de Servicio 2027 (vista previa, solo Administración) ──────
-// Por ahora es solo visual: no guarda nada en Supabase. El nombre se toma del
-// usuario conectado y la fecha/hora del momento en que se firma.
+// ══════════════════════════════════════════════════════════════════════════
+// RENOVACIÓN / COMPROMISO DE SERVICIO
+// - Integrantes existentes: Renovación de Servicio del año siguiente. El admin
+//   la abre con un botón (normalmente en noviembre). Mientras está abierta les
+//   aparece obligatoria al entrar: firman o eligen «No renuevo».
+// - Con asistencia ≤ 50% no pueden renovar hasta que el admin los habilite.
+// - Desde el 1 de enero del año renovado, quien no firmó queda sin acceso
+//   (solo el admin desbloquea).
+// - Nuevos: al crear la cuenta firman el Compromiso de Servicio; si no aceptan,
+//   la cuenta se elimina. Si aceptan, la solicitud sigue a aprobación.
+// Datos en la tabla config:
+//   renov_campana_<año>            { abierta, abiertaEn, cerradaEn }
+//   renov_<año>_<idIntegrante>     { r: "si"|"no", en, nombre, tipo: "renovacion"|"nuevo" }
+//   renov_habilitar_<año>_<id>     { en }   (asistencia baja: el admin lo habilitó)
+//   renov_desbloqueo_<año>_<id>    { en }   (sin renovar: el admin lo desbloqueó)
+// ══════════════════════════════════════════════════════════════════════════
+const RS_ASIST_MINIMA = 50; // con este % o menos debe conversar con el Encargado
 const RS_CLAUSULAS = [
   { n: "I", t: "Asistencia", x: "Participaré de manera constante en las celebraciones y ensayos del coro, con un mínimo de dos misas al mes. Sé que mi asistencia se evaluará al término del año." },
   { n: "II", t: "Compromiso", x: "Me prepararé con dedicación para cada celebración. Estudiaré los cantos y el material entregado, porque servir dignamente a la asamblea depende también de mi preparación." },
@@ -51164,22 +51216,73 @@ const RS_CLAUSULAS = [
   { n: "IV", t: "Respeto", x: "Trataré con respeto y caridad fraterna a mis compañeros, al Encargado del Coro y a las comunidades que nos reciben. Cuidaré la puntualidad y el recogimiento propios de la liturgia." },
   { n: "V", t: "Disponibilidad al llamado", x: "Como miembro de un coro misionero, tendré disposición para servir en las comunidades, celebraciones y vigilias a las que el coro sea convocado." },
 ];
-function RenovacionServicio({ user }) {
-  const [acepta, setAcepta] = useState(false);
-  const [firmadoEn, setFirmadoEn] = useState(null);
-  const nombre = String(user?.nombre || "").trim() || "Integrante";
-  const fmt = (d) =>
-    d.toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" }) +
-    " · " +
-    d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hour12: false });
-  const fecha = firmadoEn ? fmt(firmadoEn) : "Se registra al firmar";
+// Año al que corresponde firmar hoy: en noviembre y diciembre ya es el año siguiente
+function rsAnioFirma(d = new Date()) {
+  return d.getMonth() >= 10 ? d.getFullYear() + 1 : d.getFullYear();
+}
+function rsFmt(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" }) + " · " + d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hour12: false });
+  } catch (e) {
+    return "";
+  }
+}
+function rsExento(m) {
+  return !m || esCuerdaAdmin(m) || esMusico(m) || m.cuerda === "Visita" || !m.cuerda;
+}
+async function rsCargar(anio) {
+  const [camp, resps, habs, desbs] = await Promise.all([
+    mjConfigPorPrefijo(`renov_campana_${anio}`),
+    mjConfigPorPrefijo(`renov_${anio}_`),
+    mjConfigPorPrefijo(`renov_habilitar_${anio}_`),
+    mjConfigPorPrefijo(`renov_desbloqueo_${anio}_`),
+  ]);
+  if (camp === null || resps === null) return null; // no se pudo leer: no se bloquea a nadie
+  const mapa = (rows, pre) => {
+    const o = {};
+    (rows || []).forEach((x) => {
+      if (x.value) o[x.key.slice(pre.length)] = x.value;
+    });
+    return o;
+  };
+  const c = (camp || []).find((x) => x.key === `renov_campana_${anio}`);
+  return {
+    anio,
+    campana: (c && c.value) || null,
+    resp: mapa(resps, `renov_${anio}_`),
+    habilitados: mapa(habs, `renov_habilitar_${anio}_`),
+    desbloqueados: mapa(desbs, `renov_desbloqueo_${anio}_`),
+  };
+}
+async function rsGuardar(key, obj) {
+  return setConfig(key, JSON.stringify(obj));
+}
+async function rsBorrar(key) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/config?key=eq.${encodeURIComponent(key)}`, {
+      method: "DELETE",
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+    });
+  } catch (e) {}
+}
+function rsIdsAdmin(members) {
+  return (members || []).filter((m) => esCuerdaAdmin(m)).map((m) => String(m.id));
+}
+function rsPctAsistencia(asistencia, eventosDb, m) {
+  if (!m || m.asistencia_especial) return null;
+  const misas = mjConsolidarAsistencia(asistencia, mjMapaEventos(eventosDb));
+  return mjStatsAsistencia(misas, m.id, false).pct;
+}
+
+// ── La hoja del documento (la misma para renovación y compromiso de nuevos) ──
+function DocServicio({ nombre, anio, nuevo, firmadoEn }) {
+  const titulo = nuevo ? "COMPROMISO DE SERVICIO" : "RENOVACIÓN DE SERVICIO";
   return (
-    <div className="rs-wrap">
+    <div className="rs-hoja" lang="es">
       <style>{`
-        .rs-wrap{max-width:680px;margin:0 auto;padding:4px 0 32px;color:#1a2230}
-        .rs-wrap *{box-sizing:border-box}
-        .rs-prev{display:flex;align-items:center;gap:8px;margin:0 0 14px;padding:9px 14px;border-radius:12px;background:#fff7e8;border:1px solid #ecd6a8;color:#7a5a1e;font-size:12.5px;font-weight:600}
-        .rs-hoja{background:#fff;border-radius:4px;overflow:hidden;box-shadow:0 1px 2px rgba(20,40,63,.08),0 14px 36px rgba(20,40,63,.13)}
+        .rs-hoja{background:#fff;border-radius:4px;overflow:hidden;box-shadow:0 1px 2px rgba(20,40,63,.08),0 14px 36px rgba(20,40,63,.13);color:#1a2230;text-align:left}
+        .rs-hoja *{box-sizing:border-box}
         .rs-in{padding:28px 52px 36px}
         .rs-p{margin:0;font-size:15px;line-height:1.65;text-align:justify;hyphens:auto;-webkit-hyphens:auto}
         .rs-cl{display:grid;grid-template-columns:44px minmax(0,1fr)}
@@ -51188,95 +51291,594 @@ function RenovacionServicio({ user }) {
           .rs-in{padding:22px 22px 28px}
           .rs-p{font-size:14px;line-height:1.6}
           .rs-cl{grid-template-columns:30px minmax(0,1fr)}
-          .rs-h1{font-size:21px!important;letter-spacing:.1em!important}
+          .rs-h1{font-size:20px!important;letter-spacing:.09em!important}
           .rs-sig{gap:14px}
         }
       `}</style>
-
-      <div className="rs-prev">Vista previa · solo tú la ves. Al firmar aquí no se guarda nada.</div>
-
-      <div className="rs-hoja" lang="es">
-        <div style={{ height: 6, background: "#1e3a5f" }} />
-        <div style={{ height: 2, background: "#b08d57" }} />
-        <div className="rs-in">
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.14em", color: "#5b6472" }}>
-            <span>AÑO DE SERVICIO 2027</span>
+      <div style={{ height: 6, background: "#1e3a5f" }} />
+      <div style={{ height: 2, background: "#b08d57" }} />
+      <div className="rs-in">
+        <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.14em", color: "#5b6472" }}>AÑO DE SERVICIO {anio}</div>
+        <div style={{ display: "flex", justifyContent: "center", paddingTop: 10 }}>
+          <img src="/logo-coro-mj-oficial.jpg" alt="Coro Misioneros de Jesús" style={{ height: 130, width: "auto", display: "block" }} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 9, paddingTop: 22 }}>
+          <h1 className="rs-h1" style={{ margin: 0, fontSize: 28, lineHeight: 1.12, fontWeight: 700, letterSpacing: "0.12em", color: "#1e3a5f" }}>{titulo}</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 11 }} aria-hidden="true">
+            <span style={{ width: 54, height: 1, background: "#b08d57" }} />
+            <span style={{ width: 6, height: 6, background: "#b08d57", transform: "rotate(45deg)" }} />
+            <span style={{ width: 54, height: 1, background: "#b08d57" }} />
           </div>
-          <div style={{ display: "flex", justifyContent: "center", paddingTop: 10 }}>
-            <img src="/logo-coro-mj-oficial.jpg" alt="Coro Misioneros de Jesús" style={{ height: 130, width: "auto", display: "block" }} />
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 9, paddingTop: 22 }}>
-            <h1 className="rs-h1" style={{ margin: 0, fontSize: 28, lineHeight: 1.12, fontWeight: 700, letterSpacing: "0.12em", color: "#1e3a5f" }}>RENOVACIÓN DE SERVICIO</h1>
-            <div style={{ display: "flex", alignItems: "center", gap: 11 }} aria-hidden="true">
-              <span style={{ width: 54, height: 1, background: "#b08d57" }} />
-              <span style={{ width: 6, height: 6, background: "#b08d57", transform: "rotate(45deg)" }} />
-              <span style={{ width: 54, height: 1, background: "#b08d57" }} />
-            </div>
-            <div style={{ fontSize: 15, fontStyle: "italic", color: "#3a4556" }}>«Aquí estoy, Señor, envíame»</div>
-            <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.16em", color: "#5b6472" }}>ISAÍAS 6,8</div>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 11, paddingTop: 26 }}>
-            <p className="rs-p">Yo, <strong style={{ color: "#1e3a5f", borderBottom: "1px solid #1e3a5f" }}>{nombre}</strong>, integrante del Coro Misioneros de Jesús, declaro que asumo libre y voluntariamente el servicio de cantar en el coro durante el año 2027.</p>
-            <p className="rs-p">Entiendo que nuestro servicio es parte importante de la celebración de la Santa Misa. El canto ayuda a la asamblea a orar y a vivir con mayor profundidad la liturgia. Por eso reconozco que pertenecer al coro es un <strong style={{ color: "#1e3a5f" }}>compromiso serio</strong>, que asumo con responsabilidad ante Dios, ante mis compañeros y ante la comunidad. Me comprometo a cumplirlo según los siguientes puntos:</p>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "26px 0 16px" }}>
-            <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.22em", color: "#1e3a5f", whiteSpace: "nowrap" }}>CLÁUSULAS DEL COMPROMISO</span>
-            <span style={{ flex: 1, height: 1, background: "#d9dee6" }} />
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            {RS_CLAUSULAS.map((c) => (
-              <div key={c.n} className="rs-cl">
-                <div style={{ fontSize: 22, fontWeight: 300, color: "#b08d57", lineHeight: 1 }}>{c.n}</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                  <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.18em", color: "#1e3a5f", textTransform: "uppercase" }}>{c.t}</div>
-                  <p className="rs-p">{c.x}</p>
-                </div>
+          <div style={{ fontSize: 15, fontStyle: "italic", color: "#3a4556" }}>«Aquí estoy, Señor, envíame»</div>
+          <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.16em", color: "#5b6472" }}>ISAÍAS 6,8</div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 11, paddingTop: 26 }}>
+          <p className="rs-p">
+            Yo, <strong style={{ color: "#1e3a5f", borderBottom: "1px solid #1e3a5f" }}>{nombre}</strong>, {nuevo ? "al ingresar al" : "integrante del"} Coro Misioneros de Jesús, declaro que asumo libre y voluntariamente el servicio de cantar en el coro durante el año {anio}.
+          </p>
+          <p className="rs-p">
+            Entiendo que nuestro servicio es parte importante de la celebración de la Santa Misa. El canto ayuda a la asamblea a orar y a vivir con mayor profundidad la liturgia. Por eso reconozco que pertenecer al coro es un <strong style={{ color: "#1e3a5f" }}>compromiso serio</strong>, que asumo con responsabilidad ante Dios, ante mis compañeros y ante la comunidad. Me comprometo a cumplirlo según los siguientes puntos:
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "26px 0 16px" }}>
+          <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.22em", color: "#1e3a5f", whiteSpace: "nowrap" }}>CLÁUSULAS DEL COMPROMISO</span>
+          <span style={{ flex: 1, height: 1, background: "#d9dee6" }} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          {RS_CLAUSULAS.map((c) => (
+            <div key={c.n} className="rs-cl">
+              <div style={{ fontSize: 22, fontWeight: 300, color: "#b08d57", lineHeight: 1 }}>{c.n}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.18em", color: "#1e3a5f", textTransform: "uppercase" }}>{c.t}</div>
+                <p className="rs-p">{c.x}</p>
               </div>
-            ))}
+            </div>
+          ))}
+        </div>
+        <p className="rs-p" style={{ paddingTop: 22 }}>
+          Al firmar {nuevo ? "este compromiso" : "esta renovación"}, asumo este compromiso con seriedad y lo confío a Dios y a la intercesión de la Santísima Virgen María.
+        </p>
+        <div className="rs-sig" style={{ marginTop: 26, paddingTop: 20, borderTop: "1px solid #d9dee6" }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", color: "#5b6472", marginBottom: 5 }}>FIRMADO POR</div>
+            <div style={{ fontSize: 14.5, fontWeight: 600, color: firmadoEn ? "#1e3a5f" : "#8a93a1" }}>{firmadoEn ? nombre : "—"}</div>
           </div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", color: "#5b6472", marginBottom: 5 }}>FECHA Y HORA</div>
+            <div style={{ fontSize: 14.5, fontWeight: 600, color: firmadoEn ? "#1e3a5f" : "#8a93a1" }}>{firmadoEn ? rsFmt(firmadoEn) : "Se registra al firmar"}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-          <p className="rs-p" style={{ paddingTop: 22 }}>Al firmar esta renovación, asumo este compromiso con seriedad y lo confío a Dios y a la intercesión de la Santísima Virgen María.</p>
+// Casilla + botón de firma (y opcionalmente «No renuevo» / «No acepto»)
+function RsFirma({ anio, nuevo, onFirmar, onRechazar, guardando }) {
+  const [acepta, setAcepta] = useState(false);
+  const [confirmarNo, setConfirmarNo] = useState(false);
+  const txtNo = nuevo ? "No acepto" : `No renuevo para el ${anio}`;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingTop: 22 }}>
+      <label style={{ display: "flex", alignItems: "center", gap: 14, padding: "15px 18px", background: "#fff", border: "1px solid #c9d2de", borderRadius: 14, cursor: "pointer" }}>
+        <input type="checkbox" checked={acepta} onChange={(e) => setAcepta(e.target.checked)} style={{ width: 22, height: 22, margin: 0, accentColor: "#1e3a5f", flexShrink: 0 }} />
+        <span style={{ fontSize: 15, fontWeight: 600, color: "#1e3a5f", lineHeight: 1.35 }}>
+          {nuevo ? `Acepto y asumo mi compromiso para el año ${anio}.` : `Acepto y renuevo mi compromiso para el año ${anio}.`}
+        </span>
+      </label>
+      <button
+        type="button"
+        disabled={!acepta || guardando}
+        onClick={onFirmar}
+        style={{ height: 54, border: "none", borderRadius: 14, background: acepta ? "#1e3a5f" : "#aab6c6", color: "#fff", fontFamily: "inherit", fontSize: 16, fontWeight: 700, cursor: acepta ? "pointer" : "default" }}
+      >
+        {guardando ? "Guardando…" : nuevo ? "Firmar compromiso" : "Firmar renovación"}
+      </button>
+      <div style={{ fontSize: 12, color: "#5b6472", textAlign: "center" }}>Al firmar, tu nombre, la fecha y la hora quedan registrados en el portal del coro.</div>
+      {onRechazar && !confirmarNo && (
+        <button type="button" onClick={() => setConfirmarNo(true)} disabled={guardando} style={{ background: "none", border: "none", color: "#5b6472", fontFamily: "inherit", fontSize: 13.5, fontWeight: 600, textDecoration: "underline", cursor: "pointer", padding: 8 }}>
+          {txtNo}
+        </button>
+      )}
+      {onRechazar && confirmarNo && (
+        <div style={{ background: "#fff", border: "1px solid #e3c9c6", borderRadius: 14, padding: "16px 18px", textAlign: "center" }}>
+          <div style={{ fontSize: 14.5, fontWeight: 700, color: "#7a2a22", lineHeight: 1.45 }}>
+            {nuevo
+              ? "Si no aceptas el compromiso, tu cuenta se eliminará y no podrás ingresar al portal."
+              : `Si no renuevas, desde el 1 de enero de ${anio} ya no tendrás acceso al portal del coro.`}
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <button type="button" onClick={() => setConfirmarNo(false)} disabled={guardando} style={{ flex: 1, height: 46, borderRadius: 12, border: "1px solid #c9d2de", background: "#fff", color: "#1e3a5f", fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              Volver
+            </button>
+            <button type="button" onClick={onRechazar} disabled={guardando} style={{ flex: 1, height: 46, borderRadius: 12, border: "none", background: "#9b2c22", color: "#fff", fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              {nuevo ? "Eliminar mi cuenta" : "Confirmar"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
-          <div className="rs-sig" style={{ marginTop: 26, paddingTop: 20, borderTop: "1px solid #d9dee6" }}>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", color: "#5b6472", marginBottom: 5 }}>FIRMADO POR</div>
-              <div style={{ fontSize: 14.5, fontWeight: 600, color: "#1e3a5f" }}>{firmadoEn ? nombre : "—"}</div>
+function RsPantalla({ children, z = 9400 }) {
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, zIndex: z, background: "#e9edf2", overflowY: "auto", WebkitOverflowScrolling: "touch", fontFamily: "var(--font-sans)" }}>
+      <div style={{ maxWidth: 680, margin: "0 auto", padding: "22px 14px 40px" }}>{children}</div>
+    </div>,
+    document.body
+  );
+}
+function RsGracias({ titulo, texto, boton, onOk }) {
+  return (
+    <div style={{ background: "#fff", borderRadius: 20, padding: "30px 24px 24px", textAlign: "center", boxShadow: "0 14px 36px rgba(20,40,63,.13)", marginTop: 40 }}>
+      <img src="/logo-coro-mj-oficial.jpg" alt="" style={{ height: 96, width: "auto" }} />
+      <div style={{ fontSize: 22, fontWeight: 800, color: "#1e3a5f", marginTop: 16, letterSpacing: "-0.01em" }}>{titulo}</div>
+      <div style={{ fontSize: 15, color: "#3a4556", lineHeight: 1.6, marginTop: 10 }}>{texto}</div>
+      <button type="button" onClick={onOk} style={{ marginTop: 22, width: "100%", height: 52, border: "none", borderRadius: 14, background: "#1e3a5f", color: "#fff", fontFamily: "inherit", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
+        {boton}
+      </button>
+    </div>
+  );
+}
+
+// ── Integrantes: renovación obligatoria al entrar y bloqueo desde el 1 de enero ──
+function RenovacionServicioIntegrante({ user, members, asistencia, eventosDb, listo, onSalir }) {
+  const yo = (members || []).find((m) => String(m.id) === String(user?.id)) || user;
+  const exento = !user || !user.id || rsExento(yo);
+  const hoy = new Date();
+  const anioBloqueo = hoy.getFullYear();
+  const anioFirma = rsAnioFirma(hoy);
+  const [dBloq, setDBloq] = useState(undefined);
+  const [dFirma, setDFirma] = useState(undefined);
+  const [gcal, setGcal] = useState(false);
+  const [estado, setEstado] = useState("doc"); // doc | gracias | no | listo
+  const [guardando, setGuardando] = useState(false);
+  const [err, setErr] = useState("");
+  const [cerradoAviso, setCerradoAviso] = useState(false);
+  const recargar = useCallback(() => {
+    rsCargar(anioBloqueo).then((x) => setDBloq(x));
+    if (anioFirma !== anioBloqueo) rsCargar(anioFirma).then((x) => setDFirma(x));
+    else setDFirma(null);
+  }, [anioBloqueo, anioFirma]);
+  useEffect(() => {
+    if (exento) return;
+    recargar();
+    mjGcalHistorial().then(() => setGcal(true));
+    const t = setInterval(recargar, 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [exento, user && user.id]);
+  if (exento || !listo || dBloq === undefined || dFirma === undefined) return null;
+  const mid = String(user.id);
+  const nombre = String((yo && yo.nombre) || "").trim();
+
+  // 1) Bloqueo: hubo renovación para este año, no firmó y el admin no lo desbloqueó
+  if (dBloq && dBloq.campana && !(dBloq.resp[mid] && dBloq.resp[mid].r === "si") && !dBloq.desbloqueados[mid]) {
+    const dijoNo = dBloq.resp[mid] && dBloq.resp[mid].r === "no";
+    return (
+      <RsPantalla z={9500}>
+        <div data-bloqueo="1" style={{ background: "#fff", borderRadius: 22, padding: "30px 24px 24px", textAlign: "center", boxShadow: "0 14px 36px rgba(20,40,63,.13)", marginTop: 40 }}>
+          <img src="/logo-coro-mj-oficial.jpg" alt="" style={{ height: 96, width: "auto" }} />
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", color: "#8a96a8", marginTop: 16 }}>ACCESO SUSPENDIDO</div>
+          <div style={{ fontSize: 21, fontWeight: 800, color: "#0f1b2d", marginTop: 6, lineHeight: 1.25 }}>{dijoNo ? `No renovaste tu servicio para el ${anioBloqueo}` : `No firmaste la Renovación de Servicio ${anioBloqueo}`}</div>
+          <div style={{ fontSize: 14.5, color: "#4b5869", lineHeight: 1.55, marginTop: 10 }}>
+            Por eso tu acceso al portal está suspendido. Si quieres volver a servir en el coro, conversa con el <b>Encargado del Coro</b>.
+          </div>
+          <button onClick={onSalir} style={{ marginTop: 22, width: "100%", height: 48, border: "none", borderRadius: 14, background: "#1e3a5f", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+            Cerrar sesión
+          </button>
+        </div>
+      </RsPantalla>
+    );
+  }
+
+  // 2) Renovación abierta para el año siguiente
+  const d = dFirma;
+  if (!d || !d.campana || !d.campana.abierta) return null;
+  const resp = d.resp[mid];
+  if (estado === "listo") return null;
+  if (estado === "gracias")
+    return (
+      <RsPantalla>
+        <RsGracias
+          titulo="¡Gracias por renovar tu servicio!"
+          texto={`${nombre.split(" ")[0] || ""}${nombre ? ", g" : "G"}racias por decir nuevamente «aquí estoy». Tu renovación para el ${anioFirma} quedó registrada. Que Dios bendiga tu servicio en el coro.`}
+          boton="Entrar al portal"
+          onOk={() => setEstado("listo")}
+        />
+      </RsPantalla>
+    );
+  if (estado === "no")
+    return (
+      <RsPantalla>
+        <RsGracias
+          titulo="Respuesta registrada"
+          texto={`Registramos que no renovarás tu servicio para el ${anioFirma}. Gracias por todo lo que entregaste al coro. Tendrás acceso al portal hasta el 31 de diciembre.`}
+          boton="Continuar"
+          onOk={() => setEstado("listo")}
+        />
+      </RsPantalla>
+    );
+  if (resp) return null; // ya respondió
+  if (!gcal) return null;
+
+  // Asistencia baja: antes debe conversar con el Encargado
+  const pct = rsPctAsistencia(asistencia, eventosDb, yo);
+  if (pct != null && pct <= RS_ASIST_MINIMA && !d.habilitados[mid]) {
+    if (cerradoAviso) return null;
+    return (
+      <RsPantalla>
+        <div style={{ background: "#fff", borderRadius: 22, padding: "30px 24px 24px", textAlign: "center", boxShadow: "0 14px 36px rgba(20,40,63,.13)", marginTop: 40 }}>
+          <img src="/logo-coro-mj-oficial.jpg" alt="" style={{ height: 96, width: "auto" }} />
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", color: "#8a96a8", marginTop: 16 }}>RENOVACIÓN DE SERVICIO {anioFirma}</div>
+          <div style={{ fontSize: 21, fontWeight: 800, color: "#0f1b2d", marginTop: 6, lineHeight: 1.25 }}>Antes de renovar, conversa con el Encargado del Coro</div>
+          <div style={{ fontSize: 14.5, color: "#4b5869", lineHeight: 1.55, marginTop: 10 }}>
+            Tu asistencia de este año es de <b>{pct}%</b>. Para renovar tu servicio para el {anioFirma} primero debes conversar con el <b>Encargado del Coro</b>. Él te habilitará la renovación en el portal.
+          </div>
+          <div style={{ fontSize: 13, color: "#7a5a1e", background: "#fff7e8", border: "1px solid #ecd6a8", borderRadius: 12, padding: "10px 12px", marginTop: 14, lineHeight: 1.45 }}>
+            Si no renuevas, desde el 1 de enero de {anioFirma} ya no tendrás acceso al portal.
+          </div>
+          <button onClick={() => setCerradoAviso(true)} style={{ marginTop: 20, width: "100%", height: 50, border: "none", borderRadius: 14, background: "#1e3a5f", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+            Entendido
+          </button>
+        </div>
+      </RsPantalla>
+    );
+  }
+
+  const responder = async (r) => {
+    setGuardando(true);
+    setErr("");
+    const en = new Date().toISOString();
+    const ok = await rsGuardar(`renov_${anioFirma}_${mid}`, { r, en, nombre, tipo: "renovacion" });
+    if (!ok) {
+      setErr("No se pudo guardar. Revisa tu conexión e intenta de nuevo.");
+      setGuardando(false);
+      return;
+    }
+    const admins = rsIdsAdmin(members);
+    if (r === "si") {
+      sendPushToUsers([mid], "¡Gracias por renovar tu servicio! 🙏", `Tu Renovación de Servicio ${anioFirma} quedó registrada. Que Dios bendiga tu servicio en el coro.`);
+      if (admins.length) sendPushToUsers(admins, "Renovación de Servicio ✓", `${nombre} renovó su servicio para el ${anioFirma}.`);
+    } else if (admins.length) {
+      sendPushToUsers(admins, "Renovación de Servicio ✗", `${nombre} no renovará su servicio para el ${anioFirma}.`);
+    }
+    setGuardando(false);
+    setEstado(r === "si" ? "gracias" : "no");
+    recargar();
+  };
+
+  return (
+    <RsPantalla>
+      <div style={{ textAlign: "center", padding: "4px 6px 16px" }}>
+        <div style={{ fontSize: 13.5, color: "#3a4556", lineHeight: 1.5 }}>
+          Lee con calma tu Renovación de Servicio para el {anioFirma}. Para seguir usando el portal, fírmala o indica que no renovarás.
+        </div>
+      </div>
+      <DocServicio nombre={nombre} anio={anioFirma} />
+      {err && <div style={{ marginTop: 14, color: "#9b2c22", fontSize: 13.5, fontWeight: 600, textAlign: "center" }}>{err}</div>}
+      <RsFirma anio={anioFirma} guardando={guardando} onFirmar={() => responder("si")} onRechazar={() => responder("no")} />
+    </RsPantalla>
+  );
+}
+
+// ── Nuevos: Compromiso de Servicio apenas crean su cuenta ──
+async function rsTieneCompromiso(p) {
+  if (!p || !p.id) return true;
+  const anio = rsAnioFirma();
+  const v = await getConfig(`renov_${anio}_${p.id}`);
+  if (v === null || v === undefined) return false;
+  try {
+    const o = typeof v === "string" ? JSON.parse(v) : v;
+    return !!(o && o.r === "si");
+  } catch (e) {
+    return false;
+  }
+}
+async function rsEliminarCuenta(p) {
+  const H = { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` };
+  if (p && p.id != null) await fetch(`${SUPABASE_URL}/rest/v1/integrantes?id=eq.${p.id}`, { method: "DELETE", headers: H }).catch(() => {});
+  if (p && p.auth_id) await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${p.auth_id}`, { method: "DELETE", headers: H }).catch(() => {});
+}
+async function rsIdsAdminDb() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/integrantes?select=id,cuerda`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } });
+    if (!r.ok) return [];
+    return rsIdsAdmin(await r.json());
+  } catch (e) {
+    return [];
+  }
+}
+function CompromisoNuevo({ perfil, onAceptado, onEliminado }) {
+  const anio = rsAnioFirma();
+  const nombre = String((perfil && perfil.nombre) || "").trim();
+  const [guardando, setGuardando] = useState(false);
+  const [err, setErr] = useState("");
+  const [fin, setFin] = useState(null); // "si" | "no"
+  const aceptar = async () => {
+    setGuardando(true);
+    setErr("");
+    const ok = await rsGuardar(`renov_${anio}_${perfil.id}`, { r: "si", en: new Date().toISOString(), nombre, tipo: "nuevo" });
+    if (!ok) {
+      setErr("No se pudo guardar. Revisa tu conexión e intenta de nuevo.");
+      setGuardando(false);
+      return;
+    }
+    rsIdsAdminDb().then((ids) => ids.length && sendPushToUsers(ids, "Nuevo integrante 🎶", `${nombre} firmó su Compromiso de Servicio ${anio} y espera tu aprobación.`));
+    setGuardando(false);
+    setFin("si");
+  };
+  const rechazar = async () => {
+    setGuardando(true);
+    await rsEliminarCuenta(perfil);
+    setGuardando(false);
+    setFin("no");
+  };
+  return (
+    <div style={{ minHeight: "100vh", background: "#e9edf2", fontFamily: "var(--font-sans)" }}>
+      <div style={{ maxWidth: 680, margin: "0 auto", padding: "22px 14px 40px" }}>
+        {fin === "si" ? (
+          <RsGracias
+            titulo="¡Gracias por tu compromiso!"
+            texto="Tu Compromiso de Servicio quedó firmado. Ahora el Encargado del Coro revisará tu solicitud y te avisaremos cuando puedas ingresar al portal."
+            boton="Continuar"
+            onOk={onAceptado}
+          />
+        ) : fin === "no" ? (
+          <RsGracias titulo="Cuenta eliminada" texto="No aceptaste el Compromiso de Servicio, por lo que tu cuenta fue eliminada. Si cambias de opinión, puedes registrarte nuevamente." boton="Volver al inicio" onOk={onEliminado} />
+        ) : (
+          <>
+            <div style={{ textAlign: "center", padding: "4px 6px 16px" }}>
+              <div style={{ fontSize: 13.5, color: "#3a4556", lineHeight: 1.5 }}>
+                Para formar parte del coro, lee y firma tu Compromiso de Servicio. Si no lo aceptas, tu cuenta se eliminará.
+              </div>
             </div>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", color: "#5b6472", marginBottom: 5 }}>FECHA Y HORA</div>
-              <div style={{ fontSize: 14.5, fontWeight: 600, color: firmadoEn ? "#1e3a5f" : "#8a93a1" }}>{fecha}</div>
+            <DocServicio nombre={nombre} anio={anio} nuevo />
+            {err && <div style={{ marginTop: 14, color: "#9b2c22", fontSize: 13.5, fontWeight: 600, textAlign: "center" }}>{err}</div>}
+            <RsFirma anio={anio} nuevo guardando={guardando} onFirmar={aceptar} onRechazar={rechazar} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Administración: vista general de la renovación ──
+function AdminRenovaciones({ members, asistencia, eventosDb }) {
+  const [anio, setAnio] = useState(rsAnioFirma());
+  const [d, setD] = useState(undefined);
+  const [gcal, setGcal] = useState(false);
+  const [proc, setProc] = useState("");
+  const [verDoc, setVerDoc] = useState(null); // { nombre, en, nuevo }
+  const [preview, setPreview] = useState(false);
+  const [abierta, setAbierta] = useState(null); // lista expandida
+  const recargar = useCallback(() => rsCargar(anio).then((x) => setD(x || { anio, campana: null, resp: {}, habilitados: {}, desbloqueados: {} })), [anio]);
+  useEffect(() => {
+    setD(undefined);
+    recargar();
+  }, [recargar]);
+  useEffect(() => {
+    mjGcalHistorial().then(() => setGcal(true));
+  }, []);
+  const mapa = useMemo(() => mjMapaEventos(eventosDb), [eventosDb, gcal]);
+  const misas = useMemo(() => mjConsolidarAsistencia(asistencia, mapa), [asistencia, mapa]);
+  if (d === undefined) return <div style={{ padding: 30, textAlign: "center", color: "#64748b" }}>Cargando…</div>;
+
+  const activos = (members || []).filter((m) => !rsExento(m) && (m.acceso || "aprobado") === "aprobado").sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"));
+  const hoyAnio = new Date().getFullYear();
+  const yaCorre = hoyAnio >= anio; // ya llegó el 1 de enero del año renovado
+  const camp = d.campana;
+  const listas = { si: [], no: [], pend: [], conversar: [], nuevos: [], bloq: [] };
+  activos.forEach((m) => {
+    const mid = String(m.id);
+    const r = d.resp[mid];
+    const pct = m.asistencia_especial ? null : mjStatsAsistencia(misas, m.id, false).pct;
+    const item = { m, r, pct };
+    if (r && r.r === "si") (r.tipo === "nuevo" ? listas.nuevos : listas.si).push(item);
+    else {
+      if (r && r.r === "no") listas.no.push(item);
+      else if (pct != null && pct <= RS_ASIST_MINIMA && !d.habilitados[mid]) listas.conversar.push(item);
+      else listas.pend.push(item);
+      if (yaCorre && camp && !d.desbloqueados[mid]) listas.bloq.push(item);
+    }
+  });
+  const toggleCampana = async () => {
+    const abrir = !(camp && camp.abierta);
+    if (abrir && !window.confirm(`¿Abrir la Renovación de Servicio ${anio}? A todos los integrantes les aparecerá al entrar al portal.`)) return;
+    if (!abrir && !window.confirm(`¿Cerrar la Renovación de Servicio ${anio}? Ya no les aparecerá a los integrantes. El 1 de enero igual se suspende el acceso a quienes no firmaron.`)) return;
+    setProc("campana");
+    await rsGuardar(`renov_campana_${anio}`, { ...(camp || {}), abierta: abrir, [abrir ? "abiertaEn" : "cerradaEn"]: new Date().toISOString() });
+    if (abrir) {
+      const ids = activos.map((m) => String(m.id));
+      if (ids.length) sendPushToUsers(ids, `Renovación de Servicio ${anio}`, "Ya puedes firmar tu Renovación de Servicio en el portal del coro.");
+    }
+    await recargar();
+    setProc("");
+  };
+  const habilitar = async (m) => {
+    setProc("h" + m.id);
+    await rsGuardar(`renov_habilitar_${anio}_${m.id}`, { en: new Date().toISOString() });
+    sendPushToUsers([String(m.id)], `Renovación de Servicio ${anio}`, "Ya puedes firmar tu Renovación de Servicio en el portal del coro.");
+    await recargar();
+    setProc("");
+  };
+  const desbloquear = async (m) => {
+    if (!window.confirm(`¿Devolver el acceso al portal a ${m.nombre}?`)) return;
+    setProc("d" + m.id);
+    await rsGuardar(`renov_desbloqueo_${anio}_${m.id}`, { en: new Date().toISOString() });
+    await recargar();
+    setProc("");
+  };
+  const anularRespuesta = async (m) => {
+    if (!window.confirm(`¿Borrar la respuesta de ${m.nombre}? Le volverá a aparecer la renovación para que responda de nuevo.`)) return;
+    setProc("a" + m.id);
+    await rsBorrar(`renov_${anio}_${m.id}`);
+    await recargar();
+    setProc("");
+  };
+
+  const btn = (bg, fg = "#fff") => ({ border: "none", borderRadius: 10, background: bg, color: fg, fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, padding: "8px 12px", cursor: "pointer", whiteSpace: "nowrap" });
+  const Fila = ({ it, children, onNombre }) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 4px", borderTop: "1px solid #eef1f5", flexWrap: "wrap" }}>
+      <button type="button" onClick={onNombre} disabled={!onNombre} style={{ flex: "1 1 180px", minWidth: 0, textAlign: "left", background: "none", border: "none", padding: 0, fontFamily: "inherit", cursor: onNombre ? "pointer" : "default" }}>
+        <div style={{ fontSize: 14.5, fontWeight: 700, color: "#0f1b2d" }}>{it.m.nombre}</div>
+        <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+          {it.r && it.r.en ? rsFmt(it.r.en) : it.pct != null ? `Asistencia ${it.pct}%` : it.m.asistencia_especial ? "Participante Ocasional" : "Sin respuesta"}
+          {it.r && it.r.en && it.pct != null ? ` · Asistencia ${it.pct}%` : ""}
+        </div>
+      </button>
+      {children}
+    </div>
+  );
+  const Grupo = ({ id, titulo, color, items, vacio, render }) => {
+    const open = abierta === id || (abierta === null && items.length > 0 && items.length <= 12);
+    return (
+      <div style={{ background: "#fff", borderRadius: 18, padding: "14px 16px", boxShadow: "0 1px 2px rgba(0,0,0,.03),0 8px 24px rgba(15,45,92,.05)", border: "1px solid rgba(60,60,67,.08)" }}>
+        <button type="button" onClick={() => setAbierta(open ? "__" : id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", padding: 0, fontFamily: "inherit", cursor: "pointer" }}>
+          <span style={{ width: 10, height: 10, borderRadius: 99, background: color, flexShrink: 0 }} />
+          <span style={{ flex: 1, textAlign: "left", fontSize: 15, fontWeight: 800, color: "#0f1b2d" }}>{titulo}</span>
+          <span style={{ fontSize: 15, fontWeight: 800, color }}>{items.length}</span>
+          <span style={{ fontSize: 12, color: "#94a3b8", width: 14 }}>{open ? "▲" : "▼"}</span>
+        </button>
+        {open && <div style={{ marginTop: 8 }}>{items.length ? items.map(render) : <div style={{ fontSize: 13, color: "#94a3b8", padding: "10px 4px" }}>{vacio}</div>}</div>}
+      </div>
+    );
+  };
+  const kpi = (n, t, c) => (
+    <div style={{ background: "#fff", borderRadius: 16, padding: "14px 12px", textAlign: "center", border: "1px solid rgba(60,60,67,.08)" }}>
+      <div style={{ fontSize: 28, fontWeight: 800, color: c, lineHeight: 1 }}>{n}</div>
+      <div style={{ fontSize: 11.5, fontWeight: 700, color: "#64748b", marginTop: 6, textTransform: "uppercase", letterSpacing: ".06em" }}>{t}</div>
+    </div>
+  );
+
+  return (
+    <div style={{ width: "100%", maxWidth: 1100, margin: "0 auto", paddingBottom: 30 }}>
+      <div style={{ borderRadius: 22, padding: "24px 24px 22px", background: "linear-gradient(135deg,#0f2d5c,#1e3a5f)", color: "#fff", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "linear-gradient(90deg,#e9d3a1,#b08d57,#e9d3a1)" }} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".16em", color: "#e9d3a1" }}>ADMINISTRACIÓN</div>
+            <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", marginTop: 4 }}>Renovación de Servicio {anio}</div>
+            <div style={{ fontSize: 13.5, color: "rgba(255,255,255,.8)", marginTop: 6 }}>
+              {camp && camp.abierta ? `Abierta desde el ${rsFmt(camp.abiertaEn).split(" · ")[0]} · les aparece a todos al entrar` : camp ? "Cerrada" : "Aún no la abres"} · El 1 de enero de {anio} se suspende el acceso a quien no firmó.
             </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <select value={anio} onChange={(e) => setAnio(Number(e.target.value))} style={{ height: 40, borderRadius: 10, border: "none", padding: "0 10px", fontFamily: "inherit", fontSize: 14, fontWeight: 700, color: "#1e3a5f" }}>
+              {[rsAnioFirma() + 0, rsAnioFirma() - 1].map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+            <button type="button" onClick={toggleCampana} disabled={!!proc} style={{ height: 40, border: "none", borderRadius: 10, padding: "0 16px", fontFamily: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer", background: camp && camp.abierta ? "#fff" : "#b08d57", color: camp && camp.abierta ? "#9b2c22" : "#fff" }}>
+              {proc === "campana" ? "…" : camp && camp.abierta ? "Cerrar renovación" : "Abrir renovación"}
+            </button>
+            <button type="button" onClick={() => setPreview(true)} style={{ height: 40, border: "1px solid rgba(255,255,255,.4)", borderRadius: 10, padding: "0 14px", fontFamily: "inherit", fontSize: 13.5, fontWeight: 700, cursor: "pointer", background: "transparent", color: "#fff" }}>
+              Ver documento
+            </button>
           </div>
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingTop: 24 }}>
-        {firmadoEn ? (
-          <div style={{ padding: "16px 18px", borderRadius: 14, background: "#eaf0f8", border: "1px solid #c9d6e8", color: "#1e3a5f", fontSize: 15, fontWeight: 600, textAlign: "center" }}>
-            Renovación firmada · {fmt(firmadoEn)}
-            <div style={{ fontSize: 12, fontWeight: 500, color: "#5b6472", marginTop: 4 }}>(Vista previa: no quedó registrada)</div>
-          </div>
-        ) : (
-          <>
-            <label style={{ display: "flex", alignItems: "center", gap: 14, padding: "15px 18px", background: "#fff", border: "1px solid #c9d2de", borderRadius: 14, cursor: "pointer" }}>
-              <input type="checkbox" checked={acepta} onChange={(e) => setAcepta(e.target.checked)} style={{ width: 22, height: 22, margin: 0, accentColor: "#1e3a5f", flexShrink: 0 }} />
-              <span style={{ fontSize: 15, fontWeight: 600, color: "#1e3a5f", lineHeight: 1.35 }}>Acepto y renuevo mi compromiso para el año 2027.</span>
-            </label>
-            <button
-              type="button"
-              disabled={!acepta}
-              onClick={() => setFirmadoEn(new Date())}
-              style={{ height: 54, border: "none", borderRadius: 14, background: acepta ? "#1e3a5f" : "#aab6c6", color: "#fff", fontFamily: "inherit", fontSize: 16, fontWeight: 700, cursor: acepta ? "pointer" : "default" }}
-            >
-              Firmar renovación
-            </button>
-            <div style={{ fontSize: 12, color: "#5b6472", textAlign: "center" }}>Al firmar, tu nombre, la fecha y la hora quedan registrados en el portal del coro.</div>
-          </>
-        )}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10, margin: "14px 0" }}>
+        {kpi(listas.si.length, "Renovaron", "#1e4f8f")}
+        {kpi(listas.no.length, "No renuevan", "#9b2c22")}
+        {kpi(listas.pend.length, "Pendientes", "#c98a12")}
+        {kpi(listas.conversar.length, "Deben conversar", "#b45309")}
+        {kpi(listas.nuevos.length, "Nuevos", "#b08d57")}
       </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 12, alignItems: "start" }}>
+        {yaCorre && camp && (
+          <Grupo
+            id="bloq"
+            titulo="Sin acceso (no renovaron)"
+            color="#9b2c22"
+            items={listas.bloq}
+            vacio="Nadie quedó sin acceso."
+            render={(it) => (
+              <Fila key={it.m.id} it={it}>
+                <button type="button" style={btn("#1e3a5f")} disabled={!!proc} onClick={() => desbloquear(it.m)}>
+                  {proc === "d" + it.m.id ? "…" : "Devolver acceso"}
+                </button>
+              </Fila>
+            )}
+          />
+        )}
+        <Grupo
+          id="si"
+          titulo="Renovaron"
+          color="#1e4f8f"
+          items={listas.si}
+          vacio="Todavía nadie ha renovado."
+          render={(it) => (
+            <Fila key={it.m.id} it={it} onNombre={() => setVerDoc({ nombre: it.r.nombre || it.m.nombre, en: it.r.en })}>
+              <button type="button" style={btn("#eaf0f8", "#1e3a5f")} onClick={() => setVerDoc({ nombre: it.r.nombre || it.m.nombre, en: it.r.en })}>
+                Ver firma
+              </button>
+            </Fila>
+          )}
+        />
+        <Grupo
+          id="conversar"
+          titulo={`Deben conversar contigo (asistencia ≤ ${RS_ASIST_MINIMA}%)`}
+          color="#b45309"
+          items={listas.conversar}
+          vacio="Nadie con asistencia baja."
+          render={(it) => (
+            <Fila key={it.m.id} it={it}>
+              <button type="button" style={btn("#1e3a5f")} disabled={!!proc} onClick={() => habilitar(it.m)}>
+                {proc === "h" + it.m.id ? "…" : "Habilitar renovación"}
+              </button>
+            </Fila>
+          )}
+        />
+        <Grupo id="pend" titulo="Pendientes (sin responder)" color="#c98a12" items={listas.pend} vacio="No hay pendientes." render={(it) => <Fila key={it.m.id} it={it} />} />
+        <Grupo
+          id="no"
+          titulo="No renuevan"
+          color="#9b2c22"
+          items={listas.no}
+          vacio="Nadie ha dicho que no."
+          render={(it) => (
+            <Fila key={it.m.id} it={it}>
+              <button type="button" style={btn("#f3f6fa", "#3d4a5c")} disabled={!!proc} onClick={() => anularRespuesta(it.m)}>
+                {proc === "a" + it.m.id ? "…" : "Anular respuesta"}
+              </button>
+            </Fila>
+          )}
+        />
+        <Grupo
+          id="nuevos"
+          titulo={`Nuevos (Compromiso de Servicio ${anio})`}
+          color="#b08d57"
+          items={listas.nuevos}
+          vacio="Sin integrantes nuevos este período."
+          render={(it) => (
+            <Fila key={it.m.id} it={it} onNombre={() => setVerDoc({ nombre: it.r.nombre || it.m.nombre, en: it.r.en, nuevo: true })}>
+              <button type="button" style={btn("#eaf0f8", "#1e3a5f")} onClick={() => setVerDoc({ nombre: it.r.nombre || it.m.nombre, en: it.r.en, nuevo: true })}>
+                Ver firma
+              </button>
+            </Fila>
+          )}
+        />
+      </div>
+
+      {(verDoc || preview) &&
+        createPortal(
+          <div style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(15,27,45,.6)", overflowY: "auto", WebkitOverflowScrolling: "touch", fontFamily: "var(--font-sans)" }} onClick={() => (setVerDoc(null), setPreview(false))}>
+            <div style={{ maxWidth: 680, margin: "0 auto", padding: "18px 14px 40px" }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+                <button type="button" onClick={() => (setVerDoc(null), setPreview(false))} style={{ height: 40, padding: "0 16px", borderRadius: 12, border: "none", background: "#fff", color: "#1e3a5f", fontFamily: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                  Cerrar
+                </button>
+              </div>
+              {verDoc ? <DocServicio nombre={verDoc.nombre} anio={anio} nuevo={verDoc.nuevo} firmadoEn={verDoc.en} /> : <DocServicio nombre="[Nombre del integrante]" anio={anio} />}
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
