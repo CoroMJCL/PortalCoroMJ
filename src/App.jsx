@@ -51269,9 +51269,18 @@ async function rsBorrar(key) {
 function rsIdsAdmin(members) {
   return (members || []).filter((m) => esCuerdaAdmin(m)).map((m) => String(m.id));
 }
-function rsPctAsistencia(asistencia, eventosDb, m) {
+// La asistencia se evalúa desde que comenzó el registro hasta el día en que el admin abrió la renovación
+function rsFechaCorte(campana) {
+  const iso = campana && campana.abiertaEn;
+  const d = iso ? new Date(iso) : new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function rsMisasHasta(misas, corte) {
+  return (misas || []).filter((m) => !m.fecha || m.fecha <= corte);
+}
+function rsPctAsistencia(asistencia, eventosDb, m, campana) {
   if (!m || m.asistencia_especial) return null;
-  const misas = mjConsolidarAsistencia(asistencia, mjMapaEventos(eventosDb));
+  const misas = rsMisasHasta(mjConsolidarAsistencia(asistencia, mjMapaEventos(eventosDb)), rsFechaCorte(campana));
   return mjStatsAsistencia(misas, m.id, false).pct;
 }
 
@@ -51503,7 +51512,7 @@ function RenovacionServicioIntegrante({ user, members, asistencia, eventosDb, li
   if (!gcal) return null;
 
   // Asistencia baja: antes debe conversar con el Encargado
-  const pct = rsPctAsistencia(asistencia, eventosDb, yo);
+  const pct = rsPctAsistencia(asistencia, eventosDb, yo, d.campana);
   if (pct != null && pct <= RS_ASIST_MINIMA && !d.habilitados[mid]) {
     if (cerradoAviso) return null;
     return (
@@ -51513,7 +51522,7 @@ function RenovacionServicioIntegrante({ user, members, asistencia, eventosDb, li
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", color: "#8a96a8", marginTop: 16 }}>RENOVACIÓN DE SERVICIO {anioFirma}</div>
           <div style={{ fontSize: 21, fontWeight: 800, color: "#0f1b2d", marginTop: 6, lineHeight: 1.25 }}>Antes de renovar, conversa con el Encargado del Coro</div>
           <div style={{ fontSize: 14.5, color: "#4b5869", lineHeight: 1.55, marginTop: 10 }}>
-            Tu asistencia de este año es de <b>{pct}%</b>. Para renovar tu servicio para el {anioFirma} primero debes conversar con el <b>Encargado del Coro</b>. Él te habilitará la renovación en el portal.
+            Tu asistencia hasta el inicio de la renovación es de <b>{pct}%</b>. Para renovar tu servicio para el {anioFirma} primero debes conversar con el <b>Encargado del Coro</b>. Él te habilitará la renovación en el portal.
           </div>
           <div style={{ fontSize: 13, color: "#7a5a1e", background: "#fff7e8", border: "1px solid #ecd6a8", borderRadius: 12, padding: "10px 12px", marginTop: 14, lineHeight: 1.45 }}>
             Si no renuevas, desde el 1 de enero de {anioFirma} ya no tendrás acceso al portal.
@@ -51661,13 +51670,15 @@ function AdminRenovaciones({ members, asistencia, eventosDb }) {
     mjGcalHistorial().then(() => setGcal(true));
   }, []);
   const mapa = useMemo(() => mjMapaEventos(eventosDb), [eventosDb, gcal]);
-  const misas = useMemo(() => mjConsolidarAsistencia(asistencia, mapa), [asistencia, mapa]);
+  const misasTodas = useMemo(() => mjConsolidarAsistencia(asistencia, mapa), [asistencia, mapa]);
   if (d === undefined) return <div style={{ padding: 30, textAlign: "center", color: "#64748b" }}>Cargando…</div>;
 
   const activos = (members || []).filter((m) => !rsExento(m) && (m.acceso || "aprobado") === "aprobado").sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"));
   const hoyAnio = new Date().getFullYear();
   const yaCorre = hoyAnio >= anio; // ya llegó el 1 de enero del año renovado
   const camp = d.campana;
+  const corte = rsFechaCorte(camp);
+  const misas = rsMisasHasta(misasTodas, corte);
   const listas = { si: [], no: [], pend: [], conversar: [], nuevos: [], bloq: [] };
   activos.forEach((m) => {
     const mid = String(m.id);
@@ -51687,7 +51698,9 @@ function AdminRenovaciones({ members, asistencia, eventosDb }) {
     if (abrir && !window.confirm(`¿Abrir la Renovación de Servicio ${anio}? A todos los integrantes les aparecerá al entrar al portal.`)) return;
     if (!abrir && !window.confirm(`¿Cerrar la Renovación de Servicio ${anio}? Ya no les aparecerá a los integrantes. El 1 de enero igual se suspende el acceso a quienes no firmaron.`)) return;
     setProc("campana");
-    await rsGuardar(`renov_campana_${anio}`, { ...(camp || {}), abierta: abrir, [abrir ? "abiertaEn" : "cerradaEn"]: new Date().toISOString() });
+    // La primera apertura fija la fecha de corte de la asistencia (si la reabre, se mantiene)
+    const ahora = new Date().toISOString();
+    await rsGuardar(`renov_campana_${anio}`, abrir ? { ...(camp || {}), abierta: true, abiertaEn: (camp && camp.abiertaEn) || ahora } : { ...(camp || {}), abierta: false, cerradaEn: ahora });
     if (abrir) {
       const ids = activos.map((m) => String(m.id));
       if (ids.length) sendPushToUsers(ids, `Renovación de Servicio ${anio}`, "Ya puedes firmar tu Renovación de Servicio en el portal del coro.");
@@ -51760,7 +51773,7 @@ function AdminRenovaciones({ members, asistencia, eventosDb }) {
             <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".16em", color: "#e9d3a1" }}>ADMINISTRACIÓN</div>
             <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", marginTop: 4 }}>Renovación de Servicio {anio}</div>
             <div style={{ fontSize: 13.5, color: "rgba(255,255,255,.8)", marginTop: 6 }}>
-              {camp && camp.abierta ? `Abierta desde el ${rsFmt(camp.abiertaEn).split(" · ")[0]} · les aparece a todos al entrar` : camp ? "Cerrada" : "Aún no la abres"} · El 1 de enero de {anio} se suspende el acceso a quien no firmó.
+              {camp && camp.abierta ? `Abierta desde el ${rsFmt(camp.abiertaEn).split(" · ")[0]} · les aparece a todos al entrar` : camp ? "Cerrada" : "Aún no la abres"} · Asistencia evaluada hasta el {camp && camp.abiertaEn ? rsFmt(camp.abiertaEn).split(" · ")[0] : "día en que la abras (hoy, por ahora)"} · El 1 de enero de {anio} se suspende el acceso a quien no firmó.
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
