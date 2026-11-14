@@ -1792,23 +1792,89 @@ function InicioMusico({ user, pautas, setSection }) {
 }
 
 // ── Tutorial "Cómo crear una pauta" (admin y músico) ─────────────────────
+// Orden de los cantos en una misa: guía para quien no conoce la liturgia (músico invitado)
+// `orden` coincide con ORDEN_LITURGICO_OPTIONS para detectar si ya está en la pauta.
+const MJ_GUIA_ORDEN_MISA = [
+  { orden: ["Entrada"], t: "Entrada", d: "Abre la misa, mientras entra el sacerdote." },
+  { orden: ["Perdón (Kyrie)"], t: "Perdón (Señor, ten piedad)", d: "Después del saludo del sacerdote." },
+  { orden: ["Gloria"], t: "Gloria", d: "Domingos y fiestas. No se canta en Adviento ni en Cuaresma.", opc: true },
+  { orden: ["Salmo", "Salmos Responsoriales"], t: "Salmo responsorial", d: "Después de la primera lectura. El pueblo responde el estribillo." },
+  { orden: ["Secuencia"], t: "Secuencia", d: "Solo en Pascua, Pentecostés y Corpus Christi.", opc: true },
+  { orden: ["Aclamación Evangelio"], t: "Aclamación al Evangelio (Aleluya)", d: "Antes del Evangelio. En Cuaresma se canta sin «Aleluya»." },
+  { orden: ["Ofertorio"], t: "Ofertorio", d: "Mientras se preparan el pan y el vino en el altar." },
+  { orden: ["Santo"], t: "Santo", d: "Al terminar el prefacio, antes de la consagración." },
+  { orden: ["Cordero de Dios"], t: "Cordero de Dios", d: "Durante la fracción del pan, antes de comulgar." },
+  { orden: ["Comunión"], t: "Comunión", d: "Mientras la gente comulga. Si la fila es larga, puedes poner dos cantos." },
+  { orden: ["Acción de Gracias", "Comunión Espiritual"], t: "Acción de gracias", d: "Después de comulgar, un canto suave.", opc: true },
+  { orden: ["Canto Final"], t: "Canto final (Salida)", d: "Al terminar la misa, durante la salida." },
+];
+function GuiaOrdenLista({ presentes }) {
+  return (
+    <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+      {MJ_GUIA_ORDEN_MISA.map((x, k) => {
+        const ok = presentes ? x.orden.some((o) => presentes.has(o)) : false;
+        return (
+          <li key={x.t} style={{ display: "flex", gap: 10, alignItems: "flex-start", textAlign: "left" }}>
+            <span style={{ width: 22, height: 22, borderRadius: 999, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, background: ok ? "#1e3a5f" : "#eaf0f8", color: ok ? "#fff" : "#1e3a5f" }}>{ok ? "✓" : k + 1}</span>
+            <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>
+              <span style={{ fontSize: 13.5, fontWeight: 800, color: "#0f1b2d" }}>{x.t}</span>
+              {x.opc && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: "#8a96a8" }}>según el día</span>}
+              <span style={{ display: "block", fontSize: 12.5, color: "#6b7a90" }}>{x.d}</span>
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+// Panel fijo en el formulario (músico): muestra qué cantos faltan según el orden de la misa
+function GuiaOrdenMisaPanel({ canciones }) {
+  const [abierto, setAbierto] = useState(true);
+  const presentes = useMemo(() => new Set((canciones || []).filter((c) => (c.cancion || "").trim()).map((c) => c.orden)), [canciones]);
+  const faltan = MJ_GUIA_ORDEN_MISA.filter((x) => !x.opc && !x.orden.some((o) => presentes.has(o))).length;
+  return (
+    <div data-tour="pf-guia-orden" style={{ marginBottom: 16, background: "#fff", border: "1px solid #e6ecf4", borderRadius: 18, boxShadow: "0 1px 2px rgba(15,39,68,.04),0 10px 30px rgba(15,39,68,.05)", fontFamily: "var(--font-sans)", overflow: "hidden" }}>
+      <button type="button" onClick={() => setAbierto((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 16px", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+        <span style={{ width: 38, height: 38, borderRadius: 12, background: "linear-gradient(145deg,#17345c,#2a5a9c)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6h11M9 12h11M9 18h11" /><path d="M4 6h.01M4 12h.01M4 18h.01" /></svg>
+        </span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: 14.5, fontWeight: 800, color: "#0f1b2d", letterSpacing: "-0.01em" }}>Orden de los cantos en la misa</span>
+          <span style={{ display: "block", fontSize: 12, color: faltan ? "#6b7a90" : "#1e3a5f", fontWeight: faltan ? 500 : 700 }}>{faltan ? `Faltan ${faltan} canto${faltan === 1 ? "" : "s"} principales · agrégalos en este orden` : "Están todos los cantos principales"}</span>
+        </span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa5b5" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: abierto ? "rotate(90deg)" : "none", transition: "transform .2s" }}><path d="m9 6 6 6-6 6" /></svg>
+      </button>
+      {abierto && (
+        <div style={{ padding: "0 16px 14px" }}>
+          <GuiaOrdenLista presentes={presentes} />
+          <div style={{ fontSize: 12, color: "#8a96a8", marginTop: 10, lineHeight: 1.5 }}>Cada canto es una fila de la tabla: en «Momento» elige la parte de la misa. Los marcados «según el día» solo van cuando corresponde.</div>
+        </div>
+      )}
+    </div>
+  );
+}
 function mjPasosPauta(esMus) {
-  return [
-    { t: "Cómo crear una pauta", d: "Te mostramos cada parte del formulario. Pon especial atención a las canciones y a los enlaces de letra y audio: es lo que el coro usará en la misa." },
-    { sel: '[data-tour="pf-titulo"]', t: "1. La celebración", d: "Elige el tipo de misa de la lista (Misa Dominical, Vigilia…). Si no está, elige la primera opción y escríbela a mano." },
-    { sel: '[data-tour="pf-liturgia"]', t: "2. Título litúrgico (opcional)", d: "Por ejemplo «Solemnidad de Todos los Santos». Se muestra bajo el nombre de la misa y en Modo Misa." },
-    { sel: '[data-tour="pf-fecha"]', t: "3. Fecha y hora", d: "La fecha es obligatoria: con ella se ordena la pauta y se habilita el Check in de ese día." },
-    { sel: '[data-tour="pf-canciones"]', antes: "fila", t: "4. Las canciones", d: "Aquí armas el repertorio. Cada fila es un canto. Usa «+ Agregar fila» para sumar cantos; se numeran solos." },
-    { sel: '[data-tour="pf-orden"]', t: "5. Momento de la misa", d: "Elige en qué parte va el canto: Entrada, Perdón, Gloria, Salmo, Aclamación, Ofertorio, Santo, Comunión, Salida…" },
-    { sel: '[data-tour="pf-cancion"]', t: "6. Elige la canción", d: "Empieza a escribir el nombre y elige de la lista desplegable del directorio. Si eliges un canto del directorio, su letra en PDF se carga sola. Si no está, escribe el título igual." },
-    { sel: '[data-tour="pf-interprete"]', t: "7. Quién la canta", d: "Todos, Salmista, Solista o el nombre de la persona. Ayuda a que cada uno sepa cuándo le toca." },
-    { sel: '[data-tour="pf-col"]', antes: "letra", t: "8. Mostrar las columnas de enlaces", d: "Con estos botones activas las columnas «URL Letra (PDF)» y «URL Audio». Ya las dejamos activadas para que las veas." },
-    { sel: '[data-tour="pf-letra"]', t: "9. Letra (PDF)", d: "Toca «📂 Directorio» para buscar la letra entre las que ya tiene el coro; es lo recomendado. También puedes pegar un enlace de Google Drive: el archivo debe estar compartido como «Cualquier persona con el enlace», o el coro no lo podrá abrir." },
-    { sel: '[data-tour="pf-audio"]', t: "10. Audio de referencia", d: "Pega el enlace del canto en YouTube, Spotify o un audio de Google Drive (compartido con «Cualquier persona con el enlace»). YouTube y Drive se escuchan dentro del portal con el botón ▶." },
-    { sel: '[data-tour="pf-estado"]', t: "11. Por confirmar", d: "Si un canto todavía puede cambiar, márcalo «Por confirmar»: la fila queda en amarillo para que todos lo sepan." },
-    { sel: '[data-tour="pf-guardar"]', t: "12. Guardar o publicar", d: esMus ? "«Guardar Borrador» la deja guardada para seguir después. «Publicar» la deja lista. Tus pautas son privadas: solo las ves tú y el encargado del coro." : "«Guardar Borrador» la guarda sin que nadie la vea. «Publicar y Notificar» la muestra al coro y avisa a todos por notificación. Si la pauta es reservada, primero elige quiénes la ven." },
+  const base = [
+    { t: "Cómo crear una pauta", d: esMus ? "Te guiamos paso a paso. Primero verás en qué orden van los cantos de una misa, y luego cada parte del formulario." : "Te mostramos cada parte del formulario. Pon especial atención a las canciones y a los enlaces de letra y audio: es lo que el coro usará en la misa." },
+    ...(esMus ? [{ t: "El orden de la misa", d: "Una misa lleva estos cantos, en este orden. Agrega una fila por cada uno (los marcados «según el día» solo cuando corresponden). Esta lista también queda a la vista en el formulario y se marca ✓ a medida que avanzas.", lista: true }] : []),
+    { num: true, sel: '[data-tour="pf-titulo"]', t: "La celebración", d: "Elige el tipo de misa de la lista (Misa Dominical, Vigilia…). Si no está, elige la primera opción y escríbela a mano." },
+    { num: true, sel: '[data-tour="pf-liturgia"]', t: "Título litúrgico (opcional)", d: "Por ejemplo «Solemnidad de Todos los Santos». Se muestra bajo el nombre de la misa y en Modo Misa." },
+    { num: true, sel: '[data-tour="pf-fecha"]', t: "Fecha y hora", d: esMus ? "La fecha es obligatoria: con ella se ordena la pauta y se nombra el PDF." : "La fecha es obligatoria: con ella se ordena la pauta y se habilita el Check in de ese día." },
+    ...(esMus ? [{ num: true, sel: '[data-tour="pf-guia-orden"]', t: "Tu guía del orden", d: "Aquí tienes siempre el orden de los cantos. Cada canto que agregues se marca ✓, y te dice cuántos faltan." }] : []),
+    { num: true, sel: '[data-tour="pf-canciones"]', antes: "fila", t: "Las canciones", d: esMus ? "Cada fila es un canto. Empieza por la Entrada y sigue el orden de la guía. Usa «+ Agregar fila» para sumar el siguiente; se numeran solos." : "Aquí armas el repertorio. Cada fila es un canto. Usa «+ Agregar fila» para sumar cantos; se numeran solos." },
+    { num: true, sel: '[data-tour="pf-orden"]', t: "Momento de la misa", d: esMus ? "En cada fila elige qué canto es: Entrada, Perdón, Gloria, Salmo, Aclamación, Ofertorio, Santo, Cordero de Dios, Comunión, Canto Final… Debe coincidir con el orden de la guía." : "Elige en qué parte va el canto: Entrada, Perdón, Gloria, Salmo, Aclamación, Ofertorio, Santo, Comunión, Salida…" },
+    { num: true, sel: '[data-tour="pf-cancion"]', t: "Elige la canción", d: "Empieza a escribir el nombre y elige de la lista desplegable del directorio. Si eliges un canto del directorio, su letra en PDF se carga sola. Si no está, escribe el título igual." },
+    { num: true, sel: '[data-tour="pf-interprete"]', t: "Quién la canta", d: "Todos, Salmista, Solista o el nombre de la persona. Ayuda a que cada uno sepa cuándo le toca." },
+    { num: true, sel: '[data-tour="pf-col"]', antes: "letra", t: "Mostrar las columnas de enlaces", d: "Con estos botones activas las columnas «URL Letra (PDF)» y «URL Audio». Ya las dejamos activadas para que las veas." },
+    { num: true, sel: '[data-tour="pf-letra"]', t: "Letra (PDF)", d: "Toca «📂 Directorio» para buscar la letra entre las que ya tiene el coro; es lo recomendado. También puedes pegar un enlace de Google Drive: el archivo debe estar compartido como «Cualquier persona con el enlace», o el coro no lo podrá abrir." },
+    { num: true, sel: '[data-tour="pf-audio"]', t: "Audio de referencia", d: "Pega el enlace del canto en YouTube, Spotify o un audio de Google Drive (compartido con «Cualquier persona con el enlace»). YouTube y Drive se escuchan dentro del portal con el botón ▶." },
+    { num: true, sel: '[data-tour="pf-estado"]', t: "Por confirmar", d: "Si un canto todavía puede cambiar, márcalo «Por confirmar»: la fila queda en amarillo para que todos lo sepan." },
+    { num: true, sel: '[data-tour="pf-guardar"]', t: "Guardar o publicar", d: esMus ? "«Guardar Borrador» la deja guardada para seguir después. «Publicar» la deja lista. Tus pautas son privadas: solo las ves tú y el encargado del coro." : "«Guardar Borrador» la guarda sin que nadie la vea. «Publicar y Notificar» la muestra al coro y avisa a todos por notificación. Si la pauta es reservada, primero elige quiénes la ven." },
+    ...(esMus ? [{ num: true, t: "PDF con todas las letras", d: "Junto a «Guardar», y también al abrir la pauta, está «📥 Descargar cantos (PDF único)». Une todas las letras en el orden de la misa en un solo archivo (Cantos_Misa_ddmmaaaa), listo para el teléfono o para imprimir. Solo entran los cantos que tienen letra en PDF." }] : []),
     { t: "¡Listo!", d: "Ya sabes crear una pauta. Puedes repetir esta guía cuando quieras con el botón «¿Cómo crear una pauta?».", fin: true },
   ];
+  let n = 0;
+  return base.map((p) => (p.num ? { ...p, t: `${++n}. ${p.t}` } : p));
 }
 function TutorialPauta({ esMus, onCerrar, asegurarColumnas }) {
   const pasos = useMemo(() => mjPasosPauta(esMus), [esMus]);
@@ -1850,7 +1916,7 @@ function TutorialPauta({ esMus, onCerrar, asegurarColumnas }) {
   const cardW = Math.min(360, vw - 32);
   const abajo = hy + hh + 230 < vh;
   const tarjeta = (
-    <div key={i} className="tuto-card" style={centrado ? { width: "min(420px,100%)", padding: "22px 20px 18px" } : { position: "absolute", left: Math.max(16, Math.min(vw - cardW - 16, hx + hw / 2 - cardW / 2)), width: cardW, top: abajo ? hy + hh + 14 : undefined, bottom: abajo ? undefined : Math.max(16, vh - hy + 14), padding: "16px 18px" }}>
+    <div key={i} className="tuto-card" style={centrado ? { width: paso.lista ? "min(460px,100%)" : "min(420px,100%)", padding: "22px 20px 18px" } : { position: "absolute", left: Math.max(16, Math.min(vw - cardW - 16, hx + hw / 2 - cardW / 2)), width: cardW, top: abajo ? hy + hh + 14 : undefined, bottom: abajo ? undefined : Math.max(16, vh - hy + 14), padding: "16px 18px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div className="tuto-k">Crear pauta · {i + 1} de {total}</div>
         <button onClick={onCerrar} aria-label="Cerrar" style={{ background: "none", border: "none", color: "#8a96a8", fontSize: 18, cursor: "pointer", lineHeight: 1 }}>
@@ -1862,6 +1928,11 @@ function TutorialPauta({ esMus, onCerrar, asegurarColumnas }) {
       </div>
       <div style={{ fontSize: centrado ? 20 : 17, fontWeight: 800, letterSpacing: "-0.02em", marginTop: 12, lineHeight: 1.25 }}>{paso.t}</div>
       <div style={{ fontSize: 14, color: "#4b5869", lineHeight: 1.6, marginTop: 6 }}>{paso.d}</div>
+      {paso.lista && (
+        <div style={{ marginTop: 12, maxHeight: "min(46vh,380px)", overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "12px 12px", background: "#f6f8fb", border: "1px solid #e6ecf4", borderRadius: 14 }}>
+          <GuiaOrdenLista />
+        </div>
+      )}
       <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
         {i > 0 && (
           <button onClick={ant} style={{ height: 42, padding: "0 14px", border: "1px solid #e3e9f2", borderRadius: 12, background: "#fff", color: "#0f2744", fontFamily: "inherit", fontSize: 13.5, fontWeight: 800, cursor: "pointer" }}>
@@ -33818,7 +33889,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     if (mode !== "new" || !isAdmin) return;
     let visto = false;
     try {
-      visto = !!localStorage.getItem("mj_tuto_pauta_" + (user?.id || ""));
+      visto = !!localStorage.getItem((esMus ? "mj_tuto_pauta_mus2_" : "mj_tuto_pauta_") + (user?.id || ""));
     } catch (e) {}
     if (!visto) setTutoPauta(true);
   }, [mode]);
@@ -34348,7 +34419,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             onCerrar={() => {
               setTutoPauta(false);
               try {
-                localStorage.setItem("mj_tuto_pauta_" + (user?.id || ""), "1");
+                localStorage.setItem((esMus ? "mj_tuto_pauta_mus2_" : "mj_tuto_pauta_") + (user?.id || ""), "1");
               } catch (e) {}
             }}
           />
@@ -34838,6 +34909,8 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             </div>
           </div>
         </Card>
+
+        {esMus && <GuiaOrdenMisaPanel canciones={canciones} />}
 
         {/* Tabla de canciones */}
         <Card style={{ marginBottom: 16, padding: 0, overflow: "hidden" }}>
