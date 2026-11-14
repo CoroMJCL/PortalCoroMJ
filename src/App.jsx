@@ -15970,7 +15970,12 @@ async function mjAutoConvocar(conv) {
   }
 }
 async function mjResponderConv(fecha, mid, r, porAdmin = false) {
-  return setConfig(`${MJ_RESP}${fecha}_${mid}`, JSON.stringify({ r, en: new Date().toISOString(), ...(porAdmin ? { porAdmin: true } : {}) }));
+  const ok = await setConfig(`${MJ_RESP}${fecha}_${mid}`, JSON.stringify({ r, en: new Date().toISOString(), ...(porAdmin ? { porAdmin: true } : {}) }));
+  // Si la respuesta es para la misa de HOY, se programa (Sí) o cancela (No) su aviso de Check in de las 17:00
+  if (ok && fecha === mjHoyISO()) {
+    fetch(`/api/recordatorio-checkin?mid=${encodeURIComponent(mid)}`).catch(() => {});
+  }
+  return ok;
 }
 // ¿Quién queda convocado (cuenta para asistencia) en la misa de esa fecha?
 // Sin convocatoria: solo los permitidos de la pauta (o todos). Con convocatoria: permitidos + Sí + sin respuesta; quien dijo "No" queda fuera.

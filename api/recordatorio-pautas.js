@@ -10,6 +10,8 @@
 //   SUPABASE_SERVICE_KEY, CRON_SECRET (si la defines, Vercel la envía sola).
 // Prueba sin enviar nada: /api/recordatorio-pautas?dry=1
 
+import { programarRecordatoriosCheckin } from "./recordatorio-checkin.js";
+
 const SB_URL = "https://ttbipbhfswcwwgcwaist.supabase.co";
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR0YmlwYmhmc3djd3dnY3dhaXN0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTA1MDExNiwiZXhwIjoyMDk0NjI2MTE2fQ.brVGJoNX6dBEC7Z6wQIQ4RxrqrxkGt7EFkAjpZmqCMs";
 const APP_ID = process.env.ONESIGNAL_APP_ID || "6a0eb997-07a6-4de5-b4dd-98fc75a4a3ab";
@@ -40,10 +42,17 @@ export default async function handler(req, res) {
   }
   const dry = req.query?.dry === "1";
   if (!OS_KEY && !dry) return res.status(500).json({ ok: false, error: "Falta ONESIGNAL_API_KEY" });
+  // Día de misa: deja programado el aviso "marca tu asistencia" para quienes confirmaron (ver recordatorio-checkin.js)
+  let checkin = null;
+  try {
+    checkin = await programarRecordatoriosCheckin({ dry });
+  } catch (e) {
+    checkin = { ok: false, error: String(e?.message || e) };
+  }
   try {
     const hoy = hoyChile();
     const pautas = await sb(`pautas_misa?select=id,titulo,fecha,publicada&publicada=eq.true&fecha=gte.${hoy}&order=fecha.asc`);
-    if (!pautas.length) return res.status(200).json({ ok: true, enviados: 0, nota: "Sin pautas vigentes" });
+    if (!pautas.length) return res.status(200).json({ ok: true, enviados: 0, nota: "Sin pautas vigentes", checkin });
 
     const miembros = (await sb("integrantes?select=id,nombre,cuerda,acceso&acceso=eq.aprobado"))
       .filter((m) => m.cuerda && m.cuerda.trim() !== "" && m.cuerda !== "Admin" && m.cuerda !== "Músico");
@@ -131,7 +140,7 @@ export default async function handler(req, res) {
         if (r.ok) enviados += d.recipients || 0;
       }
     }
-    return res.status(200).json({ ok: true, dry, enviados, grupos: resumen });
+    return res.status(200).json({ ok: true, dry, enviados, grupos: resumen, checkin });
   } catch (e) {
     return res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
