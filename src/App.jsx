@@ -17141,8 +17141,25 @@ function PautaRevisiones({ pauta, members, compacto }) {
   const [refrescando, setRefrescando] = useState(false);
   const [ultima, setUltima] = useState(null);
   const [errorCarga, setErrorCarga] = useState(false);
+  // Quiénes deben revisar esta pauta: con convocatoria, solo los que respondieron "Sí";
+  // sin convocatoria, los permitidos de la pauta (o todos si no es reservada).
+  const [debenVer, setDebenVer] = useState(null); // { ids: Set|null, porConv: bool }
+  async function cargarDestinatarios() {
+    try {
+      const [conv, accesos] = await Promise.all([mjCargarConvocatorias(), mjCargarAccesosPauta()]);
+      const c = conv && conv.conv && conv.conv[pauta.fecha];
+      if (c) {
+        const resp = (conv.resp && conv.resp[pauta.fecha]) || {};
+        setDebenVer({ ids: new Set(Object.keys(resp).filter((k) => resp[k] && resp[k].r === "si")), porConv: true });
+        return;
+      }
+      const acc = accesos && accesos[pauta.id];
+      setDebenVer({ ids: acc && acc.restringida ? new Set((acc.ids || []).map(String)) : null, porConv: false });
+    } catch (e) {}
+  }
   async function cargar(manual) {
     if (!pauta?.id) return;
+    const pDest = cargarDestinatarios();
     if (manual === true) setRefrescando(true);
     const H = { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` };
     let fallo = false;
@@ -17171,6 +17188,7 @@ function PautaRevisiones({ pauta, members, compacto }) {
       rows2.forEach((x) => (o[x.integrante_id] = true));
       setOnline(o);
     } catch (e) {}
+    await pDest;
     setErrorCarga(fallo);
     if (!fallo) setUltima(new Date());
     setCargando(false);
@@ -17178,6 +17196,7 @@ function PautaRevisiones({ pauta, members, compacto }) {
   }
   useEffect(() => {
     setVistas({});
+    setDebenVer(null);
     setCargando(true);
     cargar();
     const iv = setInterval(cargar, 30000);
@@ -17194,7 +17213,9 @@ function PautaRevisiones({ pauta, members, compacto }) {
     };
   }, [pauta?.id]);
   const hora = (d) => d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
-  const lista = (members || []).filter((m) => m.cuerda !== "Admin" && !esVisita(m));
+  const lista = (members || []).filter(
+    (m) => m.cuerda !== "Admin" && m.cuerda !== "Músico" && !esVisita(m) && (!debenVer || !debenVer.ids || debenVer.ids.has(String(m.id)))
+  );
   const vieron = lista.filter((m) => vistas[m.id]).sort((x, y) => new Date(vistas[y.id].t) - new Date(vistas[x.id].t));
   const faltan = lista.filter((m) => !vistas[m.id]);
   const pct = lista.length ? Math.round((vieron.length / lista.length) * 100) : 0;
@@ -17254,7 +17275,7 @@ function PautaRevisiones({ pauta, members, compacto }) {
       {compacto && (
         <div style={{ fontSize: 12, color: "#b45309", fontWeight: 700, marginTop: 10 }}>⏳ Faltan por revisar: {faltan.length}</div>
       )}
-      <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 10 }}>{compacto ? "Cuenta desde que se activó este seguimiento." : "🟢 = conectado en este momento. Cuenta desde que se activó este seguimiento."}</div>
+      <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 10 }}>{debenVer && debenVer.porConv ? "Solo quienes confirmaron «Sí» a esta misa. " : debenVer && debenVer.ids ? "Solo los integrantes con acceso a esta pauta. " : ""}{compacto ? "" : "🟢 = conectado en este momento."}</div>
     </div>
   );
 }
