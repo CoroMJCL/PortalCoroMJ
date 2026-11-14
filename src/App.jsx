@@ -33871,6 +33871,29 @@ function DirectorioLetrasModal({ initialQuery = "", onSelect, onClose }) {
   );
 }
 
+// Visor del guion de la misa: usa el visor propio (pdf.js) para que funcione igual en
+// computador, tablet y teléfono (iOS/Android no muestran PDF dentro de un iframe).
+function VisorGuionMisa({ url, onCerrar }) {
+  const limpia = String(url || "").split("#")[0];
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, zIndex: 10000, background: "#0b1626", display: "flex", flexDirection: "column", fontFamily: "var(--font-sans)", paddingTop: "env(safe-area-inset-top)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "#0f1f36", color: "#fff", flexShrink: 0 }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 800, letterSpacing: "-0.01em" }}>📖 Guion de la misa</span>
+        <a href={limpia} target="_blank" rel="noreferrer" style={{ color: "#fff", fontSize: 12.5, fontWeight: 700, background: "rgba(255,255,255,.14)", borderRadius: 10, padding: "8px 12px", textDecoration: "none" }}>
+          Abrir aparte
+        </a>
+        <button onClick={onCerrar} aria-label="Cerrar" style={{ color: "#fff", fontSize: 20, lineHeight: 1, background: "rgba(255,255,255,.14)", border: "none", borderRadius: 10, width: 38, height: 34, cursor: "pointer" }}>
+          ×
+        </button>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, background: "#fff" }}>
+        <VisorPDF key={limpia} url={limpia} nombre="Guion de la misa" pegado alto="calc(100vh - 56px - env(safe-area-inset-top))" />
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const esMus = esMusico(user);
   const isAdmin = user?.cuerda === "Admin" || esMus;
@@ -34405,6 +34428,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     const pautaEdit = mode === "edit" ? selected : null;
     return (
       <div style={{ maxWidth: 1100 }}>
+        {visorGuion && <VisorGuionMisa url={visorGuion} onCerrar={() => setVisorGuion(null)} />}
         {tutoPauta && (
           <TutorialPauta
             esMus={esMus}
@@ -35349,81 +35373,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             {avisoRes && <div style={{ fontSize: 13, fontWeight: 700, color: avisoRes.startsWith("✅") ? "#065f46" : avisoRes.startsWith("⚠️") ? "#b91c1c" : "#475569" }}>{avisoRes}</div>}
           </div>
         )}
-        {/* Visor de guion (Google Drive) */}
-        {visorGuion && (
-          <div
-            onClick={() => setVisorGuion(null)}
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 10000,
-              background: "rgba(0,0,0,0.85)",
-              display: "flex",
-              flexDirection: "column",
-              padding: 0,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "12px 16px",
-                background: "#111",
-                flexShrink: 0,
-              }}
-            >
-              <span style={{ color: "white", fontSize: 14, fontWeight: 600 }}>
-                📖 Guion de la misa
-              </span>
-              <div style={{ display: "flex", gap: 8 }}>
-                <a
-                  href={visorGuion}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    color: "white",
-                    fontSize: 13,
-                    background: "rgba(255,255,255,0.15)",
-                    borderRadius: 8,
-                    padding: "6px 12px",
-                    textDecoration: "none",
-                  }}
-                >
-                  Abrir aparte
-                </a>
-                <button
-                  onClick={() => setVisorGuion(null)}
-                  style={{
-                    color: "white",
-                    fontSize: 20,
-                    background: "rgba(255,255,255,0.15)",
-                    border: "none",
-                    borderRadius: 8,
-                    width: 36,
-                    height: 32,
-                    cursor: "pointer",
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-            <iframe
-              onClick={(e) => e.stopPropagation()}
-              src={drivePreviewUrl(visorGuion) || visorGuion}
-              style={{
-                flex: 1,
-                width: "100%",
-                border: "none",
-                background: "white",
-              }}
-              title="Guion de la misa"
-              allow="autoplay"
-            />
-          </div>
-        )}
+        {visorGuion && <VisorGuionMisa url={visorGuion} onCerrar={() => setVisorGuion(null)} />}
         <div
           style={{
             display: "flex",
