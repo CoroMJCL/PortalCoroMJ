@@ -17133,14 +17133,21 @@ function PautaRevisiones({ pauta, members, compacto }) {
   const [vistas, setVistas] = useState({});
   const [online, setOnline] = useState({});
   const [cargando, setCargando] = useState(true);
-  async function cargar() {
+  const [refrescando, setRefrescando] = useState(false);
+  const [ultima, setUltima] = useState(null);
+  const [errorCarga, setErrorCarga] = useState(false);
+  async function cargar(manual) {
+    if (!pauta?.id) return;
+    if (manual === true) setRefrescando(true);
     const H = { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` };
+    let fallo = false;
     try {
       const r = await fetch(
-        `${SUPABASE_URL}/rest/v1/config?select=key,value&key=like.${encodeURIComponent("pv_" + pauta.id + "_") }*`,
-        { headers: H }
+        `${SUPABASE_URL}/rest/v1/config?select=key,value&key=like.${encodeURIComponent("pv_" + pauta.id + "_")}*`,
+        { headers: H, cache: "no-store" }
       );
-      const rows = r.ok ? await r.json() : [];
+      if (!r.ok) throw new Error("http " + r.status);
+      const rows = await r.json();
       const map = {};
       rows.forEach((x) => {
         try {
@@ -17148,22 +17155,40 @@ function PautaRevisiones({ pauta, members, compacto }) {
         } catch (e) {}
       });
       setVistas(map);
-    } catch (e) {}
+    } catch (e) {
+      fallo = true;
+    }
     try {
       const umbral = new Date(Date.now() - 60000).toISOString();
-      const r2 = await fetch(`${SUPABASE_URL}/rest/v1/presencia_online?select=integrante_id&ultimo_ping=gte.${umbral}`, { headers: H });
+      const r2 = await fetch(`${SUPABASE_URL}/rest/v1/presencia_online?select=integrante_id&ultimo_ping=gte.${umbral}`, { headers: H, cache: "no-store" });
       const rows2 = r2.ok ? await r2.json() : [];
       const o = {};
       rows2.forEach((x) => (o[x.integrante_id] = true));
       setOnline(o);
     } catch (e) {}
+    setErrorCarga(fallo);
+    if (!fallo) setUltima(new Date());
     setCargando(false);
+    setRefrescando(false);
   }
   useEffect(() => {
+    setVistas({});
+    setCargando(true);
     cargar();
     const iv = setInterval(cargar, 30000);
-    return () => clearInterval(iv);
+    // Al volver a la app (tablet/teléfono que quedó abierto), se refresca de inmediato
+    const alVolver = () => {
+      if (document.visibilityState === "visible") cargar();
+    };
+    document.addEventListener("visibilitychange", alVolver);
+    window.addEventListener("focus", alVolver);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener("visibilitychange", alVolver);
+      window.removeEventListener("focus", alVolver);
+    };
   }, [pauta?.id]);
+  const hora = (d) => d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
   const lista = (members || []).filter((m) => m.cuerda !== "Admin" && !esVisita(m));
   const vieron = lista.filter((m) => vistas[m.id]).sort((x, y) => new Date(vistas[y.id].t) - new Date(vistas[x.id].t));
   const faltan = lista.filter((m) => !vistas[m.id]);
@@ -17176,8 +17201,23 @@ function PautaRevisiones({ pauta, members, compacto }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
         {!compacto && <span style={{ fontSize: 13, fontWeight: 800, color: "#0f2744" }}><IconoOjo size={15} style={{ marginRight: 6 }} />Quién ha revisado esta pauta</span>}
         <span style={{ fontSize: 12, color: "#64748b" }}>{cargando ? "cargando…" : `${vieron.length} de ${lista.length} (${pct}%)`}</span>
-        <button onClick={cargar} style={{ marginLeft: "auto", border: "1px solid #dbe4f0", background: "#fff", borderRadius: 999, padding: "3px 10px", fontSize: 11, cursor: "pointer", color: "#1e3a5f" }}>🔄 Actualizar</button>
+        <button
+          type="button"
+          disabled={refrescando}
+          onClick={(e) => {
+            e.stopPropagation();
+            cargar(true);
+          }}
+          style={{ marginLeft: "auto", border: "1px solid #dbe4f0", background: refrescando ? "#eef3fa" : "#fff", borderRadius: 999, padding: "3px 10px", fontSize: 11, cursor: refrescando ? "default" : "pointer", color: "#1e3a5f", opacity: refrescando ? 0.75 : 1, touchAction: "manipulation" }}
+        >
+          {refrescando ? "Actualizando…" : "🔄 Actualizar"}
+        </button>
       </div>
+      {!cargando && (
+        <div style={{ fontSize: 10.5, color: errorCarga ? "#b91c1c" : "#94a3b8", marginTop: -4, marginBottom: 8 }}>
+          {errorCarga ? "No se pudo actualizar (revisa la conexión)." : ultima ? `Actualizado a las ${hora(ultima)}` : ""}
+        </div>
+      )}
       <div style={{ height: 6, borderRadius: 4, background: "#e3e9f2", overflow: "hidden", marginBottom: 12 }}>
         <div style={{ width: pct + "%", height: "100%", background: "linear-gradient(90deg,#22c55e,#16a34a)" }} />
       </div>
