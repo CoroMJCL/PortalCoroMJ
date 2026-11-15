@@ -37083,6 +37083,7 @@ const AS_CSS = `
 .as-seg{display:inline-flex;background:#eef2f7;border-radius:12px;padding:3px;gap:2px}
 .as-seg button{border:none;background:transparent;padding:8px 16px;border-radius:9px;font:inherit;font-size:13px;font-weight:700;color:#5b6779;cursor:pointer;white-space:nowrap}
 .as-seg button.on{background:#fff;color:#0f2744;box-shadow:0 1px 3px rgba(15,39,68,.12)}
+@media (max-width:520px){.as-seg{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}.as-seg button{padding:8px 10px;font-size:12px}}
 .as-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px}
 .as-kpi{background:#fff;border:1px solid #e6ecf4;border-radius:16px;padding:14px 16px;box-shadow:0 1px 2px rgba(15,39,68,.04)}
 .as-kpi b{display:block;font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1.1}
@@ -37405,6 +37406,55 @@ function AsResumen({ integrantes, misas, onAbrir, rachaDe }) {
         ))}
       </div>
       {filas.length === 0 && <div style={{ padding: 22, fontSize: 13, color: "#6b7a90", textAlign: "center" }}>No hay integrantes con ese filtro.</div>}
+    </div>
+  );
+}
+
+// Coro base: integrantes con 50% o más de asistencia (sin Participantes Ocasionales)
+function AsCoroBase({ integrantes, misas }) {
+  const [copiado, setCopiado] = useState(false);
+  const lista = mjOrdenarPorCuerda(
+    integrantes
+      .filter((m) => !m.asistencia_especial)
+      .map((m) => ({ ...m, _st: mjStatsAsistencia(misas, m.id, false, m) }))
+      .filter((m) => m._st.pct != null && m._st.pct >= 50)
+  );
+  const copiar = async () => {
+    const txt = "*Coro base* (asistencia 50% o más)\n" + lista.map((m, i) => `${i + 1}. ${m.nombre} · ${m.cuerda} · ${m._st.pct}%`).join("\n");
+    try {
+      await navigator.clipboard.writeText(txt);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch (e) {}
+  };
+  return (
+    <div className="as-card">
+      <div style={{ padding: "16px 16px 8px", display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+          <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em" }}>Coro base</div>
+          <div style={{ fontSize: 13, color: "#6b7a90", marginTop: 3 }}>
+            {lista.length} integrante{lista.length === 1 ? "" : "s"} con 50% o más de asistencia. No incluye Participantes Ocasionales.
+          </div>
+        </div>
+        <button className="as-btn sec" onClick={copiar} disabled={!lista.length}>
+          {copiado ? "¡Copiada!" : "Copiar lista"}
+        </button>
+      </div>
+      <div className="as-lista">
+        {lista.map((m) => (
+          <div key={m.id} className="as-fila">
+            <AsAvatar m={m} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.nombre}</div>
+              <div style={{ fontSize: 11.5, color: "#8a96a8" }}>
+                {m.cuerda} · {m._st.presentes} P · {m._st.ausentes} A{m._st.justificados ? ` · ${m._st.justificados} J` : ""}
+              </div>
+            </div>
+            <span style={{ fontSize: 17, fontWeight: 800, color: mjColorPct(m._st.pct) }}>{m._st.pct}%</span>
+          </div>
+        ))}
+        {lista.length === 0 && <div style={{ padding: 22, fontSize: 13, color: "#6b7a90", textAlign: "center" }}>Nadie tiene todavía 50% o más.</div>}
+      </div>
     </div>
   );
 }
@@ -38280,6 +38330,7 @@ function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) 
             {[
               ["resumen", "Resumen"],
               ["lista", "Pasar lista"],
+              ["base", "Coro base"],
               ["mia", "Mi asistencia"],
             ].map(([k, l]) => (
               <button key={k} className={vista === k ? "on" : ""} onClick={() => setVista(k)}>
@@ -38343,6 +38394,7 @@ function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) 
         </div>
       )}
       {isAdmin && vista === "resumen" && <AsResumen integrantes={integrantes} misas={misas} onAbrir={setDetalle} rachaDe={desbloqueos ? rachaDe : null} />}
+      {isAdmin && vista === "base" && <AsCoroBase integrantes={integrantes} misas={conFecha} />}
       {isAdmin && vista === "lista" && <AsPasarLista integrantes={integrantes} misas={misas} opciones={opciones} members={members} onGuardado={recargar} />}
       {isAdmin && vista === "resumen" && <AsReinicio asistencia={asistencia} mapa={mapa} onReload={onReload} />}
 
