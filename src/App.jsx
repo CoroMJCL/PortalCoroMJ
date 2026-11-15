@@ -16130,7 +16130,7 @@ async function mjResumenAsistencia(user) {
         if (re.ok) evDb = await re.json();
       } catch (e) {}
       await mjGcalHistorial();
-      const st = mjStatsAsistencia(mjConsolidarAsistencia(rows, mjMapaEventos(evDb)), user.id, esp);
+      const st = mjStatsAsistencia(mjConsolidarAsistencia(rows, mjMapaEventos(evDb)), user.id, esp, user);
       return { pct: st.pct, especial: !!st.especial, presentes: st.presentes, ausentes: st.ausentes, justificados: st.justificados, total: st.evaluados };
     } catch (e) {}
   }
@@ -18790,7 +18790,7 @@ function Dashboard({
   const mapaEvDash = useMapaEventos(_mjEventosDb);
   const misasDash = useMemo(() => mjConsolidarAsistencia(asistencia, mapaEvDash), [asistencia, mapaEvDash]);
   const yoDash = (members || []).find((m) => String(m.id) === String(user?.id));
-  const stDash = mjStatsAsistencia(misasDash, user?.id, !!(yoDash && yoDash.asistencia_especial));
+  const stDash = mjStatsAsistencia(misasDash, user?.id, !!(yoDash && yoDash.asistencia_especial), yoDash || user);
   const misPresentes = stDash.presentes;
   const misJustificados = stDash.justificados;
   const misAusentes2 = stDash.ausentes;
@@ -36947,7 +36947,27 @@ function mjConsolidarAsistencia(asistencia, mapa) {
   });
   return Object.values(misas).sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
 }
-function mjStatsAsistencia(misas, memberId, especial) {
+// Fecha de ingreso de un integrante (su asistencia corre desde ahí). Se usa la fecha de registro;
+// si tiene un presente/justificado anterior (registro creado después), vale ese.
+function mjIngresoMiembro(m, misas) {
+  if (!m) return null;
+  const raw = m.fecha_ingreso || m.created_at;
+  if (!raw) return null;
+  let f = String(raw).slice(0, 10);
+  try {
+    if (String(raw).length > 10) f = new Date(raw).toLocaleDateString("en-CA", { timeZone: "America/Santiago" });
+  } catch (e) {}
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return null;
+  const mid = String(m.id);
+  (misas || []).forEach((x) => {
+    const r = x && x.porMiembro && x.porMiembro[mid];
+    if (r && x.fecha && (r.estado === "presente" || r.estado === "justificado") && x.fecha < f) f = x.fecha;
+  });
+  return f;
+}
+const mjDesdeIngreso = (misas, ingreso) => (ingreso ? (misas || []).filter((x) => !x.fecha || x.fecha >= ingreso) : misas || []);
+function mjStatsAsistencia(misasTodas, memberId, especial, miembro) {
+  const misas = mjDesdeIngreso(misasTodas, miembro ? mjIngresoMiembro(miembro, misasTodas) : null);
   const mid = String(memberId);
   let p = 0,
     a = 0,
@@ -37168,7 +37188,8 @@ function AsBarra({ pct }) {
 
 // Detalle de una persona (el admin puede corregir cada misa)
 function AsDetalleIntegrante({ m, misas, esAdmin, onCerrar, onGuardado, members, racha, onDesbloquear }) {
-  const st = mjStatsAsistencia(misas, m.id, m.asistencia_especial);
+  const st = mjStatsAsistencia(misas, m.id, m.asistencia_especial, m);
+  const ingresoM = mjIngresoMiembro(m, misas);
   const [guardando, setGuardando] = useState("");
   const [err, setErr] = useState("");
   const cambiar = async (misa, estado) => {
@@ -37182,7 +37203,7 @@ function AsDetalleIntegrante({ m, misas, esAdmin, onCerrar, onGuardado, members,
     }
     setGuardando("");
   };
-  const conFecha = misas.filter((x) => x.fecha);
+  const conFecha = misas.filter((x) => x.fecha && (!ingresoM || x.fecha >= ingresoM));
   return createPortal(
     <div className="as-modal" onClick={onCerrar}>
       <style>{AS_CSS}</style>
@@ -37278,7 +37299,7 @@ function AsResumen({ integrantes, misas, onAbrir, rachaDe }) {
   const cuerdas = ["Todas", ...Array.from(new Set(integrantes.map((m) => m.cuerda))).filter(Boolean)];
   const filas = integrantes
     .filter((m) => (cuerda === "Todas" || m.cuerda === cuerda) && (!q || String(m.nombre || "").toLowerCase().includes(q.toLowerCase())))
-    .map((m) => ({ m, st: mjStatsAsistencia(conFecha, m.id, m.asistencia_especial) }))
+    .map((m) => ({ m, st: mjStatsAsistencia(conFecha, m.id, m.asistencia_especial, m) }))
     .sort((a, b) => {
       if (orden === "nombre") return String(a.m.nombre).localeCompare(String(b.m.nombre), "es");
       const pa = a.st.pct == null ? 101 : a.st.pct;
@@ -37419,8 +37440,14 @@ function AsPasarLista({ integrantes, misas, opciones, members, onGuardado }) {
   const acc = op && op.pautaId ? accesos[op.pautaId] : null;
   const permitidos = acc && acc.restringida ? new Set((acc.ids || []).map(String)) : null;
   // Con convocatoria: Sí + sin respuesta quedan convocados; quien avisó "No" queda fuera
-  const convocados = integrantes.filter((m) => (op && op.fecha && op.grupo === "misa" ? mjEsConvocado(m, op.fecha, permitidos, convAs) : !permitidos || permitidos.has(String(m.id))) || (misa && misa.porMiembro[String(m.id)]));
-  const noConv = integrantes.filter((m) => !convocados.includes(m));
+  // Solo quienes ya habían ingresado al coro en la fecha de esa misa (los nuevos no aparecen en misas anteriores)
+  const ingresados = integrantes.filter((m) => {
+    if (!op || !op.fecha) return true;
+    const ing = mjIngresoMiembro(m, misas);
+    return !ing || ing <= op.fecha;
+  });
+  const convocados = ingresados.filter((m) => (op && op.fecha && op.grupo === "misa" ? mjEsConvocado(m, op.fecha, permitidos, convAs) : !permitidos || permitidos.has(String(m.id))) || (misa && misa.porMiembro[String(m.id)]));
+  const noConv = ingresados.filter((m) => !convocados.includes(m));
   // Se muestran todos: primero los convocados y luego quienes avisaron que no iban (para poder justificarlos)
   const todos = [...convocados, ...noConv];
   const motivoNoConv = (m) => {
@@ -38221,7 +38248,7 @@ function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) 
     return Object.values(o).sort((a, b) => b.fecha.localeCompare(a.fecha));
   }, [misas, pautas, eventosDb, mapa]);
 
-  const statsTodos = integrantes.map((m) => mjStatsAsistencia(conFecha, m.id, m.asistencia_especial));
+  const statsTodos = integrantes.map((m) => mjStatsAsistencia(conFecha, m.id, m.asistencia_especial, m));
   const conPct = statsTodos.filter((s) => s.pct != null && !s.especial);
   const promedio = conPct.length ? Math.round(conPct.reduce((a, s) => a + s.pct, 0) / conPct.length) : null;
   const alDia = conPct.filter((s) => s.pct >= 75).length;
@@ -38230,7 +38257,7 @@ function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) 
 
   // Vista personal
   const yo = (members || []).find((m) => String(m.id) === String(user?.id)) || user || {};
-  const mio = mjStatsAsistencia(conFecha, user?.id, yo.asistencia_especial);
+  const mio = mjStatsAsistencia(conFecha, user?.id, yo.asistencia_especial, yo);
   const msgPct = mio.especial ? "Participante Ocasional: gracias por servir cuando puedes." : mio.pct == null ? "Aún no hay misas registradas para ti." : mio.pct >= 75 ? "Vas muy bien, sigue así." : mio.pct >= 50 ? "Puedes mejorar tu asistencia." : "Tu asistencia necesita atención.";
 
   return (
@@ -38348,8 +38375,8 @@ function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) 
           </div>
           <div className="as-card" style={{ overflow: "hidden" }}>
             <div style={{ padding: "13px 16px", fontSize: 10.5, fontWeight: 800, letterSpacing: ".18em", textTransform: "uppercase", color: "#8a96a8", borderBottom: "1px solid #eef2f7" }}>Mis misas</div>
-            {conFecha.filter((x) => x.porMiembro[String(user?.id)]).length === 0 && <div style={{ padding: 18, fontSize: 13, color: "#6b7a90" }}>Todavía no tienes registros.</div>}
-            {conFecha
+            {mjDesdeIngreso(conFecha, mjIngresoMiembro(yo, conFecha)).filter((x) => x.porMiembro[String(user?.id)]).length === 0 && <div style={{ padding: 18, fontSize: 13, color: "#6b7a90" }}>Todavía no tienes registros.</div>}
+            {mjDesdeIngreso(conFecha, mjIngresoMiembro(yo, conFecha))
               .filter((x) => x.porMiembro[String(user?.id)])
               .map((x) => {
                 const est = x.porMiembro[String(user?.id)].estado;
@@ -51374,7 +51401,7 @@ function rsMisasHasta(misas, corte) {
 function rsPctAsistencia(asistencia, eventosDb, m, campana) {
   if (!m || m.asistencia_especial) return null;
   const misas = rsMisasHasta(mjConsolidarAsistencia(asistencia, mjMapaEventos(eventosDb)), rsFechaCorte(campana));
-  return mjStatsAsistencia(misas, m.id, false).pct;
+  return mjStatsAsistencia(misas, m.id, false, m).pct;
 }
 
 // ── La hoja del documento (la misma para renovación y compromiso de nuevos) ──
@@ -51776,7 +51803,7 @@ function AdminRenovaciones({ members, asistencia, eventosDb }) {
   activos.forEach((m) => {
     const mid = String(m.id);
     const r = d.resp[mid];
-    const pct = m.asistencia_especial ? null : mjStatsAsistencia(misas, m.id, false).pct;
+    const pct = m.asistencia_especial ? null : mjStatsAsistencia(misas, m.id, false, m).pct;
     const item = { m, r, pct };
     if (r && r.r === "si") (r.tipo === "nuevo" ? listas.nuevos : listas.si).push(item);
     else {
