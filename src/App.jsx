@@ -36953,11 +36953,29 @@ let _mjIngresos = null;
 let _mjIngresosP = null;
 function mjCargarIngresos(forzar) {
   if (!_mjIngresosP || forzar) {
-    _mjIngresosP = mjConfigPorPrefijo("ingreso_")
+    _mjIngresosP = (async () => {
+      // Se lee con la llave de servicio primero (no depende de los permisos de la sesión)
+      for (const t of [SUPABASE_SERVICE_KEY, _authToken, SUPABASE_KEY].filter((v, i, ar) => v && ar.indexOf(v) === i)) {
+        try {
+          const r = await fetch(`${SUPABASE_URL}/rest/v1/config?select=key,value&key=like.ingreso*`, { headers: { apikey: t === SUPABASE_SERVICE_KEY ? SUPABASE_SERVICE_KEY : SUPABASE_KEY, Authorization: `Bearer ${t}` }, cache: "no-store" });
+          if (r.ok) return await r.json();
+        } catch (e) {}
+      }
+      return [];
+    })()
       .then((rows) => {
         const o = {};
-        (rows || []).forEach((x) => {
-          const f = x.value && x.value.f;
+        (Array.isArray(rows) ? rows : []).forEach((x) => {
+          if (!x || typeof x.key !== "string" || !x.key.startsWith("ingreso_")) return;
+          let v = x.value;
+          for (let i = 0; i < 2 && typeof v === "string"; i++) {
+            try {
+              v = JSON.parse(v);
+            } catch (e) {
+              break;
+            }
+          }
+          const f = v && v.f;
           if (f && /^\d{4}-\d{2}-\d{2}$/.test(f)) o[x.key.slice("ingreso_".length)] = f;
         });
         _mjIngresos = o;
@@ -37010,6 +37028,15 @@ function mjIngresoMiembro(m, misas) {
   (misas || []).forEach((x) => {
     const r = x && x.porMiembro && x.porMiembro[mid];
     if (r && x.fecha && (r.estado === "presente" || r.estado === "justificado") && x.fecha < f) f = x.fecha;
+  });
+  // Si en misas posteriores quedó marcado "nuevo", todavía no era integrante: su ingreso es después de la última
+  (misas || []).forEach((x) => {
+    const r = x && x.porMiembro && x.porMiembro[mid];
+    if (r && x.fecha && r.estado === "nuevo" && x.fecha >= f) {
+      const d = new Date(x.fecha + "T12:00:00");
+      d.setDate(d.getDate() + 1);
+      f = d.toISOString().slice(0, 10);
+    }
   });
   return f;
 }
@@ -37576,6 +37603,9 @@ function AsPasarLista({ integrantes, misas, opciones, members, onGuardado }) {
   // Solo quienes ya habían ingresado al coro en la fecha de esa misa (los nuevos no aparecen en misas anteriores)
   const ingresados = integrantes.filter((m) => {
     if (!op || !op.fecha) return true;
+    // Marcado "nuevo" en esa misa = todavía no era integrante
+    const r = misa && misa.porMiembro[String(m.id)];
+    if (r && r.estado === "nuevo") return false;
     const ing = mjIngresoMiembro(m, misas);
     return !ing || ing <= op.fecha;
   });
