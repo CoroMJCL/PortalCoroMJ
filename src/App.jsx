@@ -37402,7 +37402,6 @@ function AsPasarLista({ integrantes, misas, opciones, members, onGuardado }) {
   const [msg, setMsg] = useState("");
   const [accesos, setAccesos] = useState({});
   const [convAs, setConvAs] = useState(null);
-  const [verNoConv, setVerNoConv] = useState(false);
   useEffect(() => {
     mjCargarAccesosPauta().then(setAccesos).catch(() => {});
     mjCargarConvocatorias().then(setConvAs).catch(() => {});
@@ -37410,7 +37409,6 @@ function AsPasarLista({ integrantes, misas, opciones, members, onGuardado }) {
   useEffect(() => {
     setCambios({});
     setMsg("");
-    setVerNoConv(false);
   }, [sel]);
   const actual = (m) => {
     const mid = String(m.id);
@@ -37423,11 +37421,17 @@ function AsPasarLista({ integrantes, misas, opciones, members, onGuardado }) {
   // Con convocatoria: Sí + sin respuesta quedan convocados; quien avisó "No" queda fuera
   const convocados = integrantes.filter((m) => (op && op.fecha && op.grupo === "misa" ? mjEsConvocado(m, op.fecha, permitidos, convAs) : !permitidos || permitidos.has(String(m.id))) || (misa && misa.porMiembro[String(m.id)]));
   const noConv = integrantes.filter((m) => !convocados.includes(m));
+  // Se muestran todos: primero los convocados y luego quienes avisaron que no iban (para poder justificarlos)
+  const todos = [...convocados, ...noConv];
+  const motivoNoConv = (m) => {
+    if (op && op.fecha && convAs && mjRespuestaConv(convAs, op.fecha, String(m.id)) === "no") return "avisó que no va";
+    return "no convocado";
+  };
   const cuenta = { presente: 0, ausente: 0, justificado: 0, excluido: 0, nuevo: 0, sin: 0 };
-  convocados.forEach((m) => {
+  todos.forEach((m) => {
     const e = actual(m);
     if (e && cuenta[e] !== undefined) cuenta[e]++;
-    else cuenta.sin++;
+    else if (convocados.includes(m)) cuenta.sin++;
   });
   const nCambios = Object.keys(cambios).length;
   const poner = (m, estado) => {
@@ -37472,7 +37476,8 @@ function AsPasarLista({ integrantes, misas, opciones, members, onGuardado }) {
           <div style={{ fontSize: 11.5, color: "#8a96a8" }}>
             {m.cuerda}
             {m.asistencia_especial ? " · Participante Ocasional" : ""}
-            {!est ? " · sin marcar" : ""}
+            {!convocados.includes(m) ? <span style={{ color: MJ_ESTADOS.justificado.color, fontWeight: 700 }}> · {motivoNoConv(m)}</span> : null}
+            {!est && convocados.includes(m) ? " · sin marcar" : ""}
           </div>
         </div>
         <div className="as-est">
@@ -37533,15 +37538,14 @@ function AsPasarLista({ integrantes, misas, opciones, members, onGuardado }) {
               </button>
             </div>
           </div>
-          {permitidos && <div style={{ margin: "6px 16px 0", fontSize: 12, color: "#6b7a90" }}>Esta pauta es reservada: se muestran los {convocados.length} convocados.</div>}
           <div className="as-lista">{convocados.map(fila)}</div>
           {noConv.length > 0 && (
-            <div style={{ padding: "0 16px 16px" }}>
-              <button className="as-btn ghost" onClick={() => setVerNoConv((v) => !v)}>
-                {verNoConv ? "Ocultar" : "Ver"} no convocados ({noConv.length})
-              </button>
-              {verNoConv && <div className="as-lista" style={{ padding: "6px 0 0" }}>{noConv.map(fila)}</div>}
-            </div>
+            <>
+              <div style={{ margin: "4px 16px 0", fontSize: 11, fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: "#8a96a8" }}>
+                No convocados / avisaron que no van ({noConv.length})
+              </div>
+              <div className="as-lista">{noConv.map(fila)}</div>
+            </>
           )}
           {msg && <div style={{ margin: "0 16px 16px", fontSize: 13, fontWeight: 600, color: msg.startsWith("Listo") ? "#16335a" : "#a32a1f" }}>{msg}</div>}
           {nCambios > 0 && (
