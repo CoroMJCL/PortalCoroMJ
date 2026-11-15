@@ -3880,6 +3880,7 @@ function AppInner() {
       </div>
     );
   if (mjEsListaPublica()) return <ListaPublicaConvocatoria />;
+  if (mjEsAsistenciaPublica()) return <ListaPublicaAsistencia />;
 
   if (view === "landing")
     return (
@@ -37520,6 +37521,32 @@ function AsResumen({ integrantes, misas, onAbrir, rachaDe }) {
   );
 }
 
+// Botón para compartir el link público de % de asistencia
+function AsLinkPublico() {
+  const [ok, setOk] = useState(false);
+  const compartir = async () => {
+    const texto = "Asistencia del Coro Misioneros de Jesús: " + MJ_LINK_ASISTENCIA;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Asistencia del coro", text: texto });
+        return;
+      }
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+    }
+    try {
+      await navigator.clipboard.writeText(MJ_LINK_ASISTENCIA);
+      setOk(true);
+      setTimeout(() => setOk(false), 2000);
+    } catch (e) {}
+  };
+  return (
+    <button className="as-btn sec" onClick={compartir} style={{ height: 38 }}>
+      {ok ? "¡Link copiado!" : "Compartir % de asistencia"}
+    </button>
+  );
+}
+
 // Coro base: integrantes con 50% o más de asistencia (sin Participantes Ocasionales)
 function AsCoroBase({ integrantes, misas }) {
   const [copiado, setCopiado] = useState(false);
@@ -38456,6 +38483,7 @@ function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) 
             ))}
           </div>
         )}
+        {isAdmin && <AsLinkPublico />}
       </div>
 
       {isAdmin && vista !== "mia" && (
@@ -45110,6 +45138,113 @@ function MjIconoRespuesta({ r }) {
 function MjEtiquetaEncargado() {
   return <span style={{ display: "inline-block", marginLeft: 8, padding: "2px 8px", borderRadius: 999, background: "#1e3a5f", color: "#fff", fontSize: 10.5, fontWeight: 800, letterSpacing: ".02em", verticalAlign: "middle", whiteSpace: "nowrap" }}>Encargado Coro</span>;
 }
+// ── Lista pública de % de asistencia (link fijo: /?lista=asistencia, sin login) ──
+const MJ_LINK_ASISTENCIA = "https://coromisionerosdejesus.cl/?lista=asistencia";
+function mjEsAsistenciaPublica() {
+  try {
+    return new URLSearchParams(window.location.search).get("lista") === "asistencia";
+  } catch (e) {
+    return false;
+  }
+}
+async function mjDatosAsistenciaPublica() {
+  const t = SUPABASE_SERVICE_KEY;
+  const h = { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${t}` };
+  const get = async (q) => {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: h, cache: "no-store" });
+    if (!r.ok) throw new Error(String(r.status));
+    return r.json();
+  };
+  const [rows, evDb, ms] = await Promise.all([
+    get("asistencia?select=id,estado,evento_id,member_id,created_at"),
+    get("eventos?select=id,fecha,tipo,titulo").catch(() => _mjEventosDb || []),
+    get("integrantes?select=*&order=nombre.asc"),
+    mjGcalHistorial().catch(() => {}),
+    mjCargarIngresos(true).catch(() => {}),
+  ]);
+  const misas = mjConsolidarAsistencia(rows, mjMapaEventos(evDb)).filter((x) => x.fecha);
+  const lista = mjIntegrantesAsistencia(ms)
+    .filter((m) => m.activo !== false)
+    .map((m) => ({ m, st: mjStatsAsistencia(misas, m.id, !!m.asistencia_especial, m) }))
+    .sort((a, b) => mjNombreApellido(a.m.nombre).localeCompare(mjNombreApellido(b.m.nombre), "es"));
+  return { lista, nMisas: misas.length };
+}
+function ListaPublicaAsistencia() {
+  const [estado, setEstado] = useState({ cargando: true });
+  const cargar = async () => {
+    try {
+      const d = await mjDatosAsistenciaPublica();
+      setEstado({ ...d, en: new Date() });
+    } catch (e) {
+      setEstado({ error: true });
+    }
+  };
+  useEffect(() => {
+    cargar();
+  }, []);
+  const NAVY = "#1e3a5f";
+  const pagina = (contenido) => (
+    <div style={{ minHeight: "100vh", background: "#f3f6fa", fontFamily: "var(--font-sans, Inter, system-ui, sans-serif)", color: "#0f1b2d", padding: "24px 16px 40px", boxSizing: "border-box" }}>
+      <div style={{ maxWidth: 560, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 18 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", textTransform: "uppercase", color: "#8a96a8" }}>Coro Misioneros de Jesús</div>
+          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", color: NAVY, marginTop: 4 }}>Asistencia del coro</div>
+        </div>
+        {contenido}
+      </div>
+    </div>
+  );
+  if (estado.cargando) return pagina(<div style={{ textAlign: "center", color: "#64748b", fontSize: 14, padding: 30 }}>Cargando…</div>);
+  if (estado.error) return pagina(<div style={{ textAlign: "center", color: "#64748b", fontSize: 14, padding: 30 }}>No se pudo cargar la lista. Revisa tu conexión e intenta de nuevo.</div>);
+  const regulares = estado.lista.filter((x) => !x.st.especial);
+  const ocasionales = estado.lista.filter((x) => x.st.especial);
+  const fila = (x, derecha) => (
+    <div key={x.m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", borderTop: "1px solid #f1f4f8" }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14.5, fontWeight: 650, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{mjNombreApellido(x.m.nombre)}</div>
+        <div style={{ fontSize: 12, color: "#8a96a8", fontWeight: 600 }}>{mjCuerdaMostrar(x.m)}</div>
+      </div>
+      {derecha}
+    </div>
+  );
+  return pagina(
+    <>
+      <div style={{ background: "linear-gradient(135deg,#17345c 0%,#2a5a9c 100%)", color: "#fff", borderRadius: 20, padding: "16px 18px" }}>
+        <div style={{ fontSize: 13.5, opacity: 0.9 }}>Porcentaje de asistencia a misas</div>
+        <div style={{ fontSize: 12.5, opacity: 0.8, marginTop: 4 }}>
+          {estado.nMisas} misa{estado.nMisas === 1 ? "" : "s"} registrada{estado.nMisas === 1 ? "" : "s"}. Cada uno cuenta desde su ingreso al coro; las ausencias justificadas no bajan el porcentaje.
+        </div>
+      </div>
+      <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #e1e9f4", overflow: "hidden", marginTop: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "#e8f0fb" }}>
+          <div style={{ fontSize: 14.5, fontWeight: 800, color: NAVY }}>Integrantes</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: NAVY }}>{regulares.length}</div>
+        </div>
+        {regulares.map((x) =>
+          fila(
+            x,
+            x.st.pct == null ? (
+              <span style={{ fontSize: 12.5, color: "#8a96a8", fontWeight: 600 }}>Sin misas aún</span>
+            ) : (
+              <span style={{ fontSize: 17, fontWeight: 800, color: mjColorPct(x.st.pct) }}>{x.st.pct}%</span>
+            )
+          )
+        )}
+      </div>
+      {ocasionales.length > 0 && (
+        <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #e1e9f4", overflow: "hidden", marginTop: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "#eef2f7" }}>
+            <div style={{ fontSize: 14.5, fontWeight: 800, color: "#475569" }}>Participantes Ocasionales</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#475569" }}>{ocasionales.length}</div>
+          </div>
+          {ocasionales.map((x) => fila(x, <span style={{ fontSize: 12, color: "#8a96a8", fontWeight: 600 }}>Participante Ocasional</span>))}
+        </div>
+      )}
+      <div style={{ textAlign: "center", fontSize: 11.5, color: "#8a96a8", marginTop: 14 }}>Actualizado a las {estado.en.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}</div>
+    </>
+  );
+}
+
 function ListaPublicaConvocatoria() {
   const [estado, setEstado] = useState({ cargando: true });
   const cargar = async () => {
