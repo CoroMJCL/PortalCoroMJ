@@ -18787,6 +18787,7 @@ function Dashboard({
   }
 
   // Cálculo de asistencia del usuario (una misa cuenta una sola vez, aunque tenga registros duplicados)
+  useIngresosMJ();
   const mapaEvDash = useMapaEventos(_mjEventosDb);
   const misasDash = useMemo(() => mjConsolidarAsistencia(asistencia, mapaEvDash), [asistencia, mapaEvDash]);
   const yoDash = (members || []).find((m) => String(m.id) === String(user?.id));
@@ -36947,10 +36948,57 @@ function mjConsolidarAsistencia(asistencia, mapa) {
   });
   return Object.values(misas).sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
 }
-// Fecha de ingreso de un integrante (su asistencia corre desde ahí). Se usa la fecha de registro;
+// Fechas de ingreso fijadas a mano por el admin (config: ingreso_<id> → {f: "AAAA-MM-DD"})
+let _mjIngresos = null;
+let _mjIngresosP = null;
+function mjCargarIngresos(forzar) {
+  if (!_mjIngresosP || forzar) {
+    _mjIngresosP = mjConfigPorPrefijo("ingreso_")
+      .then((rows) => {
+        const o = {};
+        (rows || []).forEach((x) => {
+          const f = x.value && x.value.f;
+          if (f && /^\d{4}-\d{2}-\d{2}$/.test(f)) o[x.key.slice("ingreso_".length)] = f;
+        });
+        _mjIngresos = o;
+        try {
+          window.dispatchEvent(new Event("mj-ingresos"));
+        } catch (e) {}
+        return o;
+      })
+      .catch(() => {
+        _mjIngresos = _mjIngresos || {};
+        return _mjIngresos;
+      });
+  }
+  return _mjIngresosP;
+}
+// Recarga el componente cuando llegan las fechas de ingreso
+function useIngresosMJ() {
+  const [, setT] = useState(0);
+  useEffect(() => {
+    const f = () => setT((t) => t + 1);
+    window.addEventListener("mj-ingresos", f);
+    mjCargarIngresos();
+    return () => window.removeEventListener("mj-ingresos", f);
+  }, []);
+}
+const mjIngresoManual = (mid) => (_mjIngresos && _mjIngresos[String(mid)]) || null;
+async function mjGuardarIngreso(mid, fecha) {
+  const key = "ingreso_" + mid;
+  const h = { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json" };
+  const r = fecha
+    ? await fetch(`${SUPABASE_URL}/rest/v1/config`, { method: "POST", headers: { ...h, Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ key, value: JSON.stringify({ f: fecha }) }) })
+    : await fetch(`${SUPABASE_URL}/rest/v1/config?key=eq.${encodeURIComponent(key)}`, { method: "DELETE", headers: h });
+  if (!r.ok) throw new Error("No se pudo guardar la fecha de ingreso (" + r.status + ")");
+  await mjCargarIngresos(true);
+}
+// Fecha de ingreso de un integrante (su asistencia corre desde ahí). Si el admin la fijó, vale esa. Se usa la fecha de registro;
 // si tiene un presente/justificado anterior (registro creado después), vale ese.
 function mjIngresoMiembro(m, misas) {
   if (!m) return null;
+  const manual = mjIngresoManual(m.id);
+  if (manual) return manual;
   const raw = m.fecha_ingreso || m.created_at;
   if (!raw) return null;
   let f = String(raw).slice(0, 10);
@@ -37191,6 +37239,21 @@ function AsBarra({ pct }) {
 function AsDetalleIntegrante({ m, misas, esAdmin, onCerrar, onGuardado, members, racha, onDesbloquear }) {
   const st = mjStatsAsistencia(misas, m.id, m.asistencia_especial, m);
   const ingresoM = mjIngresoMiembro(m, misas);
+  const [fIng, setFIng] = useState(ingresoM || "");
+  const [guardIng, setGuardIng] = useState(false);
+  const [msgIng, setMsgIng] = useState("");
+  const guardarIngreso = async (f) => {
+    setGuardIng(true);
+    setMsgIng("");
+    try {
+      await mjGuardarIngreso(m.id, f);
+      setMsgIng(f ? "Fecha guardada" : "Fecha quitada");
+      onGuardado && (await onGuardado());
+    } catch (e) {
+      setMsgIng(String((e && e.message) || e));
+    }
+    setGuardIng(false);
+  };
   const [guardando, setGuardando] = useState("");
   const [err, setErr] = useState("");
   const cambiar = async (misa, estado) => {
@@ -37246,6 +37309,26 @@ function AsDetalleIntegrante({ m, misas, esAdmin, onCerrar, onGuardado, members,
               <button className="as-btn pri" style={{ height: 36, background: "#0f2744", color: "#fff" }} onClick={onDesbloquear}>
                 {racha >= MJ_BLOQUEO_AUSENCIAS ? "Desbloquear" : "Reiniciar conteo"}
               </button>
+            </div>
+          )}
+          {esAdmin && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: "#f4f7fb", borderRadius: 14, padding: "12px 14px", marginBottom: 12 }}>
+              <div style={{ flex: "1 1 180px", minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2744" }}>Ingreso al coro</div>
+                <div style={{ fontSize: 11.5, color: "#6b7a90", marginTop: 2 }}>
+                  {mjIngresoManual(m.id) ? "Fijada por ti. " : ""}La asistencia cuenta desde esta fecha; antes no aparece en las misas.
+                  {msgIng ? <b style={{ color: msgIng.startsWith("Fecha") ? "#16335a" : "#a32a1f" }}> {msgIng}</b> : null}
+                </div>
+              </div>
+              <input type="date" value={fIng} onChange={(e) => setFIng(e.target.value)} style={{ height: 36, border: "1px solid #dbe3ee", borderRadius: 10, padding: "0 10px", font: "inherit", fontSize: 14, background: "#fff" }} />
+              <button className="as-btn pri" style={{ height: 36, background: "#0f2744", color: "#fff" }} disabled={guardIng || !fIng || fIng === mjIngresoManual(m.id)} onClick={() => guardarIngreso(fIng)}>
+                {guardIng ? "Guardando…" : "Guardar"}
+              </button>
+              {mjIngresoManual(m.id) && (
+                <button className="as-btn ghost" style={{ height: 36 }} disabled={guardIng} onClick={() => guardarIngreso("")}>
+                  Quitar
+                </button>
+              )}
             </div>
           )}
           {err && <div style={{ background: "#fcebea", color: "#a32a1f", borderRadius: 10, padding: "9px 12px", fontSize: 12.5, marginBottom: 10 }}>{err}</div>}
@@ -37797,7 +37880,8 @@ const MJ_BLOQUEO_AUSENCIAS = 3;
 function mjRachaAusencias(misas, memberId, desde) {
   const mid = String(memberId);
   const hoy = mjHoyISO();
-  const lista = (misas || []).filter((m) => m.fecha && m.fecha <= hoy && (!desde || m.fecha > desde)).sort((a, b) => b.fecha.localeCompare(a.fecha));
+  const ing = mjIngresoManual(mid);
+  const lista = (misas || []).filter((m) => m.fecha && m.fecha <= hoy && (!desde || m.fecha > desde) && (!ing || m.fecha >= ing)).sort((a, b) => b.fecha.localeCompare(a.fecha));
   let n = 0;
   for (const m of lista) {
     const r = m.porMiembro[mid];
@@ -37815,7 +37899,7 @@ function mjRachaSinResponder(conv, misas, memberId, desde) {
   const mid = String(memberId);
   const hoy = mjHoyISO();
   const fechas = Object.keys(conv.conv)
-    .filter((f) => f < hoy && !mjConvAbierta(conv.conv[f]) && (!desde || f > desde))
+    .filter((f) => f < hoy && !mjConvAbierta(conv.conv[f]) && (!desde || f > desde) && (!mjIngresoManual(mid) || f >= mjIngresoManual(mid)))
     .sort((a, b) => b.localeCompare(a));
   let n = 0;
   for (const f of fechas) {
@@ -37869,16 +37953,18 @@ function ControlAccesoAsistencia({ user, members, asistencia, eventosDb, listo, 
   const [desb, setDesb] = useState(undefined);
   const [desbConv, setDesbConv] = useState(undefined);
   const [avisoCerrado, setAvisoCerrado] = useState(false);
+  const [ingListo, setIngListo] = useState(!!_mjIngresos);
   const yo = (members || []).find((m) => String(m.id) === String(user?.id)) || user;
   const exento = !user || !user.id || mjExentoBloqueo(yo);
   useEffect(() => {
     if (exento) return;
+    mjCargarIngresos().then(() => setIngListo(true));
     mjGcalHistorial().then(() => setGcalListo(true));
     mjCargarDesbloqueos().then((x) => setDesb(x));
     mjCargarDesbloqueosConv().then((x) => setDesbConv(x));
   }, [exento, user && user.id]);
   const mapa = useMemo(() => mjMapaEventos(eventosDb), [eventosDb, gcalListo]);
-  if (exento || !listo || !gcalListo || desb === undefined || desb === null) return null;
+  if (exento || !listo || !gcalListo || !ingListo || desb === undefined || desb === null) return null;
   const misas = mjConsolidarAsistencia(asistencia, mapa);
   const racha = mjRachaAusencias(misas, user.id, (desb[String(user.id)] || {}).hasta);
   const nombre = String((yo && yo.nombre) || "").split(" ")[0];
@@ -38085,7 +38171,7 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
       try {
         const yo = (members || []).find((m) => String(m.id) === uid) || user;
         if (!mjExentoBloqueo(yo)) {
-          const [, desb] = await Promise.all([mjGcalHistorial(), mjCargarDesbloqueos()]);
+          const [, desb] = await Promise.all([mjGcalHistorial(), mjCargarDesbloqueos(), mjCargarIngresos()]);
           const misas = mjConsolidarAsistencia(asistencia, mjMapaEventos(eventosDb));
           racha = mjRachaAusencias(misas, uid, ((desb || {})[uid] || {}).hasta);
         }
@@ -38250,6 +38336,7 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
 }
 
 function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) {
+  useIngresosMJ();
   const mapa = useMapaEventos(eventosDb);
   const misas = useMemo(() => mjConsolidarAsistencia(asistencia, mapa), [asistencia, mapa]);
   const conFecha = misas.filter((x) => x.fecha);
