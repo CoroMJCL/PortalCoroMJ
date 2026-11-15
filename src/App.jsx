@@ -45210,10 +45210,12 @@ function ListaPublicaAsistencia() {
   return pagina(
     <>
       <div style={{ background: "linear-gradient(135deg,#17345c 0%,#2a5a9c 100%)", color: "#fff", borderRadius: 20, padding: "16px 18px" }}>
-        <div style={{ fontSize: 13.5, opacity: 0.9 }}>Porcentaje de asistencia a misas</div>
-        <div style={{ fontSize: 12.5, opacity: 0.8, marginTop: 4 }}>
-          {estado.nMisas} misa{estado.nMisas === 1 ? "" : "s"} registrada{estado.nMisas === 1 ? "" : "s"}. La asistencia se comenzó a registrar desde las misas de octubre de 2026 en adelante. Cada uno cuenta desde su ingreso al coro; las ausencias justificadas no bajan el porcentaje.
-        </div>
+        <div style={{ fontSize: 16, fontWeight: 800 }}>Asistencia desde octubre de 2026</div>
+        <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 13, lineHeight: 1.5, opacity: 0.9 }}>
+          <li>Solo cuentan las misas desde octubre de 2026 en adelante.</li>
+          <li>Si entraste al coro después, se cuenta desde tu ingreso.</li>
+          <li>Si avisaste que no podías ir (ausencia justificada), no te baja el porcentaje.</li>
+        </ul>
       </div>
       <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #e1e9f4", overflow: "hidden", marginTop: 12 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "#e8f0fb" }}>
