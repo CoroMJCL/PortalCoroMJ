@@ -45203,6 +45203,19 @@ function ListaPublicaAsistencia() {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14.5, fontWeight: 650, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{mjNombreApellido(x.m.nombre)}</div>
         <div style={{ fontSize: 12, color: "#8a96a8", fontWeight: 600 }}>{mjCuerdaMostrar(x.m)}</div>
+        {!x.st.especial && (
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 5 }}>
+            {[
+              ["presente", x.st.presentes, x.st.presentes === 1 ? "presente" : "presentes"],
+              ["ausente", x.st.ausentes, x.st.ausentes === 1 ? "ausencia" : "ausencias"],
+              ["justificado", x.st.justificados, x.st.justificados === 1 ? "justificada" : "justificadas"],
+            ].map(([k, n, l]) => (
+              <span key={k} style={{ fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "2px 8px", background: MJ_ESTADOS[k].bg, color: MJ_ESTADOS[k].color }}>
+                {n} {l}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       {derecha}
     </div>
