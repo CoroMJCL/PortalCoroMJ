@@ -91,6 +91,25 @@ async function pendientes(hoy, soloMid) {
   );
   if (soloMid) miembros = miembros.filter((m) => String(m.id) === String(soloMid));
 
+  // Solo quienes confirmaron «Sí» a la próxima misa convocada pueden abrir las listas:
+  // a quien avisó «No» no se le recuerda (sin misa convocada no se filtra)
+  const convs = ((await sb(`config?select=key,value&key=like.${encodeURIComponent("misaconv_")}*`)) || [])
+    .filter((r) => r.key.startsWith("misaconv_") && !((parse(r.value) || {}).borrada))
+    .map((r) => r.key.slice("misaconv_".length))
+    .filter((f) => /^\d{4}-\d{2}-\d{2}$/.test(f) && f >= hoy)
+    .sort();
+  const convActiva = convs[0] || null;
+  const dijeronNo = new Set();
+  if (convActiva) {
+    const pref = `misaresp_${convActiva}_`;
+    ((await sb(`config?select=key,value&key=like.${encodeURIComponent(pref)}*`)) || []).forEach((r) => {
+      if (!r.key.startsWith(pref)) return;
+      const v = parse(r.value);
+      if (v && v.r === "no") dijeronNo.add(r.key.slice(pref.length));
+    });
+  }
+  miembros = miembros.filter((m) => !dijeronNo.has(String(m.id)));
+
   const pend = {};
   for (const l of listas) {
     const acc = await sb(`config?select=value&key=eq.${encodeURIComponent("pauta_acceso_" + l.id)}&limit=1`);

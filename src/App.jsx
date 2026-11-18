@@ -15992,6 +15992,12 @@ async function mjAutoConvocar(conv) {
 }
 async function mjResponderConv(fecha, mid, r, porAdmin = false) {
   const ok = await setConfig(`${MJ_RESP}${fecha}_${mid}`, JSON.stringify({ r, en: new Date().toISOString(), ...(porAdmin ? { porAdmin: true } : {}) }));
+  // Avisa a las pantallas que dependen de la confirmación (p. ej. la Pauta de Ensayo) para que se actualicen
+  if (ok) {
+    try {
+      window.dispatchEvent(new CustomEvent("mj-conv-cambio", { detail: { fecha, mid: String(mid), r } }));
+    } catch (e) {}
+  }
   // Si la respuesta es para la misa de HOY, se programa (Sí) o cancela (No) su aviso de Check in de las 17:00
   if (ok && fecha === mjHoyISO()) {
     fetch(`/api/recordatorio-checkin?mid=${encodeURIComponent(mid)}`).catch(() => {});
@@ -36917,6 +36923,114 @@ function mjEnsResumenCambios(vieja, nueva) {
   if (t(vieja.notas) !== t(nueva.notas) && t(nueva.notas)) out.push("Indicaciones actualizadas");
   return out;
 }
+// ── Acceso a la Pauta de Ensayo según la confirmación de la próxima misa convocada ──
+// Solo quienes confirmaron «Sí» a la próxima misa convocada pueden abrir las listas de ensayo.
+// Devuelve null si puede abrir, o { fecha, tipo: "pendiente" | "no" | "cerrada" }.
+function mjEnsBloqueo(conv, user) {
+  if (!user || esCuerdaAdmin(user)) return null;
+  const fecha = mjConvActiva(conv);
+  if (!fecha) return null; // no hay misa convocada: no se exige nada
+  const r = mjRespuestaConv(conv, fecha, user.id);
+  if (r === "si") return null;
+  if (r === "no") return { fecha, tipo: "no" };
+  return { fecha, tipo: mjConvConfirmable(conv, fecha) ? "pendiente" : "cerrada" };
+}
+// Convocatorias cargadas y actualizadas al instante cuando alguien responde
+function useEnsConv(user) {
+  const [conv, setConv] = useState(null);
+  useEffect(() => {
+    if (!user || esCuerdaAdmin(user)) return;
+    let vivo = true;
+    const cargarConv = () =>
+      mjCargarConvocatorias()
+        .then((c) => vivo && setConv(c))
+        .catch(() => vivo && setConv({ conv: {}, resp: {} }));
+    cargarConv();
+    const h = (e) => {
+      const d = (e && e.detail) || {};
+      // Se actualiza de inmediato con la respuesta recién guardada y luego se recarga desde el servidor
+      if (d.fecha && d.mid)
+        setConv((c) => (c ? { ...c, resp: { ...c.resp, [d.fecha]: { ...((c.resp || {})[d.fecha] || {}), [d.mid]: { r: d.r } } } } : c));
+      cargarConv();
+    };
+    window.addEventListener("mj-conv-cambio", h);
+    return () => {
+      vivo = false;
+      window.removeEventListener("mj-conv-cambio", h);
+    };
+  }, [user && user.id]);
+  if (!user || esCuerdaAdmin(user)) return { conv: null, bloqueo: null, listo: true };
+  return { conv, bloqueo: conv ? mjEnsBloqueo(conv, user) : null, listo: !!conv };
+}
+function EnsayoBloqueoPopup({ bloqueo, onCerrar }) {
+  if (!bloqueo) return null;
+  const fl = mjFechaLargaCorta(bloqueo.fecha);
+  const misa = `la misa del ${fl}`;
+  const confirmar = () => {
+    onCerrar();
+    try {
+      window.dispatchEvent(new CustomEvent("mj-confirmar-misa", { detail: bloqueo.fecha }));
+    } catch (e) {}
+  };
+  return createPortal(
+    <div onClick={onCerrar} style={{ position: "fixed", inset: 0, zIndex: 6000, background: "rgba(15,27,45,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, fontFamily: "var(--font-sans)" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 24, padding: "24px 22px 18px", maxWidth: 390, width: "100%", textAlign: "center", boxShadow: "0 28px 70px rgba(15,27,45,.4)" }}>
+        <div style={{ width: 54, height: 54, borderRadius: 16, margin: "0 auto 10px", background: "linear-gradient(135deg,#1e3a5f,#2f5d9a)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>🎶</div>
+        <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "#2f5d9a" }}>Cantos para ensayar</div>
+        {bloqueo.tipo === "pendiente" ? (
+          <>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#0f2744", margin: "6px 0 8px", letterSpacing: "-0.02em" }}>Primero confirma tu participación</div>
+            <div style={{ fontSize: 14.5, color: "#334155", lineHeight: 1.5, marginBottom: 16 }}>
+              Para ver los cantos de ensayo debes confirmar si cantarás en <b>{misa}</b>. Si no vas a participar en esa misa, no tiene sentido que ensayes estos cantos.
+            </div>
+            <button onClick={confirmar} style={{ width: "100%", border: "none", background: "#1e3a5f", color: "#fff", borderRadius: 14, padding: "15px 16px", fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+              Confirmar mi participación
+            </button>
+          </>
+        ) : bloqueo.tipo === "no" ? (
+          <>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#0f2744", margin: "6px 0 8px", letterSpacing: "-0.02em" }}>Esta lista es para quienes cantarán</div>
+            <div style={{ fontSize: 14.5, color: "#334155", lineHeight: 1.5, marginBottom: 16 }}>
+              Avisaste que no participarás en <b>{misa}</b>, por eso no tienes acceso a los cantos de ensayo. Si finalmente puedes ir, habla con el Encargado del Coro.
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#0f2744", margin: "6px 0 8px", letterSpacing: "-0.02em" }}>No confirmaste tu participación</div>
+            <div style={{ fontSize: 14.5, color: "#334155", lineHeight: 1.5, marginBottom: 16 }}>
+              El plazo para confirmar <b>{misa}</b> ya terminó y no respondiste, por eso no tienes acceso a los cantos de ensayo. Habla con el Encargado del Coro.
+            </div>
+          </>
+        )}
+        <button onClick={onCerrar} style={{ marginTop: 10, border: "none", background: "none", color: "#475569", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+          {bloqueo.tipo === "pendiente" ? "Ahora no" : "Entendido"}
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+// Banner fijo cuando la persona aún no puede ver la lista
+function EnsayoBloqueoBanner({ bloqueo, onAbrir }) {
+  if (!bloqueo) return null;
+  const txt =
+    bloqueo.tipo === "pendiente"
+      ? `Confirma tu participación en la misa del ${mjFechaLargaCorta(bloqueo.fecha)} para ver los cantos.`
+      : bloqueo.tipo === "no"
+      ? `Avisaste que no participarás en la misa del ${mjFechaLargaCorta(bloqueo.fecha)}.`
+      : `No confirmaste la misa del ${mjFechaLargaCorta(bloqueo.fecha)}. Habla con el Encargado del Coro.`;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#eef4fb", border: "1px solid #d5e2f2", borderRadius: 14, padding: "10px 12px", marginBottom: 12, fontFamily: "var(--font-sans)" }}>
+      <span style={{ fontSize: 18 }}>🔒</span>
+      <span style={{ flex: 1, fontSize: 13, color: "#1e3a5f", fontWeight: 600, lineHeight: 1.4 }}>{txt}</span>
+      {bloqueo.tipo === "pendiente" && (
+        <button onClick={onAbrir} style={{ border: "none", background: "#1e3a5f", color: "#fff", borderRadius: 999, padding: "8px 13px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+          Confirmar
+        </button>
+      )}
+    </div>
+  );
+}
 // Cantos de una lista en el formato que usa el Modo Misa / Modo Ensayo
 function mjEnsCancionesModo(l) {
   return (l.canciones || []).map((c) => ({ cancion: c.cancion, url_letra: c.url_letra || "", url_audio: c.url_youtube || "", elegido: !!c.elegido }));
@@ -37020,6 +37134,9 @@ function PautaEnsayo({ user, members, setSection }) {
   const [letraFila, setLetraFila] = useState(null);
   const [sugFila, setSugFila] = useState(null); // fila con la lista de canciones abierta
   const [modoEnsayo, setModoEnsayo] = useState(false);
+  const { bloqueo, listo: convLista } = useEnsConv(user);
+  const [porAbrir, setPorAbrir] = useState(null); // lista que quiso abrir antes de confirmar la misa
+  const [popupBloqueo, setPopupBloqueo] = useState(false);
   const [dirLetras, setDirLetras] = useState(_letrasDriveCache || []);
 
   async function cargar() {
@@ -37032,19 +37149,45 @@ function PautaEnsayo({ user, members, setSection }) {
       setListas(l);
     }
     setAccesos(ac || {});
-    // Deja en el teléfono las listas vigentes y sus letras para el Modo Ensayo sin conexión
-    if (l) mjPrepararEnsayosOffline(l.filter((x) => mjEnsPuedeVer(x, ac || {}, user))).catch(() => {});
     return l;
   }
   useEffect(() => {
     const abrir = mjEnsLeerAbrir();
     cargar().then((l) => {
-      if (abrir && l && l.some((x) => x.id === abrir)) {
-        setSelId(abrir);
-        setModo("ver");
-      }
+      if (abrir && l && l.some((x) => x.id === abrir)) setPorAbrir(abrir);
     });
   }, []);
+  // Abre la lista pendiente apenas se sabe si confirmó la misa (o muestra el aviso)
+  useEffect(() => {
+    if (!porAbrir || !convLista || !listas) return;
+    if (bloqueo) {
+      setPopupBloqueo(true);
+      return;
+    }
+    const l = listas.find((x) => x.id === porAbrir);
+    setPorAbrir(null);
+    if (l) abrir(l);
+  }, [porAbrir, convLista, !!bloqueo, listas]);
+  // Sin confirmar la misa no se ve la lista (ni en Modo Ensayo)
+  useEffect(() => {
+    if (bloqueo && !isAdmin && (modo === "ver" || modoEnsayo)) {
+      setModo(null);
+      setModoEnsayo(false);
+    }
+  }, [!!bloqueo]);
+  // Deja en el teléfono las listas vigentes y sus letras para el Modo Ensayo sin conexión (solo si puede verlas)
+  useEffect(() => {
+    if (!listas || !convLista) return;
+    mjPrepararEnsayosOffline(bloqueo ? [] : listas.filter((x) => mjEnsPuedeVer(x, accesos, user))).catch(() => {});
+  }, [listas, accesos, convLista, !!bloqueo]);
+  useEffect(() => {
+    if (bloqueo && bloqueo.tipo !== "pendiente" && !popupBloqueo) setPorAbrir(null);
+  }, [bloqueo && bloqueo.tipo]);
+  function intentarAbrir(l) {
+    if (isAdmin) return abrir(l);
+    setPorAbrir(l.id);
+    if (convLista && bloqueo) setPopupBloqueo(true);
+  }
   useEffect(() => {
     if (sugFila === null) return;
     const fuera = (e) => {
@@ -37226,6 +37369,15 @@ function PautaEnsayo({ user, members, setSection }) {
   const cabecera = (
     <>
       <style>{ENS_CSS}</style>
+      {popupBloqueo && bloqueo && (
+        <EnsayoBloqueoPopup
+          bloqueo={bloqueo}
+          onCerrar={() => {
+            setPopupBloqueo(false);
+            if (bloqueo.tipo !== "pendiente") setPorAbrir(null);
+          }}
+        />
+      )}
       {visor && <VisorPdfPantalla url={visor.url} titulo={visor.titulo} onCerrar={() => setVisor(null)} />}
     </>
   );
@@ -37387,7 +37539,7 @@ function PautaEnsayo({ user, members, setSection }) {
   }
 
   // ── Detalle de una lista ──
-  if (modo === "ver" && sel) {
+  if (modo === "ver" && sel && (isAdmin || !bloqueo)) {
     const l = sel;
     const eleg = l.canciones.filter((c) => c.elegido).length;
     const ac = accesos[l.id];
@@ -37511,7 +37663,7 @@ function PautaEnsayo({ user, members, setSection }) {
     })();
     const eleg = l.canciones.filter((c) => c.elegido).length;
     return (
-      <button key={l.id} className="ens-li" onClick={() => abrir(l)}>
+      <button key={l.id} className="ens-li" onClick={() => intentarAbrir(l)}>
         <span style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(135deg,#1e3a5f,#2f5d9a)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🎶</span>
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
@@ -37542,6 +37694,7 @@ function PautaEnsayo({ user, members, setSection }) {
         {isAdmin && <button className="ens-btn pri" onClick={nueva}>+ Nueva lista</button>}
       </div>
       {error && <div style={{ fontSize: 12.5, color: "#b45309", marginBottom: 10 }}>No se pudieron cargar las listas (revisa la conexión).</div>}
+      {!isAdmin && vigentes.length > 0 && <EnsayoBloqueoBanner bloqueo={bloqueo} onAbrir={() => setPopupBloqueo(true)} />}
       {listas === null ? (
         <Spinner />
       ) : vigentes.length === 0 ? (
@@ -37567,27 +37720,68 @@ function PautaEnsayo({ user, members, setSection }) {
 function EnsayoInicioWidget({ user, setSection }) {
   const [listas, setListas] = useState([]);
   const [modoId, setModoId] = useState(null); // lista abierta en Modo Ensayo
+  const { bloqueo, listo: convLista } = useEnsConv(user);
+  const [pendiente, setPendiente] = useState(null); // { l, accion } que quiso hacer antes de confirmar la misa
+  const [popup, setPopup] = useState(false);
+  const [cargadas, setCargadas] = useState(false);
   useEffect(() => {
     let vivo = true;
     Promise.all([mjCargarEnsayos().catch(() => null), mjCargarAccesosPauta().catch(() => ({}))]).then(([l, ac]) => {
       if (!vivo || !l) return;
       const mias = l.filter((x) => mjEnsVigente(x) && mjEnsPuedeVer(x, ac, user));
       setListas(mias);
-      mjPrepararEnsayosOffline(mias).catch(() => {});
+      setCargadas(true);
     });
     return () => {
       vivo = false;
     };
   }, [user && user.id]);
+  // Guarda en el teléfono solo lo que la persona puede ver
+  useEffect(() => {
+    if (!cargadas || !convLista) return;
+    mjPrepararEnsayosOffline(bloqueo ? [] : listas).catch(() => {});
+  }, [cargadas, convLista, !!bloqueo]);
+  // Al confirmar «Sí» se hace lo que quería (abrir la lista o el Modo Ensayo)
+  useEffect(() => {
+    if (!pendiente || !convLista || bloqueo) return;
+    const { l, accion } = pendiente;
+    setPendiente(null);
+    if (accion === "modo") {
+      mjEnsRegistrarVista(l, user);
+      setModoId(l.id);
+    } else {
+      mjEnsPedirAbrir(l.id);
+      setSection("pauta_ensayo");
+    }
+  }, [pendiente, convLista, !!bloqueo]);
+  useEffect(() => {
+    if (bloqueo && modoId) setModoId(null);
+  }, [!!bloqueo]);
+  // Si tocó antes de que cargara la confirmación, se muestra el aviso apenas se sabe
+  useEffect(() => {
+    if (pendiente && convLista && bloqueo) setPopup(true);
+  }, [convLista]);
+  // Si respondió «No», ya no se abre nada pendiente
+  useEffect(() => {
+    if (bloqueo && bloqueo.tipo !== "pendiente") setPendiente(null);
+  }, [bloqueo && bloqueo.tipo]);
   if (!listas.length) return null;
-  const ir = (l) => {
-    mjEnsPedirAbrir(l.id);
-    setSection("pauta_ensayo");
+  const intentar = (l, accion) => {
+    if (!convLista || bloqueo) {
+      setPendiente({ l, accion });
+      if (bloqueo) setPopup(true);
+      return;
+    }
+    if (accion === "modo") {
+      mjEnsRegistrarVista(l, user);
+      setModoId(l.id);
+    } else {
+      mjEnsPedirAbrir(l.id);
+      setSection("pauta_ensayo");
+    }
   };
-  const abrirModo = (l) => {
-    mjEnsRegistrarVista(l, user);
-    setModoId(l.id);
-  };
+  const ir = (l) => intentar(l, "ver");
+  const abrirModo = (l) => intentar(l, "modo");
   // Admin: marcar ★ desde el Modo Ensayo abierto en el inicio
   const elegir = async (l, i) => {
     const nuevaL = { ...l, canciones: l.canciones.map((c, j) => (j === i ? { ...c, elegido: !c.elegido } : c)), actualizada: new Date().toISOString() };
@@ -37605,7 +37799,16 @@ function EnsayoInicioWidget({ user, setSection }) {
   };
   return (
     <div style={{ margin: "10px 0 12px", borderRadius: 16, overflow: "hidden", border: "1px solid #dbe4f0", background: "#fff", boxShadow: "0 2px 10px rgba(15,39,68,.05)", fontFamily: "var(--font-sans)" }}>
-      {enModo &&
+      {popup && bloqueo && (
+        <EnsayoBloqueoPopup
+          bloqueo={bloqueo}
+          onCerrar={() => {
+            setPopup(false);
+            if (bloqueo.tipo !== "pendiente") setPendiente(null);
+          }}
+        />
+      )}
+      {enModo && !bloqueo &&
         createPortal(
           <ModoMisa
             ensayo
