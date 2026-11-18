@@ -36887,6 +36887,11 @@ const ENS_CSS = `
 .ens-in{padding:9px 12px;border-radius:10px;border:1px solid #dbe4f0;font:inherit;font-size:13.5px;outline:none;width:100%;box-sizing:border-box;background:#fff}
 .ens-in:focus{border-color:#2f5d9a}
 .ens-lbl{font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#64748b;margin:0 0 5px}
+.ens-sug{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:60;background:#fff;border:1px solid #dbe4f0;border-radius:12px;box-shadow:0 12px 32px rgba(15,39,68,.18);max-height:260px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.ens-sug-i{display:block;width:100%;text-align:left;border:none;border-top:1px solid #f1f4f8;background:#fff;padding:11px 13px;font:inherit;font-size:13.5px;color:#0f2744;cursor:pointer;touch-action:manipulation}
+.ens-sug-i:first-child{border-top:none}
+.ens-sug-i:active{background:#eef4fb}
+.ens-sug-nota{padding:11px 13px;font-size:12.5px;color:#64748b}
 .ens-chip{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 9px;white-space:nowrap}
 `;
 
@@ -36905,6 +36910,7 @@ function PautaEnsayo({ user, members, setSection }) {
   const [verCerradas, setVerCerradas] = useState(false);
   const [visor, setVisor] = useState(null); // { url, titulo }
   const [letraFila, setLetraFila] = useState(null);
+  const [sugFila, setSugFila] = useState(null); // fila con la lista de canciones abierta
   const [dirLetras, setDirLetras] = useState(_letrasDriveCache || []);
 
   async function cargar() {
@@ -37123,11 +37129,6 @@ function PautaEnsayo({ user, members, setSection }) {
             <option key={t} value={t} />
           ))}
         </datalist>
-        <datalist id="ens-dir-canciones">
-          {dirLetras.map((x) => (
-            <option key={x.id} value={x.nombre} />
-          ))}
-        </datalist>
         {letraFila !== null && (
           <DirectorioLetrasModal
             initialQuery={(f.canciones[letraFila] && f.canciones[letraFila].cancion) || ""}
@@ -37168,20 +37169,65 @@ function PautaEnsayo({ user, members, setSection }) {
             <div key={c.k} style={{ padding: "12px 14px", borderTop: i ? "1px solid #eef2f7" : "none" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                 <span style={{ width: 24, height: 24, borderRadius: 8, background: "#eaf0f8", color: "#1e3a5f", fontSize: 12, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
-                <input
-                  className="ens-in"
-                  list="ens-dir-canciones"
-                  value={c.cancion}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setFila(i, "cancion", v);
-                    const hit = dirLetras.find((x) => normBusquedaLetra(x.nombre) === normBusquedaLetra(v));
-                    if (hit) setFila(i, "url_letra", hit.url);
-                  }}
-                  placeholder="Nombre del canto (elige del directorio o escríbelo)"
-                  autoComplete="off"
-                  style={{ fontWeight: 600 }}
-                />
+                <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+                  <input
+                    className="ens-in"
+                    value={c.cancion}
+                    onFocus={(e) => {
+                      setSugFila(i);
+                      const el = e.target;
+                      // Deja espacio para la lista (que no quede tapada por el teclado o la barra inferior)
+                      setTimeout(() => {
+                        try {
+                          el.scrollIntoView({ block: "start", behavior: "smooth" });
+                        } catch (er) {}
+                      }, 250);
+                    }}
+                    onClick={() => setSugFila(i)}
+                    onBlur={() => setTimeout(() => setSugFila((x) => (x === i ? null : x)), 200)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setFila(i, "cancion", v);
+                      setSugFila(i);
+                      const hit = dirLetras.find((x) => normBusquedaLetra(x.nombre) === normBusquedaLetra(v));
+                      if (hit) setFila(i, "url_letra", hit.url);
+                    }}
+                    placeholder="Nombre del canto (elige de la lista o escríbelo)"
+                    autoComplete="off"
+                    style={{ fontWeight: 600 }}
+                  />
+                  {sugFila === i && (() => {
+                    let q = normBusquedaLetra(c.cancion || "");
+                    // Si ya eligió un canto del directorio, al tocar de nuevo se muestra la lista completa para cambiarlo
+                    if (q && dirLetras.some((x) => normBusquedaLetra(x.nombre) === q)) q = "";
+                    const res = (q ? dirLetras.filter((x) => normBusquedaLetra(x.nombre).includes(q)) : dirLetras).slice(0, 60);
+                    return (
+                      <div className="ens-sug">
+                        {!dirLetras.length ? (
+                          <div className="ens-sug-nota">Cargando canciones…</div>
+                        ) : !res.length ? (
+                          <div className="ens-sug-nota">No está en el directorio: se usará el nombre escrito.</div>
+                        ) : (
+                          res.map((x) => (
+                            <button
+                              key={x.id}
+                              type="button"
+                              className="ens-sug-i"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                setFila(i, "cancion", x.nombre);
+                                setFila(i, "url_letra", x.url);
+                                setSugFila(null);
+                              }}
+                            >
+                              {x.nombre}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
                 <button className="ens-btn" title="Subir" onClick={() => moverFila(i, -1)} disabled={i === 0} style={{ padding: "0 10px" }}>↑</button>
                 <button className="ens-btn" title="Bajar" onClick={() => moverFila(i, 1)} disabled={i === f.canciones.length - 1} style={{ padding: "0 10px" }}>↓</button>
                 <button className="ens-btn peligro" title="Quitar" onClick={() => quitarFila(i)} style={{ padding: "0 11px" }}>✕</button>
@@ -37200,7 +37246,7 @@ function PautaEnsayo({ user, members, setSection }) {
               </div>
             </div>
           ))}
-          <div style={{ padding: "10px 14px", borderTop: "1px solid #eef2f7" }}>
+          <div style={{ padding: "10px 14px", borderTop: "1px solid #eef2f7", paddingBottom: sugFila !== null ? 270 : 10 }}>
             <button className="ens-btn" onClick={agregarFila}>+ Agregar otro canto</button>
           </div>
         </div>
