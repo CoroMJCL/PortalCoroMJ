@@ -16865,7 +16865,7 @@ function AccesoModoMisaOffline() {
         </span>
       </button>
       {abierto && p && createPortal(<ModoMisa pauta={p} canciones={p.canciones || []} fecha={fmt(p)} sinRed={!navigator.onLine} onSalir={() => { setAbierto(false); setSel(null); }} />, document.body)}
-      {abierto && ens && createPortal(<ModoMisa ensayo pauta={{ id: ens.id, titulo: ens.titulo, notas: ens.notas }} canciones={ens.canciones || []} fecha={ens.fecha ? "Ensayo: " + fmt(ens) : "Lista de cantos para ensayar"} sinRed={!navigator.onLine} onSalir={() => { setAbierto(false); setSel(null); }} />, document.body)}
+      {abierto && ens && createPortal(<ModoMisa ensayo pauta={{ id: ens.id, titulo: ens.titulo, notas: ens.notas, hora: ens.hora, lugar: ens.lugar }} canciones={ens.canciones || []} fecha={mjEnsFechaModo(ens)} sinRed={!navigator.onLine} onSalir={() => { setAbierto(false); setSel(null); }} />, document.body)}
       {abierto && !p && !ens &&
         createPortal(
           <div style={{ position: "fixed", inset: 0, zIndex: 4000, background: "#f4f6fa", overflowY: "auto", fontFamily: "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)", padding: 16 }}>
@@ -24994,6 +24994,8 @@ async function mjPrepararEnsayosOffline(listas) {
       id: l.id,
       titulo: l.titulo,
       fecha: l.fecha || "",
+      hora: l.hora || "",
+      lugar: l.lugar || "",
       notas: l.notas || "",
       canciones: (l.canciones || []).map((c) => ({ cancion: c.cancion, url_letra: c.url_letra || "", elegido: !!c.elegido })),
     }));
@@ -36908,6 +36910,8 @@ function mjEnsResumenCambios(vieja, nueva) {
   const t = (v) => String(v == null ? "" : v).trim();
   if (t(vieja.titulo) !== t(nueva.titulo)) out.push(`Título: ${t(nueva.titulo)}`);
   if (t(vieja.fecha) !== t(nueva.fecha)) out.push(nueva.fecha ? `Ensayo: ${mjFechaLargaCorta(nueva.fecha)}` : "Se quitó la fecha del ensayo");
+  if (t(vieja.hora) !== t(nueva.hora)) out.push(nueva.hora ? `Hora: ${t(nueva.hora)} hrs` : "Se quitó la hora del ensayo");
+  if (t(vieja.lugar) !== t(nueva.lugar)) out.push(nueva.lugar ? `Lugar: ${t(nueva.lugar)}` : "Se quitó el lugar del ensayo");
   const nom = (c) => t(c.cancion).toLowerCase();
   const antes = (vieja.canciones || []).filter((c) => t(c.cancion));
   const ahora = (nueva.canciones || []).filter((c) => t(c.cancion));
@@ -37046,7 +37050,20 @@ function mjEnsRegistrarVista(l, user) {
   } catch (e) {}
 }
 function mjEnsFechaModo(l) {
-  return l.fecha ? "Ensayo: " + mjFechaLargaCorta(l.fecha) : "Lista de cantos para ensayar";
+  if (!l.fecha) return l.hora || l.lugar ? "Ensayo" : "Lista de cantos para ensayar";
+  const t = mjFechaLargaCorta(l.fecha);
+  return "Ensayo: " + t.charAt(0).toUpperCase() + t.slice(1);
+}
+// «Sábado, 28 de noviembre · 19:00 hrs · Capilla Sagrada Familia» (lo que haya)
+function mjEnsCuando(l) {
+  const p = [];
+  if (l.fecha) {
+    const t = mjFechaLargaCorta(l.fecha);
+    p.push(t.charAt(0).toUpperCase() + t.slice(1));
+  }
+  if (l.hora) p.push(l.hora + " hrs");
+  if (l.lugar) p.push(l.lugar);
+  return p.join(" · ");
 }
 // Abre una lista concreta al entrar a la sección (desde el inicio, un aviso push o un link)
 function mjEnsPedirAbrir(id) {
@@ -37233,7 +37250,7 @@ function PautaEnsayo({ user, members, setSection }) {
     irArriba();
   }
   function nueva() {
-    setForm({ id: mjEnsNuevoId(), titulo: "", fecha: "", notas: "", canciones: [mjEnsFila()], publicada: false, cerrada: false });
+    setForm({ id: mjEnsNuevoId(), titulo: "", fecha: "", hora: "", lugar: "", notas: "", canciones: [mjEnsFila()], publicada: false, cerrada: false });
     setEsNueva(true);
     setModo("editar");
     setMsg("");
@@ -37263,7 +37280,7 @@ function PautaEnsayo({ user, members, setSection }) {
 
   async function avisarPublicacion(l) {
     const n = l.canciones.length;
-    const r = await mjEnsAvisar(l, members, "🎶 Nueva lista de cantos para ensayar", `${l.titulo}: ${n} canto${n !== 1 ? "s" : ""} para preparar en el ensayo${l.fecha ? " del " + mjFechaLargaCorta(l.fecha) : ""}. Revísalos en el portal.`);
+    const r = await mjEnsAvisar(l, members, "🎶 Nueva lista de cantos para ensayar", `${l.titulo}: ${n} canto${n !== 1 ? "s" : ""} para preparar en el ensayo${l.fecha ? " del " + mjFechaLargaCorta(l.fecha) : ""}${l.hora ? " a las " + l.hora : ""}${l.lugar ? " en " + l.lugar : ""}. Revísalos en el portal.`);
     setAviso(r.ok ? `✅ Se avisó a los integrantes (${r.recipients || 0} dispositivo(s)).` : `⚠️ La lista quedó publicada, pero no se pudo enviar la notificación${r.data && r.data.error ? ` (${r.data.error})` : ""}.`);
   }
 
@@ -37280,6 +37297,8 @@ function PautaEnsayo({ user, members, setSection }) {
       id: f.id,
       titulo: f.titulo.trim(),
       fecha: f.fecha || "",
+      hora: f.hora || "",
+      lugar: (f.lugar || "").trim(),
       notas: (f.notas || "").trim(),
       canciones,
       publicada: publicar ? true : !!(previa && previa.publicada),
@@ -37362,7 +37381,7 @@ function PautaEnsayo({ user, members, setSection }) {
   }
   function compartirWhatsapp(l) {
     const lineas = l.canciones.map((c, i) => `${i + 1}. ${c.cancion}`).join("\n");
-    const texto = `🎶 *Cantos para ensayar — ${l.titulo}*${l.fecha ? `\n📅 Ensayo: ${mjFechaLargaCorta(l.fecha)}` : ""}\n\nEsta es la lista de cantos que vamos a ensayar. En el ensayo elegiremos cuáles usaremos en la misa.\n\n${lineas}\n\n📱 Las letras (PDF) y los videos están en el portal del coro:\n🔗 https://coromisionerosdejesus.cl/?ensayo=${l.id}\n\n¡Gracias por prepararte!\n*Encargado de Coro* 🎵`;
+    const texto = `🎶 *Cantos para ensayar — ${l.titulo}*${l.fecha ? `\n📅 Ensayo: ${mjFechaLargaCorta(l.fecha)}` : ""}${l.hora ? `\n🕖 Hora: ${l.hora} hrs` : ""}${l.lugar ? `\n📍 Lugar: ${l.lugar}` : ""}\n\nEsta es la lista de cantos que vamos a ensayar. En el ensayo elegiremos cuáles usaremos en la misa.\n\n${lineas}\n\n📱 Las letras (PDF) y los videos están en el portal del coro:\n🔗 https://coromisionerosdejesus.cl/?ensayo=${l.id}\n\n¡Gracias por prepararte!\n*Encargado de Coro* 🎵`;
     window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
   }
 
@@ -37417,6 +37436,19 @@ function PautaEnsayo({ user, members, setSection }) {
             <div>
               <div className="ens-lbl">Fecha del ensayo (opcional)</div>
               <input className="ens-in" type="date" value={f.fecha} onChange={(e) => setCampo("fecha", e.target.value)} />
+            </div>
+            <div>
+              <div className="ens-lbl">Hora del ensayo</div>
+              <input className="ens-in" type="time" value={f.hora || ""} onChange={(e) => setCampo("hora", e.target.value)} />
+            </div>
+            <div>
+              <div className="ens-lbl">Lugar del ensayo</div>
+              <input className="ens-in" list="ens-lugares" value={f.lugar || ""} onChange={(e) => setCampo("lugar", e.target.value)} placeholder="Ej: Capilla Sagrada Familia" autoComplete="off" />
+              <datalist id="ens-lugares">
+                {[...new Set(["Capilla Sagrada Familia", ...(listas || []).map((x) => x.lugar).filter(Boolean)])].map((x) => (
+                  <option key={x} value={x} />
+                ))}
+              </datalist>
             </div>
           </div>
           <div style={{ marginTop: 12 }}>
@@ -37553,7 +37585,7 @@ function PautaEnsayo({ user, members, setSection }) {
           createPortal(
             <ModoMisa
               ensayo
-              pauta={{ id: l.id, titulo: l.titulo, notas: l.notas }}
+              pauta={{ id: l.id, titulo: l.titulo, notas: l.notas, hora: l.hora, lugar: l.lugar }}
               canciones={mjEnsCancionesModo(l)}
               fecha={mjEnsFechaModo(l)}
               onElegido={isAdmin ? (i) => toggleElegido(l, i) : undefined}
@@ -37570,8 +37602,8 @@ function PautaEnsayo({ user, members, setSection }) {
             </button>
           </div>
           <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em", margin: "4px 0 2px" }}>{l.titulo}</div>
-          <div style={{ fontSize: 13, opacity: 0.85, textTransform: l.fecha ? "capitalize" : "none" }}>
-            {l.fecha ? `Ensayo: ${mjFechaLargaCorta(l.fecha)} · ` : ""}
+          <div style={{ fontSize: 13, opacity: 0.85 }}>
+            {mjEnsCuando(l) ? `Ensayo: ${mjEnsCuando(l)} · ` : ""}
             {l.canciones.length} canto{l.canciones.length !== 1 ? "s" : ""}
             {eleg ? ` · ★ ${eleg} elegido${eleg !== 1 ? "s" : ""}` : ""}
           </div>
@@ -37672,8 +37704,8 @@ function PautaEnsayo({ user, members, setSection }) {
             {isAdmin && l.cerrada && <span className="ens-chip" style={{ background: "#f1f4f8", color: "#64748b" }}>Cerrada</span>}
             {nuevaParaMi && <span className="ens-chip" style={{ background: "#1e3a5f", color: "#fff" }}>Nueva</span>}
           </span>
-          <span style={{ display: "block", fontSize: 12, color: "#64748b", marginTop: 2, textTransform: l.fecha ? "capitalize" : "none" }}>
-            {l.fecha ? `Ensayo: ${mjFechaLargaCorta(l.fecha)} · ` : ""}
+          <span style={{ display: "block", fontSize: 12, color: "#64748b", marginTop: 2 }}>
+            {mjEnsCuando(l) ? `${mjEnsCuando(l)} · ` : ""}
             {l.canciones.length} canto{l.canciones.length !== 1 ? "s" : ""}
             {eleg ? ` · ★ ${eleg}` : ""}
           </span>
@@ -37841,7 +37873,7 @@ function EnsayoInicioWidget({ user, setSection }) {
         createPortal(
           <ModoMisa
             ensayo
-            pauta={{ id: enModo.id, titulo: enModo.titulo, notas: enModo.notas }}
+            pauta={{ id: enModo.id, titulo: enModo.titulo, notas: enModo.notas, hora: enModo.hora, lugar: enModo.lugar }}
             canciones={mjEnsCancionesModo(enModo)}
             fecha={mjEnsFechaModo(enModo)}
             onElegido={esCuerdaAdmin(user) ? (i) => elegir(enModo, i) : undefined}
@@ -37873,6 +37905,8 @@ function EnsayoInicioWidget({ user, setSection }) {
             <div className="sle-meta">
               <span>♪ {l.canciones.length} canto{l.canciones.length !== 1 ? "s" : ""}</span>
               {l.fecha && <span>{(() => { const t = mjFechaLargaCorta(l.fecha); return t.charAt(0).toUpperCase() + t.slice(1); })()}</span>}
+              {l.hora && <span>🕖 {l.hora} hrs</span>}
+              {l.lugar && <span>📍 {l.lugar}</span>}
               {eleg > 0 && <span className="sle-oro">★ {eleg} elegido{eleg !== 1 ? "s" : ""}</span>}
             </div>
             {bloqueo && (
