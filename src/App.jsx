@@ -37716,6 +37716,34 @@ function PautaEnsayo({ user, members, setSection }) {
   );
 }
 
+const SLE_CSS = `
+.sle{position:relative;overflow:hidden;margin:10px 0 14px;border-radius:22px;padding:14px 12px 12px;color:#fff;font-family:var(--font-sans);background:radial-gradient(120% 90% at 100% 0%,rgba(90,140,210,.45) 0%,rgba(90,140,210,0) 55%),linear-gradient(150deg,#0b1f3a 0%,#1e3a5f 58%,#28507f 100%);box-shadow:0 16px 36px rgba(11,31,58,.28),inset 0 1px 0 rgba(255,255,255,.12)}
+.sle-deco{position:absolute;right:-20px;top:-6px;width:230px;height:140px;fill:none;stroke:rgba(255,255,255,.07);stroke-width:1.2;pointer-events:none}
+.sle-cab{position:relative;display:flex;align-items:center;gap:9px;padding:0 4px 11px}
+.sle-ico{width:30px;height:30px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);color:#f1d48a;flex-shrink:0}
+.sle-tit{flex:1;font-size:12px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#fff}
+.sle-cnt{font-size:11px;font-weight:700;color:rgba(255,255,255,.75);background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:3px 9px}
+.sle-card{position:relative;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:17px;padding:13px 13px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:transform .15s ease,background .15s ease}
+.sle-card+.sle-card{margin-top:9px}
+.sle-card:active{transform:scale(.985);background:rgba(255,255,255,.1)}
+.sle-fila{display:flex;align-items:center;gap:8px}
+.sle-nom{flex:1;min-width:0;font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sle-nuevo{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#3b2a05;background:linear-gradient(135deg,#f6dc95,#e2b650);border-radius:999px;padding:3px 9px;flex-shrink:0;box-shadow:0 2px 8px rgba(226,182,80,.35)}
+.sle-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.sle-meta span{font-size:11.5px;font-weight:600;color:rgba(255,255,255,.82);background:rgba(255,255,255,.08);border-radius:999px;padding:3px 9px}
+.sle-meta .sle-oro{color:#f1d48a;background:rgba(241,212,138,.12)}
+.sle-prev{margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,.1);display:grid;gap:4px}
+.sle-prev div{display:flex;align-items:center;gap:9px;font-size:13px;color:rgba(255,255,255,.9);min-width:0}
+.sle-prev b{width:18px;font-size:11px;font-weight:800;color:rgba(255,255,255,.45);text-align:right;flex-shrink:0}
+.sle-prev span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sle-prev .sle-mas{font-size:11.5px;color:rgba(255,255,255,.55);padding-left:27px}
+.sle-lock{margin-top:10px;font-size:12px;font-weight:600;color:#f6dfa0;background:rgba(241,212,138,.1);border:1px solid rgba(241,212,138,.22);border-radius:11px;padding:7px 10px;line-height:1.35}
+.sle-acc{display:flex;gap:8px;margin-top:12px}
+.sle-acc button{height:38px;border-radius:999px;font:inherit;font-size:13px;font-weight:800;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+.sle-b1{flex:1.2;border:none;background:#fff;color:#14305a;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.sle-b2{flex:1;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.06);color:#fff}
+`;
+
 // ── Inicio: aviso de la lista de cantos para ensayar vigente ──
 function EnsayoInicioWidget({ user, setSection }) {
   const [listas, setListas] = useState([]);
@@ -37798,7 +37826,8 @@ function EnsayoInicioWidget({ user, setSection }) {
     }
   };
   return (
-    <div style={{ margin: "10px 0 12px", borderRadius: 16, overflow: "hidden", border: "1px solid #dbe4f0", background: "#fff", boxShadow: "0 2px 10px rgba(15,39,68,.05)", fontFamily: "var(--font-sans)" }}>
+    <div className="sle">
+      <style>{SLE_CSS}</style>
       {popup && bloqueo && (
         <EnsayoBloqueoPopup
           bloqueo={bloqueo}
@@ -37820,32 +37849,71 @@ function EnsayoInicioWidget({ user, setSection }) {
           />,
           document.body
         )}
-      {listas.map((l, n) => {
+      <svg className="sle-deco" viewBox="0 0 200 120" aria-hidden="true">
+        {[20, 34, 48, 62, 76].map((y) => (
+          <path key={y} d={`M0 ${y} C 60 ${y - 14}, 120 ${y + 14}, 200 ${y - 6}`} />
+        ))}
+      </svg>
+      <div className="sle-cab">
+        <span className="sle-ico">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l11-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="17" cy="16" r="3" /></svg>
+        </span>
+        <span className="sle-tit">SetList Ensayo</span>
+        <span className="sle-cnt">{listas.length} lista{listas.length !== 1 ? "s" : ""}</span>
+      </div>
+      {listas.map((l) => {
         const nueva = !esCuerdaAdmin(user) && !vista(l);
+        const eleg = l.canciones.filter((c) => c.elegido).length;
+        const prev = l.canciones.slice(0, 3);
+        const resto = l.canciones.length - prev.length;
         return (
-          <div key={l.id} onClick={() => ir(l)} role="button" style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", boxSizing: "border-box", textAlign: "left", borderTop: n ? "1px solid #eef2f7" : "none", background: nueva ? "linear-gradient(90deg,#eef4fb,#fff)" : "#fff", padding: "11px 13px", cursor: "pointer", fontFamily: "inherit", touchAction: "manipulation" }}>
-            <span style={{ width: 36, height: 36, borderRadius: 11, background: "linear-gradient(135deg,#1e3a5f,#2f5d9a)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>🎶</span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: "block", fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "#2f5d9a" }}>{nueva ? "Nuevo · " : ""}Cantos para ensayar</span>
-              <span style={{ display: "block", fontSize: 14, fontWeight: 800, color: "#0f2744", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.titulo}</span>
-              <span style={{ display: "block", fontSize: 11.5, color: "#64748b", textTransform: l.fecha ? "capitalize" : "none" }}>
-                {l.canciones.length} canto{l.canciones.length !== 1 ? "s" : ""}
-                {l.fecha ? ` · ensayo ${mjFechaLargaCorta(l.fecha)}` : ""}
-              </span>
-            </span>
-            <span style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+          <div key={l.id} className="sle-card" onClick={() => ir(l)} role="button">
+            <div className="sle-fila">
+              <span className="sle-nom">{l.titulo}</span>
+              {nueva && <span className="sle-nuevo">Nuevo</span>}
+            </div>
+            <div className="sle-meta">
+              <span>♪ {l.canciones.length} canto{l.canciones.length !== 1 ? "s" : ""}</span>
+              {l.fecha && <span>{(() => { const t = mjFechaLargaCorta(l.fecha); return t.charAt(0).toUpperCase() + t.slice(1); })()}</span>}
+              {eleg > 0 && <span className="sle-oro">★ {eleg} elegido{eleg !== 1 ? "s" : ""}</span>}
+            </div>
+            {prev.length > 0 && (
+              <div className="sle-prev">
+                {prev.map((c, i) => (
+                  <div key={c.k || i}>
+                    <b>{i + 1}</b>
+                    <span>{c.cancion}</span>
+                  </div>
+                ))}
+                {resto > 0 && <div className="sle-mas">+ {resto} canto{resto !== 1 ? "s" : ""} más</div>}
+              </div>
+            )}
+            {bloqueo && (
+              <div className="sle-lock">🔒 {bloqueo.tipo === "pendiente" ? `Confirma la misa del ${mjFechaLargaCorta(bloqueo.fecha)} para abrirla` : "Solo para quienes cantarán en la próxima misa"}</div>
+            )}
+            <div className="sle-acc">
               <button
                 type="button"
+                className="sle-b1"
                 onClick={(e) => {
                   e.stopPropagation();
                   abrirModo(l);
                 }}
-                style={{ border: "none", background: "#1e3a5f", color: "#fff", borderRadius: 999, padding: "7px 12px", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap", cursor: "pointer", fontFamily: "inherit", touchAction: "manipulation" }}
               >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" /><path d="M4 21.5V5.5" /></svg>
                 Modo Ensayo
               </button>
-              <span style={{ border: "1px solid #dbe4f0", color: "#1e3a5f", background: "#fff", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", textAlign: "center" }}>Ver lista</span>
-            </span>
+              <button
+                type="button"
+                className="sle-b2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  ir(l);
+                }}
+              >
+                Ver setlist ›
+              </button>
+            </div>
           </div>
         );
       })}
