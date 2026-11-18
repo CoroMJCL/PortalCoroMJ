@@ -15657,26 +15657,41 @@ function BotonAudioPauta({ url, size = 26, bg = "#1e3a5f", fs = 10 }) {
   const stopRef = useRef(null);
   useEffect(
     () => () => {
-      if (_audioPautaStop === stopRef.current && _audioPauta) {
-        _audioPauta.pause();
+      if (stopRef.current && _audioPautaStop === stopRef.current) {
+        if (_audioPauta) _audioPauta.pause();
         _audioPauta = null;
         _audioPautaStop = null;
       }
     },
     []
   );
+  // Detiene lo que esté sonando en otro botón (audio o mini reproductor de YouTube/Drive)
+  function detenerOtro() {
+    if (_audioPauta) _audioPauta.pause();
+    if (_audioPautaStop && _audioPautaStop !== stopRef.current) _audioPautaStop();
+    _audioPauta = null;
+    _audioPautaStop = null;
+  }
+  // Abre el mini reproductor y lo deja como "lo que suena", para que al tocar otro canto se cierre este
+  function abrirVisor() {
+    detenerOtro();
+    const cerrar = () => setVisor(false);
+    stopRef.current = cerrar;
+    _audioPautaStop = cerrar;
+    setVisor(true);
+  }
+  function cerrarVisor() {
+    if (_audioPautaStop === stopRef.current) _audioPautaStop = null;
+    setVisor(false);
+  }
   function alternar() {
     if (visor) {
-      setVisor(false);
+      cerrarVisor();
       return;
     }
     // YouTube: se reproduce en el mini reproductor de la misma página
     if (youtubeId(url)) {
-      if (_audioPauta) {
-        _audioPauta.pause();
-        if (_audioPautaStop) _audioPautaStop();
-      }
-      setVisor(true);
+      abrirVisor();
       return;
     }
     if (estado !== "idle") {
@@ -15686,10 +15701,7 @@ function BotonAudioPauta({ url, size = 26, bg = "#1e3a5f", fs = 10 }) {
       setEstado("idle");
       return;
     }
-    if (_audioPauta) {
-      _audioPauta.pause();
-      if (_audioPautaStop) _audioPautaStop();
-    }
+    detenerOtro();
     const audio = new Audio(urlAudioReproducible(url));
     const parar = () => setEstado("idle");
     stopRef.current = parar;
@@ -15703,7 +15715,7 @@ function BotonAudioPauta({ url, size = 26, bg = "#1e3a5f", fs = 10 }) {
       _audioPauta = null;
       _audioPautaStop = null;
       // Plan B: reproductor de Drive incrustado en esta misma página (sin abrir otra ventana)
-      if (driveFileId(url)) setVisor(true);
+      if (driveFileId(url)) abrirVisor();
       else {
         alert("No se pudo reproducir este audio aquí. Se abrirá en otra pestaña.");
         window.open(url, "_blank", "noopener");
@@ -15717,7 +15729,7 @@ function BotonAudioPauta({ url, size = 26, bg = "#1e3a5f", fs = 10 }) {
       <div style={{ position: "fixed", right: 16, bottom: typeof window !== "undefined" && window.innerWidth <= 768 ? "calc(84px + env(safe-area-inset-bottom, 0px))" : 16, zIndex: 5000, width: 340, maxWidth: "calc(100vw - 32px)", background: "#fff", borderRadius: 14, boxShadow: "0 12px 40px rgba(15,39,68,.3)", border: "1px solid #dbe4f0", overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: "#1e3a5f", color: "#fff", fontSize: 12, fontWeight: 700 }}>
           <span>🎧 Audio de referencia</span>
-          <button onClick={() => setVisor(false)} style={{ background: "none", border: "none", color: "#fff", fontSize: 15, cursor: "pointer" }}>✕</button>
+          <button onClick={cerrarVisor} style={{ background: "none", border: "none", color: "#fff", fontSize: 15, cursor: "pointer" }}>✕</button>
         </div>
         {youtubeId(url) ? (
           <iframe title="Audio" src={`https://www.youtube.com/embed/${youtubeId(url)}?autoplay=1&rel=0`} allow="autoplay; encrypted-media" allowFullScreen style={{ width: "100%", height: 190, border: 0, display: "block" }} />
