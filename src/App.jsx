@@ -15829,6 +15829,74 @@ function LiturgiaLinea({ id, claro, style }) {
     </div>
   );
 }
+// ── Misas sin Check in (misas especiales de semana): config "pautas_sin_checkin" = [ids] ──
+// En esas misas no hay botón ni popup de Check in, no hay aviso de las 17:00 y no se marcan ausentes: no cuentan para la asistencia.
+let mjSinCheckinSet = (() => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem("mj_sin_checkin") || "[]").map(String));
+  } catch (e) {
+    return new Set();
+  }
+})();
+let mjSinCheckinCargado = false;
+function mjEsSinCheckin(id) {
+  return id != null && mjSinCheckinSet.has(String(id));
+}
+function mjFijarSinCheckinLocal(ids) {
+  mjSinCheckinSet = new Set((ids || []).map(String));
+  try {
+    localStorage.setItem("mj_sin_checkin", JSON.stringify([...mjSinCheckinSet]));
+  } catch (e) {}
+  try {
+    window.dispatchEvent(new CustomEvent("mj-sincheckin"));
+  } catch (e) {}
+}
+// true si leyó del servidor (aunque la lista esté vacía); false si no hubo red
+async function mjCargarSinCheckin() {
+  let v;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/config?select=value&key=eq.pautas_sin_checkin&limit=1`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` },
+    });
+    if (!r.ok) return false; // se conserva lo guardado
+    const d = await r.json();
+    v = Array.isArray(d) && d[0] ? d[0].value : [];
+  } catch (e) {
+    return false;
+  }
+  let arr = v;
+  if (typeof arr === "string") {
+    try { arr = JSON.parse(arr); } catch (e) { arr = []; }
+  }
+  mjSinCheckinCargado = true;
+  mjFijarSinCheckinLocal(Array.isArray(arr) ? arr : []);
+  return true;
+}
+async function mjGuardarSinCheckin(id, sin) {
+  if (id == null) return true;
+  if (!(await mjCargarSinCheckin())) return false; // sin leer lo último no se guarda (no pisar la lista)
+  if (mjEsSinCheckin(id) === !!sin) return true;
+  const s = new Set(mjSinCheckinSet);
+  if (sin) s.add(String(id));
+  else s.delete(String(id));
+  const ok = await setConfig("pautas_sin_checkin", JSON.stringify([...s]));
+  if (ok) {
+    mjFijarSinCheckinLocal([...s]);
+    fetch("/api/recordatorio-checkin").catch(() => {}); // si la misa es hoy, cancela o reprograma el aviso de las 17:00
+  }
+  return ok;
+}
+function useSinCheckin() {
+  const [, forzar] = useState(0);
+  useEffect(() => {
+    const f = () => forzar((n) => n + 1);
+    window.addEventListener("mj-sincheckin", f);
+    if (!mjSinCheckinCargado) mjCargarSinCheckin();
+    return () => window.removeEventListener("mj-sincheckin", f);
+  }, []);
+  return mjEsSinCheckin;
+}
+
 // ── Acceso por pauta: config "pauta_acceso_<id>" = {restringida, ids[]} ──
 async function mjCargarAccesosPauta() {
   const url = `${SUPABASE_URL}/rest/v1/config?select=key,value&key=like.${encodeURIComponent("pauta_acceso_")}*`;
@@ -16442,6 +16510,7 @@ async function mjYaRegistrado(pauta, user) {
 // Popup obligatorio el día de la misa: no se cierra hasta hacer Check in (una sola vez por misa)
 function CheckInObligatorio({ pautas, user }) {
   const cfg = useCheckinCfg();
+  const sinCheckin = useSinCheckin();
   const [ahora, setAhora] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setAhora(new Date()), 30000);
@@ -16449,7 +16518,7 @@ function CheckInObligatorio({ pautas, user }) {
   }, []);
   const hoy = mjHoyISO();
   const pauta = (pautas || [])
-    .filter((p) => p.publicada && p.fecha)
+    .filter((p) => p.publicada && p.fecha && !sinCheckin(p.id))
     .map((p) => mjPautaEfectiva(p, cfg, pautas))
     .find((p) => p.fecha === hoy);
   const [estado, setEstado] = useState("revisando"); // revisando | pedir | listo
@@ -16600,6 +16669,7 @@ function CheckInObligatorio({ pautas, user }) {
 
 function CheckInPauta({ pauta: pautaBase, pautas, user }) {
   const cfg = useCheckinCfg();
+  const sinCheckin = useSinCheckin();
   const pauta = mjPautaEfectiva(pautaBase, cfg, pautas);
   const lk = `mj_checkin_${pauta.id}_${user && user.id}`;
   const [hecho, setHecho] = useState(() => {
@@ -16634,6 +16704,7 @@ function CheckInPauta({ pauta: pautaBase, pautas, user }) {
     return () => window.removeEventListener("mj-checkin", g);
   }, [pauta.id, user && user.id]);
   if (!user || esVisita(user) || !user.id) return null;
+  if (sinCheckin(pauta.id)) return null; // misa especial de semana: sin Check in
   const est = mjCheckinEstado(pauta, cfg);
   const esHoy = est === "abierto";
   const diaHoy = pauta.fecha === mjHoyISO();
@@ -16774,7 +16845,7 @@ function AccesoCheckInOffline() {
   const cfg = mjCfgLocal();
   const lista = mjLeerPautasOffline().pautas.map((p) => ({ ...p, publicada: true }));
   const hoy = mjHoyISO();
-  const pauta = lista.map((p) => mjPautaEfectiva(p, cfg, lista)).find((p) => p.fecha === hoy);
+  const pauta = lista.map((p) => mjPautaEfectiva(p, cfg, lista)).find((p) => p.fecha === hoy && !mjEsSinCheckin(p.id));
   if (!pauta) return null;
   const lk = `mj_checkin_${pauta.id}_${ident.id}`;
   let hecho = false;
@@ -34187,6 +34258,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     mostrar_col_letra: false,
     mostrar_col_audio: false,
     acceso_solo: false,
+    sin_checkin: false,
     liturgia: "",
   };
   const [form, setForm] = useState(emptyPauta);
@@ -34336,6 +34408,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       const [created] = await res.json();
       if (esMus && created && created.id) await mjMarcarPautaMusico(created, user);
       if (created && created.id && (form.liturgia || "").trim()) await mjGuardarLiturgia(created.id, form.liturgia);
+      if (created && created.id && form.sin_checkin && !(await mjGuardarSinCheckin(created.id, true))) alert("La pauta se guardó, pero no se pudo marcar «Sin Check in». Edítala y vuelve a marcarlo.");
       await onReload();
       setMode(publish ? "view" : null);
       setForm(emptyPauta);
@@ -34392,6 +34465,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       const lineasCambio = pauta.publicada ? mjResumenCambiosPauta(pauta, body) : [];
       await updateRecord("pautas_misa", pauta.id, body);
       await mjGuardarLiturgia(pauta.id, form.liturgia);
+      if (!(await mjGuardarSinCheckin(pauta.id, !!form.sin_checkin))) alert("La pauta se guardó, pero no se pudo guardar la opción «Sin Check in». Intenta de nuevo.");
       await onReload();
       const updated = { ...pauta, ...body };
       setSelected(updated);
@@ -34589,7 +34663,9 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       mostrar_col_letra: pauta.mostrar_col_letra || false,
       mostrar_col_audio: pauta.mostrar_col_audio || false,
       liturgia: mjLiturgiaCache[pauta.id] || "",
+      sin_checkin: mjEsSinCheckin(pauta.id),
     });
+    mjCargarSinCheckin().then((ok) => ok && setForm((p) => ({ ...p, sin_checkin: mjEsSinCheckin(pauta.id) })));
     getConfig(`pauta_liturgia_${pauta.id}`)
       .then((v) => {
         const x = mjLeerLiturgia(v);
@@ -35046,6 +35122,17 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   <span style={{ fontSize: 12, color: "#64748b" }}>Al guardar eliges quiénes la ven. No se envía aviso a los demás.</span>
                 </span>
               </label>
+              {/* Misa especial de semana: sin Check in y sin contar asistencia */}
+              {!esMus && (
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, margin: "8px 0 4px", padding: "10px 12px", background: "#eef4fb", border: "1px solid #d6e3f5", borderRadius: 12, cursor: "pointer", fontSize: 13, color: "#1e3a5f", lineHeight: 1.4 }}>
+                  <input type="checkbox" checked={!!form.sin_checkin} onChange={(e) => setForm((p) => ({ ...p, sin_checkin: e.target.checked }))} style={{ width: 18, height: 18, marginTop: 1 }} />
+                  <span>
+                    <b>Sin Check in</b>
+                    <br />
+                    <span style={{ fontSize: 12, color: "#64748b" }}>Para misas especiales de semana: no se pide marcar asistencia y esta misa no cuenta para la asistencia.</span>
+                  </span>
+                </label>
+              )}
               {/* Guion de la misa */}
               <div style={{ marginTop: 14 }}>
                 <label
@@ -36655,6 +36742,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
 
 function AdminCheckIn() {
   const [cfg, setCfg] = useState({ ...MJ_CHECKIN_DEF });
+  useSinCheckin();
   const [msg, setMsg] = useState("");
   const [cerrando, setCerrando] = useState(false);
   const [cierreMsg, setCierreMsg] = useState("");
@@ -36781,6 +36869,7 @@ function AdminCheckIn() {
         const mh = prox && prox.hora ? mn(prox.hora) : null;
         const avisos = [];
         if (!prox) avisos.push("No hay ninguna pauta publicada de hoy en adelante, por eso el Check in no se muestra a nadie.");
+        if (prox && mjEsSinCheckin(prox.id)) avisos.push("Esta misa está marcada «Sin Check in»: no se pide marcar asistencia y no cuenta para la asistencia.");
         if (prox && mh != null && (mn(cfg.hasta) < mh - 30 || mn(cfg.desde) > mh)) avisos.push(`El horario del Check in (${cfg.desde}–${cfg.hasta}) no coincide con la hora de la misa (${prox.hora}). Revísalo y vuelve a guardar.`);
         const vistosHoy = prox ? (diag.vistos || []).filter((v) => v.key.startsWith(`checkin_visto_${prox.id}_`)).length : 0;
         return (

@@ -51,8 +51,17 @@ export default async function handler(req, res) {
     const proxima = pautas.find((p) => p.fecha >= hoy);
     const efectiva = pautas.map((p) => ({ ...p, fecha: cfg.fecha && proxima && proxima.id === p.id ? cfg.fecha : p.fecha }));
 
+    // Misas marcadas «Sin Check in» (misas especiales de semana): no se marcan ausentes, no cuentan para la asistencia
+    let sinCheckin = new Set();
+    try {
+      const sc = await sb("config?select=value&key=eq.pautas_sin_checkin&limit=1");
+      let arr = sc && sc[0] ? sc[0].value : [];
+      if (typeof arr === "string") arr = JSON.parse(arr);
+      if (Array.isArray(arr)) sinCheckin = new Set(arr.map(String));
+    } catch (e) {}
+
     // Cerradas = ya pasó su día, o es hoy y ya pasó la hora de término
-    const cerradas = efectiva.filter((p) => p.fecha < hoy || (p.fecha === hoy && ahora > cfg.hasta));
+    const cerradas = efectiva.filter((p) => !sinCheckin.has(String(p.id)) && (p.fecha < hoy || (p.fecha === hoy && ahora > cfg.hasta)));
     if (!cerradas.length) return res.status(200).json({ ok: true, dry, nota: "Nada que cerrar todavía", hoy, ahora, hasta: cfg.hasta });
 
     const integrantes = ((await sb("integrantes?select=id,nombre,cuerda,acceso,asistencia_especial&acceso=eq.aprobado")) || []).filter(

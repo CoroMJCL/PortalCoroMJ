@@ -106,7 +106,14 @@ export async function programarRecordatoriosCheckin({ dry = false, soloMid = nul
   const miembros = ((await sb("integrantes?select=id,cuerda,acceso&acceso=eq.aprobado")) || []).filter(
     (m) => m.cuerda && m.cuerda.trim() !== "" && m.cuerda !== "Admin" && m.cuerda !== "Músico"
   );
-  const confirmados = new Set(miembros.filter((m) => resp[String(m.id)] === "si").map((m) => String(m.id)));
+  // Misa marcada «Sin Check in» (misa especial de semana): nadie recibe el aviso y se cancela lo ya programado
+  let sinCheckin = false;
+  try {
+    const sc = await sb("config?select=value&key=eq.pautas_sin_checkin&limit=1");
+    const arr = sc && sc[0] ? parse(sc[0].value) : [];
+    sinCheckin = Array.isArray(arr) && arr.map(String).includes(String(pauta.id));
+  } catch (e) {}
+  const confirmados = sinCheckin ? new Set() : new Set(miembros.filter((m) => resp[String(m.id)] === "si").map((m) => String(m.id)));
 
   // Lo ya programado
   const regKey = "checkin_recordatorio_" + pauta.id;
