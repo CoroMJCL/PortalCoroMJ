@@ -36887,7 +36887,9 @@ const ENS_CSS = `
 .ens-in{padding:9px 12px;border-radius:10px;border:1px solid #dbe4f0;font:inherit;font-size:13.5px;outline:none;width:100%;box-sizing:border-box;background:#fff}
 .ens-in:focus{border-color:#2f5d9a}
 .ens-lbl{font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#64748b;margin:0 0 5px}
-.ens-sug{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:60;background:#fff;border:1px solid #dbe4f0;border-radius:12px;box-shadow:0 12px 32px rgba(15,39,68,.18);max-height:260px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.ens-sug{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:60;background:#fff;border:1px solid #dbe4f0;border-radius:12px;box-shadow:0 12px 32px rgba(15,39,68,.18);max-height:300px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
+.ens-sug-cab{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px 7px 13px;background:#f6f8fb;border-bottom:1px solid #e3e9f2;font-size:11px;font-weight:700;color:#64748b}
+.ens-sug-cab button{border:1px solid #dbe4f0;background:#fff;color:#1e3a5f;border-radius:999px;height:28px;padding:0 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
 .ens-sug-i{display:block;width:100%;text-align:left;border:none;border-top:1px solid #f1f4f8;background:#fff;padding:11px 13px;font:inherit;font-size:13.5px;color:#0f2744;cursor:pointer;touch-action:manipulation}
 .ens-sug-i:first-child{border-top:none}
 .ens-sug-i:active{background:#eef4fb}
@@ -36934,6 +36936,15 @@ function PautaEnsayo({ user, members, setSection }) {
       }
     });
   }, []);
+  useEffect(() => {
+    if (sugFila === null) return;
+    const fuera = (e) => {
+      const caja = e.target && e.target.closest ? e.target.closest("[data-ens-sug]") : null;
+      if (!caja || caja.getAttribute("data-ens-sug") !== String(sugFila)) setSugFila(null);
+    };
+    document.addEventListener("pointerdown", fuera);
+    return () => document.removeEventListener("pointerdown", fuera);
+  }, [sugFila]);
   useEffect(() => {
     if (modo !== "editar") return;
     let vivo = true;
@@ -37169,22 +37180,22 @@ function PautaEnsayo({ user, members, setSection }) {
             <div key={c.k} style={{ padding: "12px 14px", borderTop: i ? "1px solid #eef2f7" : "none" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                 <span style={{ width: 24, height: 24, borderRadius: 8, background: "#eaf0f8", color: "#1e3a5f", fontSize: 12, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
-                <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+                <div data-ens-sug={i} style={{ position: "relative", flex: 1, minWidth: 0 }}>
                   <input
                     className="ens-in"
                     value={c.cancion}
                     onFocus={(e) => {
                       setSugFila(i);
+                      // Si el campo está en la parte baja de la pantalla, se sube para que la lista tenga espacio
                       const el = e.target;
-                      // Deja espacio para la lista (que no quede tapada por el teclado o la barra inferior)
                       setTimeout(() => {
                         try {
-                          el.scrollIntoView({ block: "start", behavior: "smooth" });
+                          const r = el.getBoundingClientRect();
+                          if (r.top > window.innerHeight * 0.4) window.scrollBy(0, r.top - window.innerHeight * 0.15);
                         } catch (er) {}
-                      }, 250);
+                      }, 300);
                     }}
                     onClick={() => setSugFila(i)}
-                    onBlur={() => setTimeout(() => setSugFila((x) => (x === i ? null : x)), 200)}
                     onChange={(e) => {
                       const v = e.target.value;
                       setFila(i, "cancion", v);
@@ -37200,9 +37211,15 @@ function PautaEnsayo({ user, members, setSection }) {
                     let q = normBusquedaLetra(c.cancion || "");
                     // Si ya eligió un canto del directorio, al tocar de nuevo se muestra la lista completa para cambiarlo
                     if (q && dirLetras.some((x) => normBusquedaLetra(x.nombre) === q)) q = "";
-                    const res = (q ? dirLetras.filter((x) => normBusquedaLetra(x.nombre).includes(q)) : dirLetras).slice(0, 60);
+                    const res = q ? dirLetras.filter((x) => normBusquedaLetra(x.nombre).includes(q)) : dirLetras;
                     return (
                       <div className="ens-sug">
+                        {dirLetras.length > 0 && (
+                          <div className="ens-sug-cab">
+                            <span>{res.length} canto{res.length !== 1 ? "s" : ""}{q ? " encontrados" : ""}</span>
+                            <button type="button" onClick={() => setSugFila(null)}>Cerrar</button>
+                          </div>
+                        )}
                         {!dirLetras.length ? (
                           <div className="ens-sug-nota">Cargando canciones…</div>
                         ) : !res.length ? (
@@ -37246,7 +37263,7 @@ function PautaEnsayo({ user, members, setSection }) {
               </div>
             </div>
           ))}
-          <div style={{ padding: "10px 14px", borderTop: "1px solid #eef2f7", paddingBottom: sugFila !== null ? 270 : 10 }}>
+          <div style={{ padding: "10px 14px", borderTop: "1px solid #eef2f7", paddingBottom: sugFila !== null ? 320 : 10 }}>
             <button className="ens-btn" onClick={agregarFila}>+ Agregar otro canto</button>
           </div>
         </div>
