@@ -37864,8 +37864,6 @@ function EnsayoInicioWidget({ user, setSection }) {
       {listas.map((l) => {
         const nueva = !esCuerdaAdmin(user) && !vista(l);
         const eleg = l.canciones.filter((c) => c.elegido).length;
-        const prev = l.canciones.slice(0, 3);
-        const resto = l.canciones.length - prev.length;
         return (
           <div key={l.id} className="sle-card" onClick={() => ir(l)} role="button">
             <div className="sle-fila">
@@ -37877,17 +37875,6 @@ function EnsayoInicioWidget({ user, setSection }) {
               {l.fecha && <span>{(() => { const t = mjFechaLargaCorta(l.fecha); return t.charAt(0).toUpperCase() + t.slice(1); })()}</span>}
               {eleg > 0 && <span className="sle-oro">★ {eleg} elegido{eleg !== 1 ? "s" : ""}</span>}
             </div>
-            {prev.length > 0 && (
-              <div className="sle-prev">
-                {prev.map((c, i) => (
-                  <div key={c.k || i}>
-                    <b>{i + 1}</b>
-                    <span>{c.cancion}</span>
-                  </div>
-                ))}
-                {resto > 0 && <div className="sle-mas">+ {resto} canto{resto !== 1 ? "s" : ""} más</div>}
-              </div>
-            )}
             {bloqueo && (
               <div className="sle-lock">🔒 {bloqueo.tipo === "pendiente" ? `Confirma la misa del ${mjFechaLargaCorta(bloqueo.fecha)} para abrirla` : "Solo para quienes cantarán en la próxima misa"}</div>
             )}
