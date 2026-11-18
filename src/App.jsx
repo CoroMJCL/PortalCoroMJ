@@ -16839,9 +16839,14 @@ function AccesoModoMisaOffline() {
   const [abierto, setAbierto] = useState(false);
   const [sel, setSel] = useState(null);
   const datos = mjLeerPautasOffline();
-  if (!datos.pautas.length) return null;
+  // Listas de ensayo guardadas en el teléfono (Modo Ensayo sin conexión)
+  const ensayos = mjLeerEnsayosOffline().listas.filter((l) => !l.fecha || l.fecha >= mjHoyISO());
+  if (!datos.pautas.length && !ensayos.length) return null;
   const fmt = (p) => new Date(p.fecha + "T00:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
-  const p = sel || (datos.pautas.length === 1 ? datos.pautas[0] : null);
+  const unico = datos.pautas.length + ensayos.length === 1;
+  const p = sel ? (sel.__ens ? null : sel) : unico && datos.pautas.length ? datos.pautas[0] : null;
+  const ens = sel ? (sel.__ens ? sel : null) : unico && ensayos.length ? ensayos[0] : null;
+  const nombreBoton = !datos.pautas.length ? "Modo Ensayo" : ensayos.length ? "Modo Misa · Ensayo" : "Modo Misa";
   return (
     <>
       <button onClick={() => setAbierto(true)} style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: 22, zIndex: 3000, display: "inline-flex", alignItems: "center", gap: 11, height: 52, padding: "0 22px 0 9px", border: "none", background: "#fff", color: "#14305a", borderRadius: 999, cursor: "pointer", fontFamily: "var(--font-sans, 'Plus Jakarta Sans', Inter, system-ui, sans-serif)", whiteSpace: "nowrap", textAlign: "left", boxShadow: "0 12px 32px rgba(5,15,40,.38), 0 0 0 1px rgba(255,255,255,.6)" }}>
@@ -16849,16 +16854,24 @@ function AccesoModoMisaOffline() {
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" /><path d="M4 21.5V5.5" /></svg>
         </span>
         <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
-          <span style={{ fontSize: 14.5, fontWeight: 800, letterSpacing: "-0.01em" }}>Modo Misa</span>
-          <span style={{ fontSize: 11.5, fontWeight: 500, color: "#64748b", marginTop: 2 }}>Sin conexión · pauta guardada</span>
+          <span style={{ fontSize: 14.5, fontWeight: 800, letterSpacing: "-0.01em" }}>{nombreBoton}</span>
+          <span style={{ fontSize: 11.5, fontWeight: 500, color: "#64748b", marginTop: 2 }}>Sin conexión · {datos.pautas.length ? "pauta guardada" : "lista guardada"}</span>
         </span>
       </button>
       {abierto && p && createPortal(<ModoMisa pauta={p} canciones={p.canciones || []} fecha={fmt(p)} sinRed={!navigator.onLine} onSalir={() => { setAbierto(false); setSel(null); }} />, document.body)}
-      {abierto && !p &&
+      {abierto && ens && createPortal(<ModoMisa ensayo pauta={{ id: ens.id, titulo: ens.titulo, notas: ens.notas }} canciones={ens.canciones || []} fecha={ens.fecha ? "Ensayo: " + fmt(ens) : "Lista de cantos para ensayar"} sinRed={!navigator.onLine} onSalir={() => { setAbierto(false); setSel(null); }} />, document.body)}
+      {abierto && !p && !ens &&
         createPortal(
           <div style={{ position: "fixed", inset: 0, zIndex: 4000, background: "#f4f6fa", overflowY: "auto", fontFamily: "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)", padding: 16 }}>
             <button onClick={() => setAbierto(false)} style={{ border: "1px solid #e6ebf2", background: "#fff", borderRadius: 999, padding: "9px 15px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>‹ Volver</button>
-            <div style={{ fontSize: 24, fontWeight: 800, margin: "16px 0 12px", color: "#0f1b2d" }}>Elige la misa</div>
+            <div style={{ fontSize: 24, fontWeight: 800, margin: "16px 0 12px", color: "#0f1b2d" }}>{datos.pautas.length ? (ensayos.length ? "Elige la misa o el ensayo" : "Elige la misa") : "Elige el ensayo"}</div>
+            {ensayos.map((x) => (
+              <div key={x.id} onClick={() => setSel({ ...x, __ens: true })} style={{ background: "#fff", border: "1px solid #e6ebf2", borderRadius: 16, padding: "14px 16px", marginBottom: 10, cursor: "pointer" }}>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "#2f5d9a" }}>Ensayo</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#0f1b2d" }}>{x.titulo || "Ensayo"}</div>
+                <div style={{ fontSize: 13, color: "#6b7686", textTransform: x.fecha ? "capitalize" : "none" }}>{x.fecha ? fmt(x) + " · " : ""}{(x.canciones || []).length} cantos</div>
+              </div>
+            ))}
             {datos.pautas.map((x) => (
               <div key={x.id} onClick={() => setSel(x)} style={{ background: "#fff", border: "1px solid #e6ebf2", borderRadius: 16, padding: "14px 16px", marginBottom: 10, cursor: "pointer" }}>
                 <div style={{ fontSize: 16, fontWeight: 800, color: "#0f1b2d" }}>{x.titulo || "Misa"}</div>
@@ -16873,7 +16886,7 @@ function AccesoModoMisaOffline() {
 }
 
 // ── Modo Misa: la pauta publicada a pantalla completa, con las letras (PDF) leídas dentro de la app ──
-function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico, abrirK, volverCierra }) {
+function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico, abrirK, volverCierra, ensayo, onElegido }) {
   const [enLinea, setEnLinea] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   useEffect(() => {
     const f = () => setEnLinea(navigator.onLine);
@@ -16892,8 +16905,32 @@ function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico, abrirK, v
   const ok = (u) => !!u && /^https?:/i.test(u);
   const docs = [
     ...(ok(pauta.guion_url) ? [{ k: "guion", titulo: "Guion de la misa", etiqueta: "Guion", url: pauta.guion_url, audio: "" }] : []),
-    ...canciones.map((c, i) => ({ k: "c" + i, titulo: c.cancion || "Canción", etiqueta: String(c.orden || i + 1), url: ok(c.url_letra) ? c.url_letra : "", audio: ok(c.url_audio) ? c.url_audio : "" })),
+    ...canciones.map((c, i) => ({
+      k: "c" + i,
+      titulo: c.cancion || "Canción",
+      etiqueta: ensayo ? (c.elegido ? "★ Elegido para la misa" : `Canto ${i + 1}`) : String(c.orden || i + 1),
+      url: ok(c.url_letra) ? c.url_letra : "",
+      audio: ok(c.url_audio) ? c.url_audio : "",
+      elegido: !!c.elegido,
+      ix: i,
+    })),
   ];
+  // Ensayo (solo admin): marcar/desmarcar el canto como elegido para la misa
+  const estrella = (x, grande) =>
+    ensayo && onElegido && x.k !== "guion" ? (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onElegido(x.ix);
+        }}
+        title={x.elegido ? "Quitar de los elegidos" : "Marcar como elegido para la misa"}
+        aria-label={x.elegido ? "Quitar de los elegidos" : "Marcar como elegido"}
+        style={{ width: grande ? 40 : 42, height: grande ? 40 : 42, flexShrink: 0, borderRadius: 12, border: "1px solid " + (x.elegido ? "#e6c869" : "#dbe4f0"), background: x.elegido ? "#fbefc7" : "#fff", color: x.elegido ? "#b8860b" : "#b6c2d2", fontSize: 21, lineHeight: 1, cursor: "pointer", fontFamily: "inherit", touchAction: "manipulation" }}
+      >
+        {x.elegido ? "★" : "☆"}
+      </button>
+    ) : null;
   const [abierta, setAbierta] = useState(() => {
     if (!abrirK) return null;
     const ix = docs.findIndex((x) => x.k === abrirK && x.url);
@@ -16920,12 +16957,13 @@ function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico, abrirK, v
         <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "#fff", borderBottom: "1px solid " + LINE, flexShrink: 0 }}>
             <button onClick={() => (volverCierra ? onSalir() : setAbierta(null))} style={btn} aria-label="Volver a la pauta">
-              <span style={{ fontSize: 19, lineHeight: 1, marginTop: -1 }}>‹</span> Pauta
+              <span style={{ fontSize: 19, lineHeight: 1, marginTop: -1 }}>‹</span> {ensayo ? "Lista" : "Pauta"}
             </button>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: ACC }}>{d.etiqueta}</div>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: d.elegido && ensayo ? "#b8860b" : ACC }}>{d.etiqueta}</div>
               <div style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.titulo}</div>
             </div>
+            {estrella(d, true)}
             {conPdf.length > 1 && (
               <>
                 <button onClick={() => ir(pos - 1)} disabled={pos <= 0} style={flecha(pos <= 0)} aria-label="Canción anterior">‹</button>
@@ -16945,20 +16983,20 @@ function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico, abrirK, v
                 <span style={{ fontSize: 19, lineHeight: 1, marginTop: -1 }}>‹</span> Inicio
               </button>
             )}
-            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: ACC, flex: 1 }}>{publico ? "Cantos de la Misa" : "Modo Misa"}</div>
+            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: ACC, flex: 1 }}>{publico ? "Cantos de la Misa" : ensayo ? "Modo Ensayo" : "Modo Misa"}</div>
             {!publico && offline && (
               <span style={{ fontSize: 11.5, fontWeight: 700, color: "#92400e", background: "#fef3c7", borderRadius: 999, padding: "6px 11px" }}>Sin conexión · guardado</span>
             )}
-            {!publico && !offline && mjLeerPautasOffline().pautas.some((x) => x.id === pauta.id) && (
+            {!publico && !offline && (ensayo ? mjLeerEnsayosOffline().listas : mjLeerPautasOffline().pautas).some((x) => x.id === pauta.id) && (
               <span style={{ fontSize: 11.5, fontWeight: 700, color: "#166534", background: "#dcfce7", borderRadius: 999, padding: "6px 11px" }}>✓ Disponible sin conexión</span>
             )}
           </div>
           <div style={{ padding: "20px 16px 8px" }}>
             <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
-              {pauta.titulo || "Misa"}
-              <TituloLiturgicoModo id={pauta.id} />
+              {pauta.titulo || (ensayo ? "Ensayo" : "Misa")}
+              {!ensayo && <TituloLiturgicoModo id={pauta.id} />}
             </div>
-            <div style={{ fontSize: 14, color: MUTED, marginTop: 6, textTransform: "capitalize" }}>
+            <div style={{ fontSize: 14, color: MUTED, marginTop: 6, textTransform: ensayo ? "none" : "capitalize" }}>
               {fecha}
               {pauta.hora ? ` · ${pauta.hora}` : ""}
               {pauta.lugar ? ` · ${pauta.lugar}` : ""}
@@ -16966,7 +17004,7 @@ function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico, abrirK, v
             {pauta.notas && <div style={{ marginTop: 12, padding: "12px 14px", background: "#fff", border: "1px solid " + LINE, borderRadius: 14, fontSize: 13.5, color: "#475569" }}>{renderNotas(pauta.notas)}</div>}
           </div>
           <div style={{ padding: "8px 12px" }}>
-            {docs.length === 0 && <div style={{ padding: 20, fontSize: 14, color: MUTED }}>Esta pauta aún no tiene canciones.</div>}
+            {docs.length === 0 && <div style={{ padding: 20, fontSize: 14, color: MUTED }}>{ensayo ? "Esta lista aún no tiene cantos." : "Esta pauta aún no tiene canciones."}</div>}
             {docs.map((x, i) => (
               <div key={x.k} style={{ display: "flex", alignItems: "center", gap: 12, background: "#fff", border: "1px solid " + LINE, borderRadius: 16, padding: "13px 8px 13px 14px", marginBottom: 10, boxShadow: "0 1px 2px rgba(15,27,45,.03)" }}>
                 <div onClick={() => x.url && setAbierta(i)} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 12, cursor: x.url ? "pointer" : "default" }}>
@@ -16975,13 +17013,14 @@ function ModoMisa({ pauta, canciones, fecha, onSalir, sinRed, publico, abrirK, v
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h8l4 4v14H6z" /><path d="M9 12h6M9 16h6" /></svg>
                     </span>
                   ) : (
-                    <span style={{ width: 26, height: 26, borderRadius: "50%", background: "#1e3a5f", color: "#fff", fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(parseInt(String(x.k).slice(1), 10) || 0) + 1}</span>
+                    <span style={{ width: 26, height: 26, borderRadius: "50%", background: ensayo && x.elegido ? "#b8860b" : "#1e3a5f", color: "#fff", fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(parseInt(String(x.k).slice(1), 10) || 0) + 1}</span>
                   )}
                   <span style={{ minWidth: 0, flex: 1, display: "block" }}>
-                    <span style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: ACC, letterSpacing: "0.01em", lineHeight: 1.2, marginBottom: 3 }}>{x.etiqueta}</span>
+                    <span style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: ensayo && x.elegido ? "#b8860b" : ACC, letterSpacing: "0.01em", lineHeight: 1.2, marginBottom: 3 }}>{x.etiqueta}</span>
                     <span style={{ display: "block", fontSize: 16, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.25, color: INK }}>{x.titulo}</span>
                   </span>
                 </div>
+                {estrella(x)}
                 {x.audio && !offline && !publico && <BotonAudioPauta url={x.audio} size={34} fs={12} />}
                 {x.url ? (
                   <button onClick={() => setAbierta(i)} title="Ver letra (PDF)" aria-label="Ver letra (PDF)" style={{ border: "none", background: "transparent", borderRadius: 12, width: 46, height: 46, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, flexShrink: 0 }}><IconoPdf size={28} /></button>
@@ -24925,6 +24964,56 @@ async function mmPrepararOffline(pautas, onProg) {
     localStorage.setItem(MJ_PAUTA_KEY, JSON.stringify({ pautas: lista, ts: Date.now(), fallas }));
   } catch (e) {}
   return { total: unicas.length, fallas };
+}
+
+// ── Modo Ensayo sin conexión: las listas de ensayo vigentes y sus letras quedan guardadas en el teléfono ──
+const MJ_ENSAYO_OFF_KEY = "mj_modoensayo_v1";
+function mjLeerEnsayosOffline() {
+  try {
+    const o = JSON.parse(localStorage.getItem(MJ_ENSAYO_OFF_KEY) || "null");
+    return o && Array.isArray(o.listas) ? o : { listas: [], ts: 0 };
+  } catch (e) {
+    return { listas: [], ts: 0 };
+  }
+}
+// Guarda (o actualiza) en el teléfono las listas que la persona puede ver y que siguen vigentes
+let _ensOffEnCurso = false;
+async function mjPrepararEnsayosOffline(listas) {
+  if (_ensOffEnCurso || typeof navigator === "undefined" || !navigator.onLine) return;
+  _ensOffEnCurso = true;
+  try {
+    const hoy = mjHoyISO();
+    const vig = (listas || []).filter((l) => l && l.publicada && !l.cerrada && (!l.fecha || l.fecha >= hoy));
+    const guardar = vig.map((l) => ({
+      id: l.id,
+      titulo: l.titulo,
+      fecha: l.fecha || "",
+      notas: l.notas || "",
+      canciones: (l.canciones || []).map((c) => ({ cancion: c.cancion, url_letra: c.url_letra || "", elegido: !!c.elegido })),
+    }));
+    try {
+      localStorage.setItem(MJ_ENSAYO_OFF_KEY, JSON.stringify({ listas: guardar, ts: Date.now() }));
+    } catch (e) {}
+    const urls = [...new Set(guardar.flatMap((l) => l.canciones.map((c) => c.url_letra).filter((u) => /^https?:/i.test(u || ""))))];
+    for (const u of urls) {
+      const k = mjClavePdf(u);
+      try {
+        if (await mjIdbGet(k)) continue;
+        const id = /(?:drive|docs)\.google\.com/i.test(u) ? driveIdEnsayo(u) : null;
+        for (const f of id ? fuentesMultipista(u) : [u]) {
+          try {
+            const rr = await fetch(f);
+            if (rr.ok && !/text\/html/i.test(rr.headers.get("content-type") || "")) {
+              await mjIdbPut(k, await rr.arrayBuffer());
+              break;
+            }
+          } catch (e) {}
+        }
+      } catch (e) {}
+    }
+  } finally {
+    _ensOffEnCurso = false;
+  }
 }
 
 let _pdfjsPromise = null;
@@ -36828,6 +36917,23 @@ function mjEnsResumenCambios(vieja, nueva) {
   if (t(vieja.notas) !== t(nueva.notas) && t(nueva.notas)) out.push("Indicaciones actualizadas");
   return out;
 }
+// Cantos de una lista en el formato que usa el Modo Misa / Modo Ensayo
+function mjEnsCancionesModo(l) {
+  return (l.canciones || []).map((c) => ({ cancion: c.cancion, url_letra: c.url_letra || "", url_audio: c.url_youtube || "", elegido: !!c.elegido }));
+}
+// El integrante abrió la lista: se registra la revisión y, si ya no le quedan pendientes, se cancela su recordatorio de la tarde
+function mjEnsRegistrarVista(l, user) {
+  if (!l || !l.publicada || !user || esCuerdaAdmin(user)) return;
+  registrarVistaPauta({ id: l.id }, user, "pauta")
+    .then(() => fetch(`/api/recordatorio-ensayos?visto=1&mid=${encodeURIComponent(user.id)}`))
+    .catch(() => {});
+  try {
+    localStorage.setItem("mj_ens_vista_" + l.id, "1");
+  } catch (e) {}
+}
+function mjEnsFechaModo(l) {
+  return l.fecha ? "Ensayo: " + mjFechaLargaCorta(l.fecha) : "Lista de cantos para ensayar";
+}
 // Abre una lista concreta al entrar a la sección (desde el inicio, un aviso push o un link)
 function mjEnsPedirAbrir(id) {
   try {
@@ -36913,6 +37019,7 @@ function PautaEnsayo({ user, members, setSection }) {
   const [visor, setVisor] = useState(null); // { url, titulo }
   const [letraFila, setLetraFila] = useState(null);
   const [sugFila, setSugFila] = useState(null); // fila con la lista de canciones abierta
+  const [modoEnsayo, setModoEnsayo] = useState(false);
   const [dirLetras, setDirLetras] = useState(_letrasDriveCache || []);
 
   async function cargar() {
@@ -36925,6 +37032,8 @@ function PautaEnsayo({ user, members, setSection }) {
       setListas(l);
     }
     setAccesos(ac || {});
+    // Deja en el teléfono las listas vigentes y sus letras para el Modo Ensayo sin conexión
+    if (l) mjPrepararEnsayosOffline(l.filter((x) => mjEnsPuedeVer(x, ac || {}, user))).catch(() => {});
     return l;
   }
   useEffect(() => {
@@ -36965,15 +37074,7 @@ function PautaEnsayo({ user, members, setSection }) {
 
   // Seguimiento: el integrante abrió la lista
   useEffect(() => {
-    if (modo === "ver" && sel && sel.publicada && !isAdmin) {
-      // Registra la revisión y, si ya no le quedan listas pendientes, se cancela su recordatorio de la tarde
-      registrarVistaPauta({ id: sel.id }, user, "pauta")
-        .then(() => fetch(`/api/recordatorio-ensayos?visto=1&mid=${encodeURIComponent(user.id)}`))
-        .catch(() => {});
-      try {
-        localStorage.setItem("mj_ens_vista_" + sel.id, "1");
-      } catch (e) {}
-    }
+    if (modo === "ver" && sel && sel.publicada && !isAdmin) mjEnsRegistrarVista(sel, user);
   }, [modo, sel && sel.id]);
 
   function irArriba() {
@@ -37296,8 +37397,26 @@ function PautaEnsayo({ user, members, setSection }) {
         <div style={{ marginBottom: 12 }}>
           <button className="ens-btn" onClick={() => { setModo(null); setAviso(""); }}>← Todas las listas</button>
         </div>
+        {modoEnsayo &&
+          createPortal(
+            <ModoMisa
+              ensayo
+              pauta={{ id: l.id, titulo: l.titulo, notas: l.notas }}
+              canciones={mjEnsCancionesModo(l)}
+              fecha={mjEnsFechaModo(l)}
+              onElegido={isAdmin ? (i) => toggleElegido(l, i) : undefined}
+              onSalir={() => setModoEnsayo(false)}
+            />,
+            document.body
+          )}
         <div style={{ borderRadius: 20, padding: "18px 18px 16px", background: "linear-gradient(135deg,#1e3a5f,#2f5d9a)", color: "#fff", marginBottom: 12, boxShadow: "0 10px 30px rgba(30,58,95,.22)" }}>
-          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", opacity: 0.75 }}>🎶 Lista de cantos para ensayar</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ flex: 1, minWidth: 0, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", opacity: 0.75 }}>🎶 Lista de cantos para ensayar</div>
+            <button onClick={() => setModoEnsayo(true)} style={{ display: "inline-flex", alignItems: "center", gap: 7, height: 34, padding: "0 16px", border: "none", borderRadius: 999, background: "#fff", color: "#1e3a5f", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "var(--font-sans)", boxShadow: "0 2px 8px rgba(8,20,45,.25)", flexShrink: 0 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" /><path d="M4 21.5V5.5" /></svg>
+              Modo Ensayo
+            </button>
+          </div>
           <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em", margin: "4px 0 2px" }}>{l.titulo}</div>
           <div style={{ fontSize: 13, opacity: 0.85, textTransform: l.fecha ? "capitalize" : "none" }}>
             {l.fecha ? `Ensayo: ${mjFechaLargaCorta(l.fecha)} · ` : ""}
@@ -37447,11 +37566,14 @@ function PautaEnsayo({ user, members, setSection }) {
 // ── Inicio: aviso de la lista de cantos para ensayar vigente ──
 function EnsayoInicioWidget({ user, setSection }) {
   const [listas, setListas] = useState([]);
+  const [modoId, setModoId] = useState(null); // lista abierta en Modo Ensayo
   useEffect(() => {
     let vivo = true;
     Promise.all([mjCargarEnsayos().catch(() => null), mjCargarAccesosPauta().catch(() => ({}))]).then(([l, ac]) => {
       if (!vivo || !l) return;
-      setListas(l.filter((x) => mjEnsVigente(x) && mjEnsPuedeVer(x, ac, user)));
+      const mias = l.filter((x) => mjEnsVigente(x) && mjEnsPuedeVer(x, ac, user));
+      setListas(mias);
+      mjPrepararEnsayosOffline(mias).catch(() => {});
     });
     return () => {
       vivo = false;
@@ -37462,6 +37584,18 @@ function EnsayoInicioWidget({ user, setSection }) {
     mjEnsPedirAbrir(l.id);
     setSection("pauta_ensayo");
   };
+  const abrirModo = (l) => {
+    mjEnsRegistrarVista(l, user);
+    setModoId(l.id);
+  };
+  // Admin: marcar ★ desde el Modo Ensayo abierto en el inicio
+  const elegir = async (l, i) => {
+    const nuevaL = { ...l, canciones: l.canciones.map((c, j) => (j === i ? { ...c, elegido: !c.elegido } : c)), actualizada: new Date().toISOString() };
+    setListas((ls) => ls.map((x) => (x.id === l.id ? nuevaL : x)));
+    const ok = await mjGuardarEnsayo(nuevaL);
+    if (!ok) setListas((ls) => ls.map((x) => (x.id === l.id ? l : x)));
+  };
+  const enModo = listas.find((x) => x.id === modoId);
   const vista = (l) => {
     try {
       return !!localStorage.getItem("mj_ens_vista_" + l.id);
@@ -37471,10 +37605,22 @@ function EnsayoInicioWidget({ user, setSection }) {
   };
   return (
     <div style={{ margin: "10px 0 12px", borderRadius: 16, overflow: "hidden", border: "1px solid #dbe4f0", background: "#fff", boxShadow: "0 2px 10px rgba(15,39,68,.05)", fontFamily: "var(--font-sans)" }}>
+      {enModo &&
+        createPortal(
+          <ModoMisa
+            ensayo
+            pauta={{ id: enModo.id, titulo: enModo.titulo, notas: enModo.notas }}
+            canciones={mjEnsCancionesModo(enModo)}
+            fecha={mjEnsFechaModo(enModo)}
+            onElegido={esCuerdaAdmin(user) ? (i) => elegir(enModo, i) : undefined}
+            onSalir={() => setModoId(null)}
+          />,
+          document.body
+        )}
       {listas.map((l, n) => {
         const nueva = !esCuerdaAdmin(user) && !vista(l);
         return (
-          <button key={l.id} onClick={() => ir(l)} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", textAlign: "left", border: "none", borderTop: n ? "1px solid #eef2f7" : "none", background: nueva ? "linear-gradient(90deg,#eef4fb,#fff)" : "#fff", padding: "11px 13px", cursor: "pointer", fontFamily: "inherit", touchAction: "manipulation" }}>
+          <div key={l.id} onClick={() => ir(l)} role="button" style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", boxSizing: "border-box", textAlign: "left", borderTop: n ? "1px solid #eef2f7" : "none", background: nueva ? "linear-gradient(90deg,#eef4fb,#fff)" : "#fff", padding: "11px 13px", cursor: "pointer", fontFamily: "inherit", touchAction: "manipulation" }}>
             <span style={{ width: 36, height: 36, borderRadius: 11, background: "linear-gradient(135deg,#1e3a5f,#2f5d9a)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>🎶</span>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span style={{ display: "block", fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "#2f5d9a" }}>{nueva ? "Nuevo · " : ""}Cantos para ensayar</span>
@@ -37484,8 +37630,20 @@ function EnsayoInicioWidget({ user, setSection }) {
                 {l.fecha ? ` · ensayo ${mjFechaLargaCorta(l.fecha)}` : ""}
               </span>
             </span>
-            <span style={{ background: "#1e3a5f", color: "#fff", borderRadius: 999, padding: "6px 12px", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>Ver</span>
-          </button>
+            <span style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  abrirModo(l);
+                }}
+                style={{ border: "none", background: "#1e3a5f", color: "#fff", borderRadius: 999, padding: "7px 12px", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap", cursor: "pointer", fontFamily: "inherit", touchAction: "manipulation" }}
+              >
+                Modo Ensayo
+              </button>
+              <span style={{ border: "1px solid #dbe4f0", color: "#1e3a5f", background: "#fff", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", textAlign: "center" }}>Ver lista</span>
+            </span>
+          </div>
         );
       })}
     </div>
