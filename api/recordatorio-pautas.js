@@ -11,6 +11,7 @@
 // Prueba sin enviar nada: /api/recordatorio-pautas?dry=1
 
 import { programarRecordatoriosCheckin } from "./recordatorio-checkin.js";
+import { recordarEnsayos } from "./recordatorio-ensayos.js";
 
 const SB_URL = "https://ttbipbhfswcwwgcwaist.supabase.co";
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR0YmlwYmhmc3djd3dnY3dhaXN0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTA1MDExNiwiZXhwIjoyMDk0NjI2MTE2fQ.brVGJoNX6dBEC7Z6wQIQ4RxrqrxkGt7EFkAjpZmqCMs";
@@ -49,10 +50,17 @@ export default async function handler(req, res) {
   } catch (e) {
     checkin = { ok: false, error: String(e?.message || e) };
   }
+  // Pauta de Ensayo: aviso de la mañana + el de la tarde programado (ver recordatorio-ensayos.js)
+  let ensayos = null;
+  try {
+    ensayos = await recordarEnsayos({ dry });
+  } catch (e) {
+    ensayos = { ok: false, error: String(e?.message || e) };
+  }
   try {
     const hoy = hoyChile();
     const pautas = await sb(`pautas_misa?select=id,titulo,fecha,publicada&publicada=eq.true&fecha=gte.${hoy}&order=fecha.asc`);
-    if (!pautas.length) return res.status(200).json({ ok: true, enviados: 0, nota: "Sin pautas vigentes", checkin });
+    if (!pautas.length) return res.status(200).json({ ok: true, enviados: 0, nota: "Sin pautas vigentes", checkin, ensayos });
 
     const miembros = (await sb("integrantes?select=id,nombre,cuerda,acceso&acceso=eq.aprobado"))
       .filter((m) => m.cuerda && m.cuerda.trim() !== "" && m.cuerda !== "Admin" && m.cuerda !== "Músico");
@@ -140,7 +148,7 @@ export default async function handler(req, res) {
         if (r.ok) enviados += d.recipients || 0;
       }
     }
-    return res.status(200).json({ ok: true, dry, enviados, grupos: resumen, checkin });
+    return res.status(200).json({ ok: true, dry, enviados, grupos: resumen, checkin, ensayos });
   } catch (e) {
     return res.status(500).json({ ok: false, error: String(e?.message || e) });
   }

@@ -1126,6 +1126,7 @@ const NAV = [
   { id: "musica", icon: "♪", label: "Música" },
   { id: "oraciones", icon: "✦", label: "Oraciones" },
   { id: "pauta_misa", icon: "🎼", label: "Pauta de Misa" },
+  { id: "pauta_ensayo", icon: "🎶", label: "Pauta de Ensayo" },
   { id: "podcast", icon: "◉", label: "Podcast" },
   { id: "qanda", icon: "?", label: "Preguntas" },
   { id: "material_ensayo", icon: "📥", label: "Material de ensayo" },
@@ -1426,6 +1427,7 @@ const NAV_ICONOS = {
   cumpleanos: <><path d="M4 21h16v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z" /><path d="M4 16c2 1.5 4 1.5 5.3 0s3.4-1.5 5.4 0 4.3 1.5 5.3 0" /><path d="M12 11V8M12 5.5c.8-.8.8-1.7 0-2.5-.8.8-.8 1.7 0 2.5z" /></>,
   oraciones: <><path d="M12 3v18M8 8h8" /></>,
   pauta_misa: <><path d="M8 3h9a2 2 0 0 1 2 2v16l-3.5-2-3.5 2-3.5-2L5 21V6a3 3 0 0 1 3-3z" /><path d="M9 9h6M9 13h4" /></>,
+  pauta_ensayo: <><path d="M6 3h12a1 1 0 0 1 1 1v17H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /><path d="M14 7v7.5" /><circle cx="12" cy="14.5" r="2" /><path d="M14 7l3 1" /></>,
   podcast: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></>,
   escuela_canto: <><path d="M3 9l9-5 9 5-9 5z" /><path d="M7 11.5V16c1.5 1.5 3 2 5 2s3.5-.5 5-2v-4.5" /></>,
   sala_ensayo: <><path d="M9 18V5l11-2v13" /><circle cx="6" cy="18" r="3" /></>,
@@ -1433,7 +1435,7 @@ const NAV_ICONOS = {
   guia: <><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" /></>,
 };
 const NAV_GRUPOS_MENU = [
-  { t: "Principal", ids: ["dashboard", "agenda", "pauta_misa", "asistencia"] },
+  { t: "Principal", ids: ["dashboard", "agenda", "pauta_misa", "pauta_ensayo", "asistencia"] },
   { t: "Música", ids: ["cancionero_digital", "material_ensayo", "documentos", "curso_guitarra", "escuela_canto", "sala_ensayo", "biblioteca", "podcast"] },
   { t: "Comunidad", ids: ["oraciones", "cumpleanos", "reglamento", "renovacion", "guia", "perfil"] },
   { t: "Administración", ids: ["admin", "solicitudes", "subir_material", "finanzas", "info_gastos"] },
@@ -1966,6 +1968,7 @@ function TutorialPauta({ esMus, onCerrar, asegurarColumnas }) {
 function GuiaUso({ setSection, onTutorial }) {
   const temas = [
     { ico: "pauta", t: "Pauta de Misa", ir: "pauta_misa", pasos: ["En Inicio toca «Pauta de Misa» (o búscala en el menú).", "Verás los cantos en orden. El ícono rojo PDF abre la letra y ▶ reproduce el audio.", "«Descargar cantos (PDF único)» te deja todas las letras en el teléfono."] },
+    { ico: "pauta", t: "Pauta de Ensayo", ir: "pauta_ensayo", pasos: ["Para ensayos especiales (Navidad, Semana Santa…) el encargado publica una lista de cantos para ensayar.", "Te llega un aviso y la ves en Inicio o en el menú «Pauta de Ensayo».", "El ícono rojo PDF abre la letra y ▶ reproduce el video de YouTube.", "En el ensayo se eligen los cantos que irán en la pauta de la misa."] },
     { ico: "misa", t: "Modo Misa", ir: "pauta_misa", pasos: ["Dentro de la pauta toca «Modo Misa».", "Muestra los cantos en grande para leer durante la misa.", "Ábrelo una vez con internet antes de llegar: después funciona sin conexión."] },
     { ico: "check", t: "Check in y asistencia", ir: "asistencia", pasos: ["El día de la misa aparece «Check in» en la pauta.", "Márcalo estando en la capilla y antes de que empiece la misa.", "Si no lo marcas quedas ausente. Con 2 ausencias seguidas recibes un aviso y con 3 se bloquea tu acceso hasta hablar con el Encargado del Coro.", "En «Asistencia» ves tu porcentaje y cada misa."] },
     { ico: "canto", t: "Cancionero Digital", ir: "cancionero_digital", pasos: ["En Inicio o en el menú toca «Cancionero Digital».", "Busca el canto por su nombre.", "Sube o baja el tono de los acordes a tu medida."] },
@@ -2980,6 +2983,8 @@ function AppInner() {
       const params = new URLSearchParams(window.location.search);
       if (params.get("pauta")) {
         setSection("pauta_misa");
+      } else if (params.get("ensayo")) {
+        setSection("pauta_ensayo");
       }
       // Reset automático de asistencia el 1 de enero (con respaldo previo)
       const hoyDate = new Date();
@@ -4618,6 +4623,9 @@ function AppInner() {
                     "pauta"
                   )}
                 />
+              )}
+              {section === "pauta_ensayo" && !esMusico(user) && !esVisita(user) && (
+                <PautaEnsayo user={user} members={members} setSection={setSection} />
               )}
               {section === "documentos" && (
                 <Documentos docs={docs} onReload={loadData} />
@@ -18957,6 +18965,7 @@ function Dashboard({
           <div className="dash-2col">
             <div className="dash-col">
               <HerramientasCoro setSection={setSection} pautas={pautas} isAdmin={isAdmin} user={user} pautaBloqueada={pautaBloqueada} />
+              <EnsayoInicioWidget user={user} setSection={setSection} />
               {/* ── Avisos del Coro ── */}
               {avisos && avisos.length > 0 && (
                 <div style={{ marginBottom: 14 }}>
@@ -34096,6 +34105,36 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     };
   }, [mode]);
 
+  // Viene desde la Pauta de Ensayo con los cantos elegidos: se abre una pauta nueva con ellos cargados
+  const [origenEnsayo, setOrigenEnsayo] = useState("");
+  useEffect(() => {
+    if (!isAdmin || esMus) return;
+    let pre = null;
+    try {
+      pre = JSON.parse(sessionStorage.getItem("mj_prefill_pauta") || "null");
+      sessionStorage.removeItem("mj_prefill_pauta");
+    } catch (e) {}
+    if (!pre || !Array.isArray(pre.canciones) || !pre.canciones.length) return;
+    setForm(emptyPauta);
+    setSelected(null);
+    setCanciones(
+      pre.canciones.map((c, i) => ({
+        n: String(i + 1),
+        orden: "",
+        cancion: c.cancion || "",
+        autor: "",
+        salmista: "",
+        url_letra: c.url_letra || "",
+        url_audio: c.url_audio || "",
+        pendiente: false,
+      }))
+    );
+    setShowColLetra(true);
+    setShowColAudio(true);
+    setOrigenEnsayo(pre.origen || "ensayo");
+    setMode("new");
+  }, []);
+
   function toggleColLetra() {
     setShowColLetra((v) => !v);
   }
@@ -34150,6 +34189,10 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     }
     if (canciones.length === 0) {
       setMsg("Agrega al menos una canción.");
+      return;
+    }
+    if (canciones.some((c) => !c.orden)) {
+      setMsg("Asigna el momento de la misa a cada canto.");
       return;
     }
     setSaving(true);
@@ -34581,6 +34624,11 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             ¿Cómo crear una pauta?
           </button>
         </div>
+        {mode === "new" && origenEnsayo && canciones.some((c) => !c.orden) && (
+          <div style={{ background: "#fdf8ea", border: "1px solid #f0e2b6", color: "#5b4a1a", borderRadius: 12, padding: "10px 14px", fontSize: 13, marginBottom: 14, lineHeight: 1.45 }}>
+            🎶 Se cargaron los cantos elegidos en el ensayo <b>«{origenEnsayo}»</b>. Asigna el momento de la misa a cada uno y completa título, fecha y hora.
+          </div>
+        )}
         {msg && (
           <div
             style={{
@@ -35177,6 +35225,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                         onChange={(e) => updateFila(i, "orden", e.target.value)}
                         style={{ ...inpTd, minWidth: 160 }}
                       >
+                        {!c.orden && <option value="">— Elige el momento —</option>}
                         {ORDEN_LITURGICO_OPTIONS.map((o) => (
                           <option key={o}>{o}</option>
                         ))}
@@ -36675,6 +36724,695 @@ function AdminCheckIn() {
         Guardar
       </button>
       {msg && <div style={{ marginTop: 12, fontSize: 13, color: msg.startsWith("✓") ? "#166534" : "#b91c1c" }}>{msg}</div>}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ── PAUTA DE ENSAYO: listas de cantos para ensayar (Navidad, Semana Santa…)
+// config "pensayo_<id>"          = { titulo, fecha?, notas, canciones[], publicada, cerrada, creada, actualizada }
+//   canciones[] = { k, cancion, url_letra, url_youtube, elegido }
+// config "pauta_acceso_<id>"     = { restringida, ids[] }   (mismo formato que la pauta de misa)
+// config "pv_<id>_<integrante>"  = revisión (igual que la pauta de misa)
+// En el ensayo el encargado marca con ★ los cantos elegidos y crea la pauta de misa con ellos.
+// ══════════════════════════════════════════════════════════════════════
+const MJ_ENS = "pensayo_";
+const MJ_ENS_TITULOS = ["Navidad", "Adviento", "Semana Santa", "Cuaresma", "Pascua", "Pentecostés", "Corpus Christi", "Mes de María", "Fiestas Patrias", "Inmaculada Concepción", "Todos los Santos", "Matrimonio", "Primera Comunión", "Confirmación"];
+function mjEnsNuevoId() {
+  return "ens" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+}
+function mjEnsFila() {
+  return { k: Math.random().toString(36).slice(2, 9), cancion: "", url_letra: "", url_youtube: "", elegido: false };
+}
+async function mjCargarEnsayos() {
+  const rows = await mjConfigPorPrefijo(MJ_ENS);
+  if (rows === null) return null;
+  return rows
+    .map((r) => (r.value && typeof r.value === "object" ? { ...r.value, id: r.key.slice(MJ_ENS.length) } : null))
+    .filter((l) => l && !l.borrada)
+    .map((l) => ({ ...l, canciones: Array.isArray(l.canciones) ? l.canciones : [] }))
+    .sort((a, b) => String(b.actualizada || b.creada || "").localeCompare(String(a.actualizada || a.creada || "")));
+}
+async function mjGuardarEnsayo(l) {
+  const { id, ...resto } = l;
+  return setConfig(MJ_ENS + id, JSON.stringify(resto));
+}
+async function mjBorrarEnsayo(id) {
+  const H = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` };
+  for (const k of [MJ_ENS + id, "pauta_acceso_" + id]) {
+    await fetch(`${SUPABASE_URL}/rest/v1/config?key=eq.${encodeURIComponent(k)}`, { method: "DELETE", headers: H }).catch(() => {});
+  }
+}
+// Vigente: publicada, no cerrada y (sin fecha o con fecha de hoy en adelante)
+function mjEnsVigente(l) {
+  return !!(l && l.publicada && !l.cerrada && (!l.fecha || l.fecha >= mjHoyISO()));
+}
+function mjEnsPuedeVer(l, accesos, user) {
+  if (esCuerdaAdmin(user)) return true;
+  if (!l || !l.publicada) return false;
+  const ac = accesos && accesos[l.id];
+  if (!ac || !ac.restringida) return true;
+  return (ac.ids || []).map(String).includes(String(user && user.id));
+}
+// Integrantes que deben recibir avisos de esta lista (respeta el acceso por integrante)
+function mjEnsDestinatarios(l, members, accesos) {
+  const ac = accesos && accesos[l.id];
+  const ids = ac && ac.restringida ? new Set((ac.ids || []).map(String)) : null;
+  return [
+    ...new Set(
+      (members || [])
+        .filter((m) => m && m.id != null && m.activo !== false && m.cuerda !== "Admin" && m.cuerda !== "Músico" && !esVisita(m))
+        .map((m) => String(m.id))
+        .filter((id) => !ids || ids.has(id))
+    ),
+  ];
+}
+async function mjEnsAvisar(l, members, titulo, texto) {
+  const accesos = await mjCargarAccesosPauta().catch(() => ({}));
+  const ac = accesos && accesos[l.id];
+  const restringida = !!(ac && ac.restringida);
+  const ids = mjEnsDestinatarios(l, members, accesos);
+  if (!ids.length) return { ok: false, data: { error: restringida ? "la lista no tiene integrantes con acceso" : "no hay integrantes" } };
+  // Si la lista es para todos y el envío por integrante falla, se intenta el envío general
+  return sendPushToUsers(ids, titulo, texto.slice(0, 220), `/?ensayo=${encodeURIComponent(l.id)}`, !restringida);
+}
+function mjEnsResumenCambios(vieja, nueva) {
+  const out = [];
+  const t = (v) => String(v == null ? "" : v).trim();
+  if (t(vieja.titulo) !== t(nueva.titulo)) out.push(`Título: ${t(nueva.titulo)}`);
+  if (t(vieja.fecha) !== t(nueva.fecha)) out.push(nueva.fecha ? `Ensayo: ${mjFechaLargaCorta(nueva.fecha)}` : "Se quitó la fecha del ensayo");
+  const nom = (c) => t(c.cancion).toLowerCase();
+  const antes = (vieja.canciones || []).filter((c) => t(c.cancion));
+  const ahora = (nueva.canciones || []).filter((c) => t(c.cancion));
+  const nuevos = ahora.filter((c) => !antes.some((a) => nom(a) === nom(c)));
+  const quitados = antes.filter((a) => !ahora.some((c) => nom(a) === nom(c)));
+  if (nuevos.length) out.push(`Nuevo${nuevos.length > 1 ? "s" : ""}: ${nuevos.map((c) => t(c.cancion)).join(", ")}`);
+  if (quitados.length) out.push(`Se quit${quitados.length > 1 ? "aron" : "ó"}: ${quitados.map((c) => t(c.cancion)).join(", ")}`);
+  const links = ahora.filter((c) => {
+    const a = antes.find((x) => nom(x) === nom(c));
+    return a && (t(a.url_letra) !== t(c.url_letra) || t(a.url_youtube) !== t(c.url_youtube));
+  });
+  if (links.length) out.push(`PDF o YouTube actualizado: ${links.map((c) => t(c.cancion)).join(", ")}`);
+  if (t(vieja.notas) !== t(nueva.notas) && t(nueva.notas)) out.push("Indicaciones actualizadas");
+  return out;
+}
+// Abre una lista concreta al entrar a la sección (desde el inicio, un aviso push o un link)
+function mjEnsPedirAbrir(id) {
+  try {
+    sessionStorage.setItem("mj_ens_abrir", String(id));
+  } catch (e) {}
+}
+function mjEnsLeerAbrir() {
+  let id = null;
+  try {
+    id = sessionStorage.getItem("mj_ens_abrir");
+    sessionStorage.removeItem("mj_ens_abrir");
+  } catch (e) {}
+  try {
+    const u = new URL(window.location.href);
+    const q = u.searchParams.get("ensayo");
+    if (q) {
+      id = q;
+      u.searchParams.delete("ensayo");
+      window.history.replaceState(null, "", u.toString());
+    }
+  } catch (e) {}
+  return id;
+}
+
+function VisorPdfPantalla({ url, titulo, onCerrar }) {
+  const limpia = String(url || "").split("#")[0];
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, zIndex: 10000, background: "#0b1626", display: "flex", flexDirection: "column", fontFamily: "var(--font-sans)", paddingTop: "env(safe-area-inset-top)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "#0f1f36", color: "#fff", flexShrink: 0 }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 800, letterSpacing: "-0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{titulo || "Letra"}</span>
+        <button onClick={onCerrar} aria-label="Cerrar" style={{ color: "#fff", fontSize: 20, lineHeight: 1, background: "rgba(255,255,255,.14)", border: "none", borderRadius: 10, width: 38, height: 34, cursor: "pointer" }}>
+          ×
+        </button>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, background: "#fff" }}>
+        <VisorPDF key={limpia} url={limpia} nombre={titulo || "Letra"} pegado alto="calc(100vh - 56px - env(safe-area-inset-top))" />
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+const ENS_CSS = `
+.ens{font-family:var(--font-sans);max-width:980px}
+.ens-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid #dbe4f0;background:#fff;color:#1e3a5f;border-radius:999px;height:34px;padding:0 14px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.ens-btn.pri{background:#1e3a5f;border-color:#1e3a5f;color:#fff}
+.ens-btn.oro{background:#fdf6e3;border-color:#ecd9a3;color:#7a5a12}
+.ens-btn.peligro{color:#b91c1c;border-color:#f3d4d4}
+.ens-btn:disabled{opacity:.55;cursor:default}
+.ens-card{background:#fff;border:1px solid #e3e9f2;border-radius:18px;box-shadow:0 2px 10px rgba(15,39,68,.05);overflow:hidden}
+.ens-li{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:none;background:#fff;padding:13px 16px;border-top:1px solid #eef2f7;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ens-li:first-child{border-top:none}
+.ens-row{display:flex;align-items:center;gap:10px;padding:11px 14px;border-top:1px solid #eef2f7}
+.ens-row:first-child{border-top:none}
+.ens-row.sel{background:linear-gradient(90deg,#fdf8ea,#fff)}
+.ens-pdf{display:inline-flex;align-items:center;justify-content:center;width:38px;height:26px;border-radius:7px;background:#c0392b;color:#fff;font-size:9.5px;font-weight:800;letter-spacing:.05em;border:none;cursor:pointer;flex-shrink:0}
+.ens-in{padding:9px 12px;border-radius:10px;border:1px solid #dbe4f0;font:inherit;font-size:13.5px;outline:none;width:100%;box-sizing:border-box;background:#fff}
+.ens-in:focus{border-color:#2f5d9a}
+.ens-lbl{font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#64748b;margin:0 0 5px}
+.ens-chip{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 9px;white-space:nowrap}
+`;
+
+function PautaEnsayo({ user, members, setSection }) {
+  const isAdmin = esCuerdaAdmin(user);
+  const [listas, setListas] = useState(null);
+  const [accesos, setAccesos] = useState({});
+  const [error, setError] = useState(false);
+  const [selId, setSelId] = useState(null);
+  const [modo, setModo] = useState(null); // null | "ver" | "editar"
+  const [form, setForm] = useState(null);
+  const [esNueva, setEsNueva] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [aviso, setAviso] = useState("");
+  const [verCerradas, setVerCerradas] = useState(false);
+  const [visor, setVisor] = useState(null); // { url, titulo }
+  const [letraFila, setLetraFila] = useState(null);
+  const [dirLetras, setDirLetras] = useState(_letrasDriveCache || []);
+
+  async function cargar() {
+    const [l, ac] = await Promise.all([mjCargarEnsayos().catch(() => null), mjCargarAccesosPauta().catch(() => ({}))]);
+    if (l === null) {
+      setError(true);
+      setListas((x) => x || []);
+    } else {
+      setError(false);
+      setListas(l);
+    }
+    setAccesos(ac || {});
+    return l;
+  }
+  useEffect(() => {
+    const abrir = mjEnsLeerAbrir();
+    cargar().then((l) => {
+      if (abrir && l && l.some((x) => x.id === abrir)) {
+        setSelId(abrir);
+        setModo("ver");
+      }
+    });
+  }, []);
+  useEffect(() => {
+    if (modo !== "editar") return;
+    let vivo = true;
+    listarTodosDrive()
+      .then((lista) => {
+        if (!vivo || !lista.length) return;
+        _letrasDriveCache = lista;
+        setDirLetras(lista);
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [modo]);
+
+  const visibles = (listas || []).filter((l) => mjEnsPuedeVer(l, accesos, user));
+  const sel = visibles.find((l) => l.id === selId) || null;
+
+  // Seguimiento: el integrante abrió la lista
+  useEffect(() => {
+    if (modo === "ver" && sel && sel.publicada && !isAdmin) {
+      // Registra la revisión y, si ya no le quedan listas pendientes, se cancela su recordatorio de la tarde
+      registrarVistaPauta({ id: sel.id }, user, "pauta")
+        .then(() => fetch(`/api/recordatorio-ensayos?visto=1&mid=${encodeURIComponent(user.id)}`))
+        .catch(() => {});
+      try {
+        localStorage.setItem("mj_ens_vista_" + sel.id, "1");
+      } catch (e) {}
+    }
+  }, [modo, sel && sel.id]);
+
+  function irArriba() {
+    try {
+      setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 30);
+    } catch (e) {}
+  }
+  function abrir(l) {
+    setSelId(l.id);
+    setModo("ver");
+    setMsg("");
+    setAviso("");
+    irArriba();
+  }
+  function nueva() {
+    setForm({ id: mjEnsNuevoId(), titulo: "", fecha: "", notas: "", canciones: [mjEnsFila()], publicada: false, cerrada: false });
+    setEsNueva(true);
+    setModo("editar");
+    setMsg("");
+    setAviso("");
+    irArriba();
+  }
+  function editar(l) {
+    setForm(JSON.parse(JSON.stringify({ ...l, canciones: l.canciones.length ? l.canciones.map((c) => ({ ...mjEnsFila(), ...c })) : [mjEnsFila()] })));
+    setEsNueva(false);
+    setModo("editar");
+    setMsg("");
+    setAviso("");
+    irArriba();
+  }
+  const setCampo = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setFila = (i, k, v) => setForm((f) => ({ ...f, canciones: f.canciones.map((c, j) => (j === i ? { ...c, [k]: v } : c)) }));
+  const agregarFila = () => setForm((f) => ({ ...f, canciones: [...f.canciones, mjEnsFila()] }));
+  const quitarFila = (i) => setForm((f) => ({ ...f, canciones: f.canciones.filter((_, j) => j !== i) }));
+  const moverFila = (i, d) =>
+    setForm((f) => {
+      const c = [...f.canciones];
+      const j = i + d;
+      if (j < 0 || j >= c.length) return f;
+      [c[i], c[j]] = [c[j], c[i]];
+      return { ...f, canciones: c };
+    });
+
+  async function avisarPublicacion(l) {
+    const n = l.canciones.length;
+    const r = await mjEnsAvisar(l, members, "🎶 Nueva lista de cantos para ensayar", `${l.titulo}: ${n} canto${n !== 1 ? "s" : ""} para preparar en el ensayo${l.fecha ? " del " + mjFechaLargaCorta(l.fecha) : ""}. Revísalos en el portal.`);
+    setAviso(r.ok ? `✅ Se avisó a los integrantes (${r.recipients || 0} dispositivo(s)).` : `⚠️ La lista quedó publicada, pero no se pudo enviar la notificación${r.data && r.data.error ? ` (${r.data.error})` : ""}.`);
+  }
+
+  async function guardar(publicar) {
+    const f = form;
+    if (!f.titulo.trim()) return setMsg("Escribe el título del ensayo (ej. Navidad, Semana Santa).");
+    const canciones = f.canciones.map((c) => ({ ...c, cancion: c.cancion.trim(), url_letra: c.url_letra.trim(), url_youtube: c.url_youtube.trim() })).filter((c) => c.cancion);
+    if (!canciones.length) return setMsg("Agrega al menos un canto.");
+    setGuardando(true);
+    setMsg("");
+    const previa = (listas || []).find((l) => l.id === f.id) || null;
+    const ahora = new Date().toISOString();
+    const lista = {
+      id: f.id,
+      titulo: f.titulo.trim(),
+      fecha: f.fecha || "",
+      notas: (f.notas || "").trim(),
+      canciones,
+      publicada: publicar ? true : !!(previa && previa.publicada),
+      cerrada: !!f.cerrada,
+      creada: (previa && previa.creada) || ahora,
+      actualizada: ahora,
+      publicadaEn: (previa && previa.publicadaEn) || (publicar ? ahora : ""),
+    };
+    const ok = await mjGuardarEnsayo(lista);
+    if (!ok) {
+      setGuardando(false);
+      return setMsg("No se pudo guardar. Revisa la conexión e intenta de nuevo.");
+    }
+    await cargar();
+    setSelId(lista.id);
+    setModo("ver");
+    setGuardando(false);
+    irArriba();
+    if (publicar && !(previa && previa.publicada)) {
+      setAviso("Enviando aviso a los integrantes…");
+      await avisarPublicacion(lista);
+    } else if (previa && previa.publicada) {
+      // Lista ya publicada: se avisa de inmediato qué cambió
+      const lineas = mjEnsResumenCambios(previa, lista);
+      if (lineas.length) {
+        setAviso("Enviando aviso de cambios…");
+        let cuerpo = lineas.slice(0, 3).join(" · ");
+        if (lineas.length > 3) cuerpo += ` · y ${lineas.length - 3} cambio(s) más`;
+        const r = await mjEnsAvisar(lista, members, "✏️ Cambios en los cantos para ensayar", `${lista.titulo}: ${cuerpo}`);
+        setAviso(r.ok ? `✅ Cambios guardados y avisados (${r.recipients || 0} dispositivo(s)).` : "⚠️ Los cambios se guardaron, pero no se pudo enviar la notificación.");
+      } else setAviso("✅ Lista actualizada.");
+    } else setAviso("✅ Guardada como borrador. Nadie la ve hasta que la publiques.");
+  }
+
+  async function cambiar(l, cambios, texto) {
+    const nuevaL = { ...l, ...cambios, actualizada: new Date().toISOString() };
+    setListas((ls) => (ls || []).map((x) => (x.id === l.id ? nuevaL : x)));
+    const ok = await mjGuardarEnsayo(nuevaL);
+    if (!ok) {
+      setAviso("⚠️ No se pudo guardar el cambio.");
+      cargar();
+      return false;
+    }
+    if (texto) setAviso(texto);
+    return true;
+  }
+  async function publicar(l) {
+    if (!window.confirm(`¿Publicar «${l.titulo}»? Se avisará a los integrantes que hay cantos nuevos para ensayar.`)) return;
+    const ok = await cambiar(l, { publicada: true, publicadaEn: l.publicadaEn || new Date().toISOString() }, "Enviando aviso a los integrantes…");
+    if (ok) await avisarPublicacion({ ...l, publicada: true });
+  }
+  async function despublicar(l) {
+    if (!window.confirm(`¿Ocultar «${l.titulo}»? Los integrantes dejarán de verla.`)) return;
+    cambiar(l, { publicada: false }, "Lista oculta (borrador).");
+  }
+  async function alternarCerrada(l) {
+    cambiar(l, { cerrada: !l.cerrada }, l.cerrada ? "Lista reabierta." : "Lista cerrada: ya no aparece en el inicio ni se recuerda.");
+  }
+  async function eliminar(l) {
+    if (!window.confirm(`¿Eliminar «${l.titulo}»? Esta acción no se puede deshacer.`)) return;
+    await mjBorrarEnsayo(l.id);
+    await cargar();
+    setSelId(null);
+    setModo(null);
+  }
+  function toggleElegido(l, i) {
+    const canciones = l.canciones.map((c, j) => (j === i ? { ...c, elegido: !c.elegido } : c));
+    cambiar(l, { canciones }, "");
+  }
+  function limpiarElegidos(l) {
+    cambiar(l, { canciones: l.canciones.map((c) => ({ ...c, elegido: false })) }, "Selección limpiada.");
+  }
+  function crearPautaMisa(l) {
+    const eleg = l.canciones.filter((c) => c.elegido);
+    if (!eleg.length) return;
+    try {
+      sessionStorage.setItem("mj_prefill_pauta", JSON.stringify({ origen: l.titulo, canciones: eleg.map((c) => ({ cancion: c.cancion, url_letra: c.url_letra || "", url_audio: c.url_youtube || "" })) }));
+    } catch (e) {}
+    setSection("pauta_misa");
+  }
+  function compartirWhatsapp(l) {
+    const lineas = l.canciones.map((c, i) => `${i + 1}. ${c.cancion}`).join("\n");
+    const texto = `🎶 *Cantos para ensayar — ${l.titulo}*${l.fecha ? `\n📅 Ensayo: ${mjFechaLargaCorta(l.fecha)}` : ""}\n\nEsta es la lista de cantos que vamos a ensayar. En el ensayo elegiremos cuáles usaremos en la misa.\n\n${lineas}\n\n📱 Las letras (PDF) y los videos están en el portal del coro:\n🔗 https://coromisionerosdejesus.cl/?ensayo=${l.id}\n\n¡Gracias por prepararte!\n*Encargado de Coro* 🎵`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
+  }
+
+  const cabecera = (
+    <>
+      <style>{ENS_CSS}</style>
+      {visor && <VisorPdfPantalla url={visor.url} titulo={visor.titulo} onCerrar={() => setVisor(null)} />}
+    </>
+  );
+
+  // ── Formulario (crear / editar) ──
+  if (modo === "editar" && form && isAdmin) {
+    const f = form;
+    return (
+      <div className="ens">
+        {cabecera}
+        <datalist id="ens-titulos">
+          {MJ_ENS_TITULOS.map((t) => (
+            <option key={t} value={t} />
+          ))}
+        </datalist>
+        <datalist id="ens-dir-canciones">
+          {dirLetras.map((x) => (
+            <option key={x.id} value={x.nombre} />
+          ))}
+        </datalist>
+        {letraFila !== null && (
+          <DirectorioLetrasModal
+            initialQuery={(f.canciones[letraFila] && f.canciones[letraFila].cancion) || ""}
+            onClose={() => setLetraFila(null)}
+            onSelect={(item) => {
+              setFila(letraFila, "url_letra", item.url);
+              if (!((f.canciones[letraFila] && f.canciones[letraFila].cancion) || "").trim()) setFila(letraFila, "cancion", item.nombre);
+              setLetraFila(null);
+            }}
+          />
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <button className="ens-btn" onClick={() => setModo(esNueva ? null : "ver")}>← Volver</button>
+          <div style={{ fontSize: 19, fontWeight: 800, color: "#0f2744", letterSpacing: "-0.02em" }}>{esNueva ? "Nueva lista de ensayo" : "Editar lista de ensayo"}</div>
+        </div>
+        <div className="ens-card" style={{ padding: 16, marginBottom: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>
+            <div>
+              <div className="ens-lbl">Título del ensayo *</div>
+              <input className="ens-in" list="ens-titulos" value={f.titulo} onChange={(e) => setCampo("titulo", e.target.value)} placeholder="Ej: Navidad, Semana Santa…" autoComplete="off" />
+            </div>
+            <div>
+              <div className="ens-lbl">Fecha del ensayo (opcional)</div>
+              <input className="ens-in" type="date" value={f.fecha} onChange={(e) => setCampo("fecha", e.target.value)} />
+            </div>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <div className="ens-lbl">Indicaciones (opcional)</div>
+            <textarea className="ens-in" rows={2} value={f.notas} onChange={(e) => setCampo("notas", e.target.value)} placeholder="Ej: escuchen los videos antes del ensayo del sábado" style={{ resize: "vertical" }} />
+          </div>
+        </div>
+        <div className="ens-card" style={{ marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", padding: "12px 14px", borderBottom: "1px solid #eef2f7" }}>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0f2744", flex: 1 }}>Cantos ({f.canciones.filter((c) => c.cancion.trim()).length})</div>
+            <button className="ens-btn pri" onClick={agregarFila}>+ Agregar canto</button>
+          </div>
+          {f.canciones.map((c, i) => (
+            <div key={c.k} style={{ padding: "12px 14px", borderTop: i ? "1px solid #eef2f7" : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ width: 24, height: 24, borderRadius: 8, background: "#eaf0f8", color: "#1e3a5f", fontSize: 12, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
+                <input
+                  className="ens-in"
+                  list="ens-dir-canciones"
+                  value={c.cancion}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setFila(i, "cancion", v);
+                    const hit = dirLetras.find((x) => normBusquedaLetra(x.nombre) === normBusquedaLetra(v));
+                    if (hit) setFila(i, "url_letra", hit.url);
+                  }}
+                  placeholder="Nombre del canto (elige del directorio o escríbelo)"
+                  autoComplete="off"
+                  style={{ fontWeight: 600 }}
+                />
+                <button className="ens-btn" title="Subir" onClick={() => moverFila(i, -1)} disabled={i === 0} style={{ padding: "0 10px" }}>↑</button>
+                <button className="ens-btn" title="Bajar" onClick={() => moverFila(i, 1)} disabled={i === f.canciones.length - 1} style={{ padding: "0 10px" }}>↓</button>
+                <button className="ens-btn peligro" title="Quitar" onClick={() => quitarFila(i)} style={{ padding: "0 11px" }}>✕</button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 8, paddingLeft: 32 }}>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button type="button" className="ens-btn" onClick={() => setLetraFila(i)} style={c.url_letra ? { background: "#eaf0f8" } : {}}>
+                    {c.url_letra ? "✓ PDF" : "📂 PDF"}
+                  </button>
+                  <input className="ens-in" value={c.url_letra} onChange={(e) => setFila(i, "url_letra", e.target.value)} placeholder="Link del PDF (letra)" />
+                </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <span style={{ flexShrink: 0, height: 34, padding: "0 10px", borderRadius: 999, background: c.url_youtube && youtubeId(c.url_youtube) ? "#c0392b" : "#f1f4f8", color: c.url_youtube && youtubeId(c.url_youtube) ? "#fff" : "#64748b", fontSize: 11.5, fontWeight: 800, display: "inline-flex", alignItems: "center" }}>▶ YouTube</span>
+                  <input className="ens-in" value={c.url_youtube} onChange={(e) => setFila(i, "url_youtube", e.target.value)} placeholder="Link de YouTube" />
+                </div>
+              </div>
+            </div>
+          ))}
+          <div style={{ padding: "10px 14px", borderTop: "1px solid #eef2f7" }}>
+            <button className="ens-btn" onClick={agregarFila}>+ Agregar otro canto</button>
+          </div>
+        </div>
+        {msg && <div style={{ fontSize: 13, color: msg.startsWith("✅") ? "#1e3a5f" : "#b91c1c", fontWeight: 600, marginBottom: 10 }}>{msg}</div>}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {(esNueva || !(listas || []).some((l) => l.id === f.id && l.publicada)) && (
+            <button className="ens-btn" disabled={guardando} onClick={() => guardar(false)}>Guardar borrador</button>
+          )}
+          {(listas || []).some((l) => l.id === f.id && l.publicada) ? (
+            <button className="ens-btn pri" disabled={guardando} onClick={() => guardar(false)}>{guardando ? "Guardando…" : "Guardar cambios y avisar"}</button>
+          ) : (
+            <button className="ens-btn pri" disabled={guardando} onClick={() => guardar(true)}>{guardando ? "Guardando…" : "Guardar y publicar"}</button>
+          )}
+        </div>
+        {!esNueva && (listas || []).some((l) => l.id === f.id && l.publicada) && (
+          <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 8 }}>La lista ya está publicada: al guardar se avisa automáticamente a los integrantes qué cambió.</div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Detalle de una lista ──
+  if (modo === "ver" && sel) {
+    const l = sel;
+    const eleg = l.canciones.filter((c) => c.elegido).length;
+    const ac = accesos[l.id];
+    return (
+      <div className="ens">
+        {cabecera}
+        <div style={{ marginBottom: 12 }}>
+          <button className="ens-btn" onClick={() => { setModo(null); setAviso(""); }}>← Todas las listas</button>
+        </div>
+        <div style={{ borderRadius: 20, padding: "18px 18px 16px", background: "linear-gradient(135deg,#1e3a5f,#2f5d9a)", color: "#fff", marginBottom: 12, boxShadow: "0 10px 30px rgba(30,58,95,.22)" }}>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", opacity: 0.75 }}>🎶 Lista de cantos para ensayar</div>
+          <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em", margin: "4px 0 2px" }}>{l.titulo}</div>
+          <div style={{ fontSize: 13, opacity: 0.85, textTransform: l.fecha ? "capitalize" : "none" }}>
+            {l.fecha ? `Ensayo: ${mjFechaLargaCorta(l.fecha)} · ` : ""}
+            {l.canciones.length} canto{l.canciones.length !== 1 ? "s" : ""}
+            {eleg ? ` · ★ ${eleg} elegido${eleg !== 1 ? "s" : ""}` : ""}
+          </div>
+          {l.notas && <div style={{ fontSize: 13.5, lineHeight: 1.45, marginTop: 10, background: "rgba(255,255,255,.12)", borderRadius: 12, padding: "9px 12px" }}>{l.notas}</div>}
+          {!isAdmin && <div style={{ fontSize: 12, opacity: 0.75, marginTop: 10 }}>En el ensayo elegiremos cuáles cantaremos en la misa. Revisa las letras y los videos para llegar preparado.</div>}
+          {isAdmin && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
+              <span className="ens-chip" style={{ background: l.publicada ? "rgba(255,255,255,.95)" : "rgba(255,255,255,.18)", color: l.publicada ? "#1e3a5f" : "#fff" }}>{l.publicada ? "Publicada" : "Borrador"}</span>
+              {l.cerrada && <span className="ens-chip" style={{ background: "rgba(255,255,255,.18)", color: "#fff" }}>Cerrada</span>}
+              {ac && ac.restringida && <span className="ens-chip" style={{ background: "#f6e7b8", color: "#7a5a12" }}>Acceso restringido</span>}
+            </div>
+          )}
+        </div>
+
+        {aviso && <div style={{ fontSize: 13, fontWeight: 600, color: aviso.startsWith("⚠️") ? "#b45309" : "#1e3a5f", background: aviso.startsWith("⚠️") ? "#fff7e6" : "#eef4fb", borderRadius: 12, padding: "10px 12px", marginBottom: 12 }}>{aviso}</div>}
+
+        {isAdmin && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+            <button className="ens-btn pri" onClick={() => editar(l)}>✏️ Editar / sumar cantos</button>
+            {l.publicada ? <button className="ens-btn" onClick={() => despublicar(l)}>Ocultar</button> : <button className="ens-btn pri" onClick={() => publicar(l)}>Publicar y avisar</button>}
+            <AccesoPautaBoton pauta={{ id: l.id, titulo: l.titulo }} onGuardado={() => mjCargarAccesosPauta().then(setAccesos).catch(() => {})} estilo={{ display: "inline-flex", alignItems: "center", gap: 6, border: "1px solid #dbe4f0", background: "#fff", color: "#1e3a5f", borderRadius: 999, height: 34, padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }} />
+            {l.publicada && <button className="ens-btn" onClick={() => compartirWhatsapp(l)}>WhatsApp</button>}
+            <button className="ens-btn" onClick={() => alternarCerrada(l)}>{l.cerrada ? "Reabrir" : "Cerrar lista"}</button>
+            <button className="ens-btn peligro" onClick={() => eliminar(l)}>Eliminar</button>
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="ens-card" style={{ padding: "12px 14px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: "linear-gradient(90deg,#fdf8ea,#fff)", borderColor: "#f0e2b6" }}>
+            <div style={{ flex: "1 1 220px", fontSize: 12.5, color: "#5b4a1a", lineHeight: 1.45 }}>
+              <b style={{ color: "#7a5a12" }}>En el ensayo:</b> toca la ★ de cada canto elegido y luego crea la pauta de misa con ellos (después asignas el momento de cada uno).
+            </div>
+            {eleg > 0 && <button className="ens-btn" onClick={() => limpiarElegidos(l)}>Limpiar</button>}
+            <button className="ens-btn oro" disabled={!eleg} onClick={() => crearPautaMisa(l)}>🎼 Crear pauta de misa ({eleg})</button>
+          </div>
+        )}
+
+        <div className="ens-card" style={{ marginBottom: 12 }}>
+          {l.canciones.length === 0 && <div style={{ padding: 16, fontSize: 13, color: "#64748b" }}>Esta lista aún no tiene cantos.</div>}
+          {l.canciones.map((c, i) => (
+            <div key={c.k || i} className={"ens-row" + (c.elegido ? " sel" : "")}>
+              {isAdmin ? (
+                <button onClick={() => toggleElegido(l, i)} title={c.elegido ? "Quitar de los elegidos" : "Marcar como elegido para la misa"} style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 10, border: "1px solid " + (c.elegido ? "#e6c869" : "#dbe4f0"), background: c.elegido ? "#fbefc7" : "#fff", color: c.elegido ? "#b8860b" : "#b6c2d2", fontSize: 18, cursor: "pointer", touchAction: "manipulation" }}>
+                  {c.elegido ? "★" : "☆"}
+                </button>
+              ) : (
+                <span style={{ width: 26, height: 26, borderRadius: 8, background: "#eaf0f8", color: "#1e3a5f", fontSize: 12, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14.5, fontWeight: 700, color: "#0f2744", letterSpacing: "-0.01em" }}>
+                  {isAdmin ? `${i + 1}. ` : ""}
+                  {c.cancion}
+                </div>
+                {c.elegido && <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#b8860b", marginTop: 2 }}>★ Elegido para la misa</div>}
+              </div>
+              {c.url_letra && /^https?:/i.test(c.url_letra) ? (
+                <button className="ens-pdf" onClick={() => setVisor({ url: c.url_letra, titulo: c.cancion })} title="Ver letra">PDF</button>
+              ) : (
+                <span style={{ width: 38, textAlign: "center", color: "#cbd5e1", fontSize: 12, flexShrink: 0 }}>—</span>
+              )}
+              {c.url_youtube && /^https?:/i.test(c.url_youtube) ? (
+                <BotonAudioPauta url={c.url_youtube} size={30} bg="#c0392b" fs={11} />
+              ) : (
+                <span style={{ width: 30, textAlign: "center", color: "#cbd5e1", fontSize: 12, flexShrink: 0 }}>—</span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {isAdmin && l.publicada && (
+          <div className="ens-card">
+            <PautaRevisiones pauta={{ id: l.id, titulo: l.titulo }} members={members} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Lista de listas ──
+  const vigentes = visibles.filter((l) => (isAdmin ? !l.cerrada && (!l.fecha || l.fecha >= mjHoyISO()) : mjEnsVigente(l)));
+  const anteriores = visibles.filter((l) => !vigentes.includes(l) && (isAdmin || l.publicada));
+  const fila = (l) => {
+    const nuevaParaMi = !isAdmin && (() => {
+      try {
+        return !localStorage.getItem("mj_ens_vista_" + l.id);
+      } catch (e) {
+        return false;
+      }
+    })();
+    const eleg = l.canciones.filter((c) => c.elegido).length;
+    return (
+      <button key={l.id} className="ens-li" onClick={() => abrir(l)}>
+        <span style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(135deg,#1e3a5f,#2f5d9a)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🎶</span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 15, fontWeight: 800, color: "#0f2744", letterSpacing: "-0.01em" }}>{l.titulo}</span>
+            {isAdmin && !l.publicada && <span className="ens-chip" style={{ background: "#f1f4f8", color: "#64748b" }}>Borrador</span>}
+            {isAdmin && l.cerrada && <span className="ens-chip" style={{ background: "#f1f4f8", color: "#64748b" }}>Cerrada</span>}
+            {nuevaParaMi && <span className="ens-chip" style={{ background: "#1e3a5f", color: "#fff" }}>Nueva</span>}
+          </span>
+          <span style={{ display: "block", fontSize: 12, color: "#64748b", marginTop: 2, textTransform: l.fecha ? "capitalize" : "none" }}>
+            {l.fecha ? `Ensayo: ${mjFechaLargaCorta(l.fecha)} · ` : ""}
+            {l.canciones.length} canto{l.canciones.length !== 1 ? "s" : ""}
+            {eleg ? ` · ★ ${eleg}` : ""}
+          </span>
+        </span>
+        <span style={{ color: "#94a3b8", fontSize: 18 }}>›</span>
+      </button>
+    );
+  };
+  return (
+    <div className="ens">
+      {cabecera}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: "#2f5d9a" }}>Ensayos especiales</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#0f2744", letterSpacing: "-0.02em" }}>Pauta de Ensayo</div>
+          <div style={{ fontSize: 12.5, color: "#64748b", marginTop: 2 }}>Cantos para preparar. En el ensayo se eligen los que irán en la misa.</div>
+        </div>
+        {isAdmin && <button className="ens-btn pri" onClick={nueva}>+ Nueva lista</button>}
+      </div>
+      {error && <div style={{ fontSize: 12.5, color: "#b45309", marginBottom: 10 }}>No se pudieron cargar las listas (revisa la conexión).</div>}
+      {listas === null ? (
+        <Spinner />
+      ) : vigentes.length === 0 ? (
+        <div className="ens-card" style={{ padding: "22px 16px", textAlign: "center", fontSize: 13.5, color: "#64748b", marginBottom: 12 }}>
+          {isAdmin ? "No hay listas activas. Crea una con «+ Nueva lista»." : "No hay cantos para ensayar por ahora."}
+        </div>
+      ) : (
+        <div className="ens-card" style={{ marginBottom: 12 }}>{vigentes.map(fila)}</div>
+      )}
+      {anteriores.length > 0 && (
+        <>
+          <button className="ens-btn" onClick={() => setVerCerradas((v) => !v)} style={{ marginBottom: 10 }}>
+            {verCerradas ? "Ocultar anteriores" : `Ver anteriores (${anteriores.length})`}
+          </button>
+          {verCerradas && <div className="ens-card">{anteriores.map(fila)}</div>}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Inicio: aviso de la lista de cantos para ensayar vigente ──
+function EnsayoInicioWidget({ user, setSection }) {
+  const [listas, setListas] = useState([]);
+  useEffect(() => {
+    let vivo = true;
+    Promise.all([mjCargarEnsayos().catch(() => null), mjCargarAccesosPauta().catch(() => ({}))]).then(([l, ac]) => {
+      if (!vivo || !l) return;
+      setListas(l.filter((x) => mjEnsVigente(x) && mjEnsPuedeVer(x, ac, user)));
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [user && user.id]);
+  if (!listas.length) return null;
+  const ir = (l) => {
+    mjEnsPedirAbrir(l.id);
+    setSection("pauta_ensayo");
+  };
+  const vista = (l) => {
+    try {
+      return !!localStorage.getItem("mj_ens_vista_" + l.id);
+    } catch (e) {
+      return true;
+    }
+  };
+  return (
+    <div style={{ margin: "10px 0 12px", borderRadius: 16, overflow: "hidden", border: "1px solid #dbe4f0", background: "#fff", boxShadow: "0 2px 10px rgba(15,39,68,.05)", fontFamily: "var(--font-sans)" }}>
+      {listas.map((l, n) => {
+        const nueva = !esCuerdaAdmin(user) && !vista(l);
+        return (
+          <button key={l.id} onClick={() => ir(l)} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", textAlign: "left", border: "none", borderTop: n ? "1px solid #eef2f7" : "none", background: nueva ? "linear-gradient(90deg,#eef4fb,#fff)" : "#fff", padding: "11px 13px", cursor: "pointer", fontFamily: "inherit", touchAction: "manipulation" }}>
+            <span style={{ width: 36, height: 36, borderRadius: 11, background: "linear-gradient(135deg,#1e3a5f,#2f5d9a)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>🎶</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "#2f5d9a" }}>{nueva ? "Nuevo · " : ""}Cantos para ensayar</span>
+              <span style={{ display: "block", fontSize: 14, fontWeight: 800, color: "#0f2744", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.titulo}</span>
+              <span style={{ display: "block", fontSize: 11.5, color: "#64748b", textTransform: l.fecha ? "capitalize" : "none" }}>
+                {l.canciones.length} canto{l.canciones.length !== 1 ? "s" : ""}
+                {l.fecha ? ` · ensayo ${mjFechaLargaCorta(l.fecha)}` : ""}
+              </span>
+            </span>
+            <span style={{ background: "#1e3a5f", color: "#fff", borderRadius: 999, padding: "6px 12px", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>Ver</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
