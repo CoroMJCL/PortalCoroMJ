@@ -37717,31 +37717,31 @@ function PautaEnsayo({ user, members, setSection }) {
 }
 
 const SLE_CSS = `
-.sle{position:relative;overflow:hidden;margin:10px 0 14px;border-radius:22px;padding:14px 12px 12px;color:#fff;font-family:var(--font-sans);background:radial-gradient(120% 90% at 100% 0%,rgba(90,140,210,.45) 0%,rgba(90,140,210,0) 55%),linear-gradient(150deg,#0b1f3a 0%,#1e3a5f 58%,#28507f 100%);box-shadow:0 16px 36px rgba(11,31,58,.28),inset 0 1px 0 rgba(255,255,255,.12)}
-.sle-deco{position:absolute;right:-20px;top:-6px;width:230px;height:140px;fill:none;stroke:rgba(255,255,255,.07);stroke-width:1.2;pointer-events:none}
-.sle-cab{position:relative;display:flex;align-items:center;gap:9px;padding:0 4px 11px}
-.sle-ico{width:30px;height:30px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);color:#f1d48a;flex-shrink:0}
-.sle-tit{flex:1;font-size:12px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#fff}
-.sle-cnt{font-size:11px;font-weight:700;color:rgba(255,255,255,.75);background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:3px 9px}
-.sle-card{position:relative;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:17px;padding:13px 13px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:transform .15s ease,background .15s ease}
-.sle-card+.sle-card{margin-top:9px}
-.sle-card:active{transform:scale(.985);background:rgba(255,255,255,.1)}
+.sle{position:relative;overflow:hidden;margin:10px 0 14px;border-radius:22px;padding:14px 14px 10px;color:#0f2744;font-family:var(--font-sans);background:#fff;border:1px solid #e6ebf2;box-shadow:0 1px 2px rgba(15,39,68,.04),0 10px 28px rgba(15,39,68,.07)}
+.sle-deco{position:absolute;right:-24px;top:-10px;width:230px;height:140px;fill:none;stroke:rgba(30,58,95,.06);stroke-width:1.2;pointer-events:none}
+.sle-cab{position:relative;display:flex;align-items:center;gap:9px;padding:0 0 12px;border-bottom:1px solid #eef2f7}
+.sle-ico{width:30px;height:30px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:#fdf6e3;border:1px solid #f0e2b6;color:#b8860b;flex-shrink:0}
+.sle-tit{flex:1;font-size:12px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#0f2744}
+.sle-cnt{font-size:11px;font-weight:700;color:#64748b;background:#f4f6f9;border:1px solid #e6ebf2;border-radius:999px;padding:3px 9px}
+.sle-card{position:relative;padding:13px 2px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:opacity .15s ease}
+.sle-card+.sle-card{border-top:1px solid #eef2f7}
+.sle-card:active{opacity:.75}
 .sle-fila{display:flex;align-items:center;gap:8px}
-.sle-nom{flex:1;min-width:0;font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sle-nuevo{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#3b2a05;background:linear-gradient(135deg,#f6dc95,#e2b650);border-radius:999px;padding:3px 9px;flex-shrink:0;box-shadow:0 2px 8px rgba(226,182,80,.35)}
-.sle-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
-.sle-meta span{font-size:11.5px;font-weight:600;color:rgba(255,255,255,.82);background:rgba(255,255,255,.08);border-radius:999px;padding:3px 9px}
-.sle-meta .sle-oro{color:#f1d48a;background:rgba(241,212,138,.12)}
-.sle-prev{margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,.1);display:grid;gap:4px}
-.sle-prev div{display:flex;align-items:center;gap:9px;font-size:13px;color:rgba(255,255,255,.9);min-width:0}
-.sle-prev b{width:18px;font-size:11px;font-weight:800;color:rgba(255,255,255,.45);text-align:right;flex-shrink:0}
+.sle-nom{flex:1;min-width:0;font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1.15;color:#0f2744;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sle-nuevo{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#7a5a12;background:linear-gradient(135deg,#fbefc7,#f3dc94);border:1px solid #ecd28a;border-radius:999px;padding:3px 9px;flex-shrink:0}
+.sle-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.sle-meta span{font-size:11.5px;font-weight:600;color:#475569;background:#f4f6f9;border:1px solid #eaeef4;border-radius:999px;padding:3px 9px}
+.sle-meta .sle-oro{color:#8a6512;background:#fdf8ea;border-color:#f3e6bf}
+.sle-prev{margin-top:11px;display:grid;gap:5px}
+.sle-prev div{display:flex;align-items:center;gap:9px;font-size:13.5px;color:#334155;min-width:0}
+.sle-prev b{width:18px;font-size:11px;font-weight:800;color:#a3afbf;text-align:right;flex-shrink:0}
 .sle-prev span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sle-prev .sle-mas{font-size:11.5px;color:rgba(255,255,255,.55);padding-left:27px}
-.sle-lock{margin-top:10px;font-size:12px;font-weight:600;color:#f6dfa0;background:rgba(241,212,138,.1);border:1px solid rgba(241,212,138,.22);border-radius:11px;padding:7px 10px;line-height:1.35}
-.sle-acc{display:flex;gap:8px;margin-top:12px}
-.sle-acc button{height:38px;border-radius:999px;font:inherit;font-size:13px;font-weight:800;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
-.sle-b1{flex:1.2;border:none;background:#fff;color:#14305a;box-shadow:0 4px 14px rgba(0,0,0,.18)}
-.sle-b2{flex:1;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.06);color:#fff}
+.sle-prev .sle-mas{font-size:12px;color:#94a3b8;padding-left:27px}
+.sle-lock{margin-top:11px;font-size:12.5px;font-weight:600;color:#7a5a12;background:#fdf8ea;border:1px solid #f3e6bf;border-radius:12px;padding:8px 11px;line-height:1.4}
+.sle-acc{display:flex;gap:8px;margin-top:13px}
+.sle-acc button{height:40px;border-radius:999px;font:inherit;font-size:13px;font-weight:800;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+.sle-b1{flex:1.2;border:1px solid #e2c56f;background:linear-gradient(180deg,#fffaf0,#fbefcf);color:#5c430c;box-shadow:0 2px 8px rgba(184,134,11,.12)}
+.sle-b2{flex:1;border:1px solid #dfe5ee;background:#fff;color:#0f2744}
 `;
 
 // ── Inicio: aviso de la lista de cantos para ensayar vigente ──
