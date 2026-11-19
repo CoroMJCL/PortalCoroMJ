@@ -38727,6 +38727,9 @@ function AsDetalleIntegrante({ m, misas, esAdmin, onCerrar, onGuardado, members,
         <div style={{ padding: 16 }}>
           <div className="as-card" style={{ padding: 16, display: "flex", alignItems: "center", gap: 16, marginBottom: 14 }}>
             <AsAnillo pct={st.pct} size={84} ocasional={st.especial} />
+            {st.especial ? (
+              <div style={{ flex: 1, fontSize: 13.5, color: "#5b6779", lineHeight: 1.45 }}>Participante Ocasional: no registra asistencia.</div>
+            ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, flex: 1 }}>
               {[
                 ["Presente", st.presentes, "presente"],
@@ -38739,6 +38742,7 @@ function AsDetalleIntegrante({ m, misas, esAdmin, onCerrar, onGuardado, members,
                 </div>
               ))}
             </div>
+            )}
           </div>
           {esAdmin && racha >= MJ_AVISO_AUSENCIAS && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: racha >= MJ_BLOQUEO_AUSENCIAS ? "#fcebea" : "#fbf1de", borderRadius: 14, padding: "12px 14px", marginBottom: 12 }}>
@@ -38890,9 +38894,10 @@ function AsResumen({ integrantes, misas, onAbrir, rachaDe }) {
                 <td>
                   <AsBarra pct={st.pct} />
                 </td>
-                <td style={{ textAlign: "center", fontWeight: 800, color: MJ_ESTADOS.presente.color }}>{st.presentes}</td>
-                <td style={{ textAlign: "center", fontWeight: 800, color: st.ausentes ? MJ_ESTADOS.ausente.color : "#c2cad6" }}>{st.ausentes}</td>
-                <td style={{ textAlign: "center", fontWeight: 800, color: st.justificados ? MJ_ESTADOS.justificado.color : "#c2cad6" }}>{st.justificados}</td>
+                {/* Participante Ocasional: no registra asistencia, sin estadísticas */}
+                <td style={{ textAlign: "center", fontWeight: 800, color: st.especial ? "#c2cad6" : MJ_ESTADOS.presente.color }}>{st.especial ? "" : st.presentes}</td>
+                <td style={{ textAlign: "center", fontWeight: 800, color: !st.especial && st.ausentes ? MJ_ESTADOS.ausente.color : "#c2cad6" }}>{st.especial ? "" : st.ausentes}</td>
+                <td style={{ textAlign: "center", fontWeight: 800, color: !st.especial && st.justificados ? MJ_ESTADOS.justificado.color : "#c2cad6" }}>{st.especial ? "" : st.justificados}</td>
                 {columnas.map((x) => (
                   <td key={x.key} style={{ textAlign: "center" }}>
                     <AsDot estado={x.porMiembro[String(m.id)]?.estado} />
