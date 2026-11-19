@@ -53052,19 +53052,28 @@ const REGLAMENTO_ARTICULOS = [
 // RENOVACIÓN / COMPROMISO DE SERVICIO
 // - Integrantes existentes: Renovación de Servicio del año siguiente. El admin
 //   la abre con un botón (normalmente en noviembre). Mientras está abierta les
-//   aparece obligatoria al entrar: firman o eligen «No renuevo».
-// - Con asistencia ≤ 50% no pueden renovar hasta que el admin los habilite.
+//   aparece obligatoria al entrar: firman o eligen «No renuevo». No pueden usar
+//   el portal sin responder.
+// - Todos pueden renovar. Quien renueva con asistencia bajo 50% debe conversar con
+//   el Encargado (evaluar continuidad y motivos de las ausencias).
+// - Plazo: hasta el 30 de noviembre. Desde el 1 de diciembre, quien no respondió
+//   queda sin acceso; el admin puede permitirle responder fuera de plazo.
 // - Desde el 1 de enero del año renovado, quien no firmó queda sin acceso
 //   (solo el admin desbloquea).
 // - Nuevos: al crear la cuenta firman el Compromiso de Servicio; si no aceptan,
 //   la cuenta se elimina. Si aceptan, la solicitud sigue a aprobación.
 // Datos en la tabla config:
 //   renov_campana_<año>            { abierta, abiertaEn, cerradaEn }
-//   renov_<año>_<idIntegrante>     { r: "si"|"no", en, nombre, tipo: "renovacion"|"nuevo" }
-//   renov_habilitar_<año>_<id>     { en }   (asistencia baja: el admin lo habilitó)
+//   renov_<año>_<idIntegrante>     { r: "si"|"no", en, nombre, tipo: "renovacion"|"nuevo", pct }
+//   renov_tarde_<año>_<id>         { en }   (plazo vencido: el admin le permite responder)
 //   renov_desbloqueo_<año>_<id>    { en }   (sin renovar: el admin lo desbloqueó)
 // ══════════════════════════════════════════════════════════════════════════
-const RS_ASIST_MINIMA = 50; // con este % o menos debe conversar con el Encargado
+const RS_ASIST_MINIMA = 50; // bajo este % debe conversar con el Encargado
+// Último día para responder: 30 de noviembre del año anterior al renovado (hora de Chile)
+const rsPlazo = (anio) => `${anio - 1}-11-30`;
+function rsPlazoVencido(anio) {
+  return mjHoyISO() > rsPlazo(anio);
+}
 const RS_CLAUSULAS = [
   { n: "I", t: "Asistencia", x: "Participaré de manera constante en las celebraciones y ensayos del coro, con un mínimo de dos misas al mes. Sé que mi asistencia se evaluará al término del año." },
   { n: "II", t: "Compromiso", x: "Me prepararé con dedicación para cada celebración. Estudiaré los cantos y el material entregado, porque servir dignamente a la asamblea depende también de mi preparación." },
@@ -53091,7 +53100,7 @@ async function rsCargar(anio) {
   const [camp, resps, habs, desbs] = await Promise.all([
     mjConfigPorPrefijo(`renov_campana_${anio}`),
     mjConfigPorPrefijo(`renov_${anio}_`),
-    mjConfigPorPrefijo(`renov_habilitar_${anio}_`),
+    mjConfigPorPrefijo(`renov_tarde_${anio}_`),
     mjConfigPorPrefijo(`renov_desbloqueo_${anio}_`),
   ]);
   if (camp === null || resps === null) return null; // no se pudo leer: no se bloquea a nadie
@@ -53107,7 +53116,7 @@ async function rsCargar(anio) {
     anio,
     campana: (c && c.value) || null,
     resp: mapa(resps, `renov_${anio}_`),
-    habilitados: mapa(habs, `renov_habilitar_${anio}_`),
+    tarde: mapa(habs, `renov_tarde_${anio}_`),
     desbloqueados: mapa(desbs, `renov_desbloqueo_${anio}_`),
   };
 }
@@ -53300,7 +53309,7 @@ function RenovacionServicioIntegrante({ user, members, asistencia, eventosDb, li
   const [estado, setEstado] = useState("doc"); // doc | gracias | no | listo
   const [guardando, setGuardando] = useState(false);
   const [err, setErr] = useState("");
-  const [cerradoAviso, setCerradoAviso] = useState(false);
+  const [pctFirma, setPctFirma] = useState(null);
   const recargar = useCallback(() => {
     rsCargar(anioBloqueo).then((x) => setDBloq(x));
     if (anioFirma !== anioBloqueo) rsCargar(anioFirma).then((x) => setDFirma(x));
@@ -53337,22 +53346,33 @@ function RenovacionServicioIntegrante({ user, members, asistencia, eventosDb, li
     );
   }
 
-  // 2) Renovación abierta para el año siguiente
+  // 2) Renovación del año siguiente (obligatoria hasta responder)
   const d = dFirma;
-  if (!d || !d.campana || !d.campana.abierta) return null;
+  if (!d || !d.campana) return null;
   const resp = d.resp[mid];
   if (estado === "listo") return null;
-  if (estado === "gracias")
+  if (estado === "gracias") {
+    const baja = pctFirma != null && pctFirma < RS_ASIST_MINIMA;
     return (
       <RsPantalla>
         <RsGracias
           titulo="¡Gracias por renovar tu servicio!"
-          texto={`${nombre.split(" ")[0] || ""}${nombre ? ", g" : "G"}racias por decir nuevamente «aquí estoy». Tu renovación para el ${anioFirma} quedó registrada. Que Dios bendiga tu servicio en el coro.`}
+          texto={
+            <>
+              {`${nombre.split(" ")[0] || ""}${nombre ? ", g" : "G"}racias por decir nuevamente «aquí estoy». Tu renovación para el ${anioFirma} quedó registrada. Que Dios bendiga tu servicio en el coro.`}
+              {baja && (
+                <span style={{ display: "block", fontSize: 13.5, color: "#7a5a1e", background: "#fff7e8", border: "1px solid #ecd6a8", borderRadius: 12, padding: "10px 12px", marginTop: 14, lineHeight: 1.45, textAlign: "left" }}>
+                  Tu asistencia es de <b>{pctFirma}%</b>. Debes conversar con el <b>Encargado del Coro</b> para evaluar tu continuidad y conocer los motivos de tus ausencias.
+                </span>
+              )}
+            </>
+          }
           boton="Entrar al portal"
           onOk={() => setEstado("listo")}
         />
       </RsPantalla>
     );
+  }
   if (estado === "no")
     return (
       <RsPantalla>
@@ -53365,37 +53385,38 @@ function RenovacionServicioIntegrante({ user, members, asistencia, eventosDb, li
       </RsPantalla>
     );
   if (resp) return null; // ya respondió
-  if (!gcal) return null;
 
-  // Asistencia baja: antes debe conversar con el Encargado
-  const pct = rsPctAsistencia(asistencia, eventosDb, yo, d.campana);
-  if (pct != null && pct <= RS_ASIST_MINIMA && !d.habilitados[mid]) {
-    if (cerradoAviso) return null;
+  // Plazo vencido sin responder: sin acceso, salvo que el Encargado le permita responder
+  if (rsPlazoVencido(anioFirma) && !d.tarde[mid]) {
     return (
-      <RsPantalla>
-        <div style={{ background: "#fff", borderRadius: 22, padding: "30px 24px 24px", textAlign: "center", boxShadow: "0 14px 36px rgba(20,40,63,.13)", marginTop: 40 }}>
+      <RsPantalla z={9500}>
+        <div data-bloqueo="1" style={{ background: "#fff", borderRadius: 22, padding: "30px 24px 24px", textAlign: "center", boxShadow: "0 14px 36px rgba(20,40,63,.13)", marginTop: 40 }}>
           <img src="/logo-coro-mj-oficial.jpg" alt="" style={{ height: 96, width: "auto" }} />
-          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", color: "#8a96a8", marginTop: 16 }}>RENOVACIÓN DE SERVICIO {anioFirma}</div>
-          <div style={{ fontSize: 21, fontWeight: 800, color: "#0f1b2d", marginTop: 6, lineHeight: 1.25 }}>Antes de renovar, conversa con el Encargado del Coro</div>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", color: "#8a96a8", marginTop: 16 }}>ACCESO SUSPENDIDO</div>
+          <div style={{ fontSize: 21, fontWeight: 800, color: "#0f1b2d", marginTop: 6, lineHeight: 1.25 }}>No respondiste la Renovación de Servicio {anioFirma}</div>
           <div style={{ fontSize: 14.5, color: "#4b5869", lineHeight: 1.55, marginTop: 10 }}>
-            Tu asistencia hasta el inicio de la renovación es de <b>{pct}%</b>. Para renovar tu servicio para el {anioFirma} primero debes conversar con el <b>Encargado del Coro</b>. Él te habilitará la renovación en el portal.
+            El plazo para responder terminó el 30 de noviembre. Para volver a usar el portal, conversa con el <b>Encargado del Coro</b>.
           </div>
-          <div style={{ fontSize: 13, color: "#7a5a1e", background: "#fff7e8", border: "1px solid #ecd6a8", borderRadius: 12, padding: "10px 12px", marginTop: 14, lineHeight: 1.45 }}>
-            Si no renuevas, desde el 1 de enero de {anioFirma} ya no tendrás acceso al portal.
-          </div>
-          <button onClick={() => setCerradoAviso(true)} style={{ marginTop: 20, width: "100%", height: 50, border: "none", borderRadius: 14, background: "#1e3a5f", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-            Entendido
+          <button onClick={onSalir} style={{ marginTop: 22, width: "100%", height: 48, border: "none", borderRadius: 14, background: "#1e3a5f", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+            Cerrar sesión
           </button>
         </div>
       </RsPantalla>
     );
   }
+  // Mientras está abierta (o si el Encargado le permitió responder fuera de plazo) debe responder para usar el portal
+  if (!d.campana.abierta && !d.tarde[mid]) return null;
 
   const responder = async (r) => {
     setGuardando(true);
     setErr("");
     const en = new Date().toISOString();
-    const ok = await rsGuardar(`renov_${anioFirma}_${mid}`, { r, en, nombre, tipo: "renovacion" });
+    let pct = null;
+    try {
+      await Promise.all([mjGcalHistorial(), mjCargarIngresos(), mjCargarAsisSemana()]);
+      pct = rsPctAsistencia(asistencia, eventosDb, yo, null); // asistencia al día de hoy
+    } catch (e) {}
+    const ok = await rsGuardar(`renov_${anioFirma}_${mid}`, { r, en, nombre, tipo: "renovacion", pct });
     if (!ok) {
       setErr("No se pudo guardar. Revisa tu conexión e intenta de nuevo.");
       setGuardando(false);
@@ -53404,10 +53425,16 @@ function RenovacionServicioIntegrante({ user, members, asistencia, eventosDb, li
     const admins = rsIdsAdmin(members);
     if (r === "si") {
       sendPushToUsers([mid], "¡Gracias por renovar tu servicio! 🙏", `Tu Renovación de Servicio ${anioFirma} quedó registrada. Que Dios bendiga tu servicio en el coro.`);
-      if (admins.length) sendPushToUsers(admins, "Renovación de Servicio ✓", `${nombre} renovó su servicio para el ${anioFirma}.`);
+      if (admins.length)
+        sendPushToUsers(
+          admins,
+          "Renovación de Servicio ✓",
+          pct != null && pct < RS_ASIST_MINIMA ? `${nombre} renovó su servicio para el ${anioFirma}. Asistencia ${pct}%: debe conversar contigo.` : `${nombre} renovó su servicio para el ${anioFirma}.`
+        );
     } else if (admins.length) {
       sendPushToUsers(admins, "Renovación de Servicio ✗", `${nombre} no renovará su servicio para el ${anioFirma}.`);
     }
+    setPctFirma(pct);
     setGuardando(false);
     setEstado(r === "si" ? "gracias" : "no");
     recargar();
@@ -53417,12 +53444,15 @@ function RenovacionServicioIntegrante({ user, members, asistencia, eventosDb, li
     <RsPantalla>
       <div style={{ textAlign: "center", padding: "4px 6px 16px" }}>
         <div style={{ fontSize: 13.5, color: "#3a4556", lineHeight: 1.5 }}>
-          Lee con calma tu Renovación de Servicio para el {anioFirma}. Para seguir usando el portal, fírmala o indica que no renovarás.
+          Lee con calma tu Renovación de Servicio para el {anioFirma}. Para seguir usando el portal, fírmala o indica que no renovarás. Tienes plazo hasta el 30 de noviembre.
         </div>
       </div>
       <DocServicio nombre={nombre} anio={anioFirma} />
       {err && <div style={{ marginTop: 14, color: "#9b2c22", fontSize: 13.5, fontWeight: 600, textAlign: "center" }}>{err}</div>}
       <RsFirma anio={anioFirma} guardando={guardando} onFirmar={() => responder("si")} onRechazar={() => responder("no")} />
+      <button type="button" onClick={onSalir} style={{ display: "block", margin: "18px auto 0", background: "none", border: "none", color: "#8a93a1", fontFamily: "inherit", fontSize: 13, cursor: "pointer", padding: 8 }}>
+        Cerrar sesión
+      </button>
     </RsPantalla>
   );
 }
@@ -53517,7 +53547,7 @@ function AdminRenovaciones({ members, asistencia, eventosDb }) {
   const [verDoc, setVerDoc] = useState(null); // { nombre, en, nuevo }
   const [preview, setPreview] = useState(false);
   const [abierta, setAbierta] = useState(null); // lista expandida
-  const recargar = useCallback(() => rsCargar(anio).then((x) => setD(x || { anio, campana: null, resp: {}, habilitados: {}, desbloqueados: {} })), [anio]);
+  const recargar = useCallback(() => rsCargar(anio).then((x) => setD(x || { anio, campana: null, resp: {}, tarde: {}, desbloqueados: {} })), [anio]);
   useEffect(() => {
     setD(undefined);
     recargar();
@@ -53534,19 +53564,23 @@ function AdminRenovaciones({ members, asistencia, eventosDb }) {
   const hoyAnio = new Date().getFullYear();
   const yaCorre = hoyAnio >= anio; // ya llegó el 1 de enero del año renovado
   const camp = d.campana;
-  const corte = rsFechaCorte(camp);
-  const misas = rsMisasHasta(misasTodas, corte);
+  const vencido = rsPlazoVencido(anio);
   const listas = { si: [], no: [], pend: [], conversar: [], nuevos: [], bloq: [] };
   activos.forEach((m) => {
     const mid = String(m.id);
     const r = d.resp[mid];
-    const pct = m.asistencia_especial ? null : mjStatsAsistencia(misas, m.id, false, m).pct;
+    // Asistencia: la registrada al responder; si no respondió, la de hoy
+    const pctHoy = m.asistencia_especial ? null : mjStatsAsistencia(misasTodas, m.id, false, m).pct;
+    const pct = m.asistencia_especial ? null : r && r.pct != null ? r.pct : pctHoy;
     const item = { m, r, pct };
-    if (r && r.r === "si") (r.tipo === "nuevo" ? listas.nuevos : listas.si).push(item);
-    else {
+    if (r && r.r === "si") {
+      (r.tipo === "nuevo" ? listas.nuevos : listas.si).push(item);
+      if (r.tipo !== "nuevo" && pct != null && pct < RS_ASIST_MINIMA) listas.conversar.push(item);
+    } else {
       if (r && r.r === "no") listas.no.push(item);
-      else if (pct != null && pct <= RS_ASIST_MINIMA && !d.habilitados[mid]) listas.conversar.push(item);
-      else listas.pend.push(item);
+      else {
+        listas.pend.push(item);
+      }
       if (yaCorre && camp && !d.desbloqueados[mid]) listas.bloq.push(item);
     }
   });
@@ -53565,10 +53599,11 @@ function AdminRenovaciones({ members, asistencia, eventosDb }) {
     await recargar();
     setProc("");
   };
-  const habilitar = async (m) => {
-    setProc("h" + m.id);
-    await rsGuardar(`renov_habilitar_${anio}_${m.id}`, { en: new Date().toISOString() });
-    sendPushToUsers([String(m.id)], `Renovación de Servicio ${anio}`, "Ya puedes firmar tu Renovación de Servicio en el portal del coro.");
+  const permitirTarde = async (m) => {
+    if (!window.confirm(`¿Permitir que ${m.nombre} responda la renovación fuera de plazo? Al entrar le aparecerá el documento.`)) return;
+    setProc("t" + m.id);
+    await rsGuardar(`renov_tarde_${anio}_${m.id}`, { en: new Date().toISOString() });
+    sendPushToUsers([String(m.id)], `Renovación de Servicio ${anio}`, "Ya puedes responder tu Renovación de Servicio en el portal del coro.");
     await recargar();
     setProc("");
   };
@@ -53630,7 +53665,7 @@ function AdminRenovaciones({ members, asistencia, eventosDb }) {
             <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".16em", color: "#e9d3a1" }}>ADMINISTRACIÓN</div>
             <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", marginTop: 4 }}>Renovación de Servicio {anio}</div>
             <div style={{ fontSize: 13.5, color: "rgba(255,255,255,.8)", marginTop: 6 }}>
-              {camp && camp.abierta ? `Abierta desde el ${rsFmt(camp.abiertaEn).split(" · ")[0]} · les aparece a todos al entrar` : camp ? "Cerrada" : "Aún no la abres"} · Asistencia evaluada hasta el {camp && camp.abiertaEn ? rsFmt(camp.abiertaEn).split(" · ")[0] : "día en que la abras (hoy, por ahora)"} · El 1 de enero de {anio} se suspende el acceso a quien no firmó.
+              {camp && camp.abierta ? `Abierta desde el ${rsFmt(camp.abiertaEn).split(" · ")[0]} · obligatoria al entrar` : camp ? "Cerrada" : "Aún no la abres"} · Plazo hasta el 30 de noviembre: desde el 1 de diciembre queda sin acceso quien no respondió · El 1 de enero de {anio} se suspende el acceso a quien no renovó.
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -53692,19 +53727,29 @@ function AdminRenovaciones({ members, asistencia, eventosDb }) {
         />
         <Grupo
           id="conversar"
-          titulo={`Deben conversar contigo (asistencia ≤ ${RS_ASIST_MINIMA}%)`}
+          titulo={`Renovaron · deben conversar contigo (asistencia bajo ${RS_ASIST_MINIMA}%)`}
           color="#b45309"
           items={listas.conversar}
           vacio="Nadie con asistencia baja."
+          render={(it) => <Fila key={it.m.id} it={it} onNombre={() => setVerDoc({ nombre: it.r.nombre || it.m.nombre, en: it.r.en })} />}
+        />
+        <Grupo
+          id="pend"
+          titulo={vencido ? "Sin responder (plazo vencido: sin acceso)" : "Pendientes (sin responder)"}
+          color="#c98a12"
+          items={listas.pend}
+          vacio="No hay pendientes."
           render={(it) => (
             <Fila key={it.m.id} it={it}>
-              <button type="button" style={btn("#1e3a5f")} disabled={!!proc} onClick={() => habilitar(it.m)}>
-                {proc === "h" + it.m.id ? "…" : "Habilitar renovación"}
-              </button>
+              {vencido && camp && !d.tarde[String(it.m.id)] && (
+                <button type="button" style={btn("#1e3a5f")} disabled={!!proc} onClick={() => permitirTarde(it.m)}>
+                  {proc === "t" + it.m.id ? "…" : "Permitir responder"}
+                </button>
+              )}
+              {vencido && d.tarde[String(it.m.id)] && <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>Puede responder</span>}
             </Fila>
           )}
         />
-        <Grupo id="pend" titulo="Pendientes (sin responder)" color="#c98a12" items={listas.pend} vacio="No hay pendientes." render={(it) => <Fila key={it.m.id} it={it} />} />
         <Grupo
           id="no"
           titulo="No renuevan"
