@@ -38363,6 +38363,38 @@ function mjConsolidarAsistencia(asistencia, mapa) {
 // Fechas de ingreso fijadas a mano por el admin (config: ingreso_<id> → {f: "AAAA-MM-DD"})
 let _mjIngresos = null;
 let _mjIngresosP = null;
+let _mjNuevos = {}; // id → fecha (AAAA-MM-DD) en que firmó el Compromiso de Servicio al registrarse
+async function mjLeerNuevosCompromiso() {
+  for (const t of [SUPABASE_SERVICE_KEY, _authToken, SUPABASE_KEY].filter((v, i, ar) => v && ar.indexOf(v) === i)) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/config?select=key,value&key=like.renov_*`, { headers: { apikey: t === SUPABASE_SERVICE_KEY ? SUPABASE_SERVICE_KEY : SUPABASE_KEY, Authorization: `Bearer ${t}` }, cache: "no-store" });
+      if (!r.ok) continue;
+      const rows = await r.json();
+      const o = {};
+      (Array.isArray(rows) ? rows : []).forEach((x) => {
+        const mt = /^renov_(\d{4})_(.+)$/.exec((x && x.key) || "");
+        if (!mt) return;
+        let v = x.value;
+        for (let i = 0; i < 2 && typeof v === "string"; i++) {
+          try {
+            v = JSON.parse(v);
+          } catch (e) {
+            break;
+          }
+        }
+        if (v && v.tipo === "nuevo") {
+          let f = "";
+          try {
+            f = v.en ? new Date(v.en).toLocaleDateString("en-CA", { timeZone: "America/Santiago" }) : "";
+          } catch (e) {}
+          o[mt[2]] = /^\d{4}-\d{2}-\d{2}$/.test(f) ? f : "";
+        }
+      });
+      return o;
+    } catch (e) {}
+  }
+  return null;
+}
 function mjCargarIngresos(forzar) {
   if (!_mjIngresosP || forzar) {
     _mjIngresosP = (async () => {
@@ -38375,7 +38407,9 @@ function mjCargarIngresos(forzar) {
       }
       return [];
     })()
-      .then((rows) => {
+      .then(async (rows) => {
+        const nv = await mjLeerNuevosCompromiso().catch(() => null);
+        if (nv) _mjNuevos = nv;
         const o = {};
         (Array.isArray(rows) ? rows : []).forEach((x) => {
           if (!x || typeof x.key !== "string" || !x.key.startsWith("ingreso_")) return;
@@ -38423,33 +38457,44 @@ async function mjGuardarIngreso(mid, fecha) {
   if (!r.ok) throw new Error("No se pudo guardar la fecha de ingreso (" + r.status + ")");
   await mjCargarIngresos(true);
 }
-// Fecha de ingreso de un integrante (su asistencia corre desde ahí). Si el admin la fijó, vale esa. Se usa la fecha de registro;
-// si tiene un presente/justificado anterior (registro creado después), vale ese.
+// Fecha de ingreso de un integrante (su asistencia corre desde ahí).
+// - Si el admin la fijó a mano, vale esa.
+// - Nuevo = quien firmó el Compromiso de Servicio al registrarse: cuenta desde el primer evento DESPUÉS del día en que se registró.
+// - Antiguo (todos los demás, aunque haya creado la cuenta tarde): cuenta desde el inicio del registro.
+// - Si en una misa quedó marcado "nuevo", todavía no era integrante: su ingreso es después de esa misa.
+function mjDiaSiguiente(f) {
+  const d = new Date(f + "T12:00:00");
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 function mjIngresoMiembro(m, misas) {
   if (!m) return null;
   const manual = mjIngresoManual(m.id);
   if (manual) return manual;
-  const raw = m.fecha_ingreso || m.created_at;
-  if (!raw) return null;
-  let f = String(raw).slice(0, 10);
-  try {
-    if (String(raw).length > 10) f = new Date(raw).toLocaleDateString("en-CA", { timeZone: "America/Santiago" });
-  } catch (e) {}
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return null;
   const mid = String(m.id);
-  (misas || []).forEach((x) => {
-    const r = x && x.porMiembro && x.porMiembro[mid];
-    if (r && x.fecha && (r.estado === "presente" || r.estado === "justificado") && x.fecha < f) f = x.fecha;
-  });
-  // Si en misas posteriores quedó marcado "nuevo", todavía no era integrante: su ingreso es después de la última
-  (misas || []).forEach((x) => {
-    const r = x && x.porMiembro && x.porMiembro[mid];
-    if (r && x.fecha && r.estado === "nuevo" && x.fecha >= f) {
-      const d = new Date(x.fecha + "T12:00:00");
-      d.setDate(d.getDate() + 1);
-      f = d.toISOString().slice(0, 10);
+  let f = null;
+  if (Object.prototype.hasOwnProperty.call(_mjNuevos, mid)) {
+    let reg = "";
+    const raw = m.created_at || m.fecha_ingreso;
+    try {
+      if (raw) reg = String(raw).length > 10 ? new Date(raw).toLocaleDateString("en-CA", { timeZone: "America/Santiago" }) : String(raw).slice(0, 10);
+    } catch (e) {}
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(reg)) reg = _mjNuevos[mid];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(reg || "")) {
+      f = mjDiaSiguiente(reg);
+      // Si igual tiene un presente/justificado anterior, cuenta desde ahí
+      (misas || []).forEach((x) => {
+        const r = x && x.porMiembro && x.porMiembro[mid];
+        if (r && x.fecha && (r.estado === "presente" || r.estado === "justificado") && x.fecha < f) f = x.fecha;
+      });
     }
+  }
+  let ultNuevo = null;
+  (misas || []).forEach((x) => {
+    const r = x && x.porMiembro && x.porMiembro[mid];
+    if (r && x.fecha && r.estado === "nuevo" && (!ultNuevo || x.fecha > ultNuevo)) ultNuevo = x.fecha;
   });
+  if (ultNuevo && (!f || ultNuevo >= f)) f = mjDiaSiguiente(ultNuevo);
   return f;
 }
 const mjDesdeIngreso = (misas, ingreso) => (ingreso ? (misas || []).filter((x) => !x.fecha || x.fecha >= ingreso) : misas || []);
