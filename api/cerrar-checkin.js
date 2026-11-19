@@ -19,6 +19,26 @@ async function sb(path, opts = {}) {
   return t ? JSON.parse(t) : null;
 }
 
+// Misas de semana (lunes a viernes): solo cuentan si el admin activó «Tomar asistencia» en la pauta
+// (config "asistencia_semana" = { "<idPauta>": "AAAA-MM-DD" }). Sábado y domingo cuentan siempre.
+function esDiaSemana(fecha) {
+  const f = String(fecha || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return false;
+  const d = new Date(f + "T12:00:00Z").getUTCDay();
+  return d >= 1 && d <= 5;
+}
+async function leerAsisSemana() {
+  try {
+    const c = await sb("config?select=value&key=eq.asistencia_semana&limit=1");
+    let v = c && c[0] ? c[0].value : null;
+    for (let i = 0; i < 2 && typeof v === "string"; i++) v = JSON.parse(v);
+    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+  } catch (e) {
+    return {};
+  }
+}
+const tomaAsistencia = (p, mapa) => !esDiaSemana(p.fecha) || !!mapa[String(p.id)];
+
 function ahoraChile() {
   const p = Object.fromEntries(
     new Intl.DateTimeFormat("en-CA", {
@@ -51,17 +71,12 @@ export default async function handler(req, res) {
     const proxima = pautas.find((p) => p.fecha >= hoy);
     const efectiva = pautas.map((p) => ({ ...p, fecha: cfg.fecha && proxima && proxima.id === p.id ? cfg.fecha : p.fecha }));
 
-    // Misas marcadas «Sin Check in» (misas especiales de semana): no se marcan ausentes, no cuentan para la asistencia
-    let sinCheckin = new Set();
-    try {
-      const sc = await sb("config?select=value&key=eq.pautas_sin_checkin&limit=1");
-      let arr = sc && sc[0] ? sc[0].value : [];
-      if (typeof arr === "string") arr = JSON.parse(arr);
-      if (Array.isArray(arr)) sinCheckin = new Set(arr.map(String));
-    } catch (e) {}
+    // Misas de semana sin «Tomar asistencia»: no se marcan ausentes (se mira la fecha real de la pauta)
+    const asisSemana = await leerAsisSemana();
+    const sinAsistencia = new Set(pautas.filter((p) => !tomaAsistencia(p, asisSemana)).map((p) => String(p.id)));
 
     // Cerradas = ya pasó su día, o es hoy y ya pasó la hora de término
-    const cerradas = efectiva.filter((p) => !sinCheckin.has(String(p.id)) && (p.fecha < hoy || (p.fecha === hoy && ahora > cfg.hasta)));
+    const cerradas = efectiva.filter((p) => !sinAsistencia.has(String(p.id)) && (p.fecha < hoy || (p.fecha === hoy && ahora > cfg.hasta)));
     if (!cerradas.length) return res.status(200).json({ ok: true, dry, nota: "Nada que cerrar todavía", hoy, ahora, hasta: cfg.hasta });
 
     const integrantes = ((await sb("integrantes?select=id,nombre,cuerda,acceso,asistencia_especial&acceso=eq.aprobado")) || []).filter(

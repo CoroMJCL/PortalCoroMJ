@@ -28,6 +28,26 @@ async function sb(path, opts = {}) {
   const t = await r.text();
   return t ? JSON.parse(t) : null;
 }
+// Misas de semana (lunes a viernes): solo cuentan si el admin activó «Tomar asistencia» en la pauta
+// (config "asistencia_semana" = { "<idPauta>": "AAAA-MM-DD" }). Sábado y domingo cuentan siempre.
+function esDiaSemana(fecha) {
+  const f = String(fecha || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return false;
+  const d = new Date(f + "T12:00:00Z").getUTCDay();
+  return d >= 1 && d <= 5;
+}
+async function leerAsisSemana() {
+  try {
+    const c = await sb("config?select=value&key=eq.asistencia_semana&limit=1");
+    let v = c && c[0] ? c[0].value : null;
+    for (let i = 0; i < 2 && typeof v === "string"; i++) v = JSON.parse(v);
+    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+  } catch (e) {
+    return {};
+  }
+}
+const tomaAsistencia = (p, mapa) => !esDiaSemana(p.fecha) || !!mapa[String(p.id)];
+
 const parse = (v) => {
   try {
     return typeof v === "string" ? JSON.parse(v) : v;
@@ -106,14 +126,10 @@ export async function programarRecordatoriosCheckin({ dry = false, soloMid = nul
   const miembros = ((await sb("integrantes?select=id,cuerda,acceso&acceso=eq.aprobado")) || []).filter(
     (m) => m.cuerda && m.cuerda.trim() !== "" && m.cuerda !== "Admin" && m.cuerda !== "Músico"
   );
-  // Misa marcada «Sin Check in» (misa especial de semana): nadie recibe el aviso y se cancela lo ya programado
-  let sinCheckin = false;
-  try {
-    const sc = await sb("config?select=value&key=eq.pautas_sin_checkin&limit=1");
-    const arr = sc && sc[0] ? parse(sc[0].value) : [];
-    sinCheckin = Array.isArray(arr) && arr.map(String).includes(String(pauta.id));
-  } catch (e) {}
-  const confirmados = sinCheckin ? new Set() : new Set(miembros.filter((m) => resp[String(m.id)] === "si").map((m) => String(m.id)));
+  // Misa de semana sin «Tomar asistencia»: nadie recibe el aviso y se cancela lo ya programado
+  const original = pautas.find((p) => p.id === pauta.id) || pauta;
+  const sinAsistencia = !tomaAsistencia(original, await leerAsisSemana());
+  const confirmados = sinAsistencia ? new Set() : new Set(miembros.filter((m) => resp[String(m.id)] === "si").map((m) => String(m.id)));
 
   // Lo ya programado
   const regKey = "checkin_recordatorio_" + pauta.id;

@@ -15829,72 +15829,129 @@ function LiturgiaLinea({ id, claro, style }) {
     </div>
   );
 }
-// ── Misas sin Check in (misas especiales de semana): config "pautas_sin_checkin" = [ids] ──
-// En esas misas no hay botón ni popup de Check in, no hay aviso de las 17:00 y no se marcan ausentes: no cuentan para la asistencia.
-let mjSinCheckinSet = (() => {
-  try {
-    return new Set(JSON.parse(localStorage.getItem("mj_sin_checkin") || "[]").map(String));
-  } catch (e) {
-    return new Set();
-  }
-})();
-let mjSinCheckinCargado = false;
-function mjEsSinCheckin(id) {
-  return id != null && mjSinCheckinSet.has(String(id));
+// ── Asistencia en misas de semana: config "asistencia_semana" = { "<idPauta>": "AAAA-MM-DD" } ──
+// Las misas de lunes a viernes NO cuentan para la asistencia, salvo que el admin active «Tomar asistencia» en su pauta.
+// Sin activar: no hay Check in, ni aviso de las 17:00, ni ausentes automáticos, y los registros de esa fecha no cuentan.
+// Sábado y domingo siguen como siempre.
+function mjEsDiaSemana(fecha) {
+  const f = String(fecha || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return false;
+  const d = new Date(f + "T12:00:00").getDay();
+  return d >= 1 && d <= 5;
 }
-function mjFijarSinCheckinLocal(ids) {
-  mjSinCheckinSet = new Set((ids || []).map(String));
+function mjLeerJSONLocal(k, def) {
   try {
-    localStorage.setItem("mj_sin_checkin", JSON.stringify([...mjSinCheckinSet]));
+    const v = JSON.parse(localStorage.getItem(k) || "null");
+    return v == null ? def : v;
+  } catch (e) {
+    return def;
+  }
+}
+let mjAsisSemana = mjLeerJSONLocal("mj_asis_semana", {}); // pautas de semana con asistencia activada
+let mjFechasSinAsis = new Set(mjLeerJSONLocal("mj_fechas_sin_asis", [])); // fechas de misas de semana que no cuentan
+let mjAsisSemanaCargado = false;
+let mjAsisSemanaVer = 0;
+let _mjAsisSemanaP = null;
+function mjTomaAsistencia(p) {
+  if (!p) return false;
+  return !mjEsDiaSemana(p.fecha) || !!mjAsisSemana[String(p.id)];
+}
+const mjFechaCuentaAsistencia = (fecha) => !fecha || !mjFechasSinAsis.has(String(fecha).slice(0, 10));
+function mjCalcFechasSinAsis(pautas) {
+  const sin = new Set();
+  const con = new Set();
+  (pautas || []).forEach((p) => {
+    if (!p || !p.fecha) return;
+    const f = String(p.fecha).slice(0, 10);
+    if (mjTomaAsistencia(p)) con.add(f);
+    else sin.add(f);
+  });
+  con.forEach((f) => sin.delete(f)); // si otra pauta del mismo día sí toma asistencia, la fecha cuenta
+  return sin;
+}
+function mjFijarAsisSemanaLocal(mapa, pautas) {
+  mjAsisSemana = mapa || {};
+  if (pautas) mjFechasSinAsis = mjCalcFechasSinAsis(pautas);
+  mjAsisSemanaVer++;
+  try {
+    localStorage.setItem("mj_asis_semana", JSON.stringify(mjAsisSemana));
+    localStorage.setItem("mj_fechas_sin_asis", JSON.stringify([...mjFechasSinAsis]));
   } catch (e) {}
   try {
-    window.dispatchEvent(new CustomEvent("mj-sincheckin"));
+    window.dispatchEvent(new CustomEvent("mj-asissemana"));
   } catch (e) {}
 }
-// true si leyó del servidor (aunque la lista esté vacía); false si no hubo red
-async function mjCargarSinCheckin() {
-  let v;
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/config?select=value&key=eq.pautas_sin_checkin&limit=1`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${_authToken || SUPABASE_KEY}` },
-    });
-    if (!r.ok) return false; // se conserva lo guardado
-    const d = await r.json();
-    v = Array.isArray(d) && d[0] ? d[0].value : [];
-  } catch (e) {
-    return false;
+function mjParseConfigObj(v) {
+  for (let i = 0; i < 2 && typeof v === "string"; i++) {
+    try {
+      v = JSON.parse(v);
+    } catch (e) {
+      return null;
+    }
   }
-  let arr = v;
-  if (typeof arr === "string") {
-    try { arr = JSON.parse(arr); } catch (e) { arr = []; }
-  }
-  mjSinCheckinCargado = true;
-  mjFijarSinCheckinLocal(Array.isArray(arr) ? arr : []);
-  return true;
+  return v && typeof v === "object" && !Array.isArray(v) ? v : null;
 }
-async function mjGuardarSinCheckin(id, sin) {
+// Lee la configuración y las fechas de las pautas. true si leyó del servidor; false si no hubo red (se conserva lo guardado)
+function mjCargarAsisSemana(forzar) {
+  if (!_mjAsisSemanaP || forzar) {
+    _mjAsisSemanaP = (async () => {
+      for (const t of [SUPABASE_SERVICE_KEY, _authToken, SUPABASE_KEY].filter((v, i, ar) => v && ar.indexOf(v) === i)) {
+        try {
+          const h = { apikey: t === SUPABASE_SERVICE_KEY ? SUPABASE_SERVICE_KEY : SUPABASE_KEY, Authorization: `Bearer ${t}` };
+          const [rc, rp] = await Promise.all([
+            fetch(`${SUPABASE_URL}/rest/v1/config?select=value&key=eq.asistencia_semana&limit=1`, { headers: h, cache: "no-store" }),
+            fetch(`${SUPABASE_URL}/rest/v1/pautas_misa?select=id,fecha`, { headers: h, cache: "no-store" }),
+          ]);
+          if (!rc.ok || !rp.ok) continue;
+          const c = await rc.json();
+          const pautas = await rp.json();
+          const mapa = (Array.isArray(c) && c[0] && mjParseConfigObj(c[0].value)) || {};
+          mjAsisSemanaCargado = true;
+          mjFijarAsisSemanaLocal(mapa, Array.isArray(pautas) ? pautas : []);
+          return true;
+        } catch (e) {}
+      }
+      _mjAsisSemanaP = null; // se reintenta la próxima vez
+      return false;
+    })();
+  }
+  return _mjAsisSemanaP;
+}
+// Guarda la opción «Tomar asistencia» de una pauta (solo se guarda para misas de semana)
+async function mjGuardarAsisSemana(id, fecha, activa) {
   if (id == null) return true;
-  if (!(await mjCargarSinCheckin())) return false; // sin leer lo último no se guarda (no pisar la lista)
-  if (mjEsSinCheckin(id) === !!sin) return true;
-  const s = new Set(mjSinCheckinSet);
-  if (sin) s.add(String(id));
-  else s.delete(String(id));
-  const ok = await setConfig("pautas_sin_checkin", JSON.stringify([...s]));
+  if (!(await mjCargarAsisSemana(true))) return false; // sin leer lo último no se guarda (no pisar la lista)
+  const m = { ...mjAsisSemana };
+  const k = String(id);
+  const quiere = !!activa && mjEsDiaSemana(fecha);
+  if (quiere && m[k] === String(fecha).slice(0, 10)) return true;
+  if (!quiere && !(k in m)) {
+    await mjCargarAsisSemana(true); // recalcula fechas por si cambió la fecha de la pauta
+    return true;
+  }
+  if (quiere) m[k] = String(fecha).slice(0, 10);
+  else delete m[k];
+  const ok = await setConfig("asistencia_semana", JSON.stringify(m));
   if (ok) {
-    mjFijarSinCheckinLocal([...s]);
+    await mjCargarAsisSemana(true);
     fetch("/api/recordatorio-checkin").catch(() => {}); // si la misa es hoy, cancela o reprograma el aviso de las 17:00
   }
   return ok;
 }
-function useSinCheckin() {
+// Número que cambia cuando se actualiza la configuración (para recalcular porcentajes)
+function useAsisSemanaVer() {
   const [, forzar] = useState(0);
   useEffect(() => {
     const f = () => forzar((n) => n + 1);
-    window.addEventListener("mj-sincheckin", f);
-    if (!mjSinCheckinCargado) mjCargarSinCheckin();
-    return () => window.removeEventListener("mj-sincheckin", f);
+    window.addEventListener("mj-asissemana", f);
+    if (!mjAsisSemanaCargado) mjCargarAsisSemana();
+    return () => window.removeEventListener("mj-asissemana", f);
   }, []);
-  return mjEsSinCheckin;
+  return mjAsisSemanaVer;
+}
+function useTomaAsistencia() {
+  useAsisSemanaVer();
+  return mjTomaAsistencia;
 }
 
 // ── Acceso por pauta: config "pauta_acceso_<id>" = {restringida, ids[]} ──
@@ -16224,7 +16281,7 @@ async function mjResumenAsistencia(user) {
         const re = await fetch(`${SUPABASE_URL}/rest/v1/eventos?select=id,fecha,tipo,titulo`, { headers: h });
         if (re.ok) evDb = await re.json();
       } catch (e) {}
-      await mjGcalHistorial();
+      await Promise.all([mjGcalHistorial(), mjCargarAsisSemana(true).catch(() => {})]);
       const st = mjStatsAsistencia(mjConsolidarAsistencia(rows, mjMapaEventos(evDb)), user.id, esp, user);
       return { pct: st.pct, especial: !!st.especial, presentes: st.presentes, ausentes: st.ausentes, justificados: st.justificados, total: st.evaluados };
     } catch (e) {}
@@ -16510,7 +16567,7 @@ async function mjYaRegistrado(pauta, user) {
 // Popup obligatorio el día de la misa: no se cierra hasta hacer Check in (una sola vez por misa)
 function CheckInObligatorio({ pautas, user }) {
   const cfg = useCheckinCfg();
-  const sinCheckin = useSinCheckin();
+  const tomaAsistencia = useTomaAsistencia();
   const [ahora, setAhora] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setAhora(new Date()), 30000);
@@ -16518,7 +16575,7 @@ function CheckInObligatorio({ pautas, user }) {
   }, []);
   const hoy = mjHoyISO();
   const pauta = (pautas || [])
-    .filter((p) => p.publicada && p.fecha && !sinCheckin(p.id))
+    .filter((p) => p.publicada && p.fecha && tomaAsistencia(p))
     .map((p) => mjPautaEfectiva(p, cfg, pautas))
     .find((p) => p.fecha === hoy);
   const [estado, setEstado] = useState("revisando"); // revisando | pedir | listo
@@ -16669,7 +16726,7 @@ function CheckInObligatorio({ pautas, user }) {
 
 function CheckInPauta({ pauta: pautaBase, pautas, user }) {
   const cfg = useCheckinCfg();
-  const sinCheckin = useSinCheckin();
+  const tomaAsistencia = useTomaAsistencia();
   const pauta = mjPautaEfectiva(pautaBase, cfg, pautas);
   const lk = `mj_checkin_${pauta.id}_${user && user.id}`;
   const [hecho, setHecho] = useState(() => {
@@ -16704,7 +16761,7 @@ function CheckInPauta({ pauta: pautaBase, pautas, user }) {
     return () => window.removeEventListener("mj-checkin", g);
   }, [pauta.id, user && user.id]);
   if (!user || esVisita(user) || !user.id) return null;
-  if (sinCheckin(pauta.id)) return null; // misa especial de semana: sin Check in
+  if (!tomaAsistencia(pautaBase)) return null; // misa de semana sin asistencia: no hay Check in
   const est = mjCheckinEstado(pauta, cfg);
   const esHoy = est === "abierto";
   const diaHoy = pauta.fecha === mjHoyISO();
@@ -16845,7 +16902,7 @@ function AccesoCheckInOffline() {
   const cfg = mjCfgLocal();
   const lista = mjLeerPautasOffline().pautas.map((p) => ({ ...p, publicada: true }));
   const hoy = mjHoyISO();
-  const pauta = lista.map((p) => mjPautaEfectiva(p, cfg, lista)).find((p) => p.fecha === hoy && !mjEsSinCheckin(p.id));
+  const pauta = lista.filter((p) => mjTomaAsistencia(p)).map((p) => mjPautaEfectiva(p, cfg, lista)).find((p) => p.fecha === hoy);
   if (!pauta) return null;
   const lk = `mj_checkin_${pauta.id}_${ident.id}`;
   let hecho = false;
@@ -34258,7 +34315,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
     mostrar_col_letra: false,
     mostrar_col_audio: false,
     acceso_solo: false,
-    sin_checkin: false,
+    toma_asistencia: false,
     liturgia: "",
   };
   const [form, setForm] = useState(emptyPauta);
@@ -34408,7 +34465,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       const [created] = await res.json();
       if (esMus && created && created.id) await mjMarcarPautaMusico(created, user);
       if (created && created.id && (form.liturgia || "").trim()) await mjGuardarLiturgia(created.id, form.liturgia);
-      if (created && created.id && form.sin_checkin && !(await mjGuardarSinCheckin(created.id, true))) alert("La pauta se guardó, pero no se pudo marcar «Sin Check in». Edítala y vuelve a marcarlo.");
+      if (created && created.id && !(await mjGuardarAsisSemana(created.id, created.fecha || form.fecha, !!form.toma_asistencia)) && form.toma_asistencia && mjEsDiaSemana(form.fecha)) alert("La pauta se guardó, pero no se pudo activar «Tomar asistencia». Edítala y vuelve a marcarlo.");
       await onReload();
       setMode(publish ? "view" : null);
       setForm(emptyPauta);
@@ -34465,7 +34522,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       const lineasCambio = pauta.publicada ? mjResumenCambiosPauta(pauta, body) : [];
       await updateRecord("pautas_misa", pauta.id, body);
       await mjGuardarLiturgia(pauta.id, form.liturgia);
-      if (!(await mjGuardarSinCheckin(pauta.id, !!form.sin_checkin))) alert("La pauta se guardó, pero no se pudo guardar la opción «Sin Check in». Intenta de nuevo.");
+      if (!(await mjGuardarAsisSemana(pauta.id, body.fecha || form.fecha, !!form.toma_asistencia))) alert("La pauta se guardó, pero no se pudo guardar la opción «Tomar asistencia». Intenta de nuevo.");
       await onReload();
       const updated = { ...pauta, ...body };
       setSelected(updated);
@@ -34663,9 +34720,9 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       mostrar_col_letra: pauta.mostrar_col_letra || false,
       mostrar_col_audio: pauta.mostrar_col_audio || false,
       liturgia: mjLiturgiaCache[pauta.id] || "",
-      sin_checkin: mjEsSinCheckin(pauta.id),
+      toma_asistencia: !!mjAsisSemana[String(pauta.id)],
     });
-    mjCargarSinCheckin().then((ok) => ok && setForm((p) => ({ ...p, sin_checkin: mjEsSinCheckin(pauta.id) })));
+    mjCargarAsisSemana(true).then((ok) => ok && setForm((p) => ({ ...p, toma_asistencia: !!mjAsisSemana[String(pauta.id)] })));
     getConfig(`pauta_liturgia_${pauta.id}`)
       .then((v) => {
         const x = mjLeerLiturgia(v);
@@ -35122,14 +35179,14 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                   <span style={{ fontSize: 12, color: "#64748b" }}>Al guardar eliges quiénes la ven. No se envía aviso a los demás.</span>
                 </span>
               </label>
-              {/* Misa especial de semana: sin Check in y sin contar asistencia */}
-              {!esMus && (
+              {/* Misa de semana: el admin decide si se toma asistencia (por defecto no) */}
+              {!esMus && mjEsDiaSemana(form.fecha) && (
                 <label style={{ display: "flex", alignItems: "flex-start", gap: 10, margin: "8px 0 4px", padding: "10px 12px", background: "#eef4fb", border: "1px solid #d6e3f5", borderRadius: 12, cursor: "pointer", fontSize: 13, color: "#1e3a5f", lineHeight: 1.4 }}>
-                  <input type="checkbox" checked={!!form.sin_checkin} onChange={(e) => setForm((p) => ({ ...p, sin_checkin: e.target.checked }))} style={{ width: 18, height: 18, marginTop: 1 }} />
+                  <input type="checkbox" checked={!!form.toma_asistencia} onChange={(e) => setForm((p) => ({ ...p, toma_asistencia: e.target.checked }))} style={{ width: 18, height: 18, marginTop: 1 }} />
                   <span>
-                    <b>Sin Check in</b>
+                    <b>Tomar asistencia</b>
                     <br />
-                    <span style={{ fontSize: 12, color: "#64748b" }}>Para misas especiales de semana: no se pide marcar asistencia y esta misa no cuenta para la asistencia.</span>
+                    <span style={{ fontSize: 12, color: "#64748b" }}>Es una misa de semana: si no lo marcas, no cuenta para la asistencia (sin Check in ni ausentes). Márcalo si quieres que cuente.</span>
                   </span>
                 </label>
               )}
@@ -36742,7 +36799,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
 
 function AdminCheckIn() {
   const [cfg, setCfg] = useState({ ...MJ_CHECKIN_DEF });
-  useSinCheckin();
+  useAsisSemanaVer();
   const [msg, setMsg] = useState("");
   const [cerrando, setCerrando] = useState(false);
   const [cierreMsg, setCierreMsg] = useState("");
@@ -36869,7 +36926,7 @@ function AdminCheckIn() {
         const mh = prox && prox.hora ? mn(prox.hora) : null;
         const avisos = [];
         if (!prox) avisos.push("No hay ninguna pauta publicada de hoy en adelante, por eso el Check in no se muestra a nadie.");
-        if (prox && mjEsSinCheckin(prox.id)) avisos.push("Esta misa está marcada «Sin Check in»: no se pide marcar asistencia y no cuenta para la asistencia.");
+        if (prox && !mjTomaAsistencia(lista.find((p) => String(p.id) === String(prox.id)) || prox)) avisos.push("Es una misa de semana sin «Tomar asistencia»: no hay Check in y no cuenta para la asistencia. Actívalo en la pauta si quieres tomarla.");
         if (prox && mh != null && (mn(cfg.hasta) < mh - 30 || mn(cfg.desde) > mh)) avisos.push(`El horario del Check in (${cfg.desde}–${cfg.hasta}) no coincide con la hora de la misa (${prox.hora}). Revísalo y vuelve a guardar.`);
         const vistosHoy = prox ? (diag.vistos || []).filter((v) => v.key.startsWith(`checkin_visto_${prox.id}_`)).length : 0;
         return (
@@ -38271,6 +38328,7 @@ function mjMapaEventos(eventosDb) {
 }
 function useMapaEventos(eventosDb) {
   const [ver, setVer] = useState(0);
+  const asisVer = useAsisSemanaVer(); // al cambiar qué misas de semana cuentan, se recalcula todo
   useEffect(() => {
     let vivo = true;
     mjGcalHistorial().then(() => vivo && setVer((v) => v + 1));
@@ -38278,7 +38336,7 @@ function useMapaEventos(eventosDb) {
       vivo = false;
     };
   }, []);
-  return useMemo(() => mjMapaEventos(eventosDb), [ver, eventosDb]);
+  return useMemo(() => mjMapaEventos(eventosDb), [ver, eventosDb, asisVer]);
 }
 const mjClaveMisa = (fecha, grupo) => fecha + (grupo === "ensayo" ? "·ensayo" : "");
 // Agrupa los registros por misa (fecha) y persona
@@ -38287,6 +38345,7 @@ function mjConsolidarAsistencia(asistencia, mapa) {
   (asistencia || []).forEach((r) => {
     if (!r || r.evento_id == null) return;
     const ev = mapa[String(r.evento_id)];
+    if (ev && ev.grupo === "misa" && !mjFechaCuentaAsistencia(ev.fecha)) return; // misa de semana sin «Tomar asistencia»
     const key = ev ? mjClaveMisa(ev.fecha, ev.grupo) : "id:" + r.evento_id;
     let m = misas[key];
     if (!m) m = misas[key] = { key, fecha: ev ? ev.fecha : null, grupo: ev ? ev.grupo : "misa", titulo: ev ? ev.titulo : "", porMiembro: {} };
@@ -39363,17 +39422,20 @@ function ControlAccesoAsistencia({ user, members, asistencia, eventosDb, listo, 
   const [desbConv, setDesbConv] = useState(undefined);
   const [avisoCerrado, setAvisoCerrado] = useState(false);
   const [ingListo, setIngListo] = useState(!!_mjIngresos);
+  const [asisListo, setAsisListo] = useState(mjAsisSemanaCargado);
+  const asisVer = useAsisSemanaVer();
   const yo = (members || []).find((m) => String(m.id) === String(user?.id)) || user;
   const exento = !user || !user.id || mjExentoBloqueo(yo);
   useEffect(() => {
     if (exento) return;
     mjCargarIngresos().then(() => setIngListo(true));
+    mjCargarAsisSemana().then(() => setAsisListo(true));
     mjGcalHistorial().then(() => setGcalListo(true));
     mjCargarDesbloqueos().then((x) => setDesb(x));
     mjCargarDesbloqueosConv().then((x) => setDesbConv(x));
   }, [exento, user && user.id]);
-  const mapa = useMemo(() => mjMapaEventos(eventosDb), [eventosDb, gcalListo]);
-  if (exento || !listo || !gcalListo || !ingListo || desb === undefined || desb === null) return null;
+  const mapa = useMemo(() => mjMapaEventos(eventosDb), [eventosDb, gcalListo, asisVer]);
+  if (exento || !listo || !gcalListo || !ingListo || !asisListo || desb === undefined || desb === null) return null;
   const misas = mjConsolidarAsistencia(asistencia, mapa);
   const racha = mjRachaAusencias(misas, user.id, (desb[String(user.id)] || {}).hasta);
   const nombre = String((yo && yo.nombre) || "").split(" ")[0];
@@ -39580,7 +39642,7 @@ function ConfirmacionMisa({ user, members, asistencia, eventosDb, listo, conv, o
       try {
         const yo = (members || []).find((m) => String(m.id) === uid) || user;
         if (!mjExentoBloqueo(yo)) {
-          const [, desb] = await Promise.all([mjGcalHistorial(), mjCargarDesbloqueos(), mjCargarIngresos()]);
+          const [, desb] = await Promise.all([mjGcalHistorial(), mjCargarDesbloqueos(), mjCargarIngresos(), mjCargarAsisSemana()]);
           const misas = mjConsolidarAsistencia(asistencia, mjMapaEventos(eventosDb));
           racha = mjRachaAusencias(misas, uid, ((desb || {})[uid] || {}).hasta);
         }
@@ -39777,6 +39839,7 @@ function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) 
     const o = {};
     const add = (fecha, grupo, titulo, extra) => {
       if (!fecha) return;
+      if (grupo !== "ensayo" && !mjFechaCuentaAsistencia(fecha)) return; // misa de semana sin «Tomar asistencia»
       const key = mjClaveMisa(fecha, grupo);
       if (!o[key]) o[key] = { key, fecha, grupo, titulo: titulo || "" };
       if (titulo && !o[key].titulo) o[key].titulo = titulo;
@@ -46102,7 +46165,8 @@ function AdminConvocatorias({ members, pautas, asistencia, eventosDb }) {
   const [data, setData] = useState(null);
   const [desbConv, setDesbConv] = useState(null);
   const [gcalHist, setGcalHist] = useState(false);
-  const mapaAs = useMemo(() => mjMapaEventos(eventosDb), [eventosDb, gcalHist]);
+  const asisVer = useAsisSemanaVer();
+  const mapaAs = useMemo(() => mjMapaEventos(eventosDb), [eventosDb, gcalHist, asisVer]);
   const misasAs = useMemo(() => mjConsolidarAsistencia(asistencia, mapaAs), [asistencia, mapaAs]);
   const [form, setForm] = useState(null); // { fecha, titulo, hora, lugar, limite, editar }
   const [guardando, setGuardando] = useState(false);
@@ -46513,6 +46577,7 @@ async function mjDatosAsistenciaPublica() {
     get("integrantes?select=*&order=nombre.asc"),
     mjGcalHistorial().catch(() => {}),
     mjCargarIngresos(true).catch(() => {}),
+    mjCargarAsisSemana(true).catch(() => {}),
   ]);
   const misas = mjConsolidarAsistencia(rows, mjMapaEventos(evDb)).filter((x) => x.fecha);
   const lista = mjIntegrantesAsistencia(ms)
@@ -53460,7 +53525,8 @@ function AdminRenovaciones({ members, asistencia, eventosDb }) {
   useEffect(() => {
     mjGcalHistorial().then(() => setGcal(true));
   }, []);
-  const mapa = useMemo(() => mjMapaEventos(eventosDb), [eventosDb, gcal]);
+  const asisVer = useAsisSemanaVer();
+  const mapa = useMemo(() => mjMapaEventos(eventosDb), [eventosDb, gcal, asisVer]);
   const misasTodas = useMemo(() => mjConsolidarAsistencia(asistencia, mapa), [asistencia, mapa]);
   if (d === undefined) return <div style={{ padding: 30, textAlign: "center", color: "#64748b" }}>Cargando…</div>;
 
