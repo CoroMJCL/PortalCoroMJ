@@ -38462,6 +38462,16 @@ async function mjGuardarIngreso(mid, fecha) {
 // - Nuevo = quien firmó el Compromiso de Servicio al registrarse: cuenta desde el primer evento DESPUÉS del día en que se registró.
 // - Antiguo (todos los demás, aunque haya creado la cuenta tarde): cuenta desde el inicio del registro.
 // - Si en una misa quedó marcado "nuevo", todavía no era integrante: su ingreso es después de esa misa.
+const MJ_INICIO_ASISTENCIA = "2026-10-17"; // primera misa con registro de asistencia
+function mjFechaRegistro(m) {
+  const raw = m && (m.created_at || m.fecha_ingreso);
+  if (!raw) return null;
+  let f = String(raw).slice(0, 10);
+  try {
+    if (String(raw).length > 10) f = new Date(raw).toLocaleDateString("en-CA", { timeZone: "America/Santiago" });
+  } catch (e) {}
+  return /^\d{4}-\d{2}-\d{2}$/.test(f) ? f : null;
+}
 function mjDiaSiguiente(f) {
   const d = new Date(f + "T12:00:00");
   d.setDate(d.getDate() + 1);
@@ -38474,12 +38484,7 @@ function mjIngresoMiembro(m, misas) {
   const mid = String(m.id);
   let f = null;
   if (Object.prototype.hasOwnProperty.call(_mjNuevos, mid)) {
-    let reg = "";
-    const raw = m.created_at || m.fecha_ingreso;
-    try {
-      if (raw) reg = String(raw).length > 10 ? new Date(raw).toLocaleDateString("en-CA", { timeZone: "America/Santiago" }) : String(raw).slice(0, 10);
-    } catch (e) {}
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(reg)) reg = _mjNuevos[mid];
+    const reg = mjFechaRegistro(m) || _mjNuevos[mid];
     if (/^\d{4}-\d{2}-\d{2}$/.test(reg || "")) {
       f = mjDiaSiguiente(reg);
       // Si igual tiene un presente/justificado anterior, cuenta desde ahí
@@ -53362,6 +53367,25 @@ function RenovacionServicioIntegrante({ user, members, asistencia, eventosDb, li
   const [estado, setEstado] = useState("doc"); // doc | gracias | no | listo
   const [guardando, setGuardando] = useState(false);
   const [err, setErr] = useState("");
+  // ¿Nuevo o antiguo? (cuentas creadas desde que comenzó el registro de asistencia, sin Compromiso firmado)
+  const [preguntaIngreso, setPreguntaIngreso] = useState(undefined); // undefined: revisando · true: preguntar · false: no
+  const [ingresoPaso, setIngresoPaso] = useState("pregunta"); // pregunta | compromiso | gracias
+  useEffect(() => {
+    if (exento || !yo || yo.id == null) return;
+    let vivo = true;
+    (async () => {
+      const reg = mjFechaRegistro(yo);
+      if (!reg || reg < MJ_INICIO_ASISTENCIA) return vivo && setPreguntaIngreso(false);
+      await mjCargarIngresos(true);
+      const mid = String(yo.id);
+      if (mjIngresoManual(mid) || Object.prototype.hasOwnProperty.call(_mjNuevos, mid)) return vivo && setPreguntaIngreso(false);
+      const v = await getConfig(`integrante_antiguo_${mid}`);
+      if (vivo) setPreguntaIngreso(v === null || v === undefined || v === "");
+    })().catch(() => vivo && setPreguntaIngreso(false));
+    return () => {
+      vivo = false;
+    };
+  }, [exento, yo && yo.id]);
   const recargar = useCallback(() => {
     rsCargar(anioBloqueo).then((x) => setDBloq(x));
     if (anioFirma !== anioBloqueo) rsCargar(anioFirma).then((x) => setDFirma(x));
@@ -53398,7 +53422,75 @@ function RenovacionServicioIntegrante({ user, members, asistencia, eventosDb, li
     );
   }
 
-  // 2) Renovación del año siguiente (obligatoria hasta responder)
+  // 2) Cuenta creada después de que comenzó el registro, sin Compromiso: ¿ya era integrante o es nuevo?
+  if (preguntaIngreso === undefined) return null;
+  if (preguntaIngreso) {
+    const marcarAntiguo = async () => {
+      setGuardando(true);
+      setErr("");
+      const ok = await setConfig(`integrante_antiguo_${mid}`, JSON.stringify({ en: new Date().toISOString() }));
+      setGuardando(false);
+      if (!ok) return setErr("No se pudo guardar. Revisa tu conexión e intenta de nuevo.");
+      setPreguntaIngreso(false);
+    };
+    const firmarNuevo = async () => {
+      setGuardando(true);
+      setErr("");
+      const en = new Date().toISOString();
+      const ok = await rsGuardar(`renov_${anioFirma}_${mid}`, { r: "si", en, nombre, tipo: "nuevo" });
+      if (!ok) {
+        setGuardando(false);
+        return setErr("No se pudo guardar. Revisa tu conexión e intenta de nuevo.");
+      }
+      const admins = rsIdsAdmin(members);
+      if (admins.length) sendPushToUsers(admins, "Compromiso de Servicio ✓", `${nombre} firmó su Compromiso de Servicio ${anioFirma} como integrante nuevo.`);
+      await mjCargarIngresos(true);
+      setGuardando(false);
+      setIngresoPaso("gracias");
+      recargar();
+    };
+    if (ingresoPaso === "gracias")
+      return (
+        <RsPantalla>
+          <RsGracias titulo="¡Gracias por tu compromiso!" texto="Tu Compromiso de Servicio quedó firmado. Bienvenido al coro: que Dios bendiga tu servicio." boton="Entrar al portal" onOk={() => setPreguntaIngreso(false)} />
+        </RsPantalla>
+      );
+    if (ingresoPaso === "compromiso")
+      return (
+        <RsPantalla>
+          <div style={{ textAlign: "center", padding: "4px 6px 16px" }}>
+            <div style={{ fontSize: 13.5, color: "#3a4556", lineHeight: 1.5 }}>Como integrante nuevo, lee y firma tu Compromiso de Servicio para seguir usando el portal.</div>
+          </div>
+          <DocServicio nombre={nombre} anio={anioFirma} nuevo />
+          {err && <div style={{ marginTop: 14, color: "#9b2c22", fontSize: 13.5, fontWeight: 600, textAlign: "center" }}>{err}</div>}
+          <RsFirma anio={anioFirma} nuevo guardando={guardando} onFirmar={firmarNuevo} />
+          <button type="button" onClick={() => setIngresoPaso("pregunta")} disabled={guardando} style={{ display: "block", margin: "14px auto 0", background: "none", border: "none", color: "#5b6472", fontFamily: "inherit", fontSize: 13.5, fontWeight: 600, textDecoration: "underline", cursor: "pointer", padding: 8 }}>
+            Volver
+          </button>
+        </RsPantalla>
+      );
+    const op = { width: "100%", height: 54, borderRadius: 14, fontFamily: "inherit", fontSize: 15.5, fontWeight: 700, cursor: "pointer" };
+    return (
+      <RsPantalla>
+        <div style={{ background: "#fff", borderRadius: 22, padding: "30px 24px 24px", textAlign: "center", boxShadow: "0 14px 36px rgba(20,40,63,.13)", marginTop: 40 }}>
+          <img src="/logo-coro-mj-oficial.jpg" alt="" style={{ height: 96, width: "auto" }} />
+          <div style={{ fontSize: 21, fontWeight: 800, color: "#0f1b2d", marginTop: 16, lineHeight: 1.25 }}>¿Ya eras integrante del coro antes de crear tu cuenta en el portal?</div>
+          <div style={{ fontSize: 14, color: "#4b5869", lineHeight: 1.5, marginTop: 8 }}>Con tu respuesta sabemos desde cuándo se cuenta tu asistencia.</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
+            <button type="button" disabled={guardando} onClick={marcarAntiguo} style={{ ...op, border: "none", background: "#1e3a5f", color: "#fff" }}>
+              {guardando ? "Guardando…" : "Sí, ya cantaba en el coro"}
+            </button>
+            <button type="button" disabled={guardando} onClick={() => setIngresoPaso("compromiso")} style={{ ...op, border: "1px solid #c9d2de", background: "#fff", color: "#1e3a5f" }}>
+              No, soy integrante nuevo
+            </button>
+          </div>
+          {err && <div style={{ marginTop: 14, color: "#9b2c22", fontSize: 13.5, fontWeight: 600 }}>{err}</div>}
+        </div>
+      </RsPantalla>
+    );
+  }
+
+  // 3) Renovación del año siguiente (obligatoria hasta responder)
   const d = dFirma;
   if (!d || !d.campana) return null;
   const resp = d.resp[mid];
