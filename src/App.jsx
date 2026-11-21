@@ -8016,6 +8016,14 @@ function FotoDestacadaMisaWidget({ isAdmin }) {
 // ═══════════════════════════════════════════════════════════════
 //  WIDGET GALERÍA DE FOTOS
 // ═══════════════════════════════════════════════════════════════
+// Abre el panel Administrador directamente en una pestaña
+function abrirAdminEn(tab, setSection) {
+  try {
+    sessionStorage.setItem("admin_tab_inicial", tab);
+  } catch {}
+  setSection("admin");
+}
+
 function GaleriaWidget({ fotos, setSection, isAdmin }) {
   const [idx, setIdx] = useState(0);
   const [lightbox, setLightbox] = useState(false);
@@ -8059,7 +8067,7 @@ function GaleriaWidget({ fotos, setSection, isAdmin }) {
             <div style={{ fontSize: 11, color: C.gray }}>Sin fotos aún</div>
           </div>
           <button
-            onClick={() => setSection("admin-galeria")}
+            onClick={() => abrirAdminEn("galeria", setSection)}
             style={{
               background: C.primaryLight,
               border: `1px solid ${C.primary}50`,
@@ -8151,7 +8159,7 @@ function GaleriaWidget({ fotos, setSection, isAdmin }) {
           </div>
           {isAdmin && (
             <button
-              onClick={() => setSection("admin-galeria")}
+              onClick={() => abrirAdminEn("galeria", setSection)}
               style={{
                 background: C.primaryLight,
                 border: `1px solid ${C.primary}50`,
@@ -46856,7 +46864,17 @@ function Admin({
   eventosDb,
   pautasAdmin,
 }) {
-  const [tab, setTabRaw] = useState("integrantes");
+  const [tab, setTabRaw] = useState(() => {
+    // Pestaña pedida desde otra pantalla (p. ej. "Gestionar" de la Galería)
+    try {
+      const t = sessionStorage.getItem("admin_tab_inicial");
+      if (t) {
+        sessionStorage.removeItem("admin_tab_inicial");
+        if (ADMIN_TABS.some((x) => x.id === t)) return t;
+      }
+    } catch {}
+    return "integrantes";
+  });
   const adminContentRef = useRef(null);
   const setTab = (id) => {
     setTabRaw(id);
