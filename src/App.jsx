@@ -3,6 +3,7 @@ import { EscuelaCanto } from "./EscuelaCanto";
 import Landing from "./Landing";
 import { versionActual, versionPublicada } from "./ActualizacionApp";
 import CursoGuitarra from "./CursoGuitarra";
+import EstudioMJ from "./EstudioMJ";
 import { PDFDocument } from "pdf-lib";
 import { createPortal } from "react-dom";
 
@@ -1107,7 +1108,7 @@ const NAV = [
   { id: "perfil", icon: "◎", label: "Mi Perfil" },
   { id: "reglamento", icon: "📜", label: "Reglamento" },
   { id: "renovacion", icon: "✍", label: "Renovación de Servicio" },
-  { id: "curso_guitarra", icon: "🎸", label: "Curso de Guitarra" },
+  { id: "estudio", icon: "🎓", label: "Estudio MJ" },
   { id: "admin", icon: "⚙", label: "Administración" },
   { id: "subir_material", icon: "⬆", label: "Subir Material" },
   { id: "solicitudes", icon: "🔔", label: "Solicitudes" },
@@ -1429,6 +1430,7 @@ const NAV_ICONOS = {
   pauta_misa: <><path d="M8 3h9a2 2 0 0 1 2 2v16l-3.5-2-3.5 2-3.5-2L5 21V6a3 3 0 0 1 3-3z" /><path d="M9 9h6M9 13h4" /></>,
   pauta_ensayo: <><path d="M6 3h12a1 1 0 0 1 1 1v17H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /><path d="M14 7v7.5" /><circle cx="12" cy="14.5" r="2" /><path d="M14 7l3 1" /></>,
   podcast: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></>,
+  estudio: <><path d="M3 9l9-5 9 5-9 5z" /><path d="M7 11.5V16c1.5 1.5 3 2 5 2s3.5-.5 5-2v-4.5" /><path d="M21 9v5" /></>,
   escuela_canto: <><path d="M3 9l9-5 9 5-9 5z" /><path d="M7 11.5V16c1.5 1.5 3 2 5 2s3.5-.5 5-2v-4.5" /></>,
   sala_ensayo: <><path d="M9 18V5l11-2v13" /><circle cx="6" cy="18" r="3" /></>,
   material_ensayo: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></>,
@@ -1436,7 +1438,7 @@ const NAV_ICONOS = {
 };
 const NAV_GRUPOS_MENU = [
   { t: "Principal", ids: ["dashboard", "agenda", "pauta_misa", "pauta_ensayo", "asistencia"] },
-  { t: "Música", ids: ["cancionero_digital", "material_ensayo", "documentos", "curso_guitarra", "escuela_canto", "sala_ensayo", "biblioteca", "podcast"] },
+  { t: "Música", ids: ["cancionero_digital", "material_ensayo", "documentos", "estudio", "sala_ensayo", "biblioteca", "podcast"] },
   { t: "Comunidad", ids: ["oraciones", "cumpleanos", "reglamento", "renovacion", "guia", "perfil"] },
   { t: "Administración", ids: ["admin", "solicitudes", "subir_material", "finanzas", "info_gastos"] },
 ];
@@ -4643,6 +4645,21 @@ function AppInner() {
               {section === "reglamento" && <Reglamento />}
               {section === "renovacion" && esCuerdaAdmin(user) && <AdminRenovaciones members={members} asistencia={asistencia} eventosDb={eventos} />}
               {section === "curso_guitarra" && <CursoGuitarra />}
+              {section === "estudio" && (
+                <EstudioMJ
+                  renderCanto={() => (
+                    <EscuelaCanto
+                      user={user}
+                      docs={materialEnsayo}
+                      podcasts={podcasts}
+                      setSection={setSection}
+                      esVisita={esVisita(user)}
+                      isAdmin={esCuerdaAdmin(user)}
+                      onReload={loadData}
+                    />
+                  )}
+                />
+              )}
               {section === "qanda" && (
                 <QandA preguntas={preguntas} user={user} onReload={loadData} />
               )}
