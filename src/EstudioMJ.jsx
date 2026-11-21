@@ -3,6 +3,8 @@ import CursoGuitarra from "./CursoGuitarra";
 import CursoTeclado, { KEY_TECLADO } from "./CursoTeclado";
 import { NIVELES as NIVELES_GUITARRA } from "./CursoGuitarraData";
 import { NIVELES as NIVELES_TECLADO } from "./CursoTecladoData";
+import CursoUkelele, { KEY_UKELELE } from "./CursoUkelele";
+import { NIVELES as NIVELES_UKELELE } from "./CursoUkeleleData";
 
 // ═══════════════════════════════════════════════════════════════
 //  ESTUDIO MJ — todos los cursos del coro en un solo lugar
@@ -57,7 +59,7 @@ const CURSOS = [
   { id: "canto", titulo: "Canto Litúrgico", desc: "Técnica vocal, las partes de la misa y ejercicios para cantar mejor en el coro.", etiqueta: "Voz" },
   { id: "guitarra", titulo: "Guitarra", desc: "Del primer acorde al acompañamiento: diagramas, ritmos y audio.", etiqueta: "Instrumento", key: "curso_guitarra_progreso_v1", niveles: NIVELES_GUITARRA },
   { id: "teclado", titulo: "Teclado", desc: "Notas, acordes y patrones para acompañar al coro, con teclado interactivo.", etiqueta: "Instrumento", key: KEY_TECLADO, niveles: NIVELES_TECLADO, nuevo: true },
-  { id: "ukelele", titulo: "Ukelele", desc: "Acordes y rasgueos con notas Do, Re, Mi.", etiqueta: "Instrumento", pronto: true },
+  { id: "ukelele", titulo: "Ukelele", desc: "El instrumento más amable para empezar: acordes de uno o dos dedos, rasgueos y audio.", etiqueta: "Instrumento", key: KEY_UKELELE, niveles: NIVELES_UKELELE, nuevo: true },
 ];
 
 const CSS = `
@@ -111,6 +113,7 @@ export default function EstudioMJ({ renderCanto }) {
         {curso === "canto" && (renderCanto ? renderCanto() : null)}
         {curso === "guitarra" && <CursoGuitarra />}
         {curso === "teclado" && <CursoTeclado />}
+        {curso === "ukelele" && <CursoUkelele />}
       </div>
     );
   }
