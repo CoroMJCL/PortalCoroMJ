@@ -83,7 +83,7 @@ async function pendientes(hoy, soloMid) {
   const listas = rows
     .filter((r) => r.key.startsWith("pensayo_"))
     .map((r) => ({ ...(parse(r.value) || {}), id: r.key.slice("pensayo_".length) }))
-    .filter((l) => l.publicada && !l.cerrada && !l.borrada && (!l.fecha || l.fecha >= hoy));
+    .filter((l) => l.publicada && !l.cerrada && !l.borrada && (!l.hasta || l.hasta >= hoy)); // vigente hasta la última misa para la que sirve
   if (!listas.length) return { listas, pend: {} };
 
   let miembros = ((await sb("integrantes?select=id,cuerda,acceso&acceso=eq.aprobado")) || []).filter(

@@ -16999,7 +16999,7 @@ function AccesoModoMisaOffline() {
   const [sel, setSel] = useState(null);
   const datos = mjLeerPautasOffline();
   // Listas de ensayo guardadas en el teléfono (Modo Ensayo sin conexión)
-  const ensayos = mjLeerEnsayosOffline().listas.filter((l) => !l.fecha || l.fecha >= mjHoyISO());
+  const ensayos = mjLeerEnsayosOffline().listas.filter((l) => mjEnsEnFecha(l));
   if (!datos.pautas.length && !ensayos.length) return null;
   const fmt = (p) => new Date(p.fecha + "T00:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
   const unico = datos.pautas.length + ensayos.length === 1;
@@ -25141,12 +25141,12 @@ async function mjPrepararEnsayosOffline(listas) {
   if (_ensOffEnCurso || typeof navigator === "undefined" || !navigator.onLine) return;
   _ensOffEnCurso = true;
   try {
-    const hoy = mjHoyISO();
-    const vig = (listas || []).filter((l) => l && l.publicada && !l.cerrada && (!l.fecha || l.fecha >= hoy));
+    const vig = (listas || []).filter((l) => l && l.publicada && !l.cerrada && mjEnsEnFecha(l));
     const guardar = vig.map((l) => ({
       id: l.id,
       titulo: l.titulo,
       fecha: l.fecha || "",
+      hasta: l.hasta || "",
       hora: l.hora || "",
       lugar: l.lugar || "",
       notas: l.notas || "",
@@ -37043,9 +37043,14 @@ async function mjBorrarEnsayo(id) {
     await fetch(`${SUPABASE_URL}/rest/v1/config?key=eq.${encodeURIComponent(k)}`, { method: "DELETE", headers: H }).catch(() => {});
   }
 }
-// Vigente: publicada, no cerrada y (sin fecha o con fecha de hoy en adelante)
+// La lista sigue a la vista hasta el día de la última misa para la que sirve («hasta»).
+// La fecha del ensayo NO la oculta: una lista sirve para varias misas. Sin «hasta», queda hasta que se cierre.
+function mjEnsEnFecha(l) {
+  return !!(l && (!l.hasta || l.hasta >= mjHoyISO()));
+}
+// Vigente: publicada, no cerrada y sin pasar la última misa para la que sirve
 function mjEnsVigente(l) {
-  return !!(l && l.publicada && !l.cerrada && (!l.fecha || l.fecha >= mjHoyISO()));
+  return !!(l && l.publicada && !l.cerrada && mjEnsEnFecha(l));
 }
 function mjEnsPuedeVer(l, accesos, user) {
   if (esCuerdaAdmin(user)) return true;
@@ -37081,6 +37086,7 @@ function mjEnsResumenCambios(vieja, nueva) {
   const t = (v) => String(v == null ? "" : v).trim();
   if (t(vieja.titulo) !== t(nueva.titulo)) out.push(`Título: ${t(nueva.titulo)}`);
   if (t(vieja.fecha) !== t(nueva.fecha)) out.push(nueva.fecha ? `Ensayo: ${mjFechaLargaCorta(nueva.fecha)}` : "Se quitó la fecha del ensayo");
+  if (t(vieja.hasta) !== t(nueva.hasta)) out.push(nueva.hasta ? `Sirve hasta la misa del ${mjFechaLargaCorta(nueva.hasta)}` : "Sin fecha de término");
   if (t(vieja.hora) !== t(nueva.hora)) out.push(nueva.hora ? `Hora: ${t(nueva.hora)} hrs` : "Se quitó la hora del ensayo");
   if (t(vieja.lugar) !== t(nueva.lugar)) out.push(nueva.lugar ? `Lugar: ${t(nueva.lugar)}` : "Se quitó el lugar del ensayo");
   const nom = (c) => t(c.cancion).toLowerCase();
@@ -37421,7 +37427,7 @@ function PautaEnsayo({ user, members, setSection }) {
     irArriba();
   }
   function nueva() {
-    setForm({ id: mjEnsNuevoId(), titulo: "", fecha: "", hora: "", lugar: "", notas: "", canciones: [mjEnsFila()], publicada: false, cerrada: false });
+    setForm({ id: mjEnsNuevoId(), titulo: "", fecha: "", hasta: "", hora: "", lugar: "", notas: "", canciones: [mjEnsFila()], publicada: false, cerrada: false });
     setEsNueva(true);
     setModo("editar");
     setMsg("");
@@ -37468,6 +37474,7 @@ function PautaEnsayo({ user, members, setSection }) {
       id: f.id,
       titulo: f.titulo.trim(),
       fecha: f.fecha || "",
+      hasta: f.hasta || "",
       hora: f.hora || "",
       lugar: (f.lugar || "").trim(),
       notas: (f.notas || "").trim(),
@@ -37607,6 +37614,11 @@ function PautaEnsayo({ user, members, setSection }) {
             <div>
               <div className="ens-lbl">Fecha del ensayo (opcional)</div>
               <input className="ens-in" type="date" value={f.fecha} onChange={(e) => setCampo("fecha", e.target.value)} />
+            </div>
+            <div>
+              <div className="ens-lbl">Sirve hasta la misa del</div>
+              <input className="ens-in" type="date" value={f.hasta || ""} onChange={(e) => setCampo("hasta", e.target.value)} />
+              <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, lineHeight: 1.35 }}>Fecha de la última misa para la que se ensaya. La lista se ve en el inicio hasta ese día. Vacío: queda hasta que la cierres.</div>
             </div>
             <div>
               <div className="ens-lbl">Hora del ensayo</div>
@@ -37854,7 +37866,7 @@ function PautaEnsayo({ user, members, setSection }) {
   }
 
   // ── Lista de listas ──
-  const vigentes = visibles.filter((l) => (isAdmin ? !l.cerrada && (!l.fecha || l.fecha >= mjHoyISO()) : mjEnsVigente(l)));
+  const vigentes = visibles.filter((l) => (isAdmin ? !l.cerrada && mjEnsEnFecha(l) : mjEnsVigente(l)));
   const anteriores = visibles.filter((l) => !vigentes.includes(l) && (isAdmin || l.publicada));
   const fila = (l) => {
     const nuevaParaMi = !isAdmin && (() => {
