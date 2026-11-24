@@ -53484,7 +53484,7 @@ function RenovacionServicioIntegrante({ user, members, asistencia, eventosDb, li
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".22em", color: "#8a96a8", marginTop: 16 }}>ACCESO SUSPENDIDO</div>
           <div style={{ fontSize: 21, fontWeight: 800, color: "#0f1b2d", marginTop: 6, lineHeight: 1.25 }}>No respondiste la Renovación de Servicio {anioFirma}</div>
           <div style={{ fontSize: 14.5, color: "#4b5869", lineHeight: 1.55, marginTop: 10 }}>
-            El plazo para responder terminó el 30 de noviembre. Para volver a usar el portal, conversa con el <b>Encargado del Coro</b>.
+            Desde el 1 de diciembre ya no puedes acceder al portal. Se te solicitó y se te recordó muchas veces responder la Renovación de Servicio, y no respondiste a ningún llamado. Para volver a usar el portal, conversa con el <b>Encargado del Coro</b>.
           </div>
           <button onClick={onSalir} style={{ marginTop: 22, width: "100%", height: 48, border: "none", borderRadius: 14, background: "#1e3a5f", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
             Cerrar sesión
