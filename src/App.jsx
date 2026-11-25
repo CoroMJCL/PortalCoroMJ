@@ -34350,6 +34350,16 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
   const [showColLetra, setShowColLetra] = useState(true);
   const [showColAudio, setShowColAudio] = useState(false);
   const [letraFila, setLetraFila] = useState(null); // índice de la fila que elige letra del directorio
+  const [sugFilaM, setSugFilaM] = useState(null); // fila con la lista de canciones abierta
+  useEffect(() => {
+    if (sugFilaM === null) return;
+    const fuera = (e) => {
+      const caja = e.target && e.target.closest ? e.target.closest("[data-pm-sug]") : null;
+      if (!caja || caja.getAttribute("data-pm-sug") !== String(sugFilaM)) setSugFilaM(null);
+    };
+    document.addEventListener("pointerdown", fuera);
+    return () => document.removeEventListener("pointerdown", fuera);
+  }, [sugFilaM]);
   // Títulos del directorio de letras (Drive) para la lista desplegable de canciones
   const [dirLetras, setDirLetras] = useState(_letrasDriveCache || []);
   // Se vuelve a leer Drive cada vez que se abre el formulario, para ver las canciones recién agregadas.
@@ -34831,11 +34841,15 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
             <option key={o} value={o} />
           ))}
         </datalist>
-        <datalist id="pauta-dir-canciones">
-          {dirLetras.map((x) => (
-            <option key={x.id} value={x.nombre} />
-          ))}
-        </datalist>
+        <style>{`
+.pm-sug{margin-top:6px;background:#fff;border:1px solid #dbe4f0;border-radius:12px;box-shadow:0 10px 26px rgba(15,39,68,.14);max-height:280px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;min-width:220px}
+.pm-sug-cab{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px 7px 12px;background:#f6f8fb;border-bottom:1px solid #e3e9f2;font-size:11px;font-weight:700;color:#64748b}
+.pm-sug-cab button{border:1px solid #dbe4f0;background:#fff;color:#1e3a5f;border-radius:999px;height:28px;padding:0 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.pm-sug-i{display:block;width:100%;text-align:left;border:none;border-top:1px solid #f1f4f8;background:#fff;padding:10px 12px;font:inherit;font-size:13.5px;color:#0f2744;cursor:pointer;touch-action:manipulation;white-space:normal}
+.pm-sug-i:first-child{border-top:none}
+.pm-sug-i:active{background:#eef4fb}
+.pm-sug-nota{padding:10px 12px;font-size:12.5px;color:#64748b;white-space:normal}
+`}</style>
         {letraFila !== null && (
           <DirectorioLetrasModal
             initialQuery={canciones[letraFila]?.cancion || ""}
@@ -35510,13 +35524,16 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                       </select>
                     </td>
                     <td style={tdEditStyle}>
+                      <div data-pm-sug={i}>
                       <input
-                        list="pauta-dir-canciones"
                         data-tour={i === 0 ? "pf-cancion" : undefined}
                         value={c.cancion}
+                        onFocus={() => setSugFilaM(i)}
+                        onClick={() => setSugFilaM(i)}
                         onChange={(e) => {
                           const v = e.target.value;
                           updateFila(i, "cancion", v);
+                          setSugFilaM(i);
                           // Si el título coincide con uno del directorio, se carga su letra (PDF).
                           const hit = dirLetras.find(
                             (x) => normBusquedaLetra(x.nombre) === normBusquedaLetra(v)
@@ -35524,10 +35541,48 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
                           if (hit) updateFila(i, "url_letra", hit.url);
                         }}
                         placeholder="Elige del directorio o escribe el título"
-                        title="Despliega la lista con los títulos del directorio, o escribe uno distinto"
+                        title="Toca para ver la lista de cantos del directorio, o escribe uno distinto"
                         autoComplete="off"
                         style={{ ...inpTd, minWidth: 200 }}
                       />
+                      {sugFilaM === i && (() => {
+                        let q = normBusquedaLetra(c.cancion || "");
+                        // Si ya eligió un canto del directorio, al tocar de nuevo se muestra la lista completa
+                        if (q && dirLetras.some((x) => normBusquedaLetra(x.nombre) === q)) q = "";
+                        const res = q ? dirLetras.filter((x) => normBusquedaLetra(x.nombre).includes(q)) : dirLetras;
+                        return (
+                          <div className="pm-sug">
+                            {dirLetras.length > 0 && (
+                              <div className="pm-sug-cab">
+                                <span>{res.length} canto{res.length !== 1 ? "s" : ""}{q ? " encontrados" : ""}</span>
+                                <button type="button" onClick={() => setSugFilaM(null)}>Cerrar</button>
+                              </div>
+                            )}
+                            {!dirLetras.length ? (
+                              <div className="pm-sug-nota">Cargando canciones…</div>
+                            ) : !res.length ? (
+                              <div className="pm-sug-nota">No está en el directorio: se usará el nombre escrito.</div>
+                            ) : (
+                              res.map((x) => (
+                                <button
+                                  key={x.id}
+                                  type="button"
+                                  className="pm-sug-i"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    updateFila(i, "cancion", x.nombre);
+                                    updateFila(i, "url_letra", x.url);
+                                    setSugFilaM(null);
+                                  }}
+                                >
+                                  {x.nombre}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        );
+                      })()}
+                      </div>
                     </td>
                     <td style={tdEditStyle}>
                       <input
