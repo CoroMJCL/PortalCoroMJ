@@ -84,8 +84,8 @@ export default async function handler(req, res) {
     } catch (e) {}
     // Confirmaciones "Sí voy" de las convocatorias: también dan acceso a la pauta de esa fecha
     const confirmados = {};
+    const vigentes = new Set();
     try {
-      const vigentes = new Set();
       for (const c of await sb(`config?select=key,value&key=like.${encodeURIComponent("misaconv_")}*`)) {
         try {
           const v = typeof c.value === "string" ? JSON.parse(c.value) : c.value;
@@ -106,8 +106,11 @@ export default async function handler(req, res) {
     } catch (e) {}
     const puede = (p, m) => {
       const ac = acceso[p.id];
-      if (!ac || !ac.restringida || (ac.ids || []).map(String).includes(String(m.id))) return true;
-      return !!(confirmados[p.fecha] && confirmados[p.fecha].has(String(m.id)));
+      const dijoSi = !!(confirmados[p.fecha] && confirmados[p.fecha].has(String(m.id)));
+      if (ac && ac.restringida) return (ac.ids || []).map(String).includes(String(m.id)) || dijoSi;
+      // Misa con convocatoria: la pauta es solo para quienes confirmaron «Sí»
+      if (vigentes.has(p.fecha)) return dijoSi;
+      return true;
     };
 
     // Pendientes por integrante → agrupa para mandar un solo mensaje por persona

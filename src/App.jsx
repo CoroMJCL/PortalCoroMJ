@@ -280,6 +280,19 @@ async function sendPushToUsers(externalIds, title, body, url = "/", fallbackTodo
   }
 }
 
+// Aviso de pauta publicada: si la misa tiene convocatoria, solo a quienes confirmaron «Sí»; si no, a todos.
+async function mjPushPautaPublicada(pauta, titulo, texto) {
+  try {
+    const conv = await mjCargarConvocatorias();
+    if (conv && conv.conv && pauta && conv.conv[pauta.fecha]) {
+      const resp = (conv.resp && conv.resp[pauta.fecha]) || {};
+      const ids = Object.keys(resp).filter((k) => resp[k] && resp[k].r === "si");
+      return ids.length ? sendPushToUsers(ids, titulo, texto, "/") : { ok: true, recipients: 0 };
+    }
+  } catch (e) {}
+  return sendPushToAll(titulo, texto, "/");
+}
+
 // Compara dos versiones de una pauta y devuelve una lista corta de cambios legibles.
 function mjResumenCambiosPauta(vieja, nueva) {
   const out = [];
@@ -2609,7 +2622,20 @@ function AppInner() {
   const [comunidades, setComunidades] = useState([]);
   const [pautasRaw, setPautas] = useState([]);
   const [accesosPauta, setAccesosPauta] = useState({});
-  const [convData, setConvData] = useState({ conv: {}, resp: {} });
+  // Se parte con la última copia guardada en el teléfono (sirve sin internet, p. ej. en la capilla)
+  const [convData, setConvDataRaw] = useState(() => {
+    try {
+      const c = JSON.parse(localStorage.getItem("mj_conv_cache") || "null");
+      if (c && c.conv) return c;
+    } catch (e) {}
+    return { conv: {}, resp: {} };
+  });
+  const setConvData = useCallback((d) => {
+    setConvDataRaw(d);
+    try {
+      if (d && d.cargado) localStorage.setItem("mj_conv_cache", JSON.stringify(d));
+    } catch (e) {}
+  }, []);
   const recargarConv = useCallback(() => mjCargarConvocatorias().then(setConvData).catch(() => {}), []);
   // La app suele quedar abierta días: al volver a ella (y cada 2 min) se recargan confirmaciones y accesos,
   // para que quien confirmó desde el link vea la pauta sin cerrar la app.
@@ -2642,6 +2668,7 @@ function AppInner() {
   // Próxima pauta publicada que el administrador reservó y a la que este integrante NO fue incluido
   const pautaBloqueada = useMemo(() => {
     if (!user || user.cuerda === "Admin" || esVisita(user)) return null;
+    if (!(convData && convData.cargado)) return null;
     const visibles = new Set((pautas || []).map((p) => String(p.id)));
     const p = proximasPautas(pautasRaw).find((x) => !visibles.has(String(x.id))) || null;
     if (!p) return null;
@@ -16019,12 +16046,17 @@ function mjFiltrarPautasPorAcceso(pautas, accesos, user, conv) {
   if (!user || user.cuerda === "Admin") return pautas;
   // El músico ve solo las pautas que él creó
   if (esMusico(user)) return (pautas || []).filter((p) => accesos && accesos[p.id] && String(accesos[p.id].musico) === String(user.id));
+  const hoy = mjHoyISO();
   return (pautas || []).filter((p) => {
     const ac = accesos && accesos[p.id];
-    if (!ac || !ac.restringida) return true;
-    if ((ac.ids || []).map(String).includes(String(user.id))) return true;
     // Confirmó "Sí voy" en la convocatoria de esa misa → ve la pauta
-    return mjRespuestaConv(conv, p.fecha, user.id) === "si";
+    const dijoSi = mjRespuestaConv(conv, p.fecha, user.id) === "si";
+    if (ac && ac.restringida) return (ac.ids || []).map(String).includes(String(user.id)) || dijoSi;
+    // Misa con convocatoria: la pauta es solo para quienes confirmaron «Sí», aunque no se haya marcado como reservada
+    if (conv && conv.conv && conv.conv[p.fecha]) return dijoSi;
+    // Mientras no cargan las convocatorias no se muestran las pautas por venir (evita que se vean o se guarden sin conexión antes de tiempo)
+    if (!(conv && conv.cargado) && p.fecha && p.fecha >= hoy && navigator.onLine !== false) return false;
+    return true;
   });
 }
 
@@ -16072,7 +16104,7 @@ async function mjConfigPorPrefijo(prefijo) {
 }
 async function mjCargarConvocatorias() {
   const [convs, resps] = await Promise.all([mjConfigPorPrefijo(MJ_CONV), mjConfigPorPrefijo(MJ_RESP)]);
-  const out = { conv: {}, resp: {} };
+  const out = { conv: {}, resp: {}, cargado: true };
   (convs || []).forEach((x) => {
     const fecha = x.key.slice(MJ_CONV.length);
     if (x.value && !x.value.borrada) out.conv[fecha] = { ...x.value, fecha };
@@ -34517,12 +34549,12 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       } else if (publish) {
         setSelected(created);
         await notificarIntegrantes(created, members);
-        sendPushToAll(
+        mjPushPautaPublicada(
+          created,
           "📋 Nueva pauta de misa",
           `${created.titulo}${
             created.fecha ? " — " + created.fecha : ""
-          }. Revisa el repertorio en el portal.`,
-          "/"
+          }. Revisa el repertorio en el portal.`
         );
         setNotifStatus("✅ Notificación WhatsApp lista para enviar.");
       } else {
@@ -34570,11 +34602,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
       } catch (e) {}
       if (publish) {
         await notificarIntegrantes(updated, members);
-        sendPushToAll(
-          "📋 Pauta de misa publicada",
-          `${updated.titulo}${updated.fecha ? " — " + updated.fecha : ""}`,
-          "/"
-        );
+        mjPushPautaPublicada(updated, "📋 Pauta de misa publicada", `${updated.titulo}${updated.fecha ? " — " + updated.fecha : ""}`);
         setNotifStatus("✅ Pauta publicada. Notificación WhatsApp lista.");
       } else {
         setMsg("✅ Pauta actualizada.");
@@ -34635,11 +34663,7 @@ function PautaMisa({ pautas, members, user, onReload, deepPautaId }) {
         setSelected(updated);
         setMode("view");
         await notificarIntegrantes(updated, members);
-        sendPushToAll(
-          "📋 Pauta de misa publicada",
-          `${pauta.titulo}${pauta.fecha ? " — " + pauta.fecha : ""}`,
-          "/"
-        );
+        mjPushPautaPublicada(updated, "📋 Pauta de misa publicada", `${pauta.titulo}${pauta.fecha ? " — " + pauta.fecha : ""}`);
         setNotifStatus("✅ Pauta publicada. Notificación WhatsApp lista.");
       } else {
         setSelected({ ...pauta, publicada: false });
