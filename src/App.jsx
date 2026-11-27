@@ -38456,11 +38456,14 @@ function useMapaEventos(eventosDb) {
 }
 const mjClaveMisa = (fecha, grupo) => fecha + (grupo === "ensayo" ? "·ensayo" : "");
 // Agrupa los registros por misa (fecha) y persona
-function mjConsolidarAsistencia(asistencia, mapa) {
+// conFuturas: incluye registros de misas que aún no ocurren (justificados anticipados). Por defecto no cuentan en ninguna estadística.
+function mjConsolidarAsistencia(asistencia, mapa, conFuturas) {
   const misas = {};
+  const hoy = mjHoyISO();
   (asistencia || []).forEach((r) => {
     if (!r || r.evento_id == null) return;
     const ev = mapa[String(r.evento_id)];
+    if (!conFuturas && ev && ev.fecha && String(ev.fecha).slice(0, 10) > hoy) return;
     if (ev && ev.grupo === "misa" && !mjFechaCuentaAsistencia(ev.fecha)) return; // misa de semana sin «Tomar asistencia»
     const key = ev ? mjClaveMisa(ev.fecha, ev.grupo) : "id:" + r.evento_id;
     let m = misas[key];
@@ -39271,11 +39274,11 @@ function AsPasarLista({ integrantes, misas, opciones, members, onGuardado }) {
             {m.cuerda}
             {m.asistencia_especial ? " · Participante Ocasional" : ""}
             {!convocados.includes(m) ? <span style={{ color: MJ_ESTADOS.justificado.color, fontWeight: 700 }}> · {motivoNoConv(m)}</span> : null}
-            {!est && convocados.includes(m) ? " · sin marcar" : ""}
+            {!est && convocados.includes(m) && !(op && op.futura) ? " · sin marcar" : ""}
           </div>
         </div>
         <div className="as-est">
-          {["presente", "ausente", "justificado", "excluido"].map((k) => (
+          {(op && op.futura ? ["justificado", "excluido"] : ["presente", "ausente", "justificado", "excluido"]).map((k) => (
             <button key={k} onClick={() => poner(m, k)} title={MJ_ESTADOS[k].label} style={est === k ? { background: MJ_ESTADOS[k].bg, color: MJ_ESTADOS[k].color, boxShadow: "0 1px 2px rgba(15,39,68,.08)" } : null}>
               {k === "presente" ? "Presente" : k === "ausente" ? "Ausente" : k === "justificado" ? "Justif." : "N/A"}
             </button>
@@ -39297,7 +39300,7 @@ function AsPasarLista({ integrantes, misas, opciones, members, onGuardado }) {
               </div>
               <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", marginTop: 2 }}>{mjFechaCorta(x.fecha)}</div>
               <div style={{ fontSize: 11, opacity: on ? 0.85 : 0.6, marginTop: 1, maxWidth: 150, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {x.registrados ? `${x.registrados} registrados` : "Sin registros"}
+                {x.futura ? (x.registrados ? `Próxima · ${x.registrados} justif.` : "Próxima") : x.registrados ? `${x.registrados} registrados` : "Sin registros"}
               </div>
             </button>
           );
@@ -39314,23 +39317,24 @@ function AsPasarLista({ integrantes, misas, opciones, members, onGuardado }) {
               </div>
               <div style={{ fontSize: 13, color: "#6b7a90", marginTop: 3 }}>{mjCap(mjFechaLarga(op.fecha))}</div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
-                {["presente", "ausente", "justificado"].map((k) => (
+                {(op.futura ? ["justificado"] : ["presente", "ausente", "justificado"]).map((k) => (
                   <span key={k} style={{ fontSize: 12, fontWeight: 800, borderRadius: 999, padding: "5px 11px", background: MJ_ESTADOS[k].bg, color: MJ_ESTADOS[k].color }}>
                     {cuenta[k]} {MJ_ESTADOS[k].label.toLowerCase()}
                     {cuenta[k] === 1 || k === "justificado" ? "" : "s"}
                   </span>
                 ))}
-                <span style={{ fontSize: 12, fontWeight: 800, borderRadius: 999, padding: "5px 11px", background: "#f4f6f9", color: "#6b7a90" }}>{cuenta.sin} sin marcar</span>
+                {!op.futura && <span style={{ fontSize: 12, fontWeight: 800, borderRadius: 999, padding: "5px 11px", background: "#f4f6f9", color: "#6b7a90" }}>{cuenta.sin} sin marcar</span>}
               </div>
+              {op.futura && <div style={{ fontSize: 12.5, color: "#6b7a90", marginTop: 10, lineHeight: 1.45 }}>Misa próxima: por ahora solo puedes dejar marcados los justificados. Presente y Ausente se marcan el día de la misa.</div>}
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {!op.futura && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button className="as-btn sec" onClick={() => masivo("presente")} disabled={!cuenta.sin}>
                 Sin marcar → presentes
               </button>
               <button className="as-btn ghost" onClick={() => masivo("ausente")} disabled={!cuenta.sin}>
                 Sin marcar → ausentes
               </button>
-            </div>
+            </div>}
           </div>
           <div className="as-lista">{convocados.map(fila)}</div>
           {noConv.length > 0 && (
@@ -39976,6 +39980,8 @@ function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) 
   useIngresosMJ();
   const mapa = useMapaEventos(eventosDb);
   const misas = useMemo(() => mjConsolidarAsistencia(asistencia, mapa), [asistencia, mapa]);
+  // Para pasar lista: también los registros de la próxima misa (justificados anticipados)
+  const misasLista = useMemo(() => mjConsolidarAsistencia(asistencia, mapa, true), [asistencia, mapa]);
   const conFecha = misas.filter((x) => x.fecha);
   const sinFecha = misas.length - conFecha.length;
   const isAdmin = esCuerdaAdmin(user);
@@ -40011,7 +40017,12 @@ function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) 
       if (titulo && !o[key].titulo) o[key].titulo = titulo;
       if (extra) Object.assign(o[key], extra);
     };
-    conFecha.forEach((x) => add(x.fecha, x.grupo, x.titulo, { registrados: Object.keys(x.porMiembro).length }));
+    misasLista.filter((x) => x.fecha).forEach((x) => add(x.fecha, x.grupo, x.titulo, { registrados: Object.keys(x.porMiembro).length, ...(x.fecha > hoy ? { futura: true } : null) }));
+    // Próxima misa agendada: se puede abrir antes para dejar marcados los justificados
+    const proxima = [...(eventosDb || []), ..._mjGcalHistLista]
+      .filter((e) => String(e.tipo || "").toLowerCase() === "misa" && e.fecha && String(e.fecha).slice(0, 10) > hoy && mjFechaCuentaAsistencia(e.fecha))
+      .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))[0];
+    if (proxima) add(String(proxima.fecha).slice(0, 10), "misa", proxima.titulo, { futura: true });
     (pautas || []).forEach((p) => {
       if (p.publicada && p.fecha && p.fecha >= desde && p.fecha <= hoy) add(p.fecha, "misa", p.titulo, { pautaId: p.id, titulo: p.titulo || "Misa", liturgia: mjLiturgiaGuardada(p.id) });
     });
@@ -40021,7 +40032,7 @@ function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) 
       if (esMisa && e.fecha && e.fecha >= desde && e.fecha <= hoy) add(String(e.fecha).slice(0, 10), g, e.titulo);
     });
     return Object.values(o).sort((a, b) => b.fecha.localeCompare(a.fecha));
-  }, [misas, pautas, eventosDb, mapa]);
+  }, [misasLista, pautas, eventosDb, mapa]);
 
   const statsTodos = integrantes.map((m) => mjStatsAsistencia(conFecha, m.id, m.asistencia_especial, m));
   const conPct = statsTodos.filter((s) => s.pct != null && !s.especial);
@@ -40121,7 +40132,7 @@ function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) 
       )}
       {isAdmin && vista === "resumen" && <AsResumen integrantes={integrantes} misas={misas} onAbrir={setDetalle} rachaDe={desbloqueos ? rachaDe : null} />}
       {isAdmin && vista === "base" && <AsCoroBase integrantes={integrantes} misas={conFecha} />}
-      {isAdmin && vista === "lista" && <AsPasarLista integrantes={integrantes} misas={misas} opciones={opciones} members={members} onGuardado={recargar} />}
+      {isAdmin && vista === "lista" && <AsPasarLista integrantes={integrantes} misas={misasLista} opciones={opciones} members={members} onGuardado={recargar} />}
       {isAdmin && vista === "resumen" && <AsReinicio asistencia={asistencia} mapa={mapa} onReload={onReload} />}
 
       {vista === "mia" && (
