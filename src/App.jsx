@@ -27941,10 +27941,11 @@ function AdminIntegrantes({ members, onReload }) {
 
   async function toggleEspecial(m) {
     setRoleLoading(m.id);
+    const nuevo = !m.asistencia_especial;
     try {
-      await updateRecord("integrantes", m.id, {
-        asistencia_especial: !m.asistencia_especial,
-      });
+      await updateRecord("integrantes", m.id, { asistencia_especial: nuevo });
+      // Reflejarlo al tiro en el popup abierto
+      setVerIntegrante((v) => (v && v.id === m.id ? { ...v, asistencia_especial: nuevo } : v));
       onReload();
     } catch (e) {
       alert("Error: " + e.message);
@@ -28216,7 +28217,8 @@ function AdminIntegrantes({ members, onReload }) {
         {/* Popup con todos los datos del integrante */}
         {verIntegrante &&
           (() => {
-            const m = verIntegrante;
+            // Siempre los datos frescos de la lista (el popup guardaba una copia vieja)
+            const m = (members || []).find((x) => x.id === verIntegrante.id) || verIntegrante;
             const mcc = CUERDAS[m.cuerda] || C.primary;
             const editando = editId === m.id;
             const campo = (label, valor) => (
@@ -28553,10 +28555,10 @@ function AdminIntegrantes({ members, onReload }) {
                             disabled={roleLoading === m.id}
                             style={{
                               background: m.asistencia_especial
-                                ? "#ede9fe"
+                                ? "#eaf0f8"
                                 : "#f4f5f7",
-                              color: m.asistencia_especial ? "#6d28d9" : C.gray,
-                              border: "none",
+                              color: m.asistencia_especial ? "#1e3a5f" : C.gray,
+                              border: m.asistencia_especial ? "1.5px solid #1e3a5f" : "1.5px solid transparent",
                               borderRadius: 10,
                               padding: "10px 14px",
                               fontSize: 12.5,
@@ -28565,7 +28567,7 @@ function AdminIntegrantes({ members, onReload }) {
                             }}
                             title="Participa cuando puede (trabajo, estudios u otra actividad pastoral)"
                           >
-                            Participante Ocasional
+                            {roleLoading === m.id ? "Guardando…" : m.asistencia_especial ? "✓ Participante Ocasional" : "Participante Ocasional"}
                           </button>
                         </div>
                         <div
