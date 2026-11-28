@@ -520,6 +520,58 @@ async function supabase(table, options = {}) {
 setInterval(() => {
   if (_refreshToken) refreshSession();
 }, 50 * 60 * 1000);
+async function reusarCuentaHuerfana(email, password, metadata) {
+  const HA = {
+    apikey: SUPABASE_SERVICE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+    "Content-Type": "application/json",
+  };
+  const mail = (email || "").trim().toLowerCase();
+  const exRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/integrantes?select=id&email=ilike.${encodeURIComponent(mail)}`,
+    { headers: HA }
+  );
+  const existentes = exRes.ok ? await exRes.json() : [];
+  if (existentes.length)
+    throw new Error(
+      "Este correo ya tiene una cuenta en el portal. Usa «Ingresar» o «Recuperar contraseña» en vez de registrarte de nuevo."
+    );
+  let previo = null;
+  for (let page = 1; page <= 20 && !previo; page++) {
+    const r = await fetch(
+      `${SUPABASE_URL}/auth/v1/admin/users?page=${page}&per_page=200`,
+      { headers: HA }
+    );
+    if (!r.ok) break;
+    const d = await r.json();
+    const lista = d.users || [];
+    previo = lista.find((u) => (u.email || "").toLowerCase() === mail) || null;
+    if (lista.length < 200) break;
+  }
+  if (!previo)
+    throw new Error("Este correo ya está registrado. Habla con el Encargado del Coro.");
+  const upd = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${previo.id}`, {
+    method: "PUT",
+    headers: HA,
+    body: JSON.stringify({
+      password,
+      email_confirm: true,
+      ban_duration: "none",
+      user_metadata: { ...(previo.user_metadata || {}), ...metadata },
+    }),
+  });
+  if (!upd.ok) throw new Error("No se pudo recuperar la cuenta anterior de este correo.");
+  // Iniciar sesión con la nueva clave para seguir el registro normal
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: previo.email, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error_description || data.msg || "Error al registrar");
+  return data;
+}
+
 async function authSignUp(
   email,
   password,
@@ -536,9 +588,16 @@ async function authSignUp(
     headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, data: { nombre, cuerda } }),
   });
-  const data = await res.json();
-  if (!res.ok)
-    throw new Error(data.msg || data.message || "Error al registrar");
+  let data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const txt = `${data.error_code || data.code || ""} ${data.msg || data.message || ""}`.toLowerCase();
+    const yaExiste = txt.includes("already") || txt.includes("exists");
+    if (!yaExiste)
+      throw new Error(data.msg || data.message || "Error al registrar");
+    // El correo ya tiene cuenta de acceso. Si NO hay integrante con ese correo
+    // (alguien que se fue y volvió), se reutiliza la cuenta con la nueva clave.
+    data = await reusarCuentaHuerfana(email, password, { nombre, cuerda });
+  }
   if (!data.access_token)
     throw new Error(
       "Cuenta creada. Revisa tu correo para confirmarla antes de ingresar."
