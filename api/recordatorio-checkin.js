@@ -123,8 +123,9 @@ export async function programarRecordatoriosCheckin({ dry = false, soloMid = nul
     if (v && v.r) resp[r.key.slice(("misaresp_" + hoy + "_").length)] = v.r;
   }
 
-  const miembros = ((await sb("integrantes?select=id,cuerda,acceso&acceso=eq.aprobado")) || []).filter(
-    (m) => m.cuerda && m.cuerda.trim() !== "" && m.cuerda !== "Admin" && m.cuerda !== "Músico"
+  const miembros = ((await sb("integrantes?select=id,cuerda,acceso,asistencia_especial&acceso=eq.aprobado")) || []).filter(
+    // Participantes Ocasionales (★ Flexible): quedan presentes automáticamente, no hacen Check in
+    (m) => m.cuerda && m.cuerda.trim() !== "" && m.cuerda !== "Admin" && m.cuerda !== "Músico" && !m.asistencia_especial
   );
   // Misa de semana sin «Tomar asistencia»: nadie recibe el aviso y se cancela lo ya programado
   const original = pautas.find((p) => p.id === pauta.id) || pauta;

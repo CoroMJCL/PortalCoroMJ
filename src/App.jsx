@@ -16700,7 +16700,7 @@ function CheckInObligatorio({ pautas, user }) {
   const [cargando, setCargando] = useState(false);
   const [err, setErr] = useState("");
   const abierto = !!pauta && mjCheckinEstado(pauta, cfg, ahora) === "abierto";
-  const aplica = !!(pauta && user && user.id && !esVisita(user) && user.cuerda !== "Admin");
+  const aplica = !!(pauta && user && user.id && !esVisita(user) && user.cuerda !== "Admin" && !user.asistencia_especial); // Ocasionales: sin Check in
   const lk = aplica ? `mj_checkin_${pauta.id}_${user.id}` : "";
   useEffect(() => {
     if (!aplica) return;
@@ -16879,6 +16879,7 @@ function CheckInPauta({ pauta: pautaBase, pautas, user }) {
     return () => window.removeEventListener("mj-checkin", g);
   }, [pauta.id, user && user.id]);
   if (!user || esVisita(user) || !user.id) return null;
+  if (user.asistencia_especial) return null; // Participante Ocasional: presente automático, sin Check in
   if (!tomaAsistencia(pautaBase)) return null; // misa de semana sin asistencia: no hay Check in
   const est = mjCheckinEstado(pauta, cfg);
   const esHoy = est === "abierto";
