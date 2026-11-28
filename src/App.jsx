@@ -16410,7 +16410,7 @@ function ResumenAsistenciaModal({ user, onCerrar, pendiente }) {
     mjResumenAsistencia(user).then(setR).catch(() => setR(null));
   }, []);
   const pct = r ? r.pct : null;
-  const nivel = pct === null ? null : pct >= 75 ? { t: "BUENA", c: "#15803d", bg: "#dcfce7", e: "🌟", m: "¡Vas muy bien! Gracias por tu compromiso con el coro. Sigue así." } : pct >= 50 ? { t: "REGULAR", c: "#b45309", bg: "#fef3c7", e: "🙂", m: "Puedes mejorar. Cada ensayo y misa cuenta: ¡te necesitamos!" } : { t: "BAJA", c: "#b91c1c", bg: "#fee2e2", e: "⚠️", m: "Tu asistencia necesita atención. Haz el esfuerzo por venir, el coro te necesita." };
+  const nivel = pct === null || (r && r.especial) ? null : pct >= 75 ? { t: "BUENA", c: "#15803d", bg: "#dcfce7", e: "🌟", m: "¡Vas muy bien! Gracias por tu compromiso con el coro. Sigue así." } : pct >= 50 ? { t: "REGULAR", c: "#b45309", bg: "#fef3c7", e: "🙂", m: "Puedes mejorar. Cada ensayo y misa cuenta: ¡te necesitamos!" } : { t: "BAJA", c: "#b91c1c", bg: "#fee2e2", e: "⚠️", m: "Tu asistencia necesita atención. Haz el esfuerzo por venir, el coro te necesita." };
   return createPortal(
     <div style={{ position: "fixed", inset: 0, zIndex: 6500, background: "rgba(15,27,45,.62)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, fontFamily: "var(--font-sans, Inter, system-ui, -apple-system, Segoe UI, sans-serif)" }}>
       <div style={{ background: "#fff", borderRadius: 26, padding: "26px 22px 20px", maxWidth: 380, width: "100%", textAlign: "center", boxShadow: "0 28px 70px rgba(15,27,45,.4)" }}>
@@ -16435,7 +16435,9 @@ function ResumenAsistenciaModal({ user, onCerrar, pendiente }) {
         )}
         {r && r.especial && (
           <div style={{ background: "#eef3f9", borderRadius: 18, padding: "16px 14px", marginBottom: 14 }}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "#1e3a5f" }}>Participante Ocasional</div>
+            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "#1e3a5f" }}>Tu asistencia</div>
+            <div style={{ fontSize: 46, fontWeight: 800, color: "#1e3a5f", lineHeight: 1.1, margin: "4px 0" }}>100%</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#6b7a90" }}><span style={{ color: "#c9a227" }}>★</span> Asistencia flexible</div>
             <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.45, marginTop: 6 }}>Gracias por darte el tiempo de venir a servir con el coro.</div>
           </div>
         )}
@@ -19191,8 +19193,9 @@ function Dashboard({
                     </span>
                   )}
                   <span style={{ fontSize: 11, fontWeight: 600, color: "#475569" }}>
-                    {stDash.especial ? "Participante Ocasional" : pctAsistencia !== null ? `Asistencia ${pctAsistencia}%` : "Sin registros aún"}
-                    {pctAsistencia !== null && tieneEstrella && (
+                    {pctAsistencia !== null ? `Asistencia ${pctAsistencia}%` : "Sin registros aún"}
+                    {stDash.especial && <span style={{ marginLeft: 5, fontSize: 11, fontWeight: 700, color: "#6b7a90", whiteSpace: "nowrap" }}><span style={{ color: "#c9a227" }}>★</span> Flexible</span>}
+                    {pctAsistencia !== null && tieneEstrella && !stDash.especial && (
                       <span title="¡Sin ausencias este año!" style={{ marginLeft: 5 }}>⭐</span>
                     )}
                   </span>
@@ -38748,7 +38751,7 @@ function mjStatsAsistencia(misasTodas, memberId, especial, miembro) {
     else if (r.estado === "excluido") x++;
     else if (r.estado === "nuevo") n++;
   });
-  if (especial) return { presentes: (misas || []).filter((m) => m.fecha).length, ausentes: 0, justificados: j, excluidos: x, nuevos: n, evaluados: p + a, pct: null, especial: true };
+  if (especial) return { presentes: (misas || []).filter((m) => m.fecha).length, ausentes: 0, justificados: j, excluidos: x, nuevos: n, evaluados: p + a, pct: 100, especial: true };
   return { presentes: p, ausentes: a, justificados: j, excluidos: x, nuevos: n, evaluados: p + a, pct: p + a ? Math.round((p / (p + a)) * 100) : null };
 }
 const mjColorPct = (pct) => (pct == null ? "#94a3b8" : pct >= 75 ? "#1e4f8f" : pct >= 50 ? "#c98a12" : "#d0473b");
@@ -38936,18 +38939,19 @@ function AsAnillo({ pct, size = 92, ocasional }) {
       </svg>
       <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
         <span style={{ fontSize: size * 0.24, fontWeight: 800, color: pct == null ? "#94a3b8" : "#0f1b2d", letterSpacing: "-0.03em" }}>{pct == null ? "—" : pct + "%"}</span>
-        {ocasional && <span style={{ fontSize: Math.max(8.5, size * 0.1), fontWeight: 700, color: "#6b7a90", marginTop: 1 }}>Ocasional</span>}
+        {ocasional && <span style={{ fontSize: Math.max(8.5, size * 0.1), fontWeight: 700, color: "#6b7a90", marginTop: 1 }}><span style={{ color: "#c9a227" }}>★</span> Flexible</span>}
       </div>
     </div>
   );
 }
-function AsBarra({ pct }) {
+function AsBarra({ pct, flex }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
       <span style={{ fontWeight: 800, fontSize: 14, minWidth: 40, color: pct == null ? "#94a3b8" : "#0f1b2d" }}>{pct == null ? "—" : pct + "%"}</span>
       <span className="as-bar">
         <i style={{ width: (pct || 0) + "%", background: mjColorPct(pct) }} />
       </span>
+      {flex && <span style={{ marginLeft: 5, fontSize: 11, fontWeight: 700, color: "#6b7a90", whiteSpace: "nowrap" }}><span style={{ color: "#c9a227" }}>★</span> Flexible</span>}
     </div>
   );
 }
@@ -39006,7 +39010,7 @@ function AsDetalleIntegrante({ m, misas, esAdmin, onCerrar, onGuardado, members,
           <div className="as-card" style={{ padding: 16, display: "flex", alignItems: "center", gap: 16, marginBottom: 14 }}>
             <AsAnillo pct={st.pct} size={84} ocasional={st.especial} />
             {st.especial ? (
-              <div style={{ flex: 1, fontSize: 13.5, color: "#5b6779", lineHeight: 1.45 }}>Participante Ocasional: no registra asistencia.</div>
+              <div style={{ flex: 1, fontSize: 13.5, color: "#5b6779", lineHeight: 1.45 }}>Participante Ocasional: asistencia flexible, siempre 100%.</div>
             ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, flex: 1 }}>
               {[
@@ -39170,7 +39174,7 @@ function AsResumen({ integrantes, misas, onAbrir, rachaDe }) {
                   </div>
                 </td>
                 <td>
-                  <AsBarra pct={st.pct} />
+                  <AsBarra pct={st.pct} flex={st.especial} />
                 </td>
                 {/* Participante Ocasional: no registra asistencia, sin estadísticas */}
                 <td style={{ textAlign: "center", fontWeight: 800, color: st.especial ? "#c2cad6" : MJ_ESTADOS.presente.color }}>{st.especial ? "" : st.presentes}</td>
@@ -39200,7 +39204,7 @@ function AsResumen({ integrantes, misas, onAbrir, rachaDe }) {
                   {m.cuerda}{st.especial ? " · Participante Ocasional" : ` · ${st.presentes} P · ${st.ausentes} A · ${st.justificados} J`}
                 </div>
               </div>
-              <span style={{ fontSize: 17, fontWeight: 800, color: mjColorPct(st.pct) }}>{st.pct == null ? "—" : st.pct + "%"}</span>
+              <span style={{ fontSize: 17, fontWeight: 800, color: mjColorPct(st.pct), whiteSpace: "nowrap" }}>{st.pct == null ? "—" : st.pct + "%"}{st.especial && <span style={{ marginLeft: 5, fontSize: 11, fontWeight: 700, color: "#6b7a90", whiteSpace: "nowrap" }}><span style={{ color: "#c9a227" }}>★</span> Flexible</span>}</span>
             </div>
             <div style={{ display: "flex", gap: 5, marginTop: 9, marginLeft: 49, flexWrap: "wrap" }}>
               {columnas.slice(0, 8).map((x) => (
@@ -40158,7 +40162,7 @@ function Asistencia({ asistencia, members, eventosDb, pautas, user, onReload }) 
   // Vista personal
   const yo = (members || []).find((m) => String(m.id) === String(user?.id)) || user || {};
   const mio = mjStatsAsistencia(conFecha, user?.id, yo.asistencia_especial, yo);
-  const msgPct = mio.especial ? "Participante Ocasional: gracias por servir cuando puedes." : mio.pct == null ? "Aún no hay misas registradas para ti." : mio.pct >= 75 ? "Vas muy bien, sigue así." : mio.pct >= 50 ? "Puedes mejorar tu asistencia." : "Tu asistencia necesita atención.";
+  const msgPct = mio.especial ? "Asistencia flexible (★): gracias por servir cuando puedes." : mio.pct == null ? "Aún no hay misas registradas para ti." : mio.pct >= 75 ? "Vas muy bien, sigue así." : mio.pct >= 50 ? "Puedes mejorar tu asistencia." : "Tu asistencia necesita atención.";
 
   return (
     <div className="as-wrap">
@@ -46960,7 +46964,7 @@ function ListaPublicaAsistencia() {
             <div style={{ fontSize: 14.5, fontWeight: 800, color: "#475569" }}>Participantes Ocasionales</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: "#475569" }}>{ocasionales.length}</div>
           </div>
-          {ocasionales.map((x) => fila(x, <span style={{ fontSize: 12, color: "#8a96a8", fontWeight: 600 }}>Participante Ocasional</span>))}
+          {ocasionales.map((x) => fila(x, <span style={{ fontSize: 17, fontWeight: 800, color: mjColorPct(100), whiteSpace: "nowrap" }}>100%<span style={{ marginLeft: 5, fontSize: 11, fontWeight: 700, color: "#6b7a90", whiteSpace: "nowrap" }}><span style={{ color: "#c9a227" }}>★</span> Flexible</span></span>))}
         </div>
       )}
       <div style={{ textAlign: "center", fontSize: 11.5, color: "#8a96a8", marginTop: 14 }}>Actualizado a las {estado.en.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}</div>
@@ -53941,8 +53945,9 @@ function AdminRenovaciones({ members, asistencia, eventosDb }) {
       <button type="button" onClick={onNombre} disabled={!onNombre} style={{ flex: "1 1 180px", minWidth: 0, textAlign: "left", background: "none", border: "none", padding: 0, fontFamily: "inherit", cursor: onNombre ? "pointer" : "default" }}>
         <div style={{ fontSize: 14.5, fontWeight: 700, color: "#0f1b2d" }}>{it.m.nombre}</div>
         <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-          {it.r && it.r.en ? rsFmt(it.r.en) : it.pct != null ? `Asistencia ${it.pct}%` : it.m.asistencia_especial ? "Participante Ocasional" : "Sin respuesta"}
+          {it.r && it.r.en ? rsFmt(it.r.en) : it.pct != null ? `Asistencia ${it.pct}%` : it.m.asistencia_especial ? "Asistencia 100% ★ Flexible" : "Sin respuesta"}
           {it.r && it.r.en && it.pct != null ? ` · Asistencia ${it.pct}%` : ""}
+          {it.r && it.r.en && it.m.asistencia_especial ? " · Asistencia 100% ★ Flexible" : ""}
         </div>
       </button>
       {children}
