@@ -27722,37 +27722,92 @@ function AdminIntegrantes({ members, onReload }) {
     }
     setSaving(true);
     try {
+      const email = form.email.trim().toLowerCase();
+      const HA = {
+        apikey: SUPABASE_SERVICE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+        "Content-Type": "application/json",
+      };
+      const metadata = {
+        nombre: formatoNombre(form.nombre),
+        cuerda: form.cuerda,
+      };
+
+      // 0. ¿Ya hay un integrante con ese correo en la tabla?
+      const exRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/integrantes?select=id,nombre,activo&email=ilike.${encodeURIComponent(email)}`,
+        { headers: HA }
+      );
+      const existentes = exRes.ok ? await exRes.json() : [];
+      if (existentes.length) {
+        const ex = existentes[0];
+        alert(
+          ex.activo === false
+            ? `${ex.nombre} ya está en el portal pero dado de baja. Reactívalo desde Cuentas (botón Reactivar) en vez de crearlo de nuevo.`
+            : `Ya existe un integrante con ese correo: ${ex.nombre}.`
+        );
+        setSaving(false);
+        return;
+      }
+
       // 1. Crear usuario en Supabase Auth con service_role
       const authRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
         method: "POST",
-        headers: {
-          apikey: SUPABASE_SERVICE_KEY,
-          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-          "Content-Type": "application/json",
-        },
+        headers: HA,
         body: JSON.stringify({
-          email: form.email,
+          email,
           password: form.password,
           email_confirm: true,
-          user_metadata: {
-            nombre: formatoNombre(form.nombre),
-            cuerda: form.cuerda,
-          },
+          user_metadata: metadata,
         }),
       });
-      const authData = await authRes.json();
-      if (!authRes.ok)
-        throw new Error(
-          authData.msg || authData.message || "Error al crear cuenta Auth"
-        );
-      const auth_id = authData.id;
+      const authData = await authRes.json().catch(() => ({}));
+      let auth_id = authData.id;
+      if (!authRes.ok) {
+        const txt = `${authData.error_code || authData.code || ""} ${authData.msg || authData.message || ""}`.toLowerCase();
+        const yaExiste = authRes.status === 422 || txt.includes("exists") || txt.includes("already");
+        if (!yaExiste)
+          throw new Error(authData.msg || authData.message || "Error al crear cuenta Auth");
+
+        // 1b. El correo ya tiene cuenta de acceso (integrante que se fue y volvió):
+        //     buscarla y reutilizarla con la nueva contraseña, quitando la baja.
+        let previo = null;
+        for (let page = 1; page <= 20 && !previo; page++) {
+          const r = await fetch(
+            `${SUPABASE_URL}/auth/v1/admin/users?page=${page}&per_page=200`,
+            { headers: HA }
+          );
+          if (!r.ok) break;
+          const d = await r.json();
+          const lista = d.users || [];
+          previo = lista.find((u) => (u.email || "").toLowerCase() === email) || null;
+          if (lista.length < 200) break;
+        }
+        if (!previo)
+          throw new Error("El correo ya tiene una cuenta, pero no se pudo encontrar para reutilizarla.");
+        const upd = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${previo.id}`, {
+          method: "PUT",
+          headers: HA,
+          body: JSON.stringify({
+            password: form.password,
+            email_confirm: true,
+            ban_duration: "none",
+            user_metadata: { ...(previo.user_metadata || {}), ...metadata },
+          }),
+        });
+        if (!upd.ok) {
+          const d = await upd.json().catch(() => ({}));
+          throw new Error(d.msg || d.message || "No se pudo reactivar la cuenta existente");
+        }
+        auth_id = previo.id;
+      }
 
       // 2. Insertar en tabla integrantes con auth_id
       await supabase("integrantes", {
         method: "POST",
         body: {
           nombre: formatoNombre(form.nombre),
-          email: form.email,
+          email,
           cuerda: form.cuerda,
           cargo: form.cargo,
           cumpleanos: form.cumpleanos,
